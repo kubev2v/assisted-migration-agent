@@ -27,13 +27,12 @@ type Server struct {
 
 func NewServer(cfg *config.Configuration, registerHandlerFn func(router *gin.RouterGroup)) (*Server, error) {
 	gin.SetMode(gin.DebugMode)
-	if cfg.Server.Mode == ProductionServer {
+	if cfg.Server.ServerMode == ProductionServer {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	engine := gin.New()
 
-	if cfg.Server.Mode == ProductionServer {
-		// Serve static files from ui/dist directory (for frontend)
+	if cfg.Server.ServerMode == ProductionServer {
 		engine.Static("/static", cfg.Server.StaticsFolder)
 		engine.StaticFile("/", path.Join(cfg.Server.StaticsFolder, "index.html"))
 		engine.StaticFile("/favicon.ico", path.Join(cfg.Server.StaticsFolder, "favicon.ico"))
@@ -51,14 +50,6 @@ func NewServer(cfg *config.Configuration, registerHandlerFn func(router *gin.Rou
 
 	router := engine.Group(apiV1)
 
-	// if cfg.Auth.Enabled {
-	// 	authenticator, err := auth.NewAuthenticator(cfg.Authentication.WellknownURL)
-	// 	if err != nil {
-	// 		return nil, fmt.Errorf("failed to create authenticator: %w", err)
-	// 	}
-	//
-	// 	router.Use(authenticator.Middleware())
-	// }
 	router.Use(
 		middlewares.Logger(),
 		ginzap.RecoveryWithZap(zap.S().Desugar(), true),

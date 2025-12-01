@@ -26,6 +26,7 @@ import (
 	"github.com/tupyy/assisted-migration-agent/internal/models"
 	"github.com/tupyy/assisted-migration-agent/internal/server"
 	"github.com/tupyy/assisted-migration-agent/internal/services"
+	"github.com/tupyy/assisted-migration-agent/pkg/console"
 	"github.com/tupyy/assisted-migration-agent/pkg/scheduler"
 )
 
@@ -46,7 +47,11 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 				return err
 			}
 
-			zap.S().Info("using configuration", "config", helpers.Flatten(cfg.DebugMap()))
+			zap.S().Infow("using configuration",
+				"agent", helpers.Flatten(cfg.Agent.DebugMap()),
+				"server", helpers.Flatten(cfg.Server.DebugMap()),
+				"console", helpers.Flatten(cfg.Console.DebugMap()),
+			)
 
 			ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGQUIT)
 			wg := sync.WaitGroup{}
@@ -56,12 +61,15 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 			sched := scheduler.NewScheduler(cfg.Agent.NumWorkers)
 			defer sched.Close()
 
+			// init console client
+			consoleClient := console.NewConsoleClient(cfg.Console.URL)
+
 			// init services
 			var consoleSrv *services.Console
 			if models.AgentMode(cfg.Agent.Mode) == models.AgentModeConnected {
-				consoleSrv = services.NewConnectedConsoleService(sched, cfg.Console.URL, cfg.Console.UpdateInterval)
+				consoleSrv = services.NewConnectedConsoleService(cfg.Agent, sched, consoleClient)
 			} else {
-				consoleSrv = services.NewConsoleService(sched, cfg.Console.URL, cfg.Console.UpdateInterval)
+				consoleSrv = services.NewConsoleService(cfg.Agent, sched, consoleClient)
 			}
 			collectorSrv := services.NewCollectorService(sched)
 
@@ -143,13 +151,13 @@ func validateConfiguration(cfg *config.Configuration) error {
 		return fmt.Errorf("invalid mode %q: must be %q or %q", cfg.Agent.Mode, models.AgentModeConnected, models.AgentModeDisconnected)
 	}
 
-	switch config.ServerModeType(cfg.Server.Mode) {
+	switch config.ServerModeType(cfg.Server.ServerMode) {
 	case config.ServerModeProd, config.ServerModeDev:
 	default:
-		return fmt.Errorf("invalid server mode %q: must be %q or %q", cfg.Server.Mode, config.ServerModeProd, config.ServerModeDev)
+		return fmt.Errorf("invalid server mode %q: must be %q or %q", cfg.Server.ServerMode, config.ServerModeProd, config.ServerModeDev)
 	}
 
-	if config.ServerModeType(cfg.Server.Mode) == config.ServerModeProd && cfg.Server.StaticsFolder == "" {
+	if config.ServerModeType(cfg.Server.ServerMode) == config.ServerModeProd && cfg.Server.StaticsFolder == "" {
 		return errors.New("statics folder must be set when server mode is production")
 	}
 
@@ -181,7 +189,7 @@ func validateUUID(value, name string) error {
 func registerServerFlags(flagSet *pflag.FlagSet, config *config.Configuration) {
 	flagSet.IntVar(&config.Server.HTTPPort, "server-http-port", config.Server.HTTPPort, "Port on which the HTTP server is listening")
 	flagSet.StringVar(&config.Server.StaticsFolder, "server-statics-folder", config.Server.StaticsFolder, "Path to statics folder")
-	flagSet.StringVar(&config.Server.Mode, "server-mode", config.Server.Mode, "Server mode: either prod or dev. If prod the statics folder must be set")
+	flagSet.StringVar(&config.Server.ServerMode, "server-mode", config.Server.ServerMode, "Server mode: either prod or dev. If prod the statics folder must be set")
 }
 
 func registerAuthenticationFlags(flagSet *pflag.FlagSet, config *config.Configuration) {
@@ -200,5 +208,5 @@ func registerAgentFlags(flagSet *pflag.FlagSet, config *config.Configuration) {
 
 func registerConsoleFlags(flagSet *pflag.FlagSet, config *config.Configuration) {
 	flagSet.StringVar(&config.Console.URL, "console-url", config.Console.URL, "URL of console.redhat.com")
-	flagSet.DurationVar(&config.Console.UpdateInterval, "console-update-interval", config.Console.UpdateInterval, "Interval for console status updates")
+	flagSet.DurationVar(&config.Agent.UpdateInterval, "console-update-interval", config.Agent.UpdateInterval, "Interval for console status updates")
 }

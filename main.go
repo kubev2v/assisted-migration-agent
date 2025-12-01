@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
@@ -25,11 +26,16 @@ func main() {
 	// default configuration
 	cfg := config.NewConfigurationWithOptionsAndDefaults(
 		config.WithServer(config.Server{
-			HTTPPort: 8080,
-			Mode:     "dev",
+			HTTPPort:   8080,
+			ServerMode: "dev",
 		}),
 		config.WithAgent(config.Agent{
 			ID: uuid.NewString(),
+		}),
+		config.WithAgent(config.Agent{
+			NumWorkers:     3,
+			Mode:           "disconnected",
+			UpdateInterval: 5 * time.Second,
 		}),
 		config.WithAuth(config.Authentication{Enabled: false}),
 		config.WithLogFormat("console"),

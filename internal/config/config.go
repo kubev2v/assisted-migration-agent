@@ -9,7 +9,7 @@ const (
 	ServerModeDev  ServerModeType = "dev"
 )
 
-//go:generate go run github.com/ecordell/optgen -output zz_generated.configuration.go . Configuration
+//go:generate go run github.com/ecordell/optgen -output zz_generated.configuration.go . Configuration Server Agent Console Authentication
 type Configuration struct {
 	Server  Server         `debugmap:"visible"`
 	Agent   Agent          `debugmap:"visible"`
@@ -22,23 +22,23 @@ type Configuration struct {
 }
 
 type Server struct {
-	Mode          string `debugmap:"visible" default:"dev"`
+	ServerMode    string `debugmap:"visible" default:"dev"`
 	HTTPPort      int    `debugmap:"visible" default:"8080"`
 	StaticsFolder string `debugmap:"visible"`
 }
 
 type Agent struct {
-	Mode              string `debugmap:"visible" default:"disconnected"`
-	ID                string `debugmap:"visible"`
-	SourceID          string `debugmap:"visible"`
-	NumWorkers        int    `debugmap:"visible" default:"3"`
-	DataFolder        string `debugmap:"visible"`
-	OpaPoliciesFolder string `debugmap:"visible"`
+	Mode              string        `debugmap:"visible" default:"disconnected"`
+	ID                string        `debugmap:"visible"`
+	SourceID          string        `debugmap:"visible"`
+	NumWorkers        int           `debugmap:"visible" default:"3"`
+	DataFolder        string        `debugmap:"visible"`
+	OpaPoliciesFolder string        `debugmap:"visible"`
+	UpdateInterval    time.Duration `debugmap:"visible" default:"5s"`
 }
 
 type Console struct {
-	URL            string        `debugmap:"visible" default:"localhost:7443"`
-	UpdateInterval time.Duration `debugmap:"visible" default:"5s"`
+	URL string `debugmap:"visible" default:"http://localhost:7443"`
 }
 
 type Authentication struct {

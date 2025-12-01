@@ -25,12 +25,12 @@ const (
 
 // Defines values for CollectorStatusStatus.
 const (
-	CollectorStatusStatusConnected           CollectorStatusStatus = "connected"
-	CollectorStatusStatusConnecting          CollectorStatusStatus = "connecting"
-	CollectorStatusStatusError               CollectorStatusStatus = "error"
-	CollectorStatusStatusIdle                CollectorStatusStatus = "idle"
-	CollectorStatusStatusInventoryCollected  CollectorStatusStatus = "inventory_collected"
-	CollectorStatusStatusInventoryCollecting CollectorStatusStatus = "inventory_collecting"
+	CollectorStatusStatusCollected  CollectorStatusStatus = "collected"
+	CollectorStatusStatusCollecting CollectorStatusStatus = "collecting"
+	CollectorStatusStatusConnected  CollectorStatusStatus = "connected"
+	CollectorStatusStatusConnecting CollectorStatusStatus = "connecting"
+	CollectorStatusStatusError      CollectorStatusStatus = "error"
+	CollectorStatusStatusIdle       CollectorStatusStatus = "idle"
 )
 
 // AgentModeRequest defines model for AgentModeRequest.

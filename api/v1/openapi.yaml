@@ -129,8 +129,8 @@ components:
             - idle
             - connecting
             - connected
-            - inventory_collecting
-            - inventory_collected
+            - collecting
+            - collected
             - error
         error:
           type: string

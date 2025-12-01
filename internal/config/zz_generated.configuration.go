@@ -4,6 +4,7 @@ package config
 import (
 	defaults "github.com/creasty/defaults"
 	helpers "github.com/ecordell/optgen/helpers"
+	"time"
 )
 
 type ConfigurationOption func(c *Configuration)
@@ -106,5 +107,318 @@ func WithLogFormat(logFormat string) ConfigurationOption {
 func WithLogLevel(logLevel string) ConfigurationOption {
 	return func(c *Configuration) {
 		c.LogLevel = logLevel
+	}
+}
+
+type ServerOption func(s *Server)
+
+// NewServerWithOptions creates a new Server with the passed in options set
+func NewServerWithOptions(opts ...ServerOption) *Server {
+	s := &Server{}
+	for _, o := range opts {
+		o(s)
+	}
+	return s
+}
+
+// NewServerWithOptionsAndDefaults creates a new Server with the passed in options set starting from the defaults
+func NewServerWithOptionsAndDefaults(opts ...ServerOption) *Server {
+	s := &Server{}
+	defaults.MustSet(s)
+	for _, o := range opts {
+		o(s)
+	}
+	return s
+}
+
+// ToOption returns a new ServerOption that sets the values from the passed in Server
+func (s *Server) ToOption() ServerOption {
+	return func(to *Server) {
+		to.ServerMode = s.ServerMode
+		to.HTTPPort = s.HTTPPort
+		to.StaticsFolder = s.StaticsFolder
+	}
+}
+
+// DebugMap returns a map form of Server for debugging
+func (s *Server) DebugMap() map[string]any {
+	debugMap := map[string]any{}
+	debugMap["ServerMode"] = helpers.DebugValue(s.ServerMode, false)
+	debugMap["HTTPPort"] = helpers.DebugValue(s.HTTPPort, false)
+	debugMap["StaticsFolder"] = helpers.DebugValue(s.StaticsFolder, false)
+	return debugMap
+}
+
+// ServerWithOptions configures an existing Server with the passed in options set
+func ServerWithOptions(s *Server, opts ...ServerOption) *Server {
+	for _, o := range opts {
+		o(s)
+	}
+	return s
+}
+
+// WithOptions configures the receiver Server with the passed in options set
+func (s *Server) WithOptions(opts ...ServerOption) *Server {
+	for _, o := range opts {
+		o(s)
+	}
+	return s
+}
+
+// WithServerMode returns an option that can set ServerMode on a Server
+func WithServerMode(serverMode string) ServerOption {
+	return func(s *Server) {
+		s.ServerMode = serverMode
+	}
+}
+
+// WithHTTPPort returns an option that can set HTTPPort on a Server
+func WithHTTPPort(hTTPPort int) ServerOption {
+	return func(s *Server) {
+		s.HTTPPort = hTTPPort
+	}
+}
+
+// WithStaticsFolder returns an option that can set StaticsFolder on a Server
+func WithStaticsFolder(staticsFolder string) ServerOption {
+	return func(s *Server) {
+		s.StaticsFolder = staticsFolder
+	}
+}
+
+type AgentOption func(a *Agent)
+
+// NewAgentWithOptions creates a new Agent with the passed in options set
+func NewAgentWithOptions(opts ...AgentOption) *Agent {
+	a := &Agent{}
+	for _, o := range opts {
+		o(a)
+	}
+	return a
+}
+
+// NewAgentWithOptionsAndDefaults creates a new Agent with the passed in options set starting from the defaults
+func NewAgentWithOptionsAndDefaults(opts ...AgentOption) *Agent {
+	a := &Agent{}
+	defaults.MustSet(a)
+	for _, o := range opts {
+		o(a)
+	}
+	return a
+}
+
+// ToOption returns a new AgentOption that sets the values from the passed in Agent
+func (a *Agent) ToOption() AgentOption {
+	return func(to *Agent) {
+		to.Mode = a.Mode
+		to.ID = a.ID
+		to.SourceID = a.SourceID
+		to.NumWorkers = a.NumWorkers
+		to.DataFolder = a.DataFolder
+		to.OpaPoliciesFolder = a.OpaPoliciesFolder
+		to.UpdateInterval = a.UpdateInterval
+	}
+}
+
+// DebugMap returns a map form of Agent for debugging
+func (a *Agent) DebugMap() map[string]any {
+	debugMap := map[string]any{}
+	debugMap["Mode"] = helpers.DebugValue(a.Mode, false)
+	debugMap["ID"] = helpers.DebugValue(a.ID, false)
+	debugMap["SourceID"] = helpers.DebugValue(a.SourceID, false)
+	debugMap["NumWorkers"] = helpers.DebugValue(a.NumWorkers, false)
+	debugMap["DataFolder"] = helpers.DebugValue(a.DataFolder, false)
+	debugMap["OpaPoliciesFolder"] = helpers.DebugValue(a.OpaPoliciesFolder, false)
+	debugMap["UpdateInterval"] = helpers.DebugValue(a.UpdateInterval, false)
+	return debugMap
+}
+
+// AgentWithOptions configures an existing Agent with the passed in options set
+func AgentWithOptions(a *Agent, opts ...AgentOption) *Agent {
+	for _, o := range opts {
+		o(a)
+	}
+	return a
+}
+
+// WithOptions configures the receiver Agent with the passed in options set
+func (a *Agent) WithOptions(opts ...AgentOption) *Agent {
+	for _, o := range opts {
+		o(a)
+	}
+	return a
+}
+
+// WithMode returns an option that can set Mode on a Agent
+func WithMode(mode string) AgentOption {
+	return func(a *Agent) {
+		a.Mode = mode
+	}
+}
+
+// WithID returns an option that can set ID on a Agent
+func WithID(iD string) AgentOption {
+	return func(a *Agent) {
+		a.ID = iD
+	}
+}
+
+// WithSourceID returns an option that can set SourceID on a Agent
+func WithSourceID(sourceID string) AgentOption {
+	return func(a *Agent) {
+		a.SourceID = sourceID
+	}
+}
+
+// WithNumWorkers returns an option that can set NumWorkers on a Agent
+func WithNumWorkers(numWorkers int) AgentOption {
+	return func(a *Agent) {
+		a.NumWorkers = numWorkers
+	}
+}
+
+// WithDataFolder returns an option that can set DataFolder on a Agent
+func WithDataFolder(dataFolder string) AgentOption {
+	return func(a *Agent) {
+		a.DataFolder = dataFolder
+	}
+}
+
+// WithOpaPoliciesFolder returns an option that can set OpaPoliciesFolder on a Agent
+func WithOpaPoliciesFolder(opaPoliciesFolder string) AgentOption {
+	return func(a *Agent) {
+		a.OpaPoliciesFolder = opaPoliciesFolder
+	}
+}
+
+// WithUpdateInterval returns an option that can set UpdateInterval on a Agent
+func WithUpdateInterval(updateInterval time.Duration) AgentOption {
+	return func(a *Agent) {
+		a.UpdateInterval = updateInterval
+	}
+}
+
+type ConsoleOption func(c *Console)
+
+// NewConsoleWithOptions creates a new Console with the passed in options set
+func NewConsoleWithOptions(opts ...ConsoleOption) *Console {
+	c := &Console{}
+	for _, o := range opts {
+		o(c)
+	}
+	return c
+}
+
+// NewConsoleWithOptionsAndDefaults creates a new Console with the passed in options set starting from the defaults
+func NewConsoleWithOptionsAndDefaults(opts ...ConsoleOption) *Console {
+	c := &Console{}
+	defaults.MustSet(c)
+	for _, o := range opts {
+		o(c)
+	}
+	return c
+}
+
+// ToOption returns a new ConsoleOption that sets the values from the passed in Console
+func (c *Console) ToOption() ConsoleOption {
+	return func(to *Console) {
+		to.URL = c.URL
+	}
+}
+
+// DebugMap returns a map form of Console for debugging
+func (c *Console) DebugMap() map[string]any {
+	debugMap := map[string]any{}
+	debugMap["URL"] = helpers.DebugValue(c.URL, false)
+	return debugMap
+}
+
+// ConsoleWithOptions configures an existing Console with the passed in options set
+func ConsoleWithOptions(c *Console, opts ...ConsoleOption) *Console {
+	for _, o := range opts {
+		o(c)
+	}
+	return c
+}
+
+// WithOptions configures the receiver Console with the passed in options set
+func (c *Console) WithOptions(opts ...ConsoleOption) *Console {
+	for _, o := range opts {
+		o(c)
+	}
+	return c
+}
+
+// WithURL returns an option that can set URL on a Console
+func WithURL(uRL string) ConsoleOption {
+	return func(c *Console) {
+		c.URL = uRL
+	}
+}
+
+type AuthenticationOption func(a *Authentication)
+
+// NewAuthenticationWithOptions creates a new Authentication with the passed in options set
+func NewAuthenticationWithOptions(opts ...AuthenticationOption) *Authentication {
+	a := &Authentication{}
+	for _, o := range opts {
+		o(a)
+	}
+	return a
+}
+
+// NewAuthenticationWithOptionsAndDefaults creates a new Authentication with the passed in options set starting from the defaults
+func NewAuthenticationWithOptionsAndDefaults(opts ...AuthenticationOption) *Authentication {
+	a := &Authentication{}
+	defaults.MustSet(a)
+	for _, o := range opts {
+		o(a)
+	}
+	return a
+}
+
+// ToOption returns a new AuthenticationOption that sets the values from the passed in Authentication
+func (a *Authentication) ToOption() AuthenticationOption {
+	return func(to *Authentication) {
+		to.Enabled = a.Enabled
+		to.JWTFilePath = a.JWTFilePath
+	}
+}
+
+// DebugMap returns a map form of Authentication for debugging
+func (a *Authentication) DebugMap() map[string]any {
+	debugMap := map[string]any{}
+	debugMap["Enabled"] = helpers.DebugValue(a.Enabled, false)
+	debugMap["JWTFilePath"] = helpers.DebugValue(a.JWTFilePath, false)
+	return debugMap
+}
+
+// AuthenticationWithOptions configures an existing Authentication with the passed in options set
+func AuthenticationWithOptions(a *Authentication, opts ...AuthenticationOption) *Authentication {
+	for _, o := range opts {
+		o(a)
+	}
+	return a
+}
+
+// WithOptions configures the receiver Authentication with the passed in options set
+func (a *Authentication) WithOptions(opts ...AuthenticationOption) *Authentication {
+	for _, o := range opts {
+		o(a)
+	}
+	return a
+}
+
+// WithEnabled returns an option that can set Enabled on a Authentication
+func WithEnabled(enabled bool) AuthenticationOption {
+	return func(a *Authentication) {
+		a.Enabled = enabled
+	}
+}
+
+// WithJWTFilePath returns an option that can set JWTFilePath on a Authentication
+func WithJWTFilePath(jWTFilePath string) AuthenticationOption {
+	return func(a *Authentication) {
+		a.JWTFilePath = jWTFilePath
 	}
 }
