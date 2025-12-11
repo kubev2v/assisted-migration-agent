@@ -13,8 +13,7 @@ type workRequest struct {
 }
 
 type worker struct {
-	workFn models.Work[any]
-	done   chan any
+	done chan any
 }
 
 func (w worker) Work(r workRequest) {

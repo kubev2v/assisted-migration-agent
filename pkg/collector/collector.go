@@ -7,7 +7,6 @@ import (
 	"io"
 	"math"
 	"net/http"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -819,19 +818,4 @@ func migrationReport(concern []vspheremodel.Concern, inv *apiplanner.Inventory) 
 		inv.Vms.TotalMigratable++
 	}
 	return migratable, hasWarning
-}
-
-func waitForFile(filename string) {
-	for {
-		// Check if the file exists
-		if _, err := os.Stat(filename); err == nil {
-			// File exists, exit the loop
-			break
-		} else if os.IsNotExist(err) {
-			// File does not exist, wait and check again
-			time.Sleep(2 * time.Second) // Wait for 2 seconds before checking again
-		} else {
-			return
-		}
-	}
 }

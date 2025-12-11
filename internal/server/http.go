@@ -21,8 +21,7 @@ const (
 )
 
 type Server struct {
-	srv    *http.Server
-	engine *gin.Engine
+	srv *http.Server
 }
 
 func NewServer(cfg *config.Configuration, registerHandlerFn func(router *gin.RouterGroup)) (*Server, error) {

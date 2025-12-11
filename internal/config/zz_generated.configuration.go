@@ -2,9 +2,10 @@
 package config
 
 import (
+	"time"
+
 	defaults "github.com/creasty/defaults"
 	helpers "github.com/ecordell/optgen/helpers"
-	"time"
 )
 
 type ConfigurationOption func(c *Configuration)
