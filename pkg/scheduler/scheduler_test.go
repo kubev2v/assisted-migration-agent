@@ -31,11 +31,10 @@ var _ = Describe("Scheduler", func() {
 			Expect(future).NotTo(BeNil())
 
 			Eventually(func() bool {
-				_, resolved := future.Poll()
-				return resolved
+				return future.IsResolved()
 			}, 2*time.Second, 100*time.Millisecond).Should(BeTrue())
 
-			value, _ := future.Poll()
+			value := future.Result()
 			Expect(value.Data).To(Equal("done"))
 		})
 	})

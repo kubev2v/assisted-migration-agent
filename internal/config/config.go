@@ -31,6 +31,7 @@ type Agent struct {
 	Mode              string        `debugmap:"visible" default:"disconnected"`
 	ID                string        `debugmap:"visible"`
 	SourceID          string        `debugmap:"visible"`
+	Version           string        `debugmap:"visible"`
 	NumWorkers        int           `debugmap:"visible" default:"3"`
 	DataFolder        string        `debugmap:"visible"`
 	OpaPoliciesFolder string        `debugmap:"visible"`

@@ -6,10 +6,10 @@ import (
 
 type Handler struct {
 	consoleSrv *services.Console
-	collector  *services.Collector
+	collector  *services.CollectorService
 }
 
-func New(consoleSrv *services.Console, collector *services.Collector) *Handler {
+func New(consoleSrv *services.Console, collector *services.CollectorService) *Handler {
 	return &Handler{
 		consoleSrv: consoleSrv,
 		collector:  collector,

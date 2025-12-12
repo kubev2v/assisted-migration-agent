@@ -3,7 +3,7 @@ package store
 import (
 	"database/sql"
 
-	_ "github.com/marcboeker/go-duckdb"
+	_ "github.com/duckdb/duckdb-go/v2"
 )
 
 // NewDB opens a DuckDB database at the given path.

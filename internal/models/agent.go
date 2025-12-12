@@ -1,5 +1,7 @@
 package models
 
+import "fmt"
+
 type AgentMode string
 
 const (
@@ -16,24 +18,35 @@ const (
 	ConsoleStatusError        ConsoleStatusType = "error"
 )
 
+func ParseConsoleStatusType(s string) (ConsoleStatusType, error) {
+	switch s {
+	case "connected":
+		return ConsoleStatusConnected, nil
+	case "disconnected":
+		return ConsoleStatusDisconnected, nil
+	default:
+		return "", fmt.Errorf("invalid console status type: %s", s)
+	}
+}
+
 type ConsoleStatus struct {
 	Current ConsoleStatusType
 	Target  ConsoleStatusType
 	Error   error
 }
 
-type CollectorStatus string
+type CollectorStatusType string
 
 const (
-	CollectorStatusWaitingForCredentials CollectorStatus = "waiting-for-credentials"
-	CollectorStatusConnecting            CollectorStatus = "connecting"
-	CollectorStatusConnected             CollectorStatus = "connected"
-	CollectorStatusCollecting            CollectorStatus = "collecting"
-	CollectorStatusCollected             CollectorStatus = "collected"
-	CollectorStatusError                 CollectorStatus = "error"
+	CollectorStatusWaitingForCredentials CollectorStatusType = "waiting-for-credentials"
+	CollectorStatusConnecting            CollectorStatusType = "connecting"
+	CollectorStatusConnected             CollectorStatusType = "connected"
+	CollectorStatusCollecting            CollectorStatusType = "collecting"
+	CollectorStatusCollected             CollectorStatusType = "collected"
+	CollectorStatusError                 CollectorStatusType = "error"
 )
 
 type AgentStatus struct {
 	Console   ConsoleStatus
-	Collector CollectorStatus
+	Collector CollectorStatusType
 }

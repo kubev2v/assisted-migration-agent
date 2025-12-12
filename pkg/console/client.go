@@ -1,115 +1,90 @@
 package console
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"net"
+	"io"
 	"net/http"
-	"time"
+
+	"github.com/google/uuid"
+	apiAgent "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
+	agentClient "github.com/kubev2v/migration-planner/pkg/client"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
+	serviceErrs "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
 type Client struct {
 	baseURL    string
-	httpClient *http.Client
+	httpClient *agentClient.Client
 }
 
-// AgentStatusUpdate matches the remote API schema
-type AgentStatusUpdate struct {
-	Status        string `json:"status"`
-	StatusInfo    string `json:"statusInfo"`
-	CredentialUrl string `json:"credentialUrl"`
-	Version       string `json:"version"`
-	SourceId      string `json:"sourceId"`
-}
-
-// SourceStatusUpdate matches the remote API schema
-type SourceStatusUpdate struct {
-	Inventory any    `json:"inventory"`
-	AgentId   string `json:"agentId"`
-}
-
-func NewConsoleClient(baseURL string) *Client {
-	httpClient := &http.Client{
-		Transport: &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			DialContext: (&net.Dialer{
-				Timeout:   30 * time.Second,
-				KeepAlive: 30 * time.Second,
-			}).DialContext,
-			ForceAttemptHTTP2:     false,
-			MaxIdleConns:          100,
-			IdleConnTimeout:       90 * time.Second,
-			ExpectContinueTimeout: 1 * time.Second,
-		},
+func NewConsoleClient(baseURL string, jwt string) (*Client, error) {
+	httpClient, err := agentClient.NewClient(baseURL, agentClient.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error {
+		if jwt == "" {
+			return nil
+		}
+		req.Header.Add("Authorization", fmt.Sprintf("Bearer: %s", jwt))
+		return nil
+	}))
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize console client: %v", err)
 	}
 	return &Client{
 		baseURL:    baseURL,
 		httpClient: httpClient,
-	}
+	}, nil
 }
 
 // UpdateAgentStatus sends agent status to console.redhat.com
 // PUT /api/v1/agents/{id}/status
-func (c *Client) UpdateAgentStatus(ctx context.Context, agentID string, sourceID string, collectorStatus models.CollectorStatus) error {
-	url := fmt.Sprintf("%s/api/v1/agents/%s/status", c.baseURL, agentID)
-
-	body, err := json.Marshal(AgentStatusUpdate{
+func (c *Client) UpdateAgentStatus(ctx context.Context, agentID uuid.UUID, sourceID uuid.UUID, version string, collectorStatus models.CollectorStatusType) error {
+	body := apiAgent.AgentStatusUpdate{
 		Status:     string(collectorStatus),
-		StatusInfo: "",
+		StatusInfo: string(collectorStatus),
 		SourceId:   sourceID,
-	})
+		Version:    version,
+	}
+
+	resp, err := c.httpClient.UpdateAgentStatus(ctx, agentID, body)
 	if err != nil {
-		return fmt.Errorf("failed to marshal agent status: %w", err)
+		return err
+	}
+	if resp != nil {
+		defer resp.Body.Close()
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewReader(body))
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return nil
+	case http.StatusCreated:
+		return nil
+	case http.StatusGone:
+		return serviceErrs.NewSourceGoneError(sourceID)
+	case http.StatusUnauthorized:
+		return serviceErrs.NewAgentUnauthorized()
+	default:
+		return fmt.Errorf("failed to update agent status: %s", resp.Status)
 	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to send request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-
-	return nil
 }
 
 // UpdateSourceStatus sends source inventory to console.redhat.com
 // PUT /api/v1/sources/{id}/status
-func (c *Client) UpdateSourceStatus(ctx context.Context, sourceID string, update SourceStatusUpdate) error {
-	url := fmt.Sprintf("%s/api/v1/sources/%s/status", c.baseURL, sourceID)
-
-	body, err := json.Marshal(update)
+func (c *Client) UpdateSourceStatus(ctx context.Context, sourceID uuid.UUID, inventory io.Reader) error {
+	resp, err := c.httpClient.UpdateSourceInventoryWithBody(ctx, sourceID, "application/json", inventory)
 	if err != nil {
-		return fmt.Errorf("failed to marshal source status: %w", err)
+		return err
+	}
+	if resp != nil {
+		defer resp.Body.Close()
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewReader(body))
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+	switch resp.StatusCode {
+	case http.StatusOK, http.StatusCreated, http.StatusNoContent:
+		return nil
+	case http.StatusUnauthorized:
+		return serviceErrs.NewAgentUnauthorized()
+	default:
+		return fmt.Errorf("failed to update source inventory: %s", resp.Status)
 	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to send request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-
-	return nil
 }
