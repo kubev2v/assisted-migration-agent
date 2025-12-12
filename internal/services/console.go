@@ -1,56 +1,73 @@
 package services
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"fmt"
+	"io"
 	"sync"
 	"time"
 
 	"go.uber.org/zap"
 
+	"github.com/google/uuid"
+
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/pkg/console"
+	"github.com/kubev2v/assisted-migration-agent/pkg/errors"
 	"github.com/kubev2v/assisted-migration-agent/pkg/scheduler"
 )
 
-type Console struct {
-	updateInterval time.Duration
-	agentID        string
-	sourceID       string
-	status         models.ConsoleStatus
-	scheduler      *scheduler.Scheduler
-	mu             sync.Mutex
-	client         *console.Client
-	close          chan any
+type Collector interface {
+	Status() models.CollectorStatusType
+	Inventory() (io.Reader, error)
 }
 
-func NewConnectedConsoleService(cfg config.Agent, s *scheduler.Scheduler, client *console.Client) *Console {
+type Console struct {
+	updateInterval    time.Duration
+	agentID           uuid.UUID
+	sourceID          uuid.UUID
+	version           string
+	status            models.ConsoleStatus
+	scheduler         *scheduler.Scheduler
+	mu                sync.Mutex
+	client            *console.Client
+	close             chan any
+	collector         Collector
+	inventoryLastHash string // holds the hash of the last sent inventory
+}
+
+func NewConnectedConsoleService(cfg config.Agent, s *scheduler.Scheduler, client *console.Client, collector Collector) *Console {
 	defaultStatus := models.ConsoleStatus{
 		Current: models.ConsoleStatusDisconnected,
 		Target:  models.ConsoleStatusConnected,
 	}
-	c := newConsoleService(cfg, s, client, defaultStatus)
+	c := newConsoleService(cfg, s, client, collector, defaultStatus)
 	go c.run()
 	return c
 }
 
-func NewConsoleService(cfg config.Agent, s *scheduler.Scheduler, client *console.Client) *Console {
+func NewConsoleService(cfg config.Agent, s *scheduler.Scheduler, client *console.Client, collector Collector) *Console {
 	defaultStatus := models.ConsoleStatus{
 		Current: models.ConsoleStatusDisconnected,
 		Target:  models.ConsoleStatusDisconnected,
 	}
-	return newConsoleService(cfg, s, client, defaultStatus)
+	return newConsoleService(cfg, s, client, collector, defaultStatus)
 }
 
-func newConsoleService(cfg config.Agent, s *scheduler.Scheduler, client *console.Client, defaultStatus models.ConsoleStatus) *Console {
+func newConsoleService(cfg config.Agent, s *scheduler.Scheduler, client *console.Client, collector Collector, defaultStatus models.ConsoleStatus) *Console {
 	c := &Console{
 		updateInterval: cfg.UpdateInterval,
-		agentID:        cfg.ID,
-		sourceID:       cfg.SourceID,
+		agentID:        uuid.MustParse(cfg.ID),
+		sourceID:       uuid.MustParse(cfg.SourceID),
+		version:        cfg.Version,
 		scheduler:      s,
 		status:         defaultStatus,
 		client:         client,
 		close:          make(chan any),
+		collector:      collector,
 	}
 	return c
 }
@@ -81,6 +98,25 @@ func (c *Console) Status() models.ConsoleStatus {
 	return c.status
 }
 
+// run is the main loop that sends status and inventory updates to the console.
+//
+// On each tick (heartbeat):
+//  1. Check if statusFuture is resolved. If yes, handle errors (fatal errors stop the loop),
+//     then dispatch a new status update.
+//  2. If collector status is not "collected", skip inventory processing.
+//  3. If inventoryFuture is still pending, skip (don't send new inventory until previous completes).
+//  4. If inventoryFuture resolved, handle any errors.
+//  5. If inventory changed since last send (hash comparison), dispatch new inventory update.
+//
+// Fatal errors (stop the loop, no retry):
+//   - SourceGoneError (410): The source was deleted from the console. No point in sending updates.
+//   - AgentUnauthorizedError (401): Invalid or expired JWT. Agent cannot authenticate.
+//
+// Transient errors are logged and stored in status.Error, but the loop continues.
+//
+// IMPORTANT: The collector is responsible for idempotent marshaling of inventory data.
+// Since list/map ordering is not guaranteed, the collector must ensure deterministic
+// serialization (e.g., sorted keys) to produce consistent hashes for unchanged data.
 func (c *Console) run() {
 	tick := time.NewTicker(c.updateInterval)
 	defer func() {
@@ -88,7 +124,9 @@ func (c *Console) run() {
 		zap.S().Debugw("run loop stopped")
 	}()
 
-	f := c.dispatchStatus()
+	var inventoryFuture *models.Future[models.Result[any]]
+	statusFuture := c.dispatchStatus()
+
 	for {
 		select {
 		case <-tick.C:
@@ -97,16 +135,76 @@ func (c *Console) run() {
 			return
 		}
 
-		result, isResolved := f.Poll()
-		if isResolved {
+		if statusFuture != nil && statusFuture.IsResolved() {
+			result := statusFuture.Result()
 			zap.S().Debugw("status update completed", "error", result.Err)
-			f = c.dispatchStatus()
+			if result.Err != nil {
+				switch result.Err.(type) {
+				case *errors.SourceGoneError:
+					zap.S().Info("source is gone..stop sending requests")
+					return
+				case *errors.AgentUnauthorizedError:
+					zap.S().Info("agent not authenticated..stop sending requests")
+					return
+				default:
+					zap.S().Errorw("failed to send status to console", "error", result.Err)
+				}
+				c.status.Error = result.Err
+			}
+			statusFuture = c.dispatchStatus()
+		}
+
+		if c.collector.Status() != models.CollectorStatusCollected {
+			continue
+		}
+
+		if inventoryFuture != nil {
+			if !inventoryFuture.IsResolved() {
+				continue // still sending previous inventory
+			}
+			result := inventoryFuture.Result()
+			if result.Err != nil {
+				zap.S().Errorw("failed to send inventory to console", "error", result.Err)
+				c.status.Error = result.Err
+			}
+		}
+
+		if inventory, changed := c.getInventoryIfChanged(); changed {
+			inventoryFuture = c.dispatchInventory(inventory)
 		}
 	}
 }
 
 func (c *Console) dispatchStatus() *models.Future[models.Result[any]] {
 	return c.scheduler.AddWork(func(ctx context.Context) (any, error) {
-		return struct{}{}, c.client.UpdateAgentStatus(ctx, c.agentID, c.sourceID, models.CollectorStatusWaitingForCredentials)
+		return struct{}{}, c.client.UpdateAgentStatus(ctx, c.agentID, c.sourceID, c.version, c.collector.Status())
 	})
+}
+
+func (c *Console) dispatchInventory(inventory []byte) *models.Future[models.Result[any]] {
+	return c.scheduler.AddWork(func(ctx context.Context) (any, error) {
+		return struct{}{}, c.client.UpdateSourceStatus(ctx, c.sourceID, bytes.NewReader(inventory))
+	})
+}
+
+func (c *Console) getInventoryIfChanged() ([]byte, bool) {
+	reader, err := c.collector.Inventory()
+	if err != nil {
+		zap.S().Errorw("failed to get inventory", "error", err)
+		return nil, false
+	}
+
+	inventory, err := io.ReadAll(reader)
+	if err != nil {
+		zap.S().Errorw("failed to read inventory", "error", err)
+		return nil, false
+	}
+
+	hash := fmt.Sprintf("%x", sha256.Sum256(inventory))
+	if hash == c.inventoryLastHash {
+		return nil, false
+	}
+
+	c.inventoryLastHash = hash
+	return inventory, true
 }

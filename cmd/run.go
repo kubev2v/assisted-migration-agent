@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -61,17 +62,33 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 			sched := scheduler.NewScheduler(cfg.Agent.NumWorkers)
 			defer sched.Close()
 
-			// init console client
-			consoleClient := console.NewConsoleClient(cfg.Console.URL)
+			// read jwt token for agent
+			jwt := ""
+			if cfg.Auth.Enabled {
+				data, err := os.ReadFile(cfg.Auth.JWTFilePath)
+				if err != nil {
+					return fmt.Errorf("failed to read agent's jwt: %v", err)
+				}
+				if len(data) == 0 {
+					return errors.New("failed to read agent's jwt. the JWT is empty")
+				}
+				jwt = strings.TrimSpace(string(data)) // we assume the jwt is valid at this point
+			}
 
-			// init services
+			// init console client
+			consoleClient, err := console.NewConsoleClient(cfg.Console.URL, jwt)
+			if err != nil {
+				return fmt.Errorf("failed to create console client: %v", err)
+			}
+
+			// create services
+			collectorSrv := services.NewCollectorService(sched)
 			var consoleSrv *services.Console
 			if models.AgentMode(cfg.Agent.Mode) == models.AgentModeConnected {
-				consoleSrv = services.NewConnectedConsoleService(cfg.Agent, sched, consoleClient)
+				consoleSrv = services.NewConnectedConsoleService(cfg.Agent, sched, consoleClient, collectorSrv)
 			} else {
-				consoleSrv = services.NewConsoleService(cfg.Agent, sched, consoleClient)
+				consoleSrv = services.NewConsoleService(cfg.Agent, sched, consoleClient, collectorSrv)
 			}
-			collectorSrv := services.NewCollectorService(sched)
 
 			// init handlers
 			h := handlers.New(consoleSrv, collectorSrv)
@@ -202,6 +219,7 @@ func registerAgentFlags(flagSet *pflag.FlagSet, config *config.Configuration) {
 	flagSet.StringVar(&config.Agent.OpaPoliciesFolder, "opa-policies-folder", config.Agent.OpaPoliciesFolder, "Path to the OPA policies folder")
 	flagSet.StringVar(&config.Agent.ID, "agent-id", config.Agent.ID, "Unique identifier (UUID) for this agent")
 	flagSet.StringVar(&config.Agent.SourceID, "source-id", config.Agent.SourceID, "Source identifier (UUID) for this agent")
+	flagSet.StringVar(&config.Agent.Version, "version", config.Agent.Version, "Agent version to report to console")
 	flagSet.IntVar(&config.Agent.NumWorkers, "num-workers", config.Agent.NumWorkers, "Number of scheduler workers")
 	flagSet.StringVar(&config.Agent.DataFolder, "data-folder", config.Agent.DataFolder, "Path to the persistent data folder")
 }

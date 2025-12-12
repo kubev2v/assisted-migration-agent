@@ -32,15 +32,21 @@ func NewFuture[T any](input chan T, cancel context.CancelFunc) *Future[T] {
 	return f
 }
 
-func (f *Future[T]) Poll() (value T, isResolved bool) {
+func (f *Future[T]) IsResolved() bool {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	return f.inputClosed
+}
+
+func (f *Future[T]) Result() (value T) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	if f.inputClosed {
-		return f.value, true
+		return f.value
 	}
 
 	var none T
-	return none, false
+	return none
 }
 
 func (f *Future[T]) Stop() {

@@ -214,6 +214,7 @@ func (a *Agent) ToOption() AgentOption {
 		to.Mode = a.Mode
 		to.ID = a.ID
 		to.SourceID = a.SourceID
+		to.Version = a.Version
 		to.NumWorkers = a.NumWorkers
 		to.DataFolder = a.DataFolder
 		to.OpaPoliciesFolder = a.OpaPoliciesFolder
@@ -227,6 +228,7 @@ func (a *Agent) DebugMap() map[string]any {
 	debugMap["Mode"] = helpers.DebugValue(a.Mode, false)
 	debugMap["ID"] = helpers.DebugValue(a.ID, false)
 	debugMap["SourceID"] = helpers.DebugValue(a.SourceID, false)
+	debugMap["Version"] = helpers.DebugValue(a.Version, false)
 	debugMap["NumWorkers"] = helpers.DebugValue(a.NumWorkers, false)
 	debugMap["DataFolder"] = helpers.DebugValue(a.DataFolder, false)
 	debugMap["OpaPoliciesFolder"] = helpers.DebugValue(a.OpaPoliciesFolder, false)
@@ -268,6 +270,13 @@ func WithID(iD string) AgentOption {
 func WithSourceID(sourceID string) AgentOption {
 	return func(a *Agent) {
 		a.SourceID = sourceID
+	}
+}
+
+// WithVersion returns an option that can set Version on a Agent
+func WithVersion(version string) AgentOption {
+	return func(a *Agent) {
+		a.Version = version
 	}
 }
 
