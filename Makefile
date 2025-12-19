@@ -120,6 +120,24 @@ check-generate: generate
 
 validate-all: lint check-format tidy-check check-generate
 
+##################### tests support start ##########################
+GINKGO := $(GOBIN)/ginkgo
+UNIT_TEST_PACKAGES := ./...
+UNIT_TEST_GINKGO_OPTIONS ?= 
+
+# Install ginkgo if not already available
+$(GINKGO):
+	@echo "📦 Installing ginkgo..."
+	@go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.22.0
+	@echo "✅ 'ginkgo' installed successfully."
+
+.PHONY: test
+# Run unit tests using ginkgo
+test: $(GINKGO)
+	@echo "🧪 Running Unit tests..."
+	@$(GINKGO) -v --show-node-events $(UNIT_TEST_GINKGO_OPTIONS) $(UNIT_TEST_PACKAGES)
+	@echo "✅ All Unit tests passed successfully."
+
 
 ################################################################################
 # Emoji Legend for Makefile Targets
