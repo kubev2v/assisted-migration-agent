@@ -6,6 +6,7 @@ import (
 
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
+	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -62,9 +63,9 @@ var _ = Describe("InventoryStore", func() {
 	})
 
 	Describe("Get", func() {
-		It("should return ErrNotFound when no inventory exists", func() {
+		It("should return ResourceNotFoundError when no inventory exists", func() {
 			_, err := s.Inventory().Get(ctx)
-			Expect(err).To(Equal(store.ErrNotFound))
+			Expect(srvErrors.IsResourceNotFoundError(err)).To(BeTrue())
 		})
 
 		It("should retrieve saved inventory", func() {

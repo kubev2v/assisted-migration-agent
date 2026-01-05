@@ -1,10 +1,8 @@
 package services
 
 import (
-	"bytes"
 	"context"
 	"errors"
-	"io"
 	"net/url"
 	"strings"
 	"sync"
@@ -18,6 +16,7 @@ import (
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
+	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 	"github.com/kubev2v/assisted-migration-agent/pkg/scheduler"
 )
 
@@ -77,28 +76,15 @@ func (c *CollectorService) GetStatus(ctx context.Context) models.CollectorStatus
 	return status
 }
 
-func (c *CollectorService) setState(state models.CollectorState) {
-	zap.S().Debugw("collector state transition", "from", c.state, "to", state)
-	c.state = state
-	if state != models.CollectorStateError {
-		c.lastError = nil
-	}
-}
-
-func (c *CollectorService) setError(err error) {
-	c.state = models.CollectorStateError
-	c.lastError = err
-}
-
 // Start saves credentials, verifies them with vCenter, and starts async collection.
 func (c *CollectorService) Start(ctx context.Context, creds *models.Credentials) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	// Check if collection is already in progress using the future
+	c.mu.Lock()
 	if c.collectFuture != nil && !c.collectFuture.IsResolved() {
+		c.mu.Unlock()
 		return ErrCollectionInProgress
 	}
+	c.mu.Unlock()
 
 	// Save credentials
 	if err := c.store.Credentials().Save(ctx, creds); err != nil {
@@ -125,14 +111,13 @@ func (c *CollectorService) Start(ctx context.Context, creds *models.Credentials)
 
 // Stop cancels any running collection but keeps credentials for retry.
 func (c *CollectorService) Stop(ctx context.Context) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	// Cancel running job if any (this triggers context cancellation in the job)
+	c.mu.Lock()
 	if c.collectFuture != nil && !c.collectFuture.IsResolved() {
 		c.collectFuture.Stop()
 	}
 	c.collectFuture = nil
+	c.mu.Unlock()
 
 	// Keep credentials - user can retry with same credentials
 	// Reset state to ready
@@ -199,9 +184,7 @@ func (c *CollectorService) startCollectionJob() {
 	}
 
 	c.collectFuture = c.scheduler.AddWork(func(ctx context.Context) (any, error) {
-		c.mu.Lock()
 		c.setState(models.CollectorStateCollecting)
-		c.mu.Unlock()
 
 		zap.S().Info("starting vSphere inventory collection")
 
@@ -209,9 +192,7 @@ func (c *CollectorService) startCollectionJob() {
 		vsphereCollector, err := NewVSphereCollector(creds, c.dataFolder)
 		if err != nil {
 			zap.S().Errorw("failed to create vSphere collector", "error", err)
-			c.mu.Lock()
 			c.setError(err)
-			c.mu.Unlock()
 			return nil, err
 		}
 		defer vsphereCollector.Close() // Ensure cleanup when job completes
@@ -219,23 +200,17 @@ func (c *CollectorService) startCollectionJob() {
 		// Run the collection (use ctx from scheduler for cancellation)
 		if err := vsphereCollector.Collect(ctx); err != nil {
 			zap.S().Errorw("vSphere collection failed", "error", err)
-			c.mu.Lock()
 			c.setError(err)
-			c.mu.Unlock()
 			return nil, err
 		}
 
 		zap.S().Infow("vSphere inventory collection completed", "db_path", vsphereCollector.DBPath())
 
-		c.mu.Lock()
 		c.setState(models.CollectorStateCollected)
-		c.mu.Unlock()
 
 		// Transition back to ready after a brief moment
 		time.Sleep(100 * time.Millisecond)
-		c.mu.Lock()
 		c.setState(models.CollectorStateReady)
-		c.mu.Unlock()
 
 		return nil, nil
 	})
@@ -249,7 +224,7 @@ func (c *CollectorService) GetCredentials(ctx context.Context) (*models.Credenti
 // HasCredentials checks if credentials exist.
 func (c *CollectorService) HasCredentials(ctx context.Context) (bool, error) {
 	_, err := c.store.Credentials().Get(ctx)
-	if errors.Is(err, store.ErrNotFound) {
+	if srvErrors.IsResourceNotFoundError(err) {
 		return false, nil
 	}
 	if err != nil {
@@ -263,39 +238,19 @@ func (c *CollectorService) GetInventory(ctx context.Context) (*models.Inventory,
 	return c.store.Inventory().Get(ctx)
 }
 
-// Status implements the Collector interface for console service.
-// It maps internal collector state to the API status type.
-func (c *CollectorService) Status() models.CollectorStatusType {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	switch c.state {
-	case models.CollectorStateReady:
-		return models.CollectorStatusReady
-	case models.CollectorStateConnecting:
-		return models.CollectorStatusConnecting
-	case models.CollectorStateConnected:
-		return models.CollectorStatusConnected
-	case models.CollectorStateCollecting:
-		return models.CollectorStatusCollecting
-	case models.CollectorStateCollected:
-		return models.CollectorStatusCollected
-	case models.CollectorStateError:
-		return models.CollectorStatusError
-	default:
-		return models.CollectorStatusReady
+func (c *CollectorService) setState(state models.CollectorState) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	zap.S().Debugw("collector state transition", "from", c.state, "to", state)
+	c.state = state
+	if state != models.CollectorStateError {
+		c.lastError = nil
 	}
 }
 
-// Inventory implements the Collector interface for console service.
-// It returns the inventory from the database, or empty JSON if not collected yet.
-func (c *CollectorService) Inventory() (io.Reader, error) {
-	inv, err := c.store.Inventory().Get(context.Background())
-	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			return strings.NewReader("{}"), nil
-		}
-		return nil, err
-	}
-	return bytes.NewReader(inv.Data), nil
+func (c *CollectorService) setError(err error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.state = models.CollectorStateError
+	c.lastError = err
 }

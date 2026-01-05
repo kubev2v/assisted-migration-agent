@@ -11,7 +11,7 @@ import (
 	v1 "github.com/kubev2v/assisted-migration-agent/api/v1"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/services"
-	"github.com/kubev2v/assisted-migration-agent/internal/store"
+	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
 // GetCollectorStatus returns the collector status
@@ -88,8 +88,8 @@ func (h *Handler) StartCollector(c *gin.Context) {
 func (h *Handler) GetInventory(c *gin.Context) {
 	inv, err := h.collector.GetInventory(c.Request.Context())
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "inventory not found"})
+		if srvErrors.IsResourceNotFoundError(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return
 		}
 		zap.S().Errorw("failed to get inventory", "error", err)

@@ -3,7 +3,6 @@ package services_test
 import (
 	"context"
 	"database/sql"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -24,31 +23,23 @@ import (
 
 // MockCollector implements Collector interface for testing
 type MockCollector struct {
-	status    models.CollectorStatusType
-	inventory []byte
-	err       error
+	state models.CollectorState
 }
 
-func NewMockCollector(status models.CollectorStatusType) *MockCollector {
+func NewMockCollector(state models.CollectorState) *MockCollector {
 	return &MockCollector{
-		status:    status,
-		inventory: []byte("{}"),
+		state: state,
 	}
 }
 
-func (m *MockCollector) Status() models.CollectorStatusType {
-	return m.status
-}
-
-func (m *MockCollector) Inventory() (io.Reader, error) {
-	if m.err != nil {
-		return nil, m.err
+func (m *MockCollector) GetStatus(ctx context.Context) models.CollectorStatus {
+	return models.CollectorStatus{
+		State: m.state,
 	}
-	return strings.NewReader(string(m.inventory)), nil
 }
 
-func (m *MockCollector) SetStatus(status models.CollectorStatusType) {
-	m.status = status
+func (m *MockCollector) SetState(state models.CollectorState) {
+	m.state = state
 }
 
 var _ = Describe("Console Service", func() {
@@ -67,7 +58,7 @@ var _ = Describe("Console Service", func() {
 		sourceID = uuid.New().String()
 
 		sched = scheduler.NewScheduler(1)
-		collector = NewMockCollector(models.CollectorStatusReady)
+		collector = NewMockCollector(models.CollectorStateReady)
 
 		var err error
 		db, err = store.NewDB(":memory:")
@@ -340,8 +331,7 @@ var _ = Describe("Console Service", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Set collector to collected status so inventory would be sent if not blocked
-			collector.SetStatus(models.CollectorStatusCollected)
-			collector.inventory = []byte(`{"test": "data"}`)
+			collector.SetState(models.CollectorStateCollected)
 
 			consoleSrv := services.NewConsoleService(cfg, sched, client, collector, st)
 			consoleSrv.SetMode(models.AgentModeConnected)
@@ -375,8 +365,7 @@ var _ = Describe("Console Service", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Set collector to collected status so inventory would be sent if not blocked
-			collector.SetStatus(models.CollectorStatusCollected)
-			collector.inventory = []byte(`{"test": "data"}`)
+			collector.SetState(models.CollectorStateCollected)
 
 			consoleSrv := services.NewConsoleService(cfg, sched, client, collector, st)
 			consoleSrv.SetMode(models.AgentModeConnected)
@@ -429,9 +418,10 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			// Set collector to collected status with inventory
-			collector.SetStatus(models.CollectorStatusCollected)
-			collector.inventory = []byte(`{"vms": [{"name": "vm1"}]}`)
+			// Set collector to collected status and save inventory to store
+			collector.SetState(models.CollectorStateCollected)
+			err = st.Inventory().Save(context.Background(), []byte(`{"vms": [{"name": "vm1"}]}`))
+			Expect(err).NotTo(HaveOccurred())
 
 			consoleSrv := services.NewConsoleService(cfg, sched, client, collector, st)
 			consoleSrv.SetMode(models.AgentModeConnected)
@@ -443,7 +433,7 @@ var _ = Describe("Console Service", func() {
 			Eventually(inventoryReceived, 500*time.Millisecond).Should(Receive())
 		})
 
-		It("should not send inventory when collector status is not collected", func() {
+		It("should not send inventory when no inventory exists in store", func() {
 			statusReceived := make(chan bool, 10)
 			inventoryReceived := make(chan bool, 10)
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -459,8 +449,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			// Collector status is Ready (set in BeforeEach)
-			collector.inventory = []byte(`{"vms": [{"name": "vm1"}]}`)
+			// No inventory saved to store
 
 			consoleSrv := services.NewConsoleService(cfg, sched, client, collector, st)
 			consoleSrv.SetMode(models.AgentModeConnected)
@@ -468,7 +457,7 @@ var _ = Describe("Console Service", func() {
 			// Should receive status update
 			Eventually(statusReceived, 500*time.Millisecond).Should(Receive())
 
-			// Should NOT receive inventory update
+			// Should NOT receive inventory update since store is empty
 			Consistently(inventoryReceived, 300*time.Millisecond).ShouldNot(Receive())
 		})
 
@@ -485,8 +474,9 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			collector.SetStatus(models.CollectorStatusCollected)
-			collector.inventory = []byte(`{"vms": [{"name": "vm1"}]}`)
+			collector.SetState(models.CollectorStateCollected)
+			err = st.Inventory().Save(context.Background(), []byte(`{"vms": [{"name": "vm1"}]}`))
+			Expect(err).NotTo(HaveOccurred())
 
 			consoleSrv := services.NewConsoleService(cfg, sched, client, collector, st)
 			consoleSrv.SetMode(models.AgentModeConnected)
@@ -517,8 +507,9 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			collector.SetStatus(models.CollectorStatusCollected)
-			collector.inventory = []byte(`{"vms": [{"name": "vm1"}]}`)
+			collector.SetState(models.CollectorStateCollected)
+			err = st.Inventory().Save(context.Background(), []byte(`{"vms": [{"name": "vm1"}]}`))
+			Expect(err).NotTo(HaveOccurred())
 
 			consoleSrv := services.NewConsoleService(cfg, sched, client, collector, st)
 			consoleSrv.SetMode(models.AgentModeConnected)
@@ -530,7 +521,8 @@ var _ = Describe("Console Service", func() {
 			Expect(inventoryCount).To(Equal(1))
 
 			// Change inventory to trigger a new send attempt
-			collector.inventory = []byte(`{"vms": [{"name": "vm2"}]}`)
+			err = st.Inventory().Save(context.Background(), []byte(`{"vms": [{"name": "vm2"}]}`))
+			Expect(err).NotTo(HaveOccurred())
 
 			// Wait for more ticks
 			time.Sleep(300 * time.Millisecond)
@@ -557,8 +549,9 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			collector.SetStatus(models.CollectorStatusCollected)
-			collector.inventory = []byte(`{"vms": [{"name": "vm1"}]}`)
+			collector.SetState(models.CollectorStateCollected)
+			err = st.Inventory().Save(context.Background(), []byte(`{"vms": [{"name": "vm1"}]}`))
+			Expect(err).NotTo(HaveOccurred())
 
 			consoleSrv := services.NewConsoleService(cfg, sched, client, collector, st)
 			consoleSrv.SetMode(models.AgentModeConnected)
