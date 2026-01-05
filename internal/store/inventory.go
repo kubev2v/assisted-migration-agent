@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
+	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
 // InventoryStore handles inventory storage using DuckDB.
@@ -25,7 +26,7 @@ func (s *InventoryStore) Get(ctx context.Context) (*models.Inventory, error) {
 	var inv models.Inventory
 	err := row.Scan(&inv.Data, &inv.CreatedAt, &inv.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNotFound
+		return nil, srvErrors.NewInventoryNotFoundError()
 	}
 	if err != nil {
 		return nil, err

@@ -8,6 +8,7 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
+	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -83,9 +84,9 @@ var _ = Describe("CredentialsStore", func() {
 	})
 
 	Describe("Get", func() {
-		It("should return ErrNotFound when no credentials exist", func() {
+		It("should return ResourceNotFoundError when no credentials exist", func() {
 			_, err := s.Credentials().Get(ctx)
-			Expect(err).To(Equal(store.ErrNotFound))
+			Expect(srvErrors.IsResourceNotFoundError(err)).To(BeTrue())
 		})
 
 		It("should retrieve saved credentials", func() {
@@ -121,12 +122,12 @@ var _ = Describe("CredentialsStore", func() {
 			err = s.Credentials().Delete(ctx)
 			Expect(err).NotTo(HaveOccurred())
 
-			// Verify deleted - Get should return ErrNotFound
+			// Verify deleted - Get should return ResourceNotFoundError
 			_, err = s.Credentials().Get(ctx)
-			Expect(err).To(Equal(store.ErrNotFound))
+			Expect(srvErrors.IsResourceNotFoundError(err)).To(BeTrue())
 		})
 
-		It("should return ErrNotFound after delete", func() {
+		It("should return ResourceNotFoundError after delete", func() {
 			// Save first
 			err := s.Credentials().Save(ctx, creds)
 			Expect(err).NotTo(HaveOccurred())
@@ -135,9 +136,9 @@ var _ = Describe("CredentialsStore", func() {
 			err = s.Credentials().Delete(ctx)
 			Expect(err).NotTo(HaveOccurred())
 
-			// Get should return ErrNotFound
+			// Get should return ResourceNotFoundError
 			_, err = s.Credentials().Get(ctx)
-			Expect(err).To(Equal(store.ErrNotFound))
+			Expect(srvErrors.IsResourceNotFoundError(err)).To(BeTrue())
 		})
 
 		It("should not error when deleting non-existent credentials", func() {

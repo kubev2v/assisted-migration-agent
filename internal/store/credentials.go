@@ -6,10 +6,8 @@ import (
 	"errors"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
+	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
-
-// ErrNotFound is returned when a record is not found.
-var ErrNotFound = errors.New("not found")
 
 // CredentialsStore handles credentials storage using DuckDB.
 type CredentialsStore struct {
@@ -28,7 +26,7 @@ func (s *CredentialsStore) Get(ctx context.Context) (*models.Credentials, error)
 	var c models.Credentials
 	err := row.Scan(&c.URL, &c.Username, &c.Password, &c.IsDataSharingAllowed, &c.CreatedAt, &c.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNotFound
+		return nil, srvErrors.NewCredentialsNotFoundError()
 	}
 	if err != nil {
 		return nil, err

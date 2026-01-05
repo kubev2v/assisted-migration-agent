@@ -42,3 +42,29 @@ func IsAgentUnauthorizedError(err error) bool {
 	var e *AgentUnauthorizedError
 	return errors.As(err, &e)
 }
+
+// ResourceNotFoundError indicates a resource was not found.
+type ResourceNotFoundError struct {
+	Kind string
+}
+
+func NewResourceNotFoundError(kind string) *ResourceNotFoundError {
+	return &ResourceNotFoundError{Kind: kind}
+}
+
+func NewInventoryNotFoundError() *ResourceNotFoundError {
+	return NewResourceNotFoundError("inventory")
+}
+
+func NewCredentialsNotFoundError() *ResourceNotFoundError {
+	return NewResourceNotFoundError("credentials")
+}
+
+func (e *ResourceNotFoundError) Error() string {
+	return fmt.Sprintf("%s not found", e.Kind)
+}
+
+func IsResourceNotFoundError(err error) bool {
+	var e *ResourceNotFoundError
+	return errors.As(err, &e)
+}

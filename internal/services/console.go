@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
-	"io"
 	"sync"
 	"time"
 
@@ -22,8 +22,7 @@ import (
 )
 
 type Collector interface {
-	Status() models.CollectorStatusType
-	Inventory() (io.Reader, error)
+	GetStatus(context.Context) models.CollectorStatus
 }
 
 type Console struct {
@@ -168,10 +167,6 @@ func (c *Console) run() {
 			statusFuture = c.dispatchStatus()
 		}
 
-		if c.collector.Status() != models.CollectorStatusCollected {
-			continue
-		}
-
 		if inventoryFuture != nil {
 			if !inventoryFuture.IsResolved() {
 				continue // still sending previous inventory
@@ -183,7 +178,7 @@ func (c *Console) run() {
 			}
 		}
 
-		if inventory, changed := c.getInventoryIfChanged(); changed {
+		if inventory, changed, err := c.getInventoryIfChanged(context.TODO()); err == nil && changed {
 			inventoryFuture = c.dispatchInventory(inventory)
 		}
 	}
@@ -191,7 +186,7 @@ func (c *Console) run() {
 
 func (c *Console) dispatchStatus() *models.Future[models.Result[any]] {
 	return c.scheduler.AddWork(func(ctx context.Context) (any, error) {
-		return struct{}{}, c.client.UpdateAgentStatus(ctx, c.agentID, c.sourceID, c.version, c.collector.Status())
+		return struct{}{}, c.client.UpdateAgentStatus(ctx, c.agentID, c.sourceID, c.version, models.CollectorStatusType(c.collector.GetStatus(ctx).State))
 	})
 }
 
@@ -201,24 +196,22 @@ func (c *Console) dispatchInventory(inventory []byte) *models.Future[models.Resu
 	})
 }
 
-func (c *Console) getInventoryIfChanged() ([]byte, bool) {
-	reader, err := c.collector.Inventory()
+func (c *Console) getInventoryIfChanged(ctx context.Context) ([]byte, bool, error) {
+	inventory, err := c.store.Inventory().Get(ctx)
 	if err != nil {
-		zap.S().Errorw("failed to get inventory", "error", err)
-		return nil, false
+		return nil, false, err
 	}
 
-	inventory, err := io.ReadAll(reader)
+	data, err := json.Marshal(inventory)
 	if err != nil {
-		zap.S().Errorw("failed to read inventory", "error", err)
-		return nil, false
+		return nil, false, fmt.Errorf("failed to marshal inventory %v", err)
 	}
 
-	hash := fmt.Sprintf("%x", sha256.Sum256(inventory))
+	hash := fmt.Sprintf("%x", sha256.Sum256(data))
 	if hash == c.inventoryLastHash {
-		return nil, false
+		return nil, false, nil
 	}
 
 	c.inventoryLastHash = hash
-	return inventory, true
+	return data, true, nil
 }
