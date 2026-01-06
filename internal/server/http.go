@@ -1,10 +1,16 @@
 package server
 
 import (
+	"bytes"
 	"context"
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"net/http"
 	"path"
+	"time"
 
 	ginzap "github.com/gin-contrib/zap"
 	"github.com/gin-gonic/gin"
@@ -12,6 +18,7 @@ import (
 
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
 	"github.com/kubev2v/assisted-migration-agent/internal/server/middlewares"
+	"github.com/kubev2v/assisted-migration-agent/pkg/certificates"
 )
 
 const (
@@ -31,6 +38,11 @@ func NewServer(cfg *config.Configuration, registerHandlerFn func(router *gin.Rou
 	}
 	engine := gin.New()
 
+	srv := &http.Server{
+		Addr:    fmt.Sprintf("0.0.0.0:%d", cfg.Server.HTTPPort),
+		Handler: engine,
+	}
+
 	if cfg.Server.ServerMode == ProductionServer {
 		engine.Static("/static", cfg.Server.StaticsFolder)
 		engine.StaticFile("/", path.Join(cfg.Server.StaticsFolder, "index.html"))
@@ -45,6 +57,18 @@ func NewServer(cfg *config.Configuration, registerHandlerFn func(router *gin.Rou
 			}
 			c.File(path.Join(cfg.Server.StaticsFolder, "index.html"))
 		})
+
+		cert, key, err := certificates.GenerateSelfSignedCertificate(time.Now().AddDate(1, 0, 0))
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate server's certificates: %v", err)
+		}
+
+		tlsConfig, err := getTlsConfig(cert, key)
+		if err != nil {
+			return nil, err
+		}
+
+		srv.TLSConfig = tlsConfig
 	}
 
 	router := engine.Group(apiV1)
@@ -56,25 +80,46 @@ func NewServer(cfg *config.Configuration, registerHandlerFn func(router *gin.Rou
 
 	registerHandlerFn(router)
 
-	srv := &http.Server{
-		Addr:    fmt.Sprintf("0.0.0.0:%d", cfg.Server.HTTPPort),
-		Handler: engine,
-	}
-
 	return &Server{srv: srv}, nil
 }
 
-// Start starts the HTTP server and handles graceful shutdown when the context is cancelled.
+// Start starts the HTTP or HTTPS server based on TLS configuration.
 func (r *Server) Start(ctx context.Context) error {
-	if err := r.srv.ListenAndServe(); err != nil {
-		return err
+	if r.srv.TLSConfig != nil {
+		return r.srv.ListenAndServeTLS("", "")
 	}
-
-	return nil
+	return r.srv.ListenAndServe()
 }
 
 func (r *Server) Stop(ctx context.Context) {
 	if err := r.srv.Shutdown(ctx); err != nil {
 		zap.S().Errorw("server shutdown", "error", err)
 	}
+}
+
+func getTlsConfig(cert *x509.Certificate, privateKey *rsa.PrivateKey) (*tls.Config, error) {
+	certPEM := new(bytes.Buffer)
+	if err := pem.Encode(certPEM, &pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: cert.Raw,
+	}); err != nil {
+		return nil, err
+	}
+
+	privKeyPEM := new(bytes.Buffer)
+	if err := pem.Encode(privKeyPEM, &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
+	}); err != nil {
+		return nil, err
+	}
+
+	serverCert, err := tls.X509KeyPair(certPEM.Bytes(), privKeyPEM.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	return &tls.Config{
+		Certificates: []tls.Certificate{serverCert},
+	}, nil
 }
