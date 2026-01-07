@@ -1,4 +1,4 @@
-package inventory
+package v1
 
 import (
 	"sort"

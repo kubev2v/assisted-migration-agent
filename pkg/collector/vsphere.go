@@ -1,9 +1,11 @@
-package services
+package collector
 
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"path/filepath"
+	"strings"
 	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -15,47 +17,93 @@ import (
 	libcontainer "github.com/kubev2v/forklift/pkg/lib/inventory/container"
 	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
 	libweb "github.com/kubev2v/forklift/pkg/lib/inventory/web"
+	"github.com/vmware/govmomi"
+	"github.com/vmware/govmomi/session"
+	"github.com/vmware/govmomi/vim25"
+	"github.com/vmware/govmomi/vim25/soap"
 	"go.uber.org/zap"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
+	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
-// VSphereCollector wraps the forklift vSphere collector.
+type Collector interface {
+	VerifyCredentials(ctx context.Context, creds *models.Credentials) error
+	Collect(ctx context.Context, creds *models.Credentials) error
+	DB() libmodel.DB
+	Close()
+}
+
 type VSphereCollector struct {
+	dataDir   string
 	collector *vsphere.Collector
 	container *libcontainer.Container
 	db        libmodel.DB
 	dbPath    string
 }
 
-func NewVSphereCollector(creds *models.Credentials, dataDir string) (*VSphereCollector, error) {
+func NewVSphereCollector(dataDir string) *VSphereCollector {
+	return &VSphereCollector{
+		dataDir: dataDir,
+	}
+}
+
+func (c *VSphereCollector) VerifyCredentials(ctx context.Context, creds *models.Credentials) error {
+	u, err := url.ParseRequestURI(creds.URL)
+	if err != nil {
+		return err
+	}
+	if u.Path == "" || u.Path == "/" {
+		u.Path = "/sdk"
+	}
+	u.User = url.UserPassword(creds.Username, creds.Password)
+
+	verifyCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	vimClient, err := vim25.NewClient(verifyCtx, soap.NewClient(u, true))
+	if err != nil {
+		return err
+	}
+
+	client := &govmomi.Client{
+		SessionManager: session.NewManager(vimClient),
+		Client:         vimClient,
+	}
+
+	zap.S().Named("collector").Info("verifying vCenter credentials")
+	if err := client.Login(verifyCtx, u.User); err != nil {
+		if strings.Contains(err.Error(), "Login failure") ||
+			(strings.Contains(err.Error(), "incorrect") && strings.Contains(err.Error(), "password")) {
+			return srvErrors.NewInvalidCredentialsError()
+		}
+		return err
+	}
+
+	_ = client.Logout(verifyCtx)
+	client.CloseIdleConnections()
+
+	zap.S().Named("collector").Info("vCenter credentials verified successfully")
+	return nil
+}
+
+func (c *VSphereCollector) Collect(ctx context.Context, creds *models.Credentials) error {
 	provider := createProvider(creds)
 	secret := createSecret(creds)
 
-	dbPath := filepath.Join(dataDir, "vsphere.db")
+	dbPath := filepath.Join(c.dataDir, "vsphere.db")
 	db, err := createDB(provider, dbPath)
 	if err != nil {
-		return nil, err
+		return err
 	}
+	c.db = db
+	c.dbPath = dbPath
+	c.collector = vsphere.New(db, provider, secret)
 
-	collector := vsphere.New(db, provider, secret)
-
-	return &VSphereCollector{
-		collector: collector,
-		db:        db,
-		dbPath:    dbPath,
-	}, nil
-}
-
-// Collect runs the vSphere collection process.
-// This starts the forklift collector which populates the SQLite database.
-// The method blocks until collection is complete or the context is cancelled.
-func (c *VSphereCollector) Collect(ctx context.Context) error {
 	zap.S().Info("starting forklift vSphere collector")
 
-	// Start the web container and wait for collection to complete
 	container, err := startWebContainer(c.collector)
 	if err != nil {
 		return err
@@ -66,15 +114,12 @@ func (c *VSphereCollector) Collect(ctx context.Context) error {
 	return nil
 }
 
-// DBPath returns the path to the SQLite database.
-func (c *VSphereCollector) DBPath() string {
-	return c.dbPath
+func (c *VSphereCollector) DB() libmodel.DB {
+	return c.db
 }
 
-// ForkliftCollector returns the underlying forklift vSphere collector.
-// This is needed by the inventory builder to access the collected data.
-func (c *VSphereCollector) ForkliftCollector() *vsphere.Collector {
-	return c.collector
+func (c *VSphereCollector) DBPath() string {
+	return c.dbPath
 }
 
 // Close cleans up collector resources.

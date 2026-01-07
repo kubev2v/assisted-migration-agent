@@ -1,4 +1,4 @@
-package inventory
+package v1
 
 import (
 	vspheremodel "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"

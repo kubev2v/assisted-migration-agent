@@ -1,4 +1,4 @@
-package inventory
+package v1
 
 import (
 	"context"
@@ -8,16 +8,18 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/kubev2v/forklift/pkg/controller/provider/container/vsphere"
 	vspheremodel "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	web "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
 	apiplanner "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"go.uber.org/zap"
 
-	"github.com/kubev2v/assisted-migration-agent/internal/models"
-	"github.com/kubev2v/assisted-migration-agent/internal/util"
 	"github.com/kubev2v/migration-planner/pkg/opa"
+
+	"github.com/kubev2v/assisted-migration-agent/internal/models"
+	"github.com/kubev2v/assisted-migration-agent/internal/store"
+	"github.com/kubev2v/assisted-migration-agent/internal/util"
+	"github.com/kubev2v/assisted-migration-agent/pkg/collector"
 )
 
 var vendorMap = map[string]string{
@@ -39,67 +41,70 @@ var vendorMap = map[string]string{
 // Builder builds inventory from forklift collector data.
 type Builder struct {
 	opaPoliciesDir string
+	store          *store.Store
 }
 
 // NewBuilder creates a new inventory builder.
-func NewBuilder(opaPoliciesDir string) *Builder {
+func NewBuilder(s *store.Store, opaPoliciesDir string) *Builder {
 	return &Builder{
 		opaPoliciesDir: opaPoliciesDir,
+		store:          s,
 	}
 }
 
-// Build creates an inventory from the forklift collector's database.
-func (b *Builder) Build(ctx context.Context, collector *vsphere.Collector) (*apiplanner.Inventory, error) {
+func (b *Builder) Process(ctx context.Context, c collector.Collector) error {
 	zap.S().Named("inventory").Info("Building inventory from forklift collector")
+
+	db := c.DB()
 
 	// List VMs
 	vms := &[]vspheremodel.VM{}
-	err := collector.DB().List(vms, libmodel.FilterOptions{Detail: 1, Predicate: libmodel.Eq("IsTemplate", false)})
+	err := db.List(vms, libmodel.FilterOptions{Detail: 1, Predicate: libmodel.Eq("IsTemplate", false)})
 	if err != nil {
-		return nil, fmt.Errorf("failed to list VMs: %w", err)
+		return fmt.Errorf("failed to list VMs: %w", err)
 	}
 	zap.S().Named("inventory").Infof("Found %d VMs", len(*vms))
 
 	// List Hosts
 	hosts := &[]vspheremodel.Host{}
-	err = collector.DB().List(hosts, libmodel.FilterOptions{Detail: 1})
+	err = db.List(hosts, libmodel.FilterOptions{Detail: 1})
 	if err != nil {
-		return nil, fmt.Errorf("failed to list hosts: %w", err)
+		return fmt.Errorf("failed to list hosts: %w", err)
 	}
 	zap.S().Named("inventory").Infof("Found %d hosts", len(*hosts))
 
 	// List Datacenters
 	datacenters := &[]vspheremodel.Datacenter{}
-	if err := collector.DB().List(datacenters, libmodel.FilterOptions{Detail: 1}); err != nil {
-		return nil, fmt.Errorf("failed to list datacenters: %w", err)
+	if err := db.List(datacenters, libmodel.FilterOptions{Detail: 1}); err != nil {
+		return fmt.Errorf("failed to list datacenters: %w", err)
 	}
 	zap.S().Named("inventory").Infof("Found %d datacenters", len(*datacenters))
 
 	// List Clusters
 	clusters := &[]vspheremodel.Cluster{}
-	err = collector.DB().List(clusters, libmodel.FilterOptions{Detail: 1})
+	err = db.List(clusters, libmodel.FilterOptions{Detail: 1})
 	if err != nil {
-		return nil, fmt.Errorf("failed to list clusters: %w", err)
+		return fmt.Errorf("failed to list clusters: %w", err)
 	}
 	zap.S().Named("inventory").Infof("Found %d clusters", len(*clusters))
 
 	// Get About
 	about := &vspheremodel.About{}
-	err = collector.DB().Get(about)
+	err = db.Get(about)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get vCenter info: %w", err)
+		return fmt.Errorf("failed to get vCenter info: %w", err)
 	}
 
 	// List Datastores
-	datastores, err := listDatastoresFromCollector(collector)
+	datastores, err := listDatastoresFromDB(db)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list datastores: %w", err)
+		return fmt.Errorf("failed to list datastores: %w", err)
 	}
 
 	// List Networks
-	networks, err := listNetworksFromCollector(collector)
+	networks, err := listNetworksFromDB(db)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list networks: %w", err)
+		return fmt.Errorf("failed to list networks: %w", err)
 	}
 
 	// Extract cluster mapping and build helper maps
@@ -107,14 +112,14 @@ func (b *Builder) Build(ctx context.Context, collector *vsphere.Collector) (*api
 
 	// Create vCenter-level inventory
 	apiDatastores, datastoreIndexToName, datastoreMapping := getDatastores(hosts, datastores)
-	apiNetworks, networkMapping := getNetworks(networks, collector, countVmsByNetwork(*vms))
+	apiNetworks, networkMapping := getNetworks(networks, db, countVmsByNetwork(*vms))
 
 	infraData := models.InfrastructureData{
 		Datastores:            apiDatastores,
 		Networks:              apiNetworks,
 		HostPowerStates:       getHostPowerStates(*hosts),
 		Hosts:                 getHosts(hosts),
-		ClustersPerDatacenter: *clustersPerDatacenter(datacenters, collector),
+		ClustersPerDatacenter: *clustersPerDatacenter(datacenters, db),
 		TotalHosts:            len(*hosts),
 		TotalDatacenters:      len(*datacenters),
 	}
@@ -170,8 +175,19 @@ func (b *Builder) Build(ctx context.Context, collector *vsphere.Collector) (*api
 		inventory.Clusters[clusterID] = *clusterInv
 	}
 
+	// Store the inventory
+	invData, err := json.Marshal(inventory)
+	if err != nil {
+		return fmt.Errorf("failed to marshal the inventory: %v", err)
+	}
+
+	if err := b.store.Inventory().Save(ctx, invData); err != nil {
+		return err
+	}
+
 	zap.S().Named("inventory").Infof("Successfully created inventory with %d clusters", len(perClusterInventories))
-	return inventory, nil
+
+	return nil
 }
 
 func (b *Builder) validateVMs(ctx context.Context, vms *[]vspheremodel.VM) error {
@@ -484,18 +500,18 @@ func totalCapacity(disks []vspheremodel.Disk) int {
 	return util.BytesToGB(total)
 }
 
-func listDatastoresFromCollector(collector *vsphere.Collector) (*[]vspheremodel.Datastore, error) {
+func listDatastoresFromDB(db libmodel.DB) (*[]vspheremodel.Datastore, error) {
 	datastores := &[]vspheremodel.Datastore{}
-	err := collector.DB().List(datastores, libmodel.FilterOptions{Detail: 1})
+	err := db.List(datastores, libmodel.FilterOptions{Detail: 1})
 	if err != nil {
 		return nil, err
 	}
 	return datastores, nil
 }
 
-func listNetworksFromCollector(collector *vsphere.Collector) (*[]vspheremodel.Network, error) {
+func listNetworksFromDB(db libmodel.DB) (*[]vspheremodel.Network, error) {
 	networks := &[]vspheremodel.Network{}
-	err := collector.DB().List(networks, libmodel.FilterOptions{Detail: 1})
+	err := db.List(networks, libmodel.FilterOptions{Detail: 1})
 	if err != nil {
 		return nil, err
 	}
@@ -547,7 +563,7 @@ func countVmsByNetwork(vms []vspheremodel.VM) map[string]int {
 	return vmsPerNetwork
 }
 
-func getNetworks(networks *[]vspheremodel.Network, collector *vsphere.Collector, vmsPerNetwork map[string]int) (
+func getNetworks(networks *[]vspheremodel.Network, db libmodel.DB, vmsPerNetwork map[string]int) (
 	apiNetworks []apiplanner.Network,
 	networkMapping map[string]string,
 ) {
@@ -563,7 +579,7 @@ func getNetworks(networks *[]vspheremodel.Network, collector *vsphere.Collector,
 		dvNet := &vspheremodel.Network{}
 		if n.Variant == vspheremodel.NetDvPortGroup {
 			dvNet.WithRef(n.DVSwitch)
-			_ = collector.DB().Get(dvNet)
+			_ = db.Get(dvNet)
 		}
 		apiNetworks = append(apiNetworks, apiplanner.Network{
 			Name:     n.Name,
@@ -729,11 +745,11 @@ func TransformVendorName(vendor string) string {
 	return raw
 }
 
-func clustersPerDatacenter(datacenters *[]vspheremodel.Datacenter, collector *vsphere.Collector) *[]int {
+func clustersPerDatacenter(datacenters *[]vspheremodel.Datacenter, db libmodel.DB) *[]int {
 	var h []int
 
 	folders := &[]vspheremodel.Folder{}
-	if err := collector.DB().List(folders, libmodel.FilterOptions{Detail: 1}); err != nil {
+	if err := db.List(folders, libmodel.FilterOptions{Detail: 1}); err != nil {
 		return nil
 	}
 
