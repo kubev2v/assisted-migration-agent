@@ -1,1 +1,1 @@
-export { collectorPollingService, isCollectorRunning } from './CollectorPollingService';
+export { createCollectorPollingService, createAgentPollingService, isCollectorRunning } from './PollingService';

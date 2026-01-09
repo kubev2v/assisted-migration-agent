@@ -17,6 +17,7 @@ help:
 	@echo "Targets:"
 	@echo "    build:           "
 	@echo "    run:             "
+	@echo "	   run.ui:              " 
 	@echo "    clean:           clean up golangci-lint and other tools"
 	@echo "    generate:        "
 	@echo "    generate.proto:  "
@@ -41,6 +42,9 @@ clean:
 
 run:
 	$(BINARY_PATH) run
+
+run.ui:
+	cd $(CURDIR)/ui && npm run start
 
 generate:
 	@echo "Generating code..."

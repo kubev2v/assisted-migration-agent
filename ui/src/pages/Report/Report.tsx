@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 
 import {
   Infra,
+  Inventory,
   InventoryData,
   VMResourceBreakdown,
   VMs,
-} from '@generated/index';
+} from "@generated/index";
 import {
   Bullseye,
   Content,
@@ -14,27 +15,28 @@ import {
   Select,
   SelectList,
   SelectOption,
-  Stack,
   StackItem,
-  Title,
-} from '@patternfly/react-core';
-
-import { useAppSelector } from '@shared/store';
+} from "@patternfly/react-core";
 
 import {
   buildClusterViewModel,
   ClusterOption,
-} from './assessment-report/clusterView';
-import { Dashboard } from './assessment-report/Dashboard';
+} from "./assessment-report/clusterView";
+import { Dashboard } from "./assessment-report/Dashboard";
 
-const Report: React.FC = () => {
-  const { inventory } = useAppSelector((state) => state.collector);
-  const [selectedClusterId, setSelectedClusterId] = useState<string>('all');
+interface ReportProps {
+  inventory: Inventory;
+}
+
+const Report: React.FC<ReportProps> = ({ inventory }) => {
+  const [selectedClusterId, setSelectedClusterId] = useState<string>("all");
   const [isClusterSelectOpen, setIsClusterSelectOpen] = useState(false);
 
   const infra = inventory?.vcenter?.infra as Infra | undefined;
   const vms = inventory?.vcenter?.vms as VMs | undefined;
-  const clusters = inventory?.clusters as { [key: string]: InventoryData } | undefined;
+  const clusters = inventory?.clusters as
+    | { [key: string]: InventoryData }
+    | undefined;
 
   const clusterView = buildClusterViewModel({
     infra,
@@ -53,28 +55,16 @@ const Report: React.FC = () => {
 
   const handleClusterSelect = (
     _event: React.MouseEvent<Element, MouseEvent> | undefined,
-    value: string | number | undefined,
+    value: string | number | undefined
   ): void => {
-    if (typeof value === 'string') {
+    if (typeof value === "string") {
       setSelectedClusterId(value);
     }
     setIsClusterSelectOpen(false);
   };
 
   return (
-    <Stack hasGutter style={{ padding: '24px', width: '75%' }}>
-      <StackItem>
-        <Title headingLevel="h1" size="2xl">
-          Migration Assessment Report
-        </Title>
-      </StackItem>
-
-      <StackItem>
-        <Content component="p">
-          Presenting the information we were able to fetch from the discovery process
-        </Content>
-      </StackItem>
-
+    <>
       <StackItem>
         <Select
           isScrollable
@@ -94,7 +84,7 @@ const Report: React.FC = () => {
                 }
               }}
               isDisabled={clusterSelectDisabled}
-              style={{ minWidth: '422px' }}
+              style={{ minWidth: "422px" }}
             >
               {clusterView.selectionLabel}
             </MenuToggle>
@@ -122,21 +112,21 @@ const Report: React.FC = () => {
             clusterFound={clusterView.clusterFound}
           />
         ) : (
-          <Bullseye style={{ width: '100%' }}>
+          <Bullseye style={{ width: "100%" }}>
             <Content>
               <Content component="p">
                 {clusterView.isAggregateView
-                  ? 'This assessment does not have report data yet.'
-                  : 'No data is available for the selected cluster.'}
+                  ? "This assessment does not have report data yet."
+                  : "No data is available for the selected cluster."}
               </Content>
             </Content>
           </Bullseye>
         )}
       </StackItem>
-    </Stack>
+    </>
   );
 };
 
-Report.displayName = 'Report';
+Report.displayName = "Report";
 
 export default Report;

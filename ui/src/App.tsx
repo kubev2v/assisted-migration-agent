@@ -1,18 +1,19 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useMemo } from "react";
 import { Spinner } from "@patternfly/react-core";
 import { Login } from "@pages/Login";
-import { Report } from "@pages/Report";
+import { ReportContainer } from "@pages/Report";
 import { Layout } from "@shared/components";
 import { useAppDispatch, useAppSelector } from "@shared/store";
 import { fetchAgentStatus, changeAgentMode } from "@shared/reducers/agentSlice";
 import { fetchInventory, fetchCollectorStatus, startCollection, stopCollection, resetCollector } from "@shared/reducers/collectorSlice";
-import { collectorPollingService, isCollectorRunning } from "@shared/services";
+import { createCollectorPollingService, isCollectorRunning } from "@shared/services";
 import { AgentStatusModeEnum, AgentModeRequestModeEnum, CollectorStatusStatusEnum } from "@generated/index";
 import { Credentials } from "@models";
 
 function App() {
     const dispatch = useAppDispatch();
     const pollingStarted = useRef(false);
+    const collectorPollingService = useMemo(() => createCollectorPollingService(dispatch), [dispatch]);
 
     const { mode, initialized: agentInitialized } = useAppSelector(
         (state) => state.agent
@@ -42,17 +43,12 @@ function App() {
                 // Ignore agent mode errors
             }
         }
-    }, [dispatch]);
+    }, [dispatch, collectorPollingService]);
 
     const handleCancel = useCallback(() => {
         collectorPollingService.stop();
         dispatch(stopCollection());
-    }, [dispatch]);
-
-    // Init polling service
-    useEffect(() => {
-        collectorPollingService.init(dispatch);
-    }, [dispatch]);
+    }, [dispatch, collectorPollingService]);
 
     // Reset collector and fetch initial data
     useEffect(() => {
@@ -68,7 +64,14 @@ function App() {
             pollingStarted.current = true;
             collectorPollingService.start(1500);
         }
-    }, [collectorInitialized, isCollecting]);
+    }, [collectorInitialized, isCollecting, collectorPollingService]);
+
+    // Cleanup polling on unmount
+    useEffect(() => {
+        return () => {
+            collectorPollingService.stop();
+        };
+    }, [collectorPollingService]);
 
     // Fetch inventory when collection completes
     useEffect(() => {
@@ -89,7 +92,7 @@ function App() {
 
     return (
         <Layout>
-            {hasInventory ? <Report /> : (
+            {hasInventory ? <ReportContainer /> : (
                 <Login
                     version="v1.0.0"
                     isDataShared={isDataShared}
