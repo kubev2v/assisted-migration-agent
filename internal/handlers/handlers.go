@@ -5,13 +5,15 @@ import (
 )
 
 type Handler struct {
-	consoleSrv *services.Console
-	collector  *services.CollectorService
+	consoleSrv   *services.Console
+	collectorSrv *services.CollectorService
+	inventorySrv *services.InventoryService
 }
 
-func New(consoleSrv *services.Console, collector *services.CollectorService) *Handler {
+func New(consoleSrv *services.Console, collector *services.CollectorService, invSrv *services.InventoryService) *Handler {
 	return &Handler{
-		consoleSrv: consoleSrv,
-		collector:  collector,
+		consoleSrv:   consoleSrv,
+		collectorSrv: collector,
+		inventorySrv: invSrv,
 	}
 }

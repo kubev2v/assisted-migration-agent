@@ -68,11 +68,8 @@ type CollectorStartRequest struct {
 // CollectorStatus defines model for CollectorStatus.
 type CollectorStatus struct {
 	// Error Error message when status is error
-	Error *string `json:"error,omitempty"`
-
-	// HasCredentials Whether vCenter credentials are configured
-	HasCredentials bool                  `json:"hasCredentials"`
-	Status         CollectorStatusStatus `json:"status"`
+	Error  *string               `json:"error,omitempty"`
+	Status CollectorStatusStatus `json:"status"`
 }
 
 // CollectorStatusStatus defines model for CollectorStatus.Status.

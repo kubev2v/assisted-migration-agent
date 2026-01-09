@@ -3,6 +3,7 @@ package errors
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 )
@@ -101,18 +102,27 @@ func IsInvalidStateError(err error) bool {
 	return errors.As(err, &e)
 }
 
-// InvalidCredentialsError indicates the provided credentials are invalid.
-type InvalidCredentialsError struct{}
-
-func NewInvalidCredentialsError() *InvalidCredentialsError {
-	return &InvalidCredentialsError{}
+func NewVCenterError(err error) *VCenterError {
+	vErr := &VCenterError{msg: "unknown error"}
+	if strings.Contains(err.Error(), "Login failure") ||
+		(strings.Contains(err.Error(), "incorrect") && strings.Contains(err.Error(), "password")) {
+		vErr.msg = "invalid credentials"
+	} else {
+		vErr.msg = err.Error()
+	}
+	return vErr
 }
 
-func (e *InvalidCredentialsError) Error() string {
-	return "invalid credentials"
+// VCenterError indicates the provided credentials are invalid.
+type VCenterError struct {
+	msg string
 }
 
-func IsInvalidCredentialsError(err error) bool {
-	var e *InvalidCredentialsError
+func (e *VCenterError) Error() string {
+	return e.msg
+}
+
+func IsVCenterError(err error) bool {
+	var e *VCenterError
 	return errors.As(err, &e)
 }

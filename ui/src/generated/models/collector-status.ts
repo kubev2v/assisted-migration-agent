@@ -17,10 +17,6 @@
 export interface CollectorStatus {
     'status': CollectorStatusStatusEnum;
     /**
-     * Whether vCenter credentials are configured
-     */
-    'hasCredentials': boolean;
-    /**
      * Error message when status is error
      */
     'error'?: string;

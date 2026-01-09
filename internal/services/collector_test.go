@@ -85,7 +85,6 @@ var _ = Describe("CollectorService", func() {
 		It("should create a service with ready state", func() {
 			status := srv.GetStatus(ctx)
 			Expect(status.State).To(Equal(models.CollectorStateReady))
-			Expect(status.HasCredentials).To(BeFalse())
 		})
 	})
 
@@ -93,97 +92,6 @@ var _ = Describe("CollectorService", func() {
 		It("should return ready state initially", func() {
 			status := srv.GetStatus(ctx)
 			Expect(status.State).To(Equal(models.CollectorStateReady))
-		})
-
-		It("should report HasCredentials when credentials exist", func() {
-			creds := &models.Credentials{
-				URL:      "https://vcenter.example.com",
-				Username: "admin",
-				Password: "secret",
-			}
-			err := st.Credentials().Save(ctx, creds)
-			Expect(err).NotTo(HaveOccurred())
-
-			status := srv.GetStatus(ctx)
-			Expect(status.HasCredentials).To(BeTrue())
-		})
-	})
-
-	Describe("GetCredentials", func() {
-		It("should return error when no credentials exist", func() {
-			_, err := srv.GetCredentials(ctx)
-			Expect(err).To(HaveOccurred())
-		})
-
-		It("should return credentials when they exist", func() {
-			creds := &models.Credentials{
-				URL:      "https://vcenter.example.com",
-				Username: "admin",
-				Password: "secret",
-			}
-			err := st.Credentials().Save(ctx, creds)
-			Expect(err).NotTo(HaveOccurred())
-
-			retrieved, err := srv.GetCredentials(ctx)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(retrieved.URL).To(Equal(creds.URL))
-		})
-	})
-
-	Describe("HasCredentials", func() {
-		It("should return false when no credentials exist", func() {
-			has, err := srv.HasCredentials(ctx)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(has).To(BeFalse())
-		})
-
-		It("should return true when credentials exist", func() {
-			creds := &models.Credentials{
-				URL:      "https://vcenter.example.com",
-				Username: "admin",
-				Password: "secret",
-			}
-			err := st.Credentials().Save(ctx, creds)
-			Expect(err).NotTo(HaveOccurred())
-
-			has, err := srv.HasCredentials(ctx)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(has).To(BeTrue())
-		})
-	})
-
-	Describe("GetInventory", func() {
-		It("should return error when no inventory exists", func() {
-			_, err := srv.GetInventory(ctx)
-			Expect(err).To(HaveOccurred())
-		})
-
-		It("should return inventory when it exists", func() {
-			data := []byte(`{"vms": []}`)
-			err := st.Inventory().Save(ctx, data)
-			Expect(err).NotTo(HaveOccurred())
-
-			inv, err := srv.GetInventory(ctx)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(inv.Data).To(Equal(data))
-		})
-	})
-
-	Describe("HasInventory", func() {
-		It("should return false when no inventory exists", func() {
-			has, err := srv.HasInventory(ctx)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(has).To(BeFalse())
-		})
-
-		It("should return true when inventory exists", func() {
-			data := []byte(`{"vms": []}`)
-			err := st.Inventory().Save(ctx, data)
-			Expect(err).NotTo(HaveOccurred())
-
-			has, err := srv.HasInventory(ctx)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(has).To(BeTrue())
 		})
 	})
 
@@ -212,9 +120,9 @@ var _ = Describe("CollectorService", func() {
 				return srv.GetStatus(ctx).State
 			}).Should(Equal(models.CollectorStateCollected))
 
-			has, err := srv.HasInventory(ctx)
+			inv, err := st.Inventory().Get(context.TODO())
 			Expect(err).NotTo(HaveOccurred())
-			Expect(has).To(BeTrue())
+			Expect(inv).ToNot(BeNil())
 		})
 
 		It("should return error when credentials verification fails", func() {
@@ -228,11 +136,11 @@ var _ = Describe("CollectorService", func() {
 			}
 
 			err := srv.Start(ctx, creds)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("connection refused"))
+			Expect(err).ToNot(HaveOccurred())
 
-			status := srv.GetStatus(ctx)
-			Expect(status.State).To(Equal(models.CollectorStateError))
+			Eventually(func() models.CollectorState {
+				return srv.GetStatus(ctx).State
+			}).Should(Equal(models.CollectorStateError))
 		})
 
 		It("should set error state when collection fails", func() {
@@ -275,22 +183,6 @@ var _ = Describe("CollectorService", func() {
 
 			status := srv.GetStatus(ctx)
 			Expect(status.Error).To(ContainSubstring("processing failed"))
-		})
-
-		It("should save credentials after successful verification", func() {
-			creds := &models.Credentials{
-				URL:      "https://vcenter.example.com",
-				Username: "admin",
-				Password: "secret",
-			}
-
-			err := srv.Start(ctx, creds)
-			Expect(err).NotTo(HaveOccurred())
-
-			saved, err := srv.GetCredentials(ctx)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(saved.URL).To(Equal(creds.URL))
-			Expect(saved.Username).To(Equal(creds.Username))
 		})
 
 		It("should return error when collection already in progress", func() {

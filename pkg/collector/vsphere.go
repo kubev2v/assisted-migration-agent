@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/url"
 	"path/filepath"
-	"strings"
 	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -75,11 +74,7 @@ func (c *VSphereCollector) VerifyCredentials(ctx context.Context, creds *models.
 
 	zap.S().Named("collector").Info("verifying vCenter credentials")
 	if err := client.Login(verifyCtx, u.User); err != nil {
-		if strings.Contains(err.Error(), "Login failure") ||
-			(strings.Contains(err.Error(), "incorrect") && strings.Contains(err.Error(), "password")) {
-			return srvErrors.NewInvalidCredentialsError()
-		}
-		return err
+		return srvErrors.NewVCenterError(err)
 	}
 
 	_ = client.Logout(verifyCtx)

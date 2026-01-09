@@ -53,7 +53,8 @@ Class | Method | HTTP request | Description
 ------------ | ------------- | ------------- | -------------
 *DefaultApi* | [**getAgentStatus**](docs/DefaultApi.md#getagentstatus) | **GET** /agent | Get agent status
 *DefaultApi* | [**getCollectorStatus**](docs/DefaultApi.md#getcollectorstatus) | **GET** /collector | Get collector status
-*DefaultApi* | [**getInventory**](docs/DefaultApi.md#getinventory) | **GET** /collector/inventory | Get collected inventory
+*DefaultApi* | [**getInventory**](docs/DefaultApi.md#getinventory) | **GET** /inventory | Get collected inventory
+*DefaultApi* | [**resetCollector**](docs/DefaultApi.md#resetcollector) | **POST** /collector/reset | Reset collector state
 *DefaultApi* | [**setAgentMode**](docs/DefaultApi.md#setagentmode) | **POST** /agent | Change agent mode
 *DefaultApi* | [**startCollector**](docs/DefaultApi.md#startcollector) | **POST** /collector | Start inventory collection
 *DefaultApi* | [**stopCollector**](docs/DefaultApi.md#stopcollector) | **DELETE** /collector | Stop collection

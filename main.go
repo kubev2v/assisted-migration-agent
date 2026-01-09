@@ -26,7 +26,7 @@ func main() {
 	// default configuration
 	cfg := config.NewConfigurationWithOptionsAndDefaults(
 		config.WithServer(config.Server{
-			HTTPPort:   8080,
+			HTTPPort:   8000,
 			ServerMode: "dev",
 		}),
 		config.WithAgent(config.Agent{

@@ -6,7 +6,8 @@ All URIs are relative to */api/v1*
 |------------- | ------------- | -------------|
 |[**getAgentStatus**](#getagentstatus) | **GET** /agent | Get agent status|
 |[**getCollectorStatus**](#getcollectorstatus) | **GET** /collector | Get collector status|
-|[**getInventory**](#getinventory) | **GET** /collector/inventory | Get collected inventory|
+|[**getInventory**](#getinventory) | **GET** /inventory | Get collected inventory|
+|[**resetCollector**](#resetcollector) | **POST** /collector/reset | Reset collector state|
 |[**setAgentMode**](#setagentmode) | **POST** /agent | Change agent mode|
 |[**startCollector**](#startcollector) | **POST** /collector | Start inventory collection|
 |[**stopCollector**](#stopcollector) | **DELETE** /collector | Stop collection|
@@ -140,6 +141,52 @@ No authorization required
 |-------------|-------------|------------------|
 |**200** | Collected inventory |  -  |
 |**404** | Inventory not available |  -  |
+|**500** | Internal server error |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **resetCollector**
+> CollectorStatus resetCollector()
+
+
+### Example
+
+```typescript
+import {
+    DefaultApi,
+    Configuration
+} from 'migration-agent-api-client';
+
+const configuration = new Configuration();
+const apiInstance = new DefaultApi(configuration);
+
+const { status, data } = await apiInstance.resetCollector();
+```
+
+### Parameters
+This endpoint does not have any parameters.
+
+
+### Return type
+
+**CollectorStatus**
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
+ - **Accept**: application/json
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+|**200** | Collection started |  -  |
+|**400** | Invalid request |  -  |
+|**409** | Collection already in progress |  -  |
 |**500** | Internal server error |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)

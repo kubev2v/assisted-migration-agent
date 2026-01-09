@@ -91,20 +91,30 @@ function VCenterLoginForm({
             </Flex>
 
             <ActionGroup style={{ marginTop: 0 }}>
-                <Button
-                    variant="primary"
-                    type="submit"
-                    isLoading={isLoading}
-                    isDisabled={!isFormValid || isDisabled || isLoading}
-                >
-                    Create assessment report
-                </Button>
-                {isLoading && cancelCollection && (
-                    <Button variant="link" onClick={cancelCollection}>
-                        Cancel
-                    </Button>
-                )}
-                {isLoading && progressComponent}
+                <Flex alignItems={{ default: "alignItemsCenter" }} gap={{ default: "gapMd" }}>
+                    <FlexItem>
+                        <Button
+                            variant="primary"
+                            type="submit"
+                            isLoading={isLoading}
+                            isDisabled={!isFormValid || isDisabled || isLoading}
+                        >
+                            Create assessment report
+                        </Button>
+                    </FlexItem>
+                    {isLoading && cancelCollection && (
+                        <FlexItem>
+                            <Button variant="link" onClick={cancelCollection}>
+                                Cancel
+                            </Button>
+                        </FlexItem>
+                    )}
+                    {isLoading && progressComponent && (
+                        <FlexItem>
+                            {progressComponent}
+                        </FlexItem>
+                    )}
+                </Flex>
             </ActionGroup>
         </Form>
     );

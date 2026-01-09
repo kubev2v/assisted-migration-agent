@@ -3,47 +3,105 @@ import type { CollectorStartRequest, Inventory } from '@generated/index';
 import { CollectorStatusStatusEnum } from '@generated/index';
 import { apiClient } from '@shared/api/client';
 
+export interface ApiError {
+  code: number | null;
+  message: string;
+}
+
+function capitalizeFirst(str: string): string {
+  if (!str) return str;
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+function extractApiError(error: unknown, fallbackMessage: string): ApiError {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const axiosError = error as { response?: { status?: number; data?: { message?: string } }; message?: string };
+    const message = axiosError.response?.data?.message ?? axiosError.message ?? fallbackMessage;
+    return {
+      code: axiosError.response?.status ?? null,
+      message: capitalizeFirst(message),
+    };
+  }
+  if (error instanceof Error) {
+    return { code: null, message: capitalizeFirst(error.message) };
+  }
+  return { code: null, message: capitalizeFirst(fallbackMessage) };
+}
+
 interface CollectorState {
   status: CollectorStatusStatusEnum;
-  hasCredentials: boolean;
-  error: string | null;
+  error: ApiError | null;
   inventory: Inventory | null;
   loading: boolean;
+  initialized: boolean;
 }
 
 const initialState: CollectorState = {
   status: CollectorStatusStatusEnum.Ready,
-  hasCredentials: false,
   error: null,
   inventory: null,
   loading: false,
+  initialized: false,
 };
+
+export const resetCollector = createAsyncThunk(
+  'collector/reset',
+  async () => {
+    await apiClient.resetCollector();
+  }
+);
 
 export const fetchCollectorStatus = createAsyncThunk(
   'collector/fetchStatus',
-  async () => {
-    const response = await apiClient.getCollectorStatus();
-    return response.data;
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await apiClient.getCollectorStatus();
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(extractApiError(error, 'Failed to fetch status'));
+    }
   }
 );
 
 export const startCollection = createAsyncThunk(
   'collector/start',
-  async (credentials: CollectorStartRequest) => {
-    const response = await apiClient.startCollector(credentials);
-    return response.data;
+  async (credentials: CollectorStartRequest, { rejectWithValue }) => {
+    try {
+      const response = await apiClient.startCollector(credentials);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(extractApiError(error, 'Failed to start collection'));
+    }
   }
 );
 
-export const stopCollection = createAsyncThunk('collector/stop', async () => {
-  await apiClient.stopCollector();
-});
+export const stopCollection = createAsyncThunk(
+  'collector/stop',
+  async (_, { rejectWithValue }) => {
+    try {
+      await apiClient.stopCollector();
+    } catch (error) {
+      return rejectWithValue(extractApiError(error, 'Failed to stop collection'));
+    }
+  }
+);
 
 export const fetchInventory = createAsyncThunk(
   'collector/fetchInventory',
-  async () => {
-    const response = await apiClient.getInventory();
-    return response.data;
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await apiClient.getInventory();
+      return response.data;
+    } catch (error) {
+      // 404 means no inventory yet - this is expected, not an error
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as { response?: { status?: number } };
+        if (axiosError.response?.status === 404) {
+          return null;
+        }
+      }
+      return rejectWithValue(extractApiError(error, 'Failed to fetch inventory'));
+    }
   }
 );
 
@@ -54,7 +112,7 @@ const collectorSlice = createSlice({
     setStatus: (state, action: PayloadAction<CollectorStatusStatusEnum>) => {
       state.status = action.payload;
     },
-    setError: (state, action: PayloadAction<string | null>) => {
+    setError: (state, action: PayloadAction<ApiError | null>) => {
       state.error = action.payload;
     },
     clearInventory: (state) => {
@@ -63,20 +121,14 @@ const collectorSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchCollectorStatus.pending, (state) => {
-        state.loading = true;
-      })
       .addCase(fetchCollectorStatus.fulfilled, (state, action) => {
-        state.loading = false;
         if (action.payload) {
           state.status = action.payload.status;
-          state.hasCredentials = action.payload.hasCredentials;
-          state.error = action.payload.error ?? null;
+          state.error = action.payload.error ? { code: null, message: capitalizeFirst(action.payload.error) } : null;
         }
       })
       .addCase(fetchCollectorStatus.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.error.message ?? 'Failed to fetch status';
+        state.error = action.payload as ApiError;
       })
       .addCase(startCollection.pending, (state) => {
         state.loading = true;
@@ -86,13 +138,12 @@ const collectorSlice = createSlice({
         state.loading = false;
         if (action.payload) {
           state.status = action.payload.status;
-          state.hasCredentials = action.payload.hasCredentials;
-          state.error = action.payload.error ?? null;
+          state.error = action.payload.error ? { code: null, message: capitalizeFirst(action.payload.error) } : null;
         }
       })
       .addCase(startCollection.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.error.message ?? 'Failed to start collection';
+        state.error = action.payload as ApiError;
       })
       .addCase(stopCollection.pending, (state) => {
         state.loading = true;
@@ -103,20 +154,15 @@ const collectorSlice = createSlice({
       })
       .addCase(stopCollection.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.error.message ?? 'Failed to stop collection';
-      })
-      .addCase(fetchInventory.pending, (state) => {
-        state.loading = true;
+        state.error = action.payload as ApiError;
       })
       .addCase(fetchInventory.fulfilled, (state, action) => {
-        state.loading = false;
-        if (action.payload) {
-          state.inventory = action.payload;
-        }
+        state.initialized = true;
+        state.inventory = action.payload;
       })
       .addCase(fetchInventory.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.error.message ?? 'Failed to fetch inventory';
+        state.initialized = true;
+        state.error = action.payload as ApiError;
       });
   },
 });

@@ -57,11 +57,11 @@ module.exports = (env, argv) => {
       proxy: [
         {
           context: ['/api'],
-          target: 'http://localhost:8080',
+          target: 'http://localhost:8000',
           changeOrigin: true,
         },
       ],
     },
-    devtool: isProduction ? 'source-map' : 'eval-source-map',
+    devtool: isProduction ? false : 'source-map',
   };
 };

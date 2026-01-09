@@ -15,12 +15,8 @@ import (
 // GetCollectorStatus returns the collector status
 // (GET /collector)
 func (h *Handler) GetCollectorStatus(c *gin.Context) {
-	status := h.collector.GetStatus(c.Request.Context())
-
-	var resp v1.CollectorStatus
-	resp.FromModel(status)
-
-	c.JSON(http.StatusOK, resp)
+	status := h.collectorSrv.GetStatus(c.Request.Context())
+	c.JSON(http.StatusOK, v1.NewCollectorStatus(status))
 }
 
 // StartCollector starts inventory collection
@@ -52,12 +48,10 @@ func (h *Handler) StartCollector(c *gin.Context) {
 	}
 
 	// Start collection (saves creds, verifies, starts async job)
-	if err := h.collector.Start(c.Request.Context(), creds); err != nil {
+	if err := h.collectorSrv.Start(c.Request.Context(), creds); err != nil {
 		switch err.(type) {
 		case *srvErrors.CollectionInProgressError:
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
-		case *srvErrors.InvalidCredentialsError:
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		default:
 			zap.S().Named("collector_handler").Errorw("failed to start collector", "error", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to start collector"})
@@ -66,41 +60,36 @@ func (h *Handler) StartCollector(c *gin.Context) {
 	}
 
 	// Return current state after starting
-	status := h.collector.GetStatus(c.Request.Context())
-	var resp v1.CollectorStatus
-	resp.FromModel(status)
-	c.JSON(http.StatusAccepted, resp)
-}
-
-// GetInventory returns the collected inventory
-// (GET /collector/inventory)
-func (h *Handler) GetInventory(c *gin.Context) {
-	inv, err := h.collector.GetInventory(c.Request.Context())
-	if err != nil {
-		if srvErrors.IsResourceNotFoundError(err) {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-			return
-		}
-		zap.S().Named("collector_handler").Errorw("failed to get inventory", "error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get inventory"})
-		return
-	}
-
-	// Return the raw inventory JSON data
-	c.Data(http.StatusOK, "application/json", inv.Data)
+	status := h.collectorSrv.GetStatus(c.Request.Context())
+	c.JSON(http.StatusAccepted, v1.NewCollectorStatus(status))
 }
 
 // StopCollector stops the collection but keeps credentials for retry
 // (DELETE /collector)
 func (h *Handler) StopCollector(c *gin.Context) {
-	if err := h.collector.Stop(c.Request.Context()); err != nil {
+	if err := h.collectorSrv.Stop(c.Request.Context()); err != nil {
 		zap.S().Named("collector_handler").Errorw("failed to stop collector", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to stop collector"})
 		return
 	}
 
-	status := h.collector.GetStatus(c.Request.Context())
-	var resp v1.CollectorStatus
-	resp.FromModel(status)
-	c.JSON(http.StatusOK, resp)
+	status := h.collectorSrv.GetStatus(c.Request.Context())
+	c.JSON(http.StatusOK, v1.NewCollectorStatus(status))
+}
+
+func (h *Handler) ResetCollector(c *gin.Context) {
+	if err := h.collectorSrv.Reset(c.Request.Context()); err != nil {
+		switch err.(type) {
+		case *srvErrors.CollectionInProgressError:
+			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		default:
+			zap.S().Named("collector_handler").Errorw("failed to start collector", "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to reset the collector"})
+		}
+		return
+	}
+
+	// Return current state after starting
+	status := h.collectorSrv.GetStatus(c.Request.Context())
+	c.JSON(http.StatusOK, v1.NewCollectorStatus(status))
 }

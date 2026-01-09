@@ -1,0 +1,95 @@
+/* CPU Over-commitment view */
+.cpu-overcommit__boxes {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin: 124px 0 16px;
+  flex-wrap: wrap;
+}
+
+.cpu-overcommit__box {
+  color: #000;
+  min-width: 120px;
+  height: 64px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  padding: 0 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.cpu-overcommit__legend {
+  display: flex;
+  justify-content: center;
+  gap: 6px 24px; /* row-gap, column-gap */
+  flex-wrap: wrap;
+  margin-top: 20%;
+}
+
+.cpu-overcommit__legend-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cpu-overcommit__legend-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+.cpu-overcommit__legend-text {
+  font-size: 16px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .cpu-overcommit__boxes {
+    margin: 72px 0 12px;
+    gap: 20px;
+  }
+  .cpu-overcommit__legend {
+    margin-top: 20%;
+    gap: 6px 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .cpu-overcommit__boxes {
+    margin: 40px 0 8px;
+    gap: 16px;
+  }
+  .cpu-overcommit__box {
+    min-width: 96px;
+    height: 56px;
+    font-size: 18px;
+    padding: 0 12px;
+    border-radius: 10px;
+  }
+  .cpu-overcommit__legend {
+    margin-top: 20%;
+    gap: 6px 16px;
+  }
+  .cpu-overcommit__legend-text {
+    font-size: 16px;
+  }
+  .cpu-overcommit__legend-swatch {
+    width: 10px;
+    height: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .cpu-overcommit__box {
+    min-width: 88px;
+    height: 48px;
+    font-size: 16px;
+    border-radius: 8px;
+  }
+  .cpu-overcommit__legend-text {
+    font-size: 14px;
+  }
+}

@@ -70,23 +70,18 @@ func (c *CollectorService) Start(ctx context.Context, creds *models.Credentials)
 	}
 	c.mu.Unlock()
 
-	// Set connecting state
-	c.setState(models.CollectorStateConnecting)
-
-	// Verify credentials synchronously
-	if err := c.collector.VerifyCredentials(ctx, creds); err != nil {
-		c.setError(err)
-		return err
-	}
-
-	// Save credentials
-	if err := c.store.Credentials().Save(ctx, creds); err != nil {
-		return err
-	}
-
-	c.setState(models.CollectorStateConnected)
-
 	c.collectFuture = c.scheduler.AddWork(func(ctx context.Context) (any, error) {
+		// Set connecting state
+		c.setState(models.CollectorStateConnecting)
+
+		// Verify credentials synchronously
+		if err := c.collector.VerifyCredentials(ctx, creds); err != nil {
+			c.setError(err)
+			return nil, err
+		}
+
+		c.setState(models.CollectorStateConnected)
+
 		c.setState(models.CollectorStateCollecting)
 
 		zap.S().Named("collector_service").Info("starting vSphere inventory collection")
@@ -130,38 +125,15 @@ func (c *CollectorService) Stop(ctx context.Context) error {
 	return nil
 }
 
-// GetCredentials retrieves stored credentials.
-func (c *CollectorService) GetCredentials(ctx context.Context) (*models.Credentials, error) {
-	return c.store.Credentials().Get(ctx)
-}
+func (c *CollectorService) Reset(ctx context.Context) error {
+	c.mu.Lock()
+	if c.collectFuture != nil && !c.collectFuture.IsResolved() {
+		return srvErrors.NewCollectionInProgressError()
+	}
+	c.mu.Unlock()
 
-// HasCredentials checks if credentials exist.
-func (c *CollectorService) HasCredentials(ctx context.Context) (bool, error) {
-	_, err := c.store.Credentials().Get(ctx)
-	if srvErrors.IsResourceNotFoundError(err) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	return true, nil
-}
-
-// GetInventory retrieves the stored inventory.
-func (c *CollectorService) GetInventory(ctx context.Context) (*models.Inventory, error) {
-	return c.store.Inventory().Get(ctx)
-}
-
-// HasInventory checks if inventory exists.
-func (c *CollectorService) HasInventory(ctx context.Context) (bool, error) {
-	_, err := c.store.Inventory().Get(ctx)
-	if srvErrors.IsResourceNotFoundError(err) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	return true, nil
+	c.setState(models.CollectorStateReady)
+	return nil
 }
 
 func (c *CollectorService) setState(state models.CollectorState) {

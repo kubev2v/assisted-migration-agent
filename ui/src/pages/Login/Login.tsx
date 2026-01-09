@@ -1,211 +1,196 @@
 import { useState } from "react";
 import {
-    Backdrop,
-    Bullseye,
-    Card,
-    CardBody,
-    CardHeader,
-    Content,
-    ContentVariants,
-    Divider,
-    Flex,
-    FlexItem,
-    Popover,
-    Title,
+  Card,
+  CardBody,
+  CardHeader,
+  Content,
+  ContentVariants,
+  Divider,
+  Flex,
+  FlexItem,
+  Popover,
+  Title,
 } from "@patternfly/react-core";
 import {
-    InfoCircleIcon,
-    OutlinedQuestionCircleIcon,
+  InfoCircleIcon,
+  OutlinedQuestionCircleIcon,
 } from "@patternfly/react-icons";
-import { useAppDispatch, useAppSelector } from "@shared/store";
 import {
-    Information,
-    DataSharing,
-    PrivacyNote,
-    RedHatLogo,
+  Information,
+  DataSharing,
+  PrivacyNote,
+  RedHatLogo,
 } from "@shared/components";
-import {
-    startCollection,
-    stopCollection,
-} from "@shared/reducers/collectorSlice";
 import { CollectorStatusStatusEnum } from "@generated/index";
+import { ApiError } from "@shared/reducers/collectorSlice";
 import { Credentials } from "@models";
 import VCenterLoginForm from "./VCenterLoginForm";
 import CollectionProgress from "./VCenterLoginForm/CollectionProgress";
 
 interface LoginProps {
-    version?: string;
+  version?: string;
+  isDataShared: boolean;
+  isCollecting: boolean;
+  status: CollectorStatusStatusEnum;
+  error: ApiError | null;
+  onCollect: (credentials: Credentials, isDataShared: boolean) => void;
+  onCancel: () => void;
 }
 
-function Login({ version = "1.03" }: LoginProps) {
-    const dispatch = useAppDispatch();
-    const { status, loading, error } = useAppSelector(
-        (state) => state.collector
-    );
+function Login({
+  version,
+  isDataShared: initialIsDataShared,
+  isCollecting,
+  status,
+  error,
+  onCollect,
+  onCancel,
+}: LoginProps) {
+  const [isDataShared, setIsDataShared] = useState(initialIsDataShared);
 
-    const [isDataShared, setIsDataShared] = useState(false);
-    const [collectionProgress, setCollectionProgress] = useState({
-        percentage: 0,
-        statusText: "Connecting...",
-    });
+  const getProgressInfo = () => {
+    switch (status) {
+      case CollectorStatusStatusEnum.Connecting:
+        return { percentage: 25, statusText: "Connecting to vCenter..." };
+      case CollectorStatusStatusEnum.Connected:
+        return { percentage: 50, statusText: "Connected, starting collection..." };
+      case CollectorStatusStatusEnum.Collecting:
+        return { percentage: 75, statusText: "Collecting inventory data..." };
+      default:
+        return { percentage: 0, statusText: "" };
+    }
+  };
 
-    const isCollecting =
-        status === CollectorStatusStatusEnum.Connecting ||
-        status === CollectorStatusStatusEnum.Connected ||
-        status === CollectorStatusStatusEnum.Collecting;
+  const progressInfo = getProgressInfo();
 
-    const handleCollect = (credentials: Credentials) => {
-        dispatch(
-            startCollection({
-                url: credentials.url,
-                username: credentials.username,
-                password: credentials.password,
-            })
-        );
-    };
+  const handleCollect = (credentials: Credentials) => {
+    onCollect(credentials, isDataShared);
+  };
 
-    const handleCancelCollection = () => {
-        dispatch(stopCollection());
-    };
+  return (
+    <Card
+      style={{
+        maxWidth: "40rem",
+        width: "100%",
+        maxHeight: "90vh",
+        overflowY: "auto",
+        borderRadius: "8px",
+      }}
+    >
+      <CardHeader>
+        <Flex direction={{ default: "column" }} gap={{ default: "gapMd" }}>
+          <FlexItem>
+            <RedHatLogo />
+          </FlexItem>
 
-    return (
-        <>
-            <Backdrop style={{ zIndex: 0 }} />
-            <Bullseye style={{ minHeight: "100vh" }}>
-                <Card
-                    style={{
-                        maxWidth: "36rem",
-                        width: "100%",
-                        maxHeight: "90vh",
-                        overflowY: "auto",
-                        borderRadius: "8px",
-                    }}
-                >
-                    <CardHeader>
-                        <Flex
-                            direction={{ default: "column" }}
-                            gap={{ default: "gapMd" }}
-                        >
-                            <FlexItem>
-                                <RedHatLogo />
-                            </FlexItem>
+          <Flex
+            justifyContent={{
+              default: "justifyContentSpaceBetween",
+            }}
+          >
+            <FlexItem>
+              <Title headingLevel="h1" size="2xl">
+                Migration assessment
+              </Title>
+            </FlexItem>
+            <FlexItem>
+              <Content component={ContentVariants.small}>
+                Agent ver. {version}
+              </Content>
+            </FlexItem>
+          </Flex>
 
-                            <Flex
-                                justifyContent={{
-                                    default: "justifyContentSpaceBetween",
-                                }}
-                            >
-                                <FlexItem>
-                                    <Title headingLevel="h1" size="2xl">
-                                        Migration assessment
-                                    </Title>
-                                </FlexItem>
-                                <FlexItem>
-                                    <Content component={ContentVariants.small}>
-                                        Agent ver. {version}
-                                    </Content>
-                                </FlexItem>
-                            </Flex>
+          <FlexItem>
+            <Flex
+              gap={{ default: "gapSm" }}
+              alignItems={{ default: "alignItemsCenter" }}
+            >
+              <FlexItem>
+                <Content component={ContentVariants.p}>
+                  Migration Discovery VM
+                </Content>
+              </FlexItem>
+              <FlexItem>
+                <Popover bodyContent="The Migration Discovery VM collects infrastructure data from your vCenter environment to generate a migration assessment report.">
+                  <OutlinedQuestionCircleIcon style={{ color: "#000000" }} />
+                </Popover>
+              </FlexItem>
+            </Flex>
+          </FlexItem>
 
-                            <FlexItem>
-                                <Flex
-                                    gap={{ default: "gapSm" }}
-                                    alignItems={{ default: "alignItemsCenter" }}
-                                >
-                                    <FlexItem>
-                                        <Content component={ContentVariants.p}>
-                                            Migration Discovery VM
-                                        </Content>
-                                    </FlexItem>
-                                    <FlexItem>
-                                        <Popover bodyContent="The Migration Discovery VM collects infrastructure data from your vCenter environment to generate a migration assessment report.">
-                                            <OutlinedQuestionCircleIcon
-                                                style={{ color: "#000000" }}
-                                            />
-                                        </Popover>
-                                    </FlexItem>
-                                </Flex>
-                            </FlexItem>
+          <FlexItem>
+            <Title headingLevel="h2" size="xl">
+              vCenter login
+            </Title>
+          </FlexItem>
 
-                            <FlexItem>
-                                <Title headingLevel="h2" size="xl">
-                                    vCenter login
-                                </Title>
-                            </FlexItem>
+          <FlexItem>
+            <Flex
+              gap={{ default: "gapSm" }}
+              alignItems={{
+                default: "alignItemsFlexStart",
+              }}
+            >
+              <FlexItem>
+                <InfoCircleIcon style={{ color: "#007bff" }} />
+              </FlexItem>
+              <FlexItem>
+                <strong>Access control</strong>
+              </FlexItem>
+              <Flex
+                direction={{ default: "column" }}
+                gap={{ default: "gapXs" }}
+              >
+                <FlexItem>
+                  <Content component={ContentVariants.p}>
+                    A VMware user account with read-only permissions is
+                    sufficient for secure access during the discovery process.
+                  </Content>
+                </FlexItem>
+              </Flex>
+            </Flex>
+          </FlexItem>
+        </Flex>
+      </CardHeader>
 
-                            <FlexItem>
-                                <Flex
-                                    gap={{ default: "gapSm" }}
-                                    alignItems={{
-                                        default: "alignItemsFlexStart",
-                                    }}
-                                >
-                                    <FlexItem>
-                                        <InfoCircleIcon
-                                            style={{ color: "#007bff" }}
-                                        />
-                                    </FlexItem>
-                                    <FlexItem>
-                                        <strong>Access control</strong>
-                                    </FlexItem>
-                                    <Flex
-                                        direction={{ default: "column" }}
-                                        gap={{ default: "gapXs" }}
-                                    >
-                                        <FlexItem>
-                                            <Content
-                                                component={ContentVariants.p}
-                                            >
-                                                A VMware user account with
-                                                read-only permissions is
-                                                sufficient for secure access
-                                                during the discovery process.
-                                            </Content>
-                                        </FlexItem>
-                                    </Flex>
-                                </Flex>
-                            </FlexItem>
-                        </Flex>
-                    </CardHeader>
+      <Divider
+        style={
+          {
+            "--pf-v6-c-divider--Height": "8px",
+            "--pf-v6-c-divider--BackgroundColor": "#f5f5f5",
+          } as React.CSSProperties
+        }
+      />
 
-                    <Divider
-                        style={{
-                            "--pf-v6-c-divider--Height": "8px",
-                            "--pf-v6-c-divider--BackgroundColor": "#f5f5f5",
-                        } as React.CSSProperties}
-                    />
-
-                    <CardBody>
-                        <VCenterLoginForm
-                            collect={handleCollect}
-                            cancelCollection={handleCancelCollection}
-                            isLoading={loading || isCollecting}
-                            isDataShared={isDataShared}
-                            dataSharingComponent={
-                                <DataSharing
-                                    variant="checkbox"
-                                    isChecked={isDataShared}
-                                    onChange={setIsDataShared}
-                                    isDisabled={loading || isCollecting}
-                                />
-                            }
-                            informationComponent={
-                                <Information error={error}>
-                                    <PrivacyNote />
-                                </Information>
-                            }
-                            progressComponent={
-                                <CollectionProgress
-                                    percentage={collectionProgress.percentage}
-                                    statusText={collectionProgress.statusText}
-                                />
-                            }
-                        />
-                    </CardBody>
-                </Card>
-            </Bullseye>
-        </>
-    );
+      <CardBody>
+        <VCenterLoginForm
+          collect={handleCollect}
+          cancelCollection={onCancel}
+          isLoading={isCollecting}
+          isDataShared={isDataShared}
+          dataSharingComponent={
+            <DataSharing
+              variant="checkbox"
+              isChecked={isDataShared}
+              onChange={setIsDataShared}
+              isDisabled={isCollecting}
+            />
+          }
+          informationComponent={
+            <Information error={error}>
+              <PrivacyNote />
+            </Information>
+          }
+          progressComponent={
+            <CollectionProgress
+              percentage={progressInfo.percentage}
+              statusText={progressInfo.statusText}
+            />
+          }
+        />
+      </CardBody>
+    </Card>
+  );
 }
 
 export default Login;

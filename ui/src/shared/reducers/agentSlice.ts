@@ -6,10 +6,16 @@ import {
 } from '@generated/index';
 import { apiClient } from '@shared/api/client';
 
+function capitalizeFirst(str: string): string {
+  if (!str) return str;
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
 interface AgentState {
   mode: AgentStatusModeEnum;
   consoleConnection: AgentStatusConsoleConnectionEnum;
   loading: boolean;
+  initialized: boolean;
   error: string | null;
 }
 
@@ -17,6 +23,7 @@ const initialState: AgentState = {
   mode: AgentStatusModeEnum.Disconnected,
   consoleConnection: AgentStatusConsoleConnectionEnum.Disconnected,
   loading: false,
+  initialized: false,
   error: null,
 };
 
@@ -55,11 +62,8 @@ const agentSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchAgentStatus.pending, (state) => {
-        state.loading = true;
-      })
       .addCase(fetchAgentStatus.fulfilled, (state, action) => {
-        state.loading = false;
+        state.initialized = true;
         if (action.payload) {
           state.mode = action.payload.mode;
           state.consoleConnection = action.payload.console_connection;
@@ -67,8 +71,8 @@ const agentSlice = createSlice({
         }
       })
       .addCase(fetchAgentStatus.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.error.message ?? 'Failed to fetch agent status';
+        state.initialized = true;
+        state.error = capitalizeFirst(action.error.message ?? 'Failed to fetch agent status');
       })
       .addCase(changeAgentMode.pending, (state) => {
         state.loading = true;
@@ -83,7 +87,7 @@ const agentSlice = createSlice({
       })
       .addCase(changeAgentMode.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.error.message ?? 'Failed to change agent mode';
+        state.error = capitalizeFirst(action.error.message ?? 'Failed to change agent mode');
       });
   },
 });

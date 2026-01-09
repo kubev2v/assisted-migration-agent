@@ -1,0 +1,13 @@
+.upgrade-recommendation-popover
+  .popover-override
+  .pf-v5-c-popover__close
+  .pf-v5-c-button.pf-m-plain {
+  color: #151515;
+}
+
+.upgrade-recommendation-popover
+  .popover-override
+  .pf-v5-c-popover__close
+  .pf-v5-c-button.pf-m-plain:hover {
+  color: #000;
+}

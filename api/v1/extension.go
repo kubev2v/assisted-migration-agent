@@ -9,8 +9,10 @@ func (a *AgentStatus) FromModel(m models.AgentStatus) {
 	a.Mode = AgentStatusMode(m.Console.Target)
 }
 
-func (c *CollectorStatus) FromModel(m models.CollectorStatus) {
-	switch m.State {
+func NewCollectorStatus(status models.CollectorStatus) CollectorStatus {
+	var c CollectorStatus
+
+	switch status.State {
 	case models.CollectorStateReady:
 		c.Status = CollectorStatusStatusReady
 	case models.CollectorStateConnecting:
@@ -26,8 +28,19 @@ func (c *CollectorStatus) FromModel(m models.CollectorStatus) {
 	default:
 		c.Status = CollectorStatusStatusReady
 	}
-	c.HasCredentials = m.HasCredentials
-	if m.Error != "" {
-		c.Error = &m.Error
+
+	if status.Error != "" {
+		c.Error = &status.Error
 	}
+
+	return c
+}
+
+func NewCollectorStatusWithError(status models.CollectorStatus, err error) CollectorStatus {
+	c := NewCollectorStatus(status)
+	if err != nil {
+		errStr := err.Error()
+		c.Error = &errStr
+	}
+	return c
 }

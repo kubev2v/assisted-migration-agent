@@ -83,7 +83,25 @@ paths:
         '500':
           description: Internal server error
 
-  /collector/inventory:
+  /collector/reset:
+    post:
+      summary: Reset collector state
+      operationId: resetCollector
+      responses:
+        '200':
+          description: Collection started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectorStatus'
+        '400':
+          description: Invalid request
+        '409':
+          description: Collection already in progress
+        '500':
+          description: Internal server error
+
+  /inventory:
     get:
       summary: Get collected inventory
       operationId: getInventory
@@ -122,7 +140,6 @@ components:
       type: object
       required:
         - status
-        - hasCredentials
       properties:
         status:
           type: string
@@ -133,9 +150,6 @@ components:
             - collecting
             - collected
             - error
-        hasCredentials:
-          type: boolean
-          description: Whether vCenter credentials are configured
         error:
           type: string
           description: Error message when status is error

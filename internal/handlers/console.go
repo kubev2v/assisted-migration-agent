@@ -12,7 +12,11 @@ import (
 // GetAgentStatus returns the current agent status
 // (GET /agent)
 func (h *Handler) GetAgentStatus(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, gin.H{"msg": "not implemented"})
+	status := h.consoleSrv.Status()
+	var resp v1.AgentStatus
+	resp.FromModel(models.AgentStatus{Console: status})
+
+	c.JSON(http.StatusOK, resp)
 }
 
 // SetAgentMode changes the agent mode

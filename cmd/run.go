@@ -110,9 +110,10 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 			vsphereCollector := collector.NewVSphereCollector(cfg.Agent.DataFolder)
 			collectorSrv := services.NewCollectorService(sched, s, vsphereCollector, collectorV1.NewBuilder(s, cfg.Agent.OpaPoliciesFolder))
 			consoleSrv := services.NewConsoleService(cfg.Agent, sched, consoleClient, collectorSrv, s)
+			inventorySrv := services.NewInventoryService(s)
 
 			// init handlers
-			h := handlers.New(consoleSrv, collectorSrv)
+			h := handlers.New(consoleSrv, collectorSrv, inventorySrv)
 
 			srv, err := server.NewServer(cfg, func(router *gin.RouterGroup) {
 				v1.RegisterHandlers(router, h)
