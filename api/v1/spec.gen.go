@@ -4,7 +4,11 @@
 package v1
 
 import (
+	"fmt"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
+	"github.com/oapi-codegen/runtime"
 )
 
 // ServerInterface represents all server handlers.
@@ -30,6 +34,24 @@ type ServerInterface interface {
 	// Get collected inventory
 	// (GET /inventory)
 	GetInventory(c *gin.Context)
+	// Get list of VMs with filtering and pagination
+	// (GET /vms)
+	GetVMs(c *gin.Context, params GetVMsParams)
+	// Remove VMs from inspection queue or stop inspector entirely
+	// (DELETE /vms/inspector)
+	RemoveVMsFromInspection(c *gin.Context)
+	// Get inspector status
+	// (GET /vms/inspector)
+	GetInspectorStatus(c *gin.Context)
+	// Add more VMs to inspection queue
+	// (PATCH /vms/inspector)
+	AddVMsToInspection(c *gin.Context)
+	// Start inspection for VMs
+	// (POST /vms/inspector)
+	StartInspection(c *gin.Context)
+	// Get inspection status for a specific VM
+	// (GET /vms/{id}/inspector)
+	GetVMInspectionStatus(c *gin.Context, id int)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -132,6 +154,164 @@ func (siw *ServerInterfaceWrapper) GetInventory(c *gin.Context) {
 	siw.Handler.GetInventory(c)
 }
 
+// GetVMs operation middleware
+func (siw *ServerInterfaceWrapper) GetVMs(c *gin.Context) {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetVMsParams
+
+	// ------------- Optional query parameter "issues" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "issues", c.Request.URL.Query(), &params.Issues)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter issues: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "datacenters" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "datacenters", c.Request.URL.Query(), &params.Datacenters)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter datacenters: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "clusters" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "clusters", c.Request.URL.Query(), &params.Clusters)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter clusters: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "disksize" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "disksize", c.Request.URL.Query(), &params.Disksize)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter disksize: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "memorysize" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "memorysize", c.Request.URL.Query(), &params.Memorysize)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter memorysize: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "status", c.Request.URL.Query(), &params.Status)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter status: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "page", c.Request.URL.Query(), &params.Page)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter page: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "pageSize" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "pageSize", c.Request.URL.Query(), &params.PageSize)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter pageSize: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetVMs(c, params)
+}
+
+// RemoveVMsFromInspection operation middleware
+func (siw *ServerInterfaceWrapper) RemoveVMsFromInspection(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.RemoveVMsFromInspection(c)
+}
+
+// GetInspectorStatus operation middleware
+func (siw *ServerInterfaceWrapper) GetInspectorStatus(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetInspectorStatus(c)
+}
+
+// AddVMsToInspection operation middleware
+func (siw *ServerInterfaceWrapper) AddVMsToInspection(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.AddVMsToInspection(c)
+}
+
+// StartInspection operation middleware
+func (siw *ServerInterfaceWrapper) StartInspection(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.StartInspection(c)
+}
+
+// GetVMInspectionStatus operation middleware
+func (siw *ServerInterfaceWrapper) GetVMInspectionStatus(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetVMInspectionStatus(c, id)
+}
+
 // GinServerOptions provides options for the Gin server.
 type GinServerOptions struct {
 	BaseURL      string
@@ -166,4 +346,10 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.POST(options.BaseURL+"/collector", wrapper.StartCollector)
 	router.POST(options.BaseURL+"/collector/reset", wrapper.ResetCollector)
 	router.GET(options.BaseURL+"/inventory", wrapper.GetInventory)
+	router.GET(options.BaseURL+"/vms", wrapper.GetVMs)
+	router.DELETE(options.BaseURL+"/vms/inspector", wrapper.RemoveVMsFromInspection)
+	router.GET(options.BaseURL+"/vms/inspector", wrapper.GetInspectorStatus)
+	router.PATCH(options.BaseURL+"/vms/inspector", wrapper.AddVMsToInspection)
+	router.POST(options.BaseURL+"/vms/inspector", wrapper.StartInspection)
+	router.GET(options.BaseURL+"/vms/:id/inspector", wrapper.GetVMInspectionStatus)
 }

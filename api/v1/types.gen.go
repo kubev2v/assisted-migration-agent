@@ -33,6 +33,40 @@ const (
 	CollectorStatusStatusReady      CollectorStatusStatus = "ready"
 )
 
+// Defines values for InspectionStatusState.
+const (
+	InspectionStatusStateCompleted InspectionStatusState = "completed"
+	InspectionStatusStateError     InspectionStatusState = "error"
+	InspectionStatusStatePending   InspectionStatusState = "pending"
+	InspectionStatusStateRunning   InspectionStatusState = "running"
+)
+
+// Defines values for InspectorStatusState.
+const (
+	InspectorStatusStateError   InspectorStatusState = "error"
+	InspectorStatusStateReady   InspectorStatusState = "ready"
+	InspectorStatusStateRunning InspectorStatusState = "running"
+)
+
+// Defines values for GetVMsParamsDisksize.
+const (
+	N010TB  GetVMsParamsDisksize = "0-10TB"
+	N1120TB GetVMsParamsDisksize = "11-20TB"
+	N2150TB GetVMsParamsDisksize = "21-50TB"
+	N50TB   GetVMsParamsDisksize = "50+TB"
+)
+
+// Defines values for GetVMsParamsMemorysize.
+const (
+	N04GB     GetVMsParamsMemorysize = "0-4GB"
+	N129256GB GetVMsParamsMemorysize = "129-256GB"
+	N1732GB   GetVMsParamsMemorysize = "17-32GB"
+	N256GB    GetVMsParamsMemorysize = "256+GB"
+	N3364GB   GetVMsParamsMemorysize = "33-64GB"
+	N516GB    GetVMsParamsMemorysize = "5-16GB"
+	N65128GB  GetVMsParamsMemorysize = "65-128GB"
+)
+
 // AgentModeRequest defines model for AgentModeRequest.
 type AgentModeRequest struct {
 	Mode AgentModeRequestMode `json:"mode"`
@@ -75,8 +109,121 @@ type CollectorStatus struct {
 // CollectorStatusStatus defines model for CollectorStatus.Status.
 type CollectorStatusStatus string
 
+// InspectionStatus defines model for InspectionStatus.
+type InspectionStatus struct {
+	// Error Error message when state is error
+	Error *string `json:"error,omitempty"`
+
+	// Results Inspection results
+	Results *map[string]interface{} `json:"results,omitempty"`
+
+	// State Current inspection state
+	State InspectionStatusState `json:"state"`
+}
+
+// InspectionStatusState Current inspection state
+type InspectionStatusState string
+
+// InspectorStatus defines model for InspectorStatus.
+type InspectorStatus struct {
+	// Error Error message when state is error
+	Error *string `json:"error,omitempty"`
+
+	// State Inspector state
+	State InspectorStatusState `json:"state"`
+}
+
+// InspectorStatusState Inspector state
+type InspectorStatusState string
+
+// VM defines model for VM.
+type VM struct {
+	// Cluster Cluster name
+	Cluster string `json:"cluster"`
+
+	// Datacenter Datacenter name
+	Datacenter string `json:"datacenter"`
+
+	// DiskSize Total disk size (e.g., 12GB)
+	DiskSize string `json:"diskSize"`
+
+	// Id VM ID
+	Id         int              `json:"id"`
+	Inspection InspectionStatus `json:"inspection"`
+
+	// Issues List of issues found during inspection
+	Issues []string `json:"issues"`
+
+	// Memory Memory size (e.g., 16GB)
+	Memory string `json:"memory"`
+
+	// Name VM name
+	Name string `json:"name"`
+
+	// VCenterState vCenter state (e.g., green, yellow, red)
+	VCenterState string `json:"vCenterState"`
+}
+
+// VMIdArray Array of VM IDs
+type VMIdArray = []int
+
+// VMListResponse defines model for VMListResponse.
+type VMListResponse struct {
+	// Page Current page number
+	Page int `json:"page"`
+
+	// PageCount Total number of pages
+	PageCount int `json:"pageCount"`
+
+	// Total Total number of VMs matching the filter
+	Total int  `json:"total"`
+	Vms   []VM `json:"vms"`
+}
+
+// GetVMsParams defines parameters for GetVMs.
+type GetVMsParams struct {
+	// Issues Filter by issues (OR logic - matches VMs with any of the specified issues)
+	Issues *[]string `form:"issues,omitempty" json:"issues,omitempty"`
+
+	// Datacenters Filter by datacenters (OR logic - matches VMs in any of the specified datacenters)
+	Datacenters *[]string `form:"datacenters,omitempty" json:"datacenters,omitempty"`
+
+	// Clusters Filter by clusters (OR logic - matches VMs in any of the specified clusters)
+	Clusters *[]string `form:"clusters,omitempty" json:"clusters,omitempty"`
+
+	// Disksize Filter by disk size ranges (OR logic - matches VMs in any of the specified ranges)
+	Disksize *[]GetVMsParamsDisksize `form:"disksize,omitempty" json:"disksize,omitempty"`
+
+	// Memorysize Filter by memory size ranges (OR logic - matches VMs in any of the specified ranges)
+	Memorysize *[]GetVMsParamsMemorysize `form:"memorysize,omitempty" json:"memorysize,omitempty"`
+
+	// Status Filter by status (OR logic - matches VMs with any of the specified statuses)
+	Status *[]string `form:"status,omitempty" json:"status,omitempty"`
+
+	// Page Page number for pagination
+	Page *int `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize Number of items per page
+	PageSize *int `form:"pageSize,omitempty" json:"pageSize,omitempty"`
+}
+
+// GetVMsParamsDisksize defines parameters for GetVMs.
+type GetVMsParamsDisksize string
+
+// GetVMsParamsMemorysize defines parameters for GetVMs.
+type GetVMsParamsMemorysize string
+
 // SetAgentModeJSONRequestBody defines body for SetAgentMode for application/json ContentType.
 type SetAgentModeJSONRequestBody = AgentModeRequest
 
 // StartCollectorJSONRequestBody defines body for StartCollector for application/json ContentType.
 type StartCollectorJSONRequestBody = CollectorStartRequest
+
+// RemoveVMsFromInspectionJSONRequestBody defines body for RemoveVMsFromInspection for application/json ContentType.
+type RemoveVMsFromInspectionJSONRequestBody = VMIdArray
+
+// AddVMsToInspectionJSONRequestBody defines body for AddVMsToInspection for application/json ContentType.
+type AddVMsToInspectionJSONRequestBody = VMIdArray
+
+// StartInspectionJSONRequestBody defines body for StartInspection for application/json ContentType.
+type StartInspectionJSONRequestBody = VMIdArray

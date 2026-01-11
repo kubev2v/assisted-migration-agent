@@ -117,6 +117,218 @@ paths:
         '500':
           description: Internal server error
 
+  /vms:
+    get:
+      summary: Get list of VMs with filtering and pagination
+      operationId: getVMs
+      parameters:
+        - name: issues
+          in: query
+          description: Filter by issues (OR logic - matches VMs with any of the specified issues)
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+          example: ["issue1", "issue2"]
+        - name: datacenters
+          in: query
+          description: Filter by datacenters (OR logic - matches VMs in any of the specified datacenters)
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+          example: ["dc1", "dc2"]
+        - name: clusters
+          in: query
+          description: Filter by clusters (OR logic - matches VMs in any of the specified clusters)
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+          example: ["cluster1", "cluster2"]
+        - name: disksize
+          in: query
+          description: Filter by disk size ranges (OR logic - matches VMs in any of the specified ranges)
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - 0-10TB
+                - 11-20TB
+                - 21-50TB
+                - 50+TB
+          style: form
+          explode: true
+          example: ["0-10TB", "11-20TB"]
+        - name: memorysize
+          in: query
+          description: Filter by memory size ranges (OR logic - matches VMs in any of the specified ranges)
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - 0-4GB
+                - 5-16GB
+                - 17-32GB
+                - 33-64GB
+                - 65-128GB
+                - 129-256GB
+                - 256+GB
+          style: form
+          explode: true
+          example: ["5-16GB", "17-32GB"]
+        - name: status
+          in: query
+          description: Filter by status (OR logic - matches VMs with any of the specified statuses)
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+          example: ["status1", "status2"]
+        - name: page
+          in: query
+          description: Page number for pagination
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: pageSize
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: List of VMs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VMListResponse'
+        '400':
+          description: Invalid request parameters
+        '500':
+          description: Internal server error
+
+  /vms/{id}/inspector:
+    get:
+      summary: Get inspection status for a specific VM
+      operationId: getVMInspectionStatus
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: VM ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: VM inspection status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionStatus'
+        '404':
+          description: VM not found
+        '500':
+          description: Internal server error
+
+  /vms/inspector:
+    get:
+      summary: Get inspector status
+      operationId: getInspectorStatus
+      responses:
+        '200':
+          description: Inspector status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectorStatus'
+        '500':
+          description: Internal server error
+    post:
+      summary: Start inspection for VMs
+      operationId: startInspection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VMIdArray'
+            example: [1233, 1234, 1235]
+      responses:
+        '202':
+          description: Inspection started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectorStatus'
+        '400':
+          description: Invalid request
+        '409':
+          description: Inspector already running
+        '500':
+          description: Internal server error
+    patch:
+      summary: Add more VMs to inspection queue
+      operationId: addVMsToInspection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VMIdArray'
+            example: [1236, 1237]
+      responses:
+        '202':
+          description: VMs added to inspection queue
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectorStatus'
+        '400':
+          description: Invalid request
+        '404':
+          description: Inspector not running
+        '500':
+          description: Internal server error
+    delete:
+      summary: Remove VMs from inspection queue or stop inspector entirely
+      operationId: removeVMsFromInspection
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VMIdArray'
+            example: [1236, 1237]
+        description: Optional array of VM IDs to remove from queue. If not provided, stops the inspector entirely.
+      responses:
+        '200':
+          description: VMs removed from queue
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectorStatus'
+        '204':
+          description: Inspector stopped (when no request body provided)
+        '400':
+          description: Invalid request
+        '404':
+          description: Inspector not running
+        '500':
+          description: Internal server error
+
 components:
   schemas:
     CollectorStartRequest:
@@ -185,3 +397,109 @@ components:
           enum:
             - connected
             - disconnected
+
+    InspectionStatus:
+      type: object
+      required:
+        - state
+      properties:
+        state:
+          type: string
+          enum:
+            - pending
+            - running
+            - completed
+            - error
+          description: Current inspection state
+        error:
+          type: string
+          description: Error message when state is error
+        results:
+          type: object
+          description: Inspection results
+
+    VM:
+      type: object
+      required:
+        - name
+        - id
+        - vCenterState
+        - datacenter
+        - cluster
+        - diskSize
+        - memory
+        - issues
+        - inspection
+      properties:
+        name:
+          type: string
+          description: VM name
+        id:
+          type: integer
+          description: VM ID
+        vCenterState:
+          type: string
+          description: vCenter state (e.g., green, yellow, red)
+        datacenter:
+          type: string
+          description: Datacenter name
+        cluster:
+          type: string
+          description: Cluster name
+        diskSize:
+          type: string
+          description: Total disk size (e.g., 12GB)
+        memory:
+          type: string
+          description: Memory size (e.g., 16GB)
+        issues:
+          type: array
+          items:
+            type: string
+          description: List of issues found during inspection
+        inspection:
+          $ref: '#/components/schemas/InspectionStatus'
+
+    VMListResponse:
+      type: object
+      required:
+        - vms
+        - total
+        - page
+        - pageCount
+      properties:
+        vms:
+          type: array
+          items:
+            $ref: '#/components/schemas/VM'
+        total:
+          type: integer
+          description: Total number of VMs matching the filter
+        page:
+          type: integer
+          description: Current page number
+        pageCount:
+          type: integer
+          description: Total number of pages
+
+    InspectorStatus:
+      type: object
+      required:
+        - state
+      properties:
+        state:
+          type: string
+          enum:
+            - ready
+            - running
+            - error
+          description: Inspector state
+        error:
+          type: string
+          description: Error message when state is error
+
+    VMIdArray:
+      type: array
+      items:
+        type: integer
+      description: Array of VM IDs
