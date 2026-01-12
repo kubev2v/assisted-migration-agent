@@ -15,7 +15,7 @@ import (
 // GetCollectorStatus returns the collector status
 // (GET /collector)
 func (h *Handler) GetCollectorStatus(c *gin.Context) {
-	status := h.collectorSrv.GetStatus(c.Request.Context())
+	status := h.collectorSrv.GetStatus()
 	c.JSON(http.StatusOK, v1.NewCollectorStatus(status))
 }
 
@@ -60,36 +60,15 @@ func (h *Handler) StartCollector(c *gin.Context) {
 	}
 
 	// Return current state after starting
-	status := h.collectorSrv.GetStatus(c.Request.Context())
+	status := h.collectorSrv.GetStatus()
 	c.JSON(http.StatusAccepted, v1.NewCollectorStatus(status))
 }
 
 // StopCollector stops the collection but keeps credentials for retry
 // (DELETE /collector)
 func (h *Handler) StopCollector(c *gin.Context) {
-	if err := h.collectorSrv.Stop(c.Request.Context()); err != nil {
-		zap.S().Named("collector_handler").Errorw("failed to stop collector", "error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to stop collector"})
-		return
-	}
+	h.collectorSrv.Stop()
 
-	status := h.collectorSrv.GetStatus(c.Request.Context())
-	c.JSON(http.StatusOK, v1.NewCollectorStatus(status))
-}
-
-func (h *Handler) ResetCollector(c *gin.Context) {
-	if err := h.collectorSrv.Reset(c.Request.Context()); err != nil {
-		switch err.(type) {
-		case *srvErrors.CollectionInProgressError:
-			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
-		default:
-			zap.S().Named("collector_handler").Errorw("failed to start collector", "error", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to reset the collector"})
-		}
-		return
-	}
-
-	// Return current state after starting
-	status := h.collectorSrv.GetStatus(c.Request.Context())
+	status := h.collectorSrv.GetStatus()
 	c.JSON(http.StatusOK, v1.NewCollectorStatus(status))
 }

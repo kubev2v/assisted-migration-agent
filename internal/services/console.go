@@ -22,7 +22,7 @@ import (
 )
 
 type Collector interface {
-	GetStatus(context.Context) models.CollectorStatus
+	GetStatus() models.CollectorStatus
 }
 
 type Console struct {
@@ -187,7 +187,7 @@ func (c *Console) run() {
 
 func (c *Console) dispatchStatus() *models.Future[models.Result[any]] {
 	return c.scheduler.AddWork(func(ctx context.Context) (any, error) {
-		return struct{}{}, c.client.UpdateAgentStatus(ctx, c.agentID, c.sourceID, c.version, models.CollectorStatusType(c.collector.GetStatus(ctx).State))
+		return struct{}{}, c.client.UpdateAgentStatus(ctx, c.agentID, c.sourceID, c.version, models.CollectorStatusType(c.collector.GetStatus().State))
 	})
 }
 

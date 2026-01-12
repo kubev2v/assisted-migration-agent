@@ -128,36 +128,6 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
         },
         /**
          * 
-         * @summary Reset collector state
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        resetCollector: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            const localVarPath = `/collector/reset`;
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-            localVarHeaderParameter['Accept'] = 'application/json';
-
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
-        /**
-         * 
          * @summary Change agent mode
          * @param {AgentModeRequest} agentModeRequest 
          * @param {*} [options] Override http request option.
@@ -302,18 +272,6 @@ export const DefaultApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
-         * @summary Reset collector state
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async resetCollector(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<CollectorStatus>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.resetCollector(options);
-            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['DefaultApi.resetCollector']?.[localVarOperationServerIndex]?.url;
-            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
-        },
-        /**
-         * 
          * @summary Change agent mode
          * @param {AgentModeRequest} agentModeRequest 
          * @param {*} [options] Override http request option.
@@ -388,15 +346,6 @@ export const DefaultApiFactory = function (configuration?: Configuration, basePa
         },
         /**
          * 
-         * @summary Reset collector state
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        resetCollector(options?: RawAxiosRequestConfig): AxiosPromise<CollectorStatus> {
-            return localVarFp.resetCollector(options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 
          * @summary Change agent mode
          * @param {AgentModeRequest} agentModeRequest 
          * @param {*} [options] Override http request option.
@@ -454,14 +403,6 @@ export interface DefaultApiInterface {
      * @throws {RequiredError}
      */
     getInventory(options?: RawAxiosRequestConfig): AxiosPromise<Inventory>;
-
-    /**
-     * 
-     * @summary Reset collector state
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     */
-    resetCollector(options?: RawAxiosRequestConfig): AxiosPromise<CollectorStatus>;
 
     /**
      * 
@@ -523,16 +464,6 @@ export class DefaultApi extends BaseAPI implements DefaultApiInterface {
      */
     public getInventory(options?: RawAxiosRequestConfig) {
         return DefaultApiFp(this.configuration).getInventory(options).then((request) => request(this.axios, this.basePath));
-    }
-
-    /**
-     * 
-     * @summary Reset collector state
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     */
-    public resetCollector(options?: RawAxiosRequestConfig) {
-        return DefaultApiFp(this.configuration).resetCollector(options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

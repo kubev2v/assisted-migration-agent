@@ -12,40 +12,73 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/services"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
-	"github.com/kubev2v/assisted-migration-agent/pkg/collector"
 	"github.com/kubev2v/assisted-migration-agent/pkg/scheduler"
-	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
 )
 
-type mockCollector struct {
+type mockWorkBuilder struct {
 	verifyErr  error
 	collectErr error
-}
-
-func (m *mockCollector) VerifyCredentials(ctx context.Context, creds *models.Credentials) error {
-	return m.verifyErr
-}
-
-func (m *mockCollector) Collect(ctx context.Context, creds *models.Credentials) error {
-	return m.collectErr
-}
-
-func (m *mockCollector) DB() libmodel.DB {
-	return nil
-}
-
-func (m *mockCollector) Close() {}
-
-type mockProcessor struct {
-	store      *store.Store
 	processErr error
+	store      *store.Store
 }
 
-func (m *mockProcessor) Process(ctx context.Context, c collector.Collector) error {
-	if m.processErr != nil {
-		return m.processErr
+func (m *mockWorkBuilder) WithCredentials(creds *models.Credentials) models.WorkBuilder {
+	return m
+}
+
+func (m *mockWorkBuilder) Build() []models.WorkUnit {
+	return []models.WorkUnit{
+		m.connecting(),
+		m.collecting(),
+		m.collected(),
 	}
-	return m.store.Inventory().Save(ctx, []byte(`{"vms":[]}`))
+}
+
+func (m *mockWorkBuilder) connecting() models.WorkUnit {
+	return models.WorkUnit{
+		Status: func() models.CollectorStatus {
+			return models.CollectorStatus{State: models.CollectorStateConnecting}
+		},
+		Work: func() func(ctx context.Context) (any, error) {
+			return func(ctx context.Context) (any, error) {
+				if m.verifyErr != nil {
+					return nil, m.verifyErr
+				}
+				return nil, nil
+			}
+		},
+	}
+}
+
+func (m *mockWorkBuilder) collecting() models.WorkUnit {
+	return models.WorkUnit{
+		Status: func() models.CollectorStatus {
+			return models.CollectorStatus{State: models.CollectorStateCollecting}
+		},
+		Work: func() func(ctx context.Context) (any, error) {
+			return func(ctx context.Context) (any, error) {
+				if m.collectErr != nil {
+					return nil, m.collectErr
+				}
+				if m.processErr != nil {
+					return nil, m.processErr
+				}
+				// Save mock inventory
+				return nil, m.store.Inventory().Save(ctx, []byte(`{"vms":[]}`))
+			}
+		},
+	}
+}
+
+func (m *mockWorkBuilder) collected() models.WorkUnit {
+	return models.WorkUnit{
+		Status: func() models.CollectorStatus {
+			return models.CollectorStatus{State: models.CollectorStateCollected}
+		},
+		Work: func() func(ctx context.Context) (any, error) {
+			return func(ctx context.Context) (any, error) { return nil, nil }
+		},
+	}
 }
 
 var _ = Describe("CollectorService", func() {
@@ -69,7 +102,7 @@ var _ = Describe("CollectorService", func() {
 
 		st = store.NewStore(db)
 		sched = scheduler.NewScheduler(1)
-		srv = services.NewCollectorService(sched, st, &mockCollector{}, &mockProcessor{store: st})
+		srv = services.NewCollectorService(sched, &mockWorkBuilder{store: st})
 	})
 
 	AfterEach(func() {
@@ -83,24 +116,23 @@ var _ = Describe("CollectorService", func() {
 
 	Describe("NewCollectorService", func() {
 		It("should create a service with ready state", func() {
-			status := srv.GetStatus(ctx)
+			status := srv.GetStatus()
 			Expect(status.State).To(Equal(models.CollectorStateReady))
 		})
 	})
 
 	Describe("GetStatus", func() {
 		It("should return ready state initially", func() {
-			status := srv.GetStatus(ctx)
+			status := srv.GetStatus()
 			Expect(status.State).To(Equal(models.CollectorStateReady))
 		})
 	})
 
 	Describe("Stop", func() {
 		It("should reset state to ready", func() {
-			err := srv.Stop(ctx)
-			Expect(err).NotTo(HaveOccurred())
+			srv.Stop()
 
-			status := srv.GetStatus(ctx)
+			status := srv.GetStatus()
 			Expect(status.State).To(Equal(models.CollectorStateReady))
 		})
 	})
@@ -117,7 +149,7 @@ var _ = Describe("CollectorService", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() models.CollectorState {
-				return srv.GetStatus(ctx).State
+				return srv.GetStatus().State
 			}).Should(Equal(models.CollectorStateCollected))
 
 			inv, err := st.Inventory().Get(context.TODO())
@@ -126,8 +158,10 @@ var _ = Describe("CollectorService", func() {
 		})
 
 		It("should return error when credentials verification fails", func() {
-			mockColl := &mockCollector{verifyErr: errors.New("connection refused")}
-			srv = services.NewCollectorService(sched, st, mockColl, &mockProcessor{store: st})
+			srv = services.NewCollectorService(sched, &mockWorkBuilder{
+				store:     st,
+				verifyErr: errors.New("connection refused"),
+			})
 
 			creds := &models.Credentials{
 				URL:      "https://vcenter.example.com",
@@ -139,13 +173,15 @@ var _ = Describe("CollectorService", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			Eventually(func() models.CollectorState {
-				return srv.GetStatus(ctx).State
+				return srv.GetStatus().State
 			}).Should(Equal(models.CollectorStateError))
 		})
 
 		It("should set error state when collection fails", func() {
-			mockColl := &mockCollector{collectErr: errors.New("collection failed")}
-			srv = services.NewCollectorService(sched, st, mockColl, &mockProcessor{store: st})
+			srv = services.NewCollectorService(sched, &mockWorkBuilder{
+				store:      st,
+				collectErr: errors.New("collection failed"),
+			})
 
 			creds := &models.Credentials{
 				URL:      "https://vcenter.example.com",
@@ -157,16 +193,18 @@ var _ = Describe("CollectorService", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() models.CollectorState {
-				return srv.GetStatus(ctx).State
+				return srv.GetStatus().State
 			}).Should(Equal(models.CollectorStateError))
 
-			status := srv.GetStatus(ctx)
-			Expect(status.Error).To(ContainSubstring("collection failed"))
+			status := srv.GetStatus()
+			Expect(status.Error.Error()).To(ContainSubstring("collection failed"))
 		})
 
 		It("should set error state when processor fails", func() {
-			mockProc := &mockProcessor{store: st, processErr: errors.New("processing failed")}
-			srv = services.NewCollectorService(sched, st, &mockCollector{}, mockProc)
+			srv = services.NewCollectorService(sched, &mockWorkBuilder{
+				store:      st,
+				processErr: errors.New("processing failed"),
+			})
 
 			creds := &models.Credentials{
 				URL:      "https://vcenter.example.com",
@@ -178,11 +216,11 @@ var _ = Describe("CollectorService", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() models.CollectorState {
-				return srv.GetStatus(ctx).State
+				return srv.GetStatus().State
 			}).Should(Equal(models.CollectorStateError))
 
-			status := srv.GetStatus(ctx)
-			Expect(status.Error).To(ContainSubstring("processing failed"))
+			status := srv.GetStatus()
+			Expect(status.Error.Error()).To(ContainSubstring("processing failed"))
 		})
 
 		It("should return error when collection already in progress", func() {

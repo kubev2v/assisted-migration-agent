@@ -29,8 +29,9 @@ func NewCollectorStatus(status models.CollectorStatus) CollectorStatus {
 		c.Status = CollectorStatusStatusReady
 	}
 
-	if status.Error != "" {
-		c.Error = &status.Error
+	if status.Error != nil {
+		e := status.Error.Error()
+		c.Error = &e
 	}
 
 	return c

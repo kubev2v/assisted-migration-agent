@@ -28,9 +28,6 @@ type ServerInterface interface {
 	// Start inventory collection
 	// (POST /collector)
 	StartCollector(c *gin.Context)
-	// Reset collector state
-	// (POST /collector/reset)
-	ResetCollector(c *gin.Context)
 	// Get collected inventory
 	// (GET /inventory)
 	GetInventory(c *gin.Context)
@@ -126,19 +123,6 @@ func (siw *ServerInterfaceWrapper) StartCollector(c *gin.Context) {
 	}
 
 	siw.Handler.StartCollector(c)
-}
-
-// ResetCollector operation middleware
-func (siw *ServerInterfaceWrapper) ResetCollector(c *gin.Context) {
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.ResetCollector(c)
 }
 
 // GetInventory operation middleware
@@ -344,7 +328,6 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.DELETE(options.BaseURL+"/collector", wrapper.StopCollector)
 	router.GET(options.BaseURL+"/collector", wrapper.GetCollectorStatus)
 	router.POST(options.BaseURL+"/collector", wrapper.StartCollector)
-	router.POST(options.BaseURL+"/collector/reset", wrapper.ResetCollector)
 	router.GET(options.BaseURL+"/inventory", wrapper.GetInventory)
 	router.GET(options.BaseURL+"/vms", wrapper.GetVMs)
 	router.DELETE(options.BaseURL+"/vms/inspector", wrapper.RemoveVMsFromInspection)

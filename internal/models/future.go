@@ -19,17 +19,21 @@ func NewFuture[T any](input chan T, cancel context.CancelFunc) *Future[T] {
 		cancel: cancel,
 	}
 
-	go func() {
-		v := <-f.input
-		f.lock.Lock()
-		defer f.lock.Unlock()
-
-		f.value = v
-		f.inputClosed = true
-		f.cancel()
-	}()
+	// go func() {
+	// 	v := <-f.input
+	// 	f.lock.Lock()
+	// 	defer f.lock.Unlock()
+	//
+	// 	f.value = v
+	// 	f.inputClosed = true
+	// 	f.cancel()
+	// }()
 
 	return f
+}
+
+func (f *Future[T]) C() chan T {
+	return f.input
 }
 
 func (f *Future[T]) IsResolved() bool {

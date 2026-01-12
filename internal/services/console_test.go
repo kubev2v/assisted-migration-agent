@@ -32,7 +32,7 @@ func NewMockCollector(state models.CollectorState) *MockCollector {
 	}
 }
 
-func (m *MockCollector) GetStatus(ctx context.Context) models.CollectorStatus {
+func (m *MockCollector) GetStatus() models.CollectorStatus {
 	return models.CollectorStatus{
 		State: m.state,
 	}

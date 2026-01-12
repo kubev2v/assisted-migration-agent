@@ -1,5 +1,9 @@
 package models
 
+import (
+	"context"
+)
+
 // CollectorState represents the current state of the collector.
 type CollectorState string
 
@@ -21,5 +25,16 @@ const (
 // CollectorStatus holds the current collector state and metadata.
 type CollectorStatus struct {
 	State CollectorState
-	Error string
+	Error error
+}
+
+type WorkBuilder interface {
+	WithCredentials(creds *Credentials) WorkBuilder
+	Build() []WorkUnit
+}
+
+// WorkUnit represents a unit of work in the collector workflow.
+type WorkUnit struct {
+	Status func() CollectorStatus
+	Work   func() func(ctx context.Context) (any, error)
 }

@@ -175,6 +175,12 @@ func (b *Builder) Process(ctx context.Context, c collector.Collector) error {
 		inventory.Clusters[clusterID] = *clusterInv
 	}
 
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	// Store the inventory
 	invData, err := json.Marshal(inventory)
 	if err != nil {

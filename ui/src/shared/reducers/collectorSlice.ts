@@ -44,13 +44,6 @@ const initialState: CollectorState = {
   initialized: false,
 };
 
-export const resetCollector = createAsyncThunk(
-  'collector/reset',
-  async () => {
-    await apiClient.resetCollector();
-  }
-);
-
 export const fetchCollectorStatus = createAsyncThunk(
   'collector/fetchStatus',
   async (_, { rejectWithValue }) => {

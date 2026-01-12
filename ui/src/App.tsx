@@ -5,7 +5,7 @@ import { ReportContainer } from "@pages/Report";
 import { Layout } from "@shared/components";
 import { useAppDispatch, useAppSelector } from "@shared/store";
 import { fetchAgentStatus, changeAgentMode } from "@shared/reducers/agentSlice";
-import { fetchInventory, fetchCollectorStatus, startCollection, stopCollection, resetCollector } from "@shared/reducers/collectorSlice";
+import { fetchInventory, fetchCollectorStatus, startCollection, stopCollection } from "@shared/reducers/collectorSlice";
 import { createCollectorPollingService, isCollectorRunning } from "@shared/services";
 import { AgentStatusModeEnum, AgentModeRequestModeEnum, CollectorStatusStatusEnum } from "@generated/index";
 import { Credentials } from "@models";
@@ -27,9 +27,6 @@ function App() {
     const isCollecting = isCollectorRunning(status);
 
     const handleCollect = useCallback(async (credentials: Credentials, dataShared: boolean) => {
-        // Reset collector to clear any previous error state
-        await dispatch(resetCollector()).catch(() => {});
-        
         dispatch(startCollection({
             url: credentials.url,
             username: credentials.username,
@@ -53,9 +50,8 @@ function App() {
         dispatch(stopCollection());
     }, [dispatch, collectorPollingService]);
 
-    // Reset collector and fetch initial data
+    // Fetch initial data
     useEffect(() => {
-        dispatch(resetCollector()).catch(() => {});
         dispatch(fetchAgentStatus());
         dispatch(fetchCollectorStatus());
         dispatch(fetchInventory());
