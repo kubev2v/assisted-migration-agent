@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -29,7 +30,8 @@ type Console struct {
 	agentID           uuid.UUID
 	sourceID          uuid.UUID
 	version           string
-	state             chan models.ConsoleStatus
+	state             models.ConsoleStatus
+	mu                sync.Mutex
 	scheduler         *scheduler.Scheduler
 	client            *console.Client
 	close             chan any
@@ -65,20 +67,18 @@ func NewConsoleService(cfg config.Agent, s *scheduler.Scheduler, client *console
 }
 
 func newConsoleService(cfg config.Agent, s *scheduler.Scheduler, client *console.Client, collector Collector, store *store.Store, defaultStatus models.ConsoleStatus) *Console {
-	c := &Console{
+	return &Console{
 		updateInterval: cfg.UpdateInterval,
 		agentID:        uuid.MustParse(cfg.ID),
 		sourceID:       uuid.MustParse(cfg.SourceID),
 		version:        cfg.Version,
 		scheduler:      s,
-		state:          make(chan models.ConsoleStatus, 1),
+		state:          defaultStatus,
 		client:         client,
 		close:          make(chan any),
 		store:          store,
 		collector:      collector,
 	}
-	c.state <- defaultStatus
-	return c
 }
 
 // IsDataSharingAllowed checks if the user has allowed data sharing.
@@ -91,35 +91,39 @@ func (c *Console) IsDataSharingAllowed(ctx context.Context) (bool, error) {
 }
 
 func (c *Console) SetMode(mode models.AgentMode) {
-	s := <-c.state
+	c.mu.Lock()
+	prevTarget := c.state.Target
 
 	switch mode {
 	case models.AgentModeConnected:
-		c.state <- models.ConsoleStatus{Current: s.Current, Target: models.ConsoleStatusConnected}
+		c.state.Target = models.ConsoleStatusConnected
+		c.mu.Unlock()
 		zap.S().Debugw("starting run loop for connected mode")
 		go c.run()
 	case models.AgentModeDisconnected:
-		if s.Target == models.ConsoleStatusConnected {
+		c.state.Target = models.ConsoleStatusDisconnected
+		c.mu.Unlock()
+		if prevTarget == models.ConsoleStatusConnected {
 			zap.S().Debugw("stopping run loop for disconnected mode")
 			c.close <- struct{}{}
 		}
-		c.state <- models.ConsoleStatus{Current: s.Current, Target: models.ConsoleStatusDisconnected}
+	default:
+		c.mu.Unlock()
 	}
 
-	zap.S().Named("console_service").Infow("agent mode changed", "current", mode, "target", s.Target)
+	zap.S().Named("console_service").Infow("agent mode changed", "current", mode, "target", prevTarget)
 }
 
 func (c *Console) Status() models.ConsoleStatus {
-	s := <-c.state
-	status := s
-	c.state <- s
-	return status
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.state
 }
 
 func (c *Console) setError(err error) {
-	s := <-c.state
-	s.Error = err
-	c.state <- s
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.state.Error = err
 }
 
 // run is the main loop that sends status and inventory updates to the console.
