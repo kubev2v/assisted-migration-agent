@@ -3,6 +3,7 @@ module github.com/kubev2v/assisted-migration-agent
 go 1.24.10
 
 require (
+	github.com/Masterminds/squirrel v1.5.4
 	github.com/creasty/defaults v1.8.0
 	github.com/duckdb/duckdb-go/v2 v2.5.4
 	github.com/ecordell/optgen v0.1.1
@@ -97,6 +98,8 @@ require (
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.7.7 // indirect
 	github.com/klauspost/compress v1.18.2 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
+	github.com/lann/builder v0.0.0-20180802200727-47ae307949d0 // indirect
+	github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/mailru/easyjson v0.9.1 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect

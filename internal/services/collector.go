@@ -97,8 +97,6 @@ func (c *CollectorService) run(ctx context.Context, done chan any, work []models
 				c.setState(models.CollectorStatus{State: models.CollectorStateError, Error: result.Err})
 				return
 			}
-			// TODO: Ideally, it's collector reposibility to save the inventory
-			// Check if the result has an inventory and save it.
 		}
 	}
 }

@@ -181,6 +181,17 @@ func (b *Builder) Process(ctx context.Context, c collector.Collector) error {
 	default:
 	}
 
+	// List Folders for VM storage mapping
+	folders := &[]vspheremodel.Folder{}
+	if err := db.List(folders, libmodel.FilterOptions{Detail: 1}); err != nil {
+		return fmt.Errorf("failed to list folders: %w", err)
+	}
+
+	// Store VMs in the database
+	if err := b.storeVMs(ctx, vms, hosts, clusters, datacenters, folders); err != nil {
+		return fmt.Errorf("failed to store VMs: %w", err)
+	}
+
 	// Store the inventory
 	invData, err := json.Marshal(inventory)
 	if err != nil {
@@ -212,6 +223,62 @@ func (b *Builder) validateVMs(ctx context.Context, vms *[]vspheremodel.VM) error
 		vm.Concerns = append(vm.Concerns, concerns...)
 	}
 
+	return nil
+}
+
+func (b *Builder) storeVMs(
+	ctx context.Context,
+	vms *[]vspheremodel.VM,
+	hosts *[]vspheremodel.Host,
+	clusters *[]vspheremodel.Cluster,
+	datacenters *[]vspheremodel.Datacenter,
+	folders *[]vspheremodel.Folder,
+) error {
+	// Build host -> cluster ID mapping
+	hostToClusterID := make(map[string]string, len(*hosts))
+	for _, host := range *hosts {
+		if host.ID != "" && host.Cluster != "" {
+			hostToClusterID[host.ID] = host.Cluster
+		}
+	}
+
+	// Build folder ID -> datacenter ID mapping
+	folderToDatacenterID := make(map[string]string, len(*folders))
+	for _, folder := range *folders {
+		folderToDatacenterID[folder.ID] = folder.Datacenter
+	}
+
+	// Build cluster ID -> name and cluster ID -> datacenter ID mappings
+	clusterIDToName := make(map[string]string, len(*clusters))
+	clusterIDToDatacenterID := make(map[string]string, len(*clusters))
+	for _, cluster := range *clusters {
+		clusterIDToName[cluster.ID] = cluster.Name
+		clusterIDToDatacenterID[cluster.ID] = folderToDatacenterID[cluster.Folder]
+	}
+
+	// Build datacenter ID -> name mapping
+	datacenterIDToName := make(map[string]string, len(*datacenters))
+	for _, dc := range *datacenters {
+		datacenterIDToName[dc.ID] = dc.Name
+	}
+
+	// Convert forklift VMs to model VMs
+	modelVMs := make([]models.VM, 0, len(*vms))
+	for _, vm := range *vms {
+		clusterID := hostToClusterID[vm.Host]
+		clusterName := clusterIDToName[clusterID]
+		datacenterID := clusterIDToDatacenterID[clusterID]
+		datacenterName := datacenterIDToName[datacenterID]
+
+		modelVMs = append(modelVMs, models.NewVMFromForklift(vm, clusterName, datacenterName))
+	}
+
+	// Store in the database
+	if err := b.store.VM().Insert(ctx, modelVMs...); err != nil {
+		return err
+	}
+
+	zap.S().Named("inventory").Infof("Stored %d VMs in database", len(modelVMs))
 	return nil
 }
 
