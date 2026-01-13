@@ -34,9 +34,9 @@ type ServerInterface interface {
 	// Get list of VMs with filtering and pagination
 	// (GET /vms)
 	GetVMs(c *gin.Context, params GetVMsParams)
-	// Remove VMs from inspection queue or stop inspector entirely
+	// Stop inspector entirely
 	// (DELETE /vms/inspector)
-	RemoveVMsFromInspection(c *gin.Context)
+	StopInspection(c *gin.Context)
 	// Get inspector status
 	// (GET /vms/inspector)
 	GetInspectorStatus(c *gin.Context)
@@ -49,9 +49,12 @@ type ServerInterface interface {
 	// Get details about a vm
 	// (GET /vms/{id})
 	GetVM(c *gin.Context, id string)
+	// Remove VM from inspection queue
+	// (DELETE /vms/{id}/inspector)
+	RemoveVMFromInspection(c *gin.Context, id string)
 	// Get inspection status for a specific VM
 	// (GET /vms/{id}/inspector)
-	GetVMInspectionStatus(c *gin.Context, id int)
+	GetVMInspectionStatus(c *gin.Context, id string)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -239,8 +242,8 @@ func (siw *ServerInterfaceWrapper) GetVMs(c *gin.Context) {
 	siw.Handler.GetVMs(c, params)
 }
 
-// RemoveVMsFromInspection operation middleware
-func (siw *ServerInterfaceWrapper) RemoveVMsFromInspection(c *gin.Context) {
+// StopInspection operation middleware
+func (siw *ServerInterfaceWrapper) StopInspection(c *gin.Context) {
 
 	for _, middleware := range siw.HandlerMiddlewares {
 		middleware(c)
@@ -249,7 +252,7 @@ func (siw *ServerInterfaceWrapper) RemoveVMsFromInspection(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.RemoveVMsFromInspection(c)
+	siw.Handler.StopInspection(c)
 }
 
 // GetInspectorStatus operation middleware
@@ -315,13 +318,37 @@ func (siw *ServerInterfaceWrapper) GetVM(c *gin.Context) {
 	siw.Handler.GetVM(c, id)
 }
 
+// RemoveVMFromInspection operation middleware
+func (siw *ServerInterfaceWrapper) RemoveVMFromInspection(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.RemoveVMFromInspection(c, id)
+}
+
 // GetVMInspectionStatus operation middleware
 func (siw *ServerInterfaceWrapper) GetVMInspectionStatus(c *gin.Context) {
 
 	var err error
 
 	// ------------- Path parameter "id" -------------
-	var id int
+	var id string
 
 	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {
@@ -373,10 +400,11 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.POST(options.BaseURL+"/collector", wrapper.StartCollector)
 	router.GET(options.BaseURL+"/inventory", wrapper.GetInventory)
 	router.GET(options.BaseURL+"/vms", wrapper.GetVMs)
-	router.DELETE(options.BaseURL+"/vms/inspector", wrapper.RemoveVMsFromInspection)
+	router.DELETE(options.BaseURL+"/vms/inspector", wrapper.StopInspection)
 	router.GET(options.BaseURL+"/vms/inspector", wrapper.GetInspectorStatus)
 	router.PATCH(options.BaseURL+"/vms/inspector", wrapper.AddVMsToInspection)
 	router.POST(options.BaseURL+"/vms/inspector", wrapper.StartInspection)
 	router.GET(options.BaseURL+"/vms/:id", wrapper.GetVM)
+	router.DELETE(options.BaseURL+"/vms/:id/inspector", wrapper.RemoveVMFromInspection)
 	router.GET(options.BaseURL+"/vms/:id/inspector", wrapper.GetVMInspectionStatus)
 }

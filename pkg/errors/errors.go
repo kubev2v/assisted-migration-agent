@@ -151,3 +151,43 @@ func IsVCenterError(err error) bool {
 	var e *VCenterError
 	return errors.As(err, &e)
 }
+
+// InspectorInProgressError indicates that an inspector is already running.
+type InspectorInProgressError struct{}
+
+func NewInspectionInProgressError() *InspectorInProgressError {
+	return &InspectorInProgressError{}
+}
+
+func (e *InspectorInProgressError) Error() string {
+	return "inspection already in progress"
+}
+
+// InspectorWorkError
+type InspectorWorkError struct {
+	msg string
+}
+
+func NewInspectorWorkError(format string, args ...any) error {
+	return &InspectorWorkError{
+		msg: fmt.Sprintf(format, args...),
+	}
+}
+
+func (e *InspectorWorkError) Error() string {
+	return e.msg
+}
+
+type InspectorNonExistVmError struct {
+	msg string
+}
+
+func NewInspectorNonExistVmError(format string, args ...any) error {
+	return &InspectorNonExistVmError{
+		msg: fmt.Sprintf(format, args...),
+	}
+}
+
+func (e *InspectorNonExistVmError) Error() string {
+	return e.msg
+}
