@@ -1,8 +1,10 @@
 package store
 
-import "database/sql"
+import (
+	"context"
+	"database/sql"
+)
 
-// Store provides access to all storage repositories.
 type Store struct {
 	db            *sql.DB
 	configuration *ConfigurationStore
@@ -11,11 +13,12 @@ type Store struct {
 }
 
 func NewStore(db *sql.DB) *Store {
+	qi := newQueryInterceptor(db)
 	return &Store{
 		db:            db,
-		configuration: NewConfigurationStore(db),
-		inventory:     NewInventoryStore(db),
-		vm:            NewVMStore(db),
+		configuration: NewConfigurationStore(qi),
+		inventory:     NewInventoryStore(qi),
+		vm:            NewVMStore(qi),
 	}
 }
 
@@ -33,4 +36,10 @@ func (s *Store) VM() *VMStore {
 
 func (s *Store) Close() error {
 	return s.db.Close()
+}
+
+type QueryInterceptor interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 }

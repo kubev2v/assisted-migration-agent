@@ -2,17 +2,16 @@ package store
 
 import (
 	"context"
-	"database/sql"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 )
 
 type VMStore struct {
-	db *sql.DB
+	db QueryInterceptor
 }
 
-func NewVMStore(db *sql.DB) *VMStore {
+func NewVMStore(db QueryInterceptor) *VMStore {
 	return &VMStore{db: db}
 }
 
