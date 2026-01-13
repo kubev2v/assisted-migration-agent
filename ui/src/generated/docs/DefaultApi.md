@@ -322,6 +322,7 @@ let diskSizeMax: number; //Maximum disk size in MB (optional) (default to undefi
 let memorySizeMin: number; //Minimum memory size in MB (optional) (default to undefined)
 let memorySizeMax: number; //Maximum memory size in MB (optional) (default to undefined)
 let status: Array<string>; //Filter by status (OR logic - matches VMs with any of the specified statuses) (optional) (default to undefined)
+let sort: Array<string>; //Sort fields with direction (e.g., \"name:asc\" or \"datacenter:desc,name:asc\"). Valid fields are name, vCenterState, datacenter, cluster, diskSize, memory. (optional) (default to undefined)
 let page: number; //Page number for pagination (optional) (default to 1)
 let pageSize: number; //Number of items per page (optional) (default to undefined)
 
@@ -334,6 +335,7 @@ const { status, data } = await apiInstance.getVMs(
     memorySizeMin,
     memorySizeMax,
     status,
+    sort,
     page,
     pageSize
 );
@@ -351,6 +353,7 @@ const { status, data } = await apiInstance.getVMs(
 | **memorySizeMin** | [**number**] | Minimum memory size in MB | (optional) defaults to undefined|
 | **memorySizeMax** | [**number**] | Maximum memory size in MB | (optional) defaults to undefined|
 | **status** | **Array&lt;string&gt;** | Filter by status (OR logic - matches VMs with any of the specified statuses) | (optional) defaults to undefined|
+| **sort** | **Array&lt;string&gt;** | Sort fields with direction (e.g., \&quot;name:asc\&quot; or \&quot;datacenter:desc,name:asc\&quot;). Valid fields are name, vCenterState, datacenter, cluster, diskSize, memory. | (optional) defaults to undefined|
 | **page** | [**number**] | Page number for pagination | (optional) defaults to 1|
 | **pageSize** | [**number**] | Number of items per page | (optional) defaults to undefined|
 

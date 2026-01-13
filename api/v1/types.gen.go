@@ -187,6 +187,9 @@ type GetVMsParams struct {
 	// Status Filter by status (OR logic - matches VMs with any of the specified statuses)
 	Status *[]string `form:"status,omitempty" json:"status,omitempty"`
 
+	// Sort Sort fields with direction (e.g., "name:asc" or "datacenter:desc,name:asc"). Valid fields are name, vCenterState, datacenter, cluster, diskSize, memory.
+	Sort *[]string `form:"sort,omitempty" json:"sort,omitempty"`
+
 	// Page Page number for pagination
 	Page *int `form:"page,omitempty" json:"page,omitempty"`
 

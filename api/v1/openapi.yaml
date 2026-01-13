@@ -176,6 +176,16 @@ paths:
           style: form
           explode: true
           example: ["status1", "status2"]
+        - name: sort
+          in: query
+          description: Sort fields with direction (e.g., "name:asc" or "datacenter:desc,name:asc"). Valid fields are name, vCenterState, datacenter, cluster, diskSize, memory.
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+          example: ["datacenter:asc", "name:desc"]
         - name: page
           in: query
           description: Page number for pagination

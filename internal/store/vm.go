@@ -28,8 +28,7 @@ func (s *VMStore) List(ctx context.Context, opts ...ListOption) ([]models.VM, er
 			"vms.id", "vms.name", "vms.state", "vms.datacenter", "vms.cluster",
 			"vms.disk_size", "vms.memory",
 			"vms.inspection_state", "vms.inspection_error", "vms.inspection_result",
-		).
-		OrderBy("vms.id")
+		)
 
 	for _, opt := range opts {
 		builder = opt(builder)
@@ -267,6 +266,47 @@ func WithLimit(limit uint64) ListOption {
 func WithOffset(offset uint64) ListOption {
 	return func(b sq.SelectBuilder) sq.SelectBuilder {
 		return b.Offset(offset)
+	}
+}
+
+// SortParam represents a single sort parameter with field name and direction.
+type SortParam struct {
+	Field string
+	Desc  bool
+}
+
+// apiFieldToDBColumn maps API field names to database column names
+var apiFieldToDBColumn = map[string]string{
+	"name":         "vms.name",
+	"vCenterState": "vms.state",
+	"datacenter":   "vms.datacenter",
+	"cluster":      "vms.cluster",
+	"diskSize":     "vms.disk_size",
+	"memory":       "vms.memory",
+}
+
+func WithDefaultSort() ListOption {
+	return func(b sq.SelectBuilder) sq.SelectBuilder {
+		return b.OrderBy("vms.id")
+	}
+}
+
+func WithSort(sorts []SortParam) ListOption {
+	return func(b sq.SelectBuilder) sq.SelectBuilder {
+		var orderClauses []string
+		for _, s := range sorts {
+			col, ok := apiFieldToDBColumn[s.Field]
+			if !ok {
+				continue
+			}
+			if s.Desc {
+				orderClauses = append(orderClauses, col+" DESC")
+			} else {
+				orderClauses = append(orderClauses, col+" ASC")
+			}
+		}
+		orderClauses = append(orderClauses, "vms.id")
+		return b.OrderBy(orderClauses...)
 	}
 }
 

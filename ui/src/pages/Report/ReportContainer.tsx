@@ -12,7 +12,7 @@ import {
   TabTitleText,
 } from "@patternfly/react-core";
 import { useAppSelector, useAppDispatch } from "@shared/store";
-import { fetchVMs, setPage, setPageSize } from "@shared/reducers";
+import { fetchVMs, setPage, setPageSize, setSort } from "@shared/reducers";
 import { Infra, InventoryData, VMs } from "@generated/index";
 import { DataSharingAlert } from "@shared/components";
 import Header from "./Header";
@@ -44,6 +44,11 @@ const ReportContainer: React.FC = () => {
   const handlePageSizeChange = (newPageSize: number) => {
     dispatch(setPageSize(newPageSize));
     dispatch(fetchVMs({ pageSize: newPageSize }));
+  };
+
+  const handleSortChange = (newSort: string[]) => {
+    dispatch(setSort(newSort));
+    dispatch(fetchVMs({ sort: newSort }));
   };
 
   if (!inventory) {
@@ -164,8 +169,10 @@ const ReportContainer: React.FC = () => {
                   pageSize={vmState.pageSize}
                   pageCount={vmState.pageCount}
                   loading={vmState.loading}
+                  sort={vmState.sort}
                   onPageChange={handlePageChange}
                   onPageSizeChange={handlePageSizeChange}
+                  onSortChange={handleSortChange}
                 />
               </div>
             </Tab>
