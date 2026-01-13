@@ -17,7 +17,7 @@ import { Infra, InventoryData, VMs } from "@generated/index";
 import { DataSharingAlert } from "@shared/components";
 import Header from "./Header";
 import Report from "./Report";
-import { VMTable } from "./VirtualMachines";
+import { VirtualMachinesView } from "./VirtualMachines";
 import { buildClusterViewModel, ClusterOption } from "./assessment-report/clusterView";
 
 const ReportContainer: React.FC = () => {
@@ -162,7 +162,7 @@ const ReportContainer: React.FC = () => {
             </Tab>
             <Tab eventKey={1} title={<TabTitleText>Virtual Machines</TabTitleText>}>
               <div style={{ marginTop: "24px" }}>
-                <VMTable
+                <VirtualMachinesView
                   vms={vmState.vms}
                   total={vmState.total}
                   page={vmState.page}

@@ -3,10 +3,13 @@ package store
 import (
 	"context"
 	"database/sql"
+
+	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
 )
 
 type Store struct {
 	db            *sql.DB
+	parser        *duckdb_parser.Parser
 	configuration *ConfigurationStore
 	inventory     *InventoryStore
 	vm            *VMStore
@@ -15,13 +18,19 @@ type Store struct {
 
 func NewStore(db *sql.DB) *Store {
 	qi := newQueryInterceptor(db)
+	parser := duckdb_parser.New(db, nil)
 	return &Store{
 		db:            db,
+		parser:        parser,
 		configuration: NewConfigurationStore(qi),
 		inventory:     NewInventoryStore(qi),
-		vm:            NewVMStore(qi),
+		vm:            NewVMStore(parser),
 		credentials:   NewCredentialsStore(qi),
 	}
+}
+
+func (s *Store) Parser() *duckdb_parser.Parser {
+	return s.parser
 }
 
 func (s *Store) Configuration() *ConfigurationStore {

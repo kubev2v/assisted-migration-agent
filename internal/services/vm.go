@@ -39,6 +39,10 @@ type VMListResult struct {
 	Total int
 }
 
+func (s *VMService) Get(ctx context.Context, id string) (*models.VM, error) {
+	return s.store.VM().Get(ctx, id)
+}
+
 func (s *VMService) List(ctx context.Context, params VMListParams) ([]models.VM, int, error) {
 	opts := s.buildListOptions(params)
 

@@ -511,6 +511,12 @@ components:
         host:
           type: string
           description: Reference to the ESXi host where the VM is running
+        datacenter:
+          type: string
+          description: Name of the datacenter containing the VM
+        cluster:
+          type: string
+          description: Name of the cluster containing the VM
         folder:
           type: string
           description: Reference to the inventory folder containing the VM

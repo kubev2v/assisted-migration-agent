@@ -18,6 +18,7 @@ var validSortFields = map[string]bool{
 	"cluster":      true,
 	"diskSize":     true,
 	"memory":       true,
+	"issues":       true,
 }
 
 const (
@@ -135,7 +136,14 @@ func (h *Handler) GetVMs(c *gin.Context, params v1.GetVMsParams) {
 // GetVM returns details for a specific VM
 // (GET /vms/{id})
 func (h *Handler) GetVM(c *gin.Context, id string) {
-	c.JSON(http.StatusNotImplemented, gin.H{"error": "not yet implemented"})
+	vm, err := h.vmSrv.Get(c.Request.Context(), id)
+	if err != nil {
+		zap.S().Named("vm_handler").Errorw("failed to get VM", "id", id, "error", err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "VM not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, v1.NewVMDetailsFromModel(*vm))
 }
 
 // GetVMInspectionStatus returns the inspection status for a specific VM

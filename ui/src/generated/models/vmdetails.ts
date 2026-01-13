@@ -59,6 +59,14 @@ export interface VMDetails {
      */
     'host'?: string;
     /**
+     * Name of the datacenter containing the VM
+     */
+    'datacenter'?: string;
+    /**
+     * Name of the cluster containing the VM
+     */
+    'cluster'?: string;
+    /**
      * Reference to the inventory folder containing the VM
      */
     'folder'?: string;

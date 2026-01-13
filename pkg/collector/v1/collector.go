@@ -215,7 +215,6 @@ func (b *Builder) validateVMs(ctx context.Context, vms *[]vspheremodel.VM) error
 	return nil
 }
 
-
 // CreateBasicInventory creates a basic inventory object with the provided data.
 func CreateBasicInventory(
 	vms *[]vspheremodel.VM,

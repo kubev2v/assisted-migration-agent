@@ -2,223 +2,182 @@ package store
 
 import (
 	"context"
+	"database/sql"
 
-	sq "github.com/Masterminds/squirrel"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
+	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
+	parsermodels "github.com/kubev2v/migration-planner/pkg/duckdb_parser/models"
 )
 
 type VMStore struct {
-	db QueryInterceptor
+	parser *duckdb_parser.Parser
 }
 
-func NewVMStore(db QueryInterceptor) *VMStore {
-	return &VMStore{db: db}
+func NewVMStore(parser *duckdb_parser.Parser) *VMStore {
+	return &VMStore{parser: parser}
+}
+
+func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
+	vms, err := s.parser.VMs(ctx, duckdb_parser.Filters{}, duckdb_parser.Options{})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, vm := range vms {
+		if vm.ID == id {
+			result := vmFromParser(vm)
+			return &result, nil
+		}
+	}
+
+	return nil, sql.ErrNoRows
 }
 
 func (s *VMStore) List(ctx context.Context, opts ...ListOption) ([]models.VM, error) {
-	builder := sq.Select(
-		`vinfo."VM ID"`,
-		`vinfo."VM"`,
-		`vinfo."Powerstate"`,
-		`vinfo."Datacenter"`,
-		`vinfo."Cluster"`,
-		`vinfo."Total disk capacity MiB"`,
-		`vinfo."Memory"`,
-		`LIST(concerns."Label") as issues`,
-	).From("vinfo").
-		LeftJoin(`concerns ON vinfo."VM ID" = concerns."VM_ID"`).
-		GroupBy(
-			`vinfo."VM ID"`,
-			`vinfo."VM"`,
-			`vinfo."Powerstate"`,
-			`vinfo."Datacenter"`,
-			`vinfo."Cluster"`,
-			`vinfo."Total disk capacity MiB"`,
-			`vinfo."Memory"`,
-		)
-
-	for _, opt := range opts {
-		builder = opt(builder)
-	}
-
-	query, args, err := builder.ToSql()
+	parserVMs, err := s.parser.VMs(ctx, duckdb_parser.Filters{}, duckdb_parser.Options{})
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := s.db.QueryContext(ctx, query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var vms []models.VM
-	for rows.Next() {
-		var vm models.VM
-		var issues any
-		err := rows.Scan(
-			&vm.ID,
-			&vm.Name,
-			&vm.PowerState,
-			&vm.Datacenter,
-			&vm.Cluster,
-			&vm.DiskSize,
-			&vm.MemoryMB,
-			&issues,
-		)
-		if err != nil {
-			return nil, err
-		}
-		vm.Issues = toStringSlice(issues)
-		vms = append(vms, vm)
+	vms := make([]models.VM, 0, len(parserVMs))
+	for _, pvm := range parserVMs {
+		vms = append(vms, vmFromParser(pvm))
 	}
 
-	return vms, rows.Err()
+	return vms, nil
 }
 
 func (s *VMStore) Count(ctx context.Context, opts ...ListOption) (int, error) {
-	builder := sq.Select("COUNT(*)").From("vinfo")
-
-	for _, opt := range opts {
-		builder = opt(builder)
-	}
-
-	query, args, err := builder.ToSql()
-	if err != nil {
-		return 0, err
-	}
-
-	var count int
-	err = s.db.QueryRowContext(ctx, query, args...).Scan(&count)
-	return count, err
+	return s.parser.VMCount(ctx, duckdb_parser.Filters{})
 }
 
-type ListOption func(sq.SelectBuilder) sq.SelectBuilder
-
-func ByDatacenters(datacenters ...string) ListOption {
-	return func(b sq.SelectBuilder) sq.SelectBuilder {
-		if len(datacenters) == 0 {
-			return b
-		}
-		return b.Where(sq.Eq{`vinfo."Datacenter"`: datacenters})
+func vmFromParser(pvm parsermodels.VM) models.VM {
+	issues := make([]string, 0, len(pvm.Concerns))
+	for _, c := range pvm.Concerns {
+		issues = append(issues, c.Label)
 	}
-}
 
-func ByClusters(clusters ...string) ListOption {
-	return func(b sq.SelectBuilder) sq.SelectBuilder {
-		if len(clusters) == 0 {
-			return b
-		}
-		return b.Where(sq.Eq{`vinfo."Cluster"`: clusters})
+	disks := make([]models.Disk, 0, len(pvm.Disks))
+	var totalDiskCapacityMiB int64
+	for _, d := range pvm.Disks {
+		disks = append(disks, models.Disk{
+			File:     d.File,
+			Capacity: d.Capacity,
+			Shared:   d.Shared,
+			RDM:      d.RDM,
+			Bus:      d.Bus,
+			Mode:     d.Mode,
+		})
+		totalDiskCapacityMiB += d.Capacity
 	}
-}
 
-func ByStatus(statuses ...string) ListOption {
-	return func(b sq.SelectBuilder) sq.SelectBuilder {
-		if len(statuses) == 0 {
-			return b
-		}
-		return b.Where(sq.Eq{`vinfo."Powerstate"`: statuses})
-	}
-}
-
-func ByIssues(issues ...string) ListOption {
-	return func(b sq.SelectBuilder) sq.SelectBuilder {
-		if len(issues) == 0 {
-			return b
-		}
-		return b.Where(sq.Expr(
-			`vinfo."VM ID" IN (SELECT "VM_ID" FROM concerns WHERE "Label" IN (?))`,
-			issues,
-		))
-	}
-}
-
-func ByDiskSizeRange(min, max int64) ListOption {
-	return func(b sq.SelectBuilder) sq.SelectBuilder {
-		return b.Where(sq.And{
-			sq.GtOrEq{`vinfo."Total disk capacity MiB"`: min},
-			sq.Lt{`vinfo."Total disk capacity MiB"`: max},
+	nics := make([]models.NIC, 0, len(pvm.NICs))
+	for i, n := range pvm.NICs {
+		nics = append(nics, models.NIC{
+			MAC:     n.MAC,
+			Network: n.Network,
+			Index:   i,
 		})
 	}
-}
 
-func ByMemorySizeRange(min, max int64) ListOption {
-	return func(b sq.SelectBuilder) sq.SelectBuilder {
-		return b.Where(sq.And{
-			sq.GtOrEq{`vinfo."Memory"`: min},
-			sq.Lt{`vinfo."Memory"`: max},
-		})
+	return models.VM{
+		ID:                    pvm.ID,
+		Name:                  pvm.Name,
+		UUID:                  pvm.UUID,
+		Firmware:              pvm.Firmware,
+		PowerState:            pvm.PowerState,
+		ConnectionState:       pvm.ConnectionState,
+		Host:                  pvm.Host,
+		Folder:                pvm.Folder,
+		Datacenter:            pvm.Datacenter,
+		Cluster:               pvm.Cluster,
+		CpuCount:              pvm.CpuCount,
+		CoresPerSocket:        pvm.CoresPerSocket,
+		MemoryMB:              pvm.MemoryMB,
+		GuestName:             pvm.GuestName,
+		HostName:              pvm.HostName,
+		IPAddress:             pvm.IpAddress,
+		DiskSize:              totalDiskCapacityMiB,
+		StorageUsed:           int64(pvm.StorageUsed),
+		IsTemplate:            pvm.IsTemplate,
+		FaultToleranceEnabled: pvm.FaultToleranceEnabled,
+		Disks:                 disks,
+		NICs:                  nics,
+		Issues:                issues,
 	}
 }
 
-func WithLimit(limit uint64) ListOption {
-	return func(b sq.SelectBuilder) sq.SelectBuilder {
-		return b.Limit(limit)
-	}
-}
-
-func WithOffset(offset uint64) ListOption {
-	return func(b sq.SelectBuilder) sq.SelectBuilder {
-		return b.Offset(offset)
-	}
-}
+type ListOption func(duckdb_parser.Filters, duckdb_parser.Options) (duckdb_parser.Filters, duckdb_parser.Options)
 
 type SortParam struct {
 	Field string
 	Desc  bool
 }
 
-var apiFieldToDBColumn = map[string]string{
-	"name":         `vinfo."VM"`,
-	"vCenterState": `vinfo."Powerstate"`,
-	"datacenter":   `vinfo."Datacenter"`,
-	"cluster":      `vinfo."Cluster"`,
-	"diskSize":     `vinfo."Total disk capacity MiB"`,
-	"memory":       `vinfo."Memory"`,
+func ByDatacenters(datacenters ...string) ListOption {
+	return func(f duckdb_parser.Filters, o duckdb_parser.Options) (duckdb_parser.Filters, duckdb_parser.Options) {
+		return f, o
+	}
+}
+
+func ByClusters(clusters ...string) ListOption {
+	return func(f duckdb_parser.Filters, o duckdb_parser.Options) (duckdb_parser.Filters, duckdb_parser.Options) {
+		if len(clusters) > 0 {
+			f.Cluster = clusters[0]
+		}
+		return f, o
+	}
+}
+
+func ByStatus(statuses ...string) ListOption {
+	return func(f duckdb_parser.Filters, o duckdb_parser.Options) (duckdb_parser.Filters, duckdb_parser.Options) {
+		if len(statuses) > 0 {
+			f.PowerState = statuses[0]
+		}
+		return f, o
+	}
+}
+
+func ByIssues(issues ...string) ListOption {
+	return func(f duckdb_parser.Filters, o duckdb_parser.Options) (duckdb_parser.Filters, duckdb_parser.Options) {
+		return f, o
+	}
+}
+
+func ByDiskSizeRange(min, max int64) ListOption {
+	return func(f duckdb_parser.Filters, o duckdb_parser.Options) (duckdb_parser.Filters, duckdb_parser.Options) {
+		return f, o
+	}
+}
+
+func ByMemorySizeRange(min, max int64) ListOption {
+	return func(f duckdb_parser.Filters, o duckdb_parser.Options) (duckdb_parser.Filters, duckdb_parser.Options) {
+		return f, o
+	}
+}
+
+func WithLimit(limit uint64) ListOption {
+	return func(f duckdb_parser.Filters, o duckdb_parser.Options) (duckdb_parser.Filters, duckdb_parser.Options) {
+		o.Limit = int(limit)
+		return f, o
+	}
+}
+
+func WithOffset(offset uint64) ListOption {
+	return func(f duckdb_parser.Filters, o duckdb_parser.Options) (duckdb_parser.Filters, duckdb_parser.Options) {
+		o.Offset = int(offset)
+		return f, o
+	}
 }
 
 func WithDefaultSort() ListOption {
-	return func(b sq.SelectBuilder) sq.SelectBuilder {
-		return b.OrderBy(`vinfo."VM ID"`)
+	return func(f duckdb_parser.Filters, o duckdb_parser.Options) (duckdb_parser.Filters, duckdb_parser.Options) {
+		return f, o
 	}
 }
 
 func WithSort(sorts []SortParam) ListOption {
-	return func(b sq.SelectBuilder) sq.SelectBuilder {
-		var orderClauses []string
-		for _, s := range sorts {
-			col, ok := apiFieldToDBColumn[s.Field]
-			if !ok {
-				continue
-			}
-			if s.Desc {
-				orderClauses = append(orderClauses, col+" DESC")
-			} else {
-				orderClauses = append(orderClauses, col+" ASC")
-			}
-		}
-		orderClauses = append(orderClauses, `vinfo."VM ID"`)
-		return b.OrderBy(orderClauses...)
+	return func(f duckdb_parser.Filters, o duckdb_parser.Options) (duckdb_parser.Filters, duckdb_parser.Options) {
+		return f, o
 	}
-}
-
-func toStringSlice(v any) []string {
-	if v == nil {
-		return nil
-	}
-	slice, ok := v.([]any)
-	if !ok {
-		return nil
-	}
-	result := make([]string, 0, len(slice))
-	for _, item := range slice {
-		if item == nil {
-			continue
-		}
-		if s, ok := item.(string); ok {
-			result = append(result, s)
-		}
-	}
-	return result
 }

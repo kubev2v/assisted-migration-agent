@@ -12,6 +12,8 @@ Name | Type | Description | Notes
 **powerState** | **string** | Current power state of the VM (poweredOn, poweredOff, or suspended) | [default to undefined]
 **connectionState** | **string** | State of the connection between vCenter and the VM\&#39;s host (connected, disconnected, orphaned, or inaccessible) | [default to undefined]
 **host** | **string** | Reference to the ESXi host where the VM is running | [optional] [default to undefined]
+**datacenter** | **string** | Name of the datacenter containing the VM | [optional] [default to undefined]
+**cluster** | **string** | Name of the cluster containing the VM | [optional] [default to undefined]
 **folder** | **string** | Reference to the inventory folder containing the VM | [optional] [default to undefined]
 **cpuCount** | **number** | Total number of virtual CPUs allocated to the VM | [default to undefined]
 **coresPerSocket** | **number** | Number of CPU cores per virtual socket | [default to undefined]
@@ -47,6 +49,8 @@ const instance: VMDetails = {
     powerState,
     connectionState,
     host,
+    datacenter,
+    cluster,
     folder,
     cpuCount,
     coresPerSocket,

@@ -27,6 +27,7 @@ export enum CollectorStatusStatusEnum {
     Connecting = 'connecting',
     Connected = 'connected',
     Collecting = 'collecting',
+    Parsing = 'parsing',
     Collected = 'collected',
     Error = 'error'
 }

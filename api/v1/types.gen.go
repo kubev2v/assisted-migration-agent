@@ -30,6 +30,7 @@ const (
 	CollectorStatusStatusConnected  CollectorStatusStatus = "connected"
 	CollectorStatusStatusConnecting CollectorStatusStatus = "connecting"
 	CollectorStatusStatusError      CollectorStatusStatus = "error"
+	CollectorStatusStatusParsing    CollectorStatusStatus = "parsing"
 	CollectorStatusStatusReady      CollectorStatusStatus = "ready"
 )
 
@@ -165,6 +166,9 @@ type VM struct {
 
 // VMDetails defines model for VMDetails.
 type VMDetails struct {
+	// Cluster Name of the cluster containing the VM
+	Cluster *string `json:"cluster,omitempty"`
+
 	// ConnectionState State of the connection between vCenter and the VM's host (connected, disconnected, orphaned, or inaccessible)
 	ConnectionState string `json:"connectionState"`
 
@@ -176,6 +180,9 @@ type VMDetails struct {
 
 	// CpuCount Total number of virtual CPUs allocated to the VM
 	CpuCount int32 `json:"cpuCount"`
+
+	// Datacenter Name of the datacenter containing the VM
+	Datacenter *string `json:"datacenter,omitempty"`
 
 	// Devices List of other virtual devices attached to the VM
 	Devices *[]VMDevice `json:"devices,omitempty"`

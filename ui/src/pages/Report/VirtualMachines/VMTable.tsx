@@ -42,9 +42,10 @@ interface VMTableProps {
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
   onSortChange: (sort: string[]) => void;
+  onVMClick?: (vm: VM) => void;
 }
 
-type SortableColumn = "name" | "vCenterState" | "datacenter" | "cluster" | "diskSize" | "memory";
+type SortableColumn = "name" | "vCenterState" | "diskSize" | "memory" | "issues";
 
 const statusLabels: Record<string, string> = {
   "green": "Migratable",
@@ -86,6 +87,7 @@ const VMTable: React.FC<VMTableProps> = ({
   onPageChange,
   onPageSizeChange,
   onSortChange,
+  onVMClick,
 }) => {
   // Search state
   const [searchValue, setSearchValue] = useState("");
@@ -104,10 +106,9 @@ const VMTable: React.FC<VMTableProps> = ({
   const columns: { key: SortableColumn; label: string; sortable: boolean }[] = [
     { key: "name", label: "Name", sortable: true },
     { key: "vCenterState", label: "Status", sortable: true },
-    { key: "datacenter", label: "Data center", sortable: true },
-    { key: "cluster", label: "Cluster", sortable: true },
     { key: "diskSize", label: "Disk size", sortable: true },
     { key: "memory", label: "Memory size", sortable: true },
+    { key: "issues", label: "Issues", sortable: true },
   ];
 
   // Filter and search VMs (client-side filtering within the current page for search only)
@@ -214,8 +215,7 @@ const VMTable: React.FC<VMTableProps> = ({
 
   // Render issues column
   const renderIssues = (vm: VM) => {
-    if (vm.issues.length === 0) return "—";
-    return vm.issues.join(", ");
+    return vm.issues.length;
   };
 
   return (
@@ -302,20 +302,19 @@ const VMTable: React.FC<VMTableProps> = ({
                 {column.label}
               </Th>
             ))}
-            <Th>Issues</Th>
             <Th screenReaderText="Actions" />
           </Tr>
         </Thead>
         <Tbody>
           {loading ? (
             <Tr>
-              <Td colSpan={columns.length + 3} style={{ textAlign: "center" }}>
+              <Td colSpan={columns.length + 2} style={{ textAlign: "center" }}>
                 Loading...
               </Td>
             </Tr>
           ) : filteredVMs.length === 0 ? (
             <Tr>
-              <Td colSpan={columns.length + 3} style={{ textAlign: "center" }}>
+              <Td colSpan={columns.length + 2} style={{ textAlign: "center" }}>
                 No virtual machines found
               </Td>
             </Tr>
@@ -329,10 +328,12 @@ const VMTable: React.FC<VMTableProps> = ({
                     isSelected: selectedVMs.has(vm.id),
                   }}
                 />
-                <Td dataLabel="Name">{vm.name}</Td>
+                <Td dataLabel="Name">
+                  <Button variant="link" isInline onClick={() => onVMClick?.(vm)}>
+                    {vm.name}
+                  </Button>
+                </Td>
                 <Td dataLabel="Status">{renderStatus(vm)}</Td>
-                <Td dataLabel="Data center">{vm.datacenter}</Td>
-                <Td dataLabel="Cluster">{vm.cluster}</Td>
                 <Td dataLabel="Disk size">{formatDiskSize(vm.diskSize)}</Td>
                 <Td dataLabel="Memory size">{formatMemorySize(vm.memory)}</Td>
                 <Td dataLabel="Issues">{renderIssues(vm)}</Td>
