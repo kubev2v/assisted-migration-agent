@@ -15,6 +15,11 @@ func NewVMService(st *store.Store) *VMService {
 	return &VMService{store: st}
 }
 
+type SortField struct {
+	Field string
+	Desc  bool
+}
+
 type VMListParams struct {
 	Datacenters   []string
 	Clusters      []string
@@ -24,6 +29,7 @@ type VMListParams struct {
 	DiskSizeMax   *int64
 	MemorySizeMin *int64
 	MemorySizeMax *int64
+	Sort          []SortField
 	Limit         uint64
 	Offset        uint64
 }
@@ -35,6 +41,10 @@ type VMListResult struct {
 
 func (s *VMService) List(ctx context.Context, params VMListParams) ([]models.VM, int, error) {
 	opts := s.buildListOptions(params)
+
+	if len(params.Sort) == 0 {
+		opts = append(opts, store.WithDefaultSort())
+	}
 
 	vms, err := s.store.VM().List(ctx, opts...)
 	if err != nil {
@@ -100,6 +110,14 @@ func (s *VMService) buildListOptions(params VMListParams) []store.ListOption {
 			max = *params.MemorySizeMax
 		}
 		opts = append(opts, store.ByMemorySizeRange(min, max))
+	}
+
+	if len(params.Sort) > 0 {
+		sortParams := make([]store.SortParam, len(params.Sort))
+		for i, s := range params.Sort {
+			sortParams[i] = store.SortParam{Field: s.Field, Desc: s.Desc}
+		}
+		opts = append(opts, store.WithSort(sortParams))
 	}
 
 	if params.Limit > 0 {

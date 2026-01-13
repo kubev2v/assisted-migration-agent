@@ -151,15 +151,14 @@ var _ = Describe("VMStore", func() {
 			})
 
 			It("should offset results", func() {
-				firstPage, err := s.VM().List(ctx, store.WithLimit(2))
+				firstPage, err := s.VM().List(ctx, store.WithDefaultSort(), store.WithLimit(2))
 				Expect(err).NotTo(HaveOccurred())
 				Expect(firstPage).To(HaveLen(2))
 
-				secondPage, err := s.VM().List(ctx, store.WithOffset(2), store.WithLimit(2))
+				secondPage, err := s.VM().List(ctx, store.WithDefaultSort(), store.WithOffset(2), store.WithLimit(2))
 				Expect(err).NotTo(HaveOccurred())
 				Expect(secondPage).To(HaveLen(2))
 
-				// Verify pages don't overlap
 				for _, vm := range secondPage {
 					Expect(vm.ID).NotTo(Equal(firstPage[0].ID))
 					Expect(vm.ID).NotTo(Equal(firstPage[1].ID))

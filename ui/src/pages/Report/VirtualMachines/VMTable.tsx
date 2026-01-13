@@ -38,8 +38,10 @@ interface VMTableProps {
   pageSize: number;
   pageCount: number;
   loading: boolean;
+  sort?: string[];
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
+  onSortChange: (sort: string[]) => void;
 }
 
 type SortableColumn = "name" | "vCenterState" | "datacenter" | "cluster" | "diskSize" | "memory";
@@ -80,8 +82,10 @@ const VMTable: React.FC<VMTableProps> = ({
   page,
   pageSize,
   loading,
+  sort = [],
   onPageChange,
   onPageSizeChange,
+  onSortChange,
 }) => {
   // Search state
   const [searchValue, setSearchValue] = useState("");
@@ -89,10 +93,6 @@ const VMTable: React.FC<VMTableProps> = ({
   // Filter state
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false);
-
-  // Sort state
-  const [activeSortIndex, setActiveSortIndex] = useState<number | null>(null);
-  const [activeSortDirection, setActiveSortDirection] = useState<"asc" | "desc">("asc");
 
   // Selection state
   const [selectedVMs, setSelectedVMs] = useState<Set<string>>(new Set());
@@ -110,14 +110,14 @@ const VMTable: React.FC<VMTableProps> = ({
     { key: "memory", label: "Memory size", sortable: true },
   ];
 
-  // Filter and search VMs (client-side filtering within the current page)
+  // Filter and search VMs (client-side filtering within the current page for search only)
   const filteredVMs = useMemo(() => {
     return vms.filter((vm) => {
-      // Search filter
+      // Search filter (client-side for current page only)
       if (searchValue && !vm.name.toLowerCase().includes(searchValue.toLowerCase())) {
         return false;
       }
-      // Status filter
+      // Status filter (client-side for current page only)
       if (statusFilter.length > 0 && !statusFilter.includes(vm.vCenterState)) {
         return false;
       }
@@ -125,49 +125,45 @@ const VMTable: React.FC<VMTableProps> = ({
     });
   }, [vms, searchValue, statusFilter]);
 
-  // Sort VMs
-  const sortedVMs = useMemo(() => {
-    if (activeSortIndex === null) return filteredVMs;
+  // Parse current sort state from props
+  const { activeSortIndex, activeSortDirection } = useMemo(() => {
+    if (sort.length === 0) {
+      return { activeSortIndex: null, activeSortDirection: "asc" as const };
+    }
+    // Use the first sort field for the UI indicator
+    const [field, direction] = sort[0].split(":");
+    const index = columns.findIndex((col) => col.key === field);
+    return {
+      activeSortIndex: index >= 0 ? index : null,
+      activeSortDirection: (direction as "asc" | "desc") || "asc",
+    };
+  }, [sort, columns]);
 
-    const columnKey = columns[activeSortIndex].key;
-    return [...filteredVMs].sort((a, b) => {
-      const aValue = a[columnKey];
-      const bValue = b[columnKey];
-
-      if (typeof aValue === "string" && typeof bValue === "string") {
-        return activeSortDirection === "asc"
-          ? aValue.localeCompare(bValue)
-          : bValue.localeCompare(aValue);
-      }
-      return 0;
-    });
-  }, [filteredVMs, activeSortIndex, activeSortDirection, columns]);
-
-  // Sort handler
+  // Sort handler - triggers server-side sorting
   const getSortParams = (columnIndex: number): ThProps["sort"] => ({
     sortBy: {
       index: activeSortIndex ?? undefined,
       direction: activeSortDirection,
     },
     onSort: (_event, index, direction) => {
-      setActiveSortIndex(index);
-      setActiveSortDirection(direction);
+      const columnKey = columns[index].key;
+      onSortChange([`${columnKey}:${direction}`]);
     },
     columnIndex,
   });
 
   // Selection handlers
-  const isAllSelected = sortedVMs.length > 0 && sortedVMs.every((vm) => selectedVMs.has(vm.id));
-  const isSomeSelected = sortedVMs.some((vm) => selectedVMs.has(vm.id));
+  const isAllSelected = filteredVMs.length > 0 && filteredVMs.every((vm) => selectedVMs.has(vm.id));
+  const isSomeSelected = filteredVMs.some((vm) => selectedVMs.has(vm.id));
 
   const onSelectAll = (isSelected: boolean) => {
     if (isSelected) {
       const newSelected = new Set(selectedVMs);
-      sortedVMs.forEach((vm) => newSelected.add(vm.id));
+      filteredVMs.forEach((vm) => newSelected.add(vm.id));
       setSelectedVMs(newSelected);
     } else {
       const newSelected = new Set(selectedVMs);
-      sortedVMs.forEach((vm) => newSelected.delete(vm.id));
+      filteredVMs.forEach((vm) => newSelected.delete(vm.id));
       setSelectedVMs(newSelected);
     }
   };
@@ -317,14 +313,14 @@ const VMTable: React.FC<VMTableProps> = ({
                 Loading...
               </Td>
             </Tr>
-          ) : sortedVMs.length === 0 ? (
+          ) : filteredVMs.length === 0 ? (
             <Tr>
               <Td colSpan={columns.length + 3} style={{ textAlign: "center" }}>
                 No virtual machines found
               </Td>
             </Tr>
           ) : (
-            sortedVMs.map((vm) => (
+            filteredVMs.map((vm) => (
               <Tr key={vm.id}>
                 <Td
                   select={{

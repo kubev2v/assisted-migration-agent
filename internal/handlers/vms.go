@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -9,6 +10,15 @@ import (
 	v1 "github.com/kubev2v/assisted-migration-agent/api/v1"
 	"github.com/kubev2v/assisted-migration-agent/internal/services"
 )
+
+var validSortFields = map[string]bool{
+	"name":         true,
+	"vCenterState": true,
+	"datacenter":   true,
+	"cluster":      true,
+	"diskSize":     true,
+	"memory":       true,
+}
 
 const (
 	defaultPageSize = 20
@@ -72,6 +82,27 @@ func (h *Handler) GetVMs(c *gin.Context, params v1.GetVMsParams) {
 	}
 	if params.MemorySizeMax != nil {
 		svcParams.MemorySizeMax = params.MemorySizeMax
+	}
+
+	// Parse and validate sort params
+	if params.Sort != nil {
+		for _, s := range *params.Sort {
+			parts := strings.SplitN(s, ":", 2)
+			if len(parts) != 2 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid sort format, expected 'field:direction' (e.g., 'name:asc')"})
+				return
+			}
+			field, direction := parts[0], parts[1]
+			if !validSortFields[field] {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid sort field: " + field})
+				return
+			}
+			if direction != "asc" && direction != "desc" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid sort direction: " + direction + ", must be 'asc' or 'desc'"})
+				return
+			}
+			svcParams.Sort = append(svcParams.Sort, services.SortField{Field: field, Desc: direction == "desc"})
+		}
 	}
 
 	vms, total, err := h.vmSrv.List(c.Request.Context(), svcParams)

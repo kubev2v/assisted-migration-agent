@@ -13,6 +13,7 @@ export interface VMFilters {
   diskSizeMax?: number;
   memorySizeMin?: number;
   memorySizeMax?: number;
+  sort?: string[];
 }
 
 interface VMState {
@@ -22,6 +23,7 @@ interface VMState {
   pageSize: number;
   pageCount: number;
   filters: VMFilters;
+  sort: string[];
   loading: boolean;
   error: ApiError | null;
   initialized: boolean;
@@ -34,6 +36,7 @@ const initialState: VMState = {
   pageSize: 20,
   pageCount: 1,
   filters: {},
+  sort: [],
   loading: false,
   error: null,
   initialized: false,
@@ -43,6 +46,7 @@ export interface FetchVMsParams {
   page?: number;
   pageSize?: number;
   filters?: VMFilters;
+  sort?: string[];
 }
 
 export const fetchVMs = createAsyncThunk(
@@ -53,6 +57,7 @@ export const fetchVMs = createAsyncThunk(
       const page = params?.page ?? state.vm.page;
       const pageSize = params?.pageSize ?? state.vm.pageSize;
       const filters = params?.filters ?? state.vm.filters;
+      const sort = params?.sort ?? state.vm.sort;
 
       const response = await apiClient.getVMs(
         filters.issues,
@@ -63,6 +68,7 @@ export const fetchVMs = createAsyncThunk(
         filters.memorySizeMin,
         filters.memorySizeMax,
         filters.status,
+        sort,
         page,
         pageSize
       );
@@ -87,6 +93,9 @@ const vmSlice = createSlice({
     setFilters: (state, action: PayloadAction<VMFilters>) => {
       state.filters = action.payload;
       state.page = 1; // Reset to first page when changing filters
+    },
+    setSort: (state, action: PayloadAction<string[]>) => {
+      state.sort = action.payload;
     },
     clearError: (state) => {
       state.error = null;
@@ -114,5 +123,5 @@ const vmSlice = createSlice({
   },
 });
 
-export const { setPage, setPageSize, setFilters, clearError } = vmSlice.actions;
+export const { setPage, setPageSize, setFilters, setSort, clearError } = vmSlice.actions;
 export default vmSlice.reducer;
