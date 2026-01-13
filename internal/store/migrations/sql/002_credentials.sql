@@ -1,7 +1,0 @@
-CREATE TABLE IF NOT EXISTS credentials (
-    id INTEGER PRIMARY KEY DEFAULT 1,
-    url VARCHAR NOT NULL,
-    username VARCHAR NOT NULL,
-    password VARCHAR NOT NULL,
-    CHECK (id = 1)
-);

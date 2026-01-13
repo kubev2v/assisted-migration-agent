@@ -8,7 +8,6 @@ import (
 type Store struct {
 	db            *sql.DB
 	configuration *ConfigurationStore
-	credentials   *CredentialsStore
 	inventory     *InventoryStore
 	vm            *VMStore
 }
@@ -18,7 +17,6 @@ func NewStore(db *sql.DB) *Store {
 	return &Store{
 		db:            db,
 		configuration: NewConfigurationStore(qi),
-		credentials:   NewCredentialsStore(qi),
 		inventory:     NewInventoryStore(qi),
 		vm:            NewVMStore(qi),
 	}
@@ -26,10 +24,6 @@ func NewStore(db *sql.DB) *Store {
 
 func (s *Store) Configuration() *ConfigurationStore {
 	return s.configuration
-}
-
-func (s *Store) Credentials() *CredentialsStore {
-	return s.credentials
 }
 
 func (s *Store) Inventory() *InventoryStore {

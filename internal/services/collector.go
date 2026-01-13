@@ -40,6 +40,7 @@ func (c *CollectorService) GetStatus() models.CollectorStatus {
 	return c.state
 }
 
+// Start verifies creds with vCenter, and starts async collection.
 func (c *CollectorService) Start(ctx context.Context, creds *models.Credentials) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
