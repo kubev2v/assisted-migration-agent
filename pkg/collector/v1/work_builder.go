@@ -67,6 +67,12 @@ func (b *V1WorkBuilder) connecting() models.WorkUnit {
 					return nil, err
 				}
 				zap.S().Named("collector_service").Info("vCenter credentials verified")
+
+				if err := b.store.Credentials().Insert(ctx, b.creds); err != nil {
+					zap.S().Named("collector_service").Errorw("failed to save credentials", "error", err)
+					return nil, err
+				}
+
 				return nil, nil
 			}
 		},
