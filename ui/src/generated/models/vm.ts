@@ -27,13 +27,9 @@ export interface VM {
      */
     'id': string;
     /**
-     * vCenter state (e.g., green, yellow, red)
+     * vCenter state (e.g., poweredOn, poweredOff, suspended)
      */
     'vCenterState': string;
-    /**
-     * Datacenter name
-     */
-    'datacenter': string;
     /**
      * Cluster name
      */
@@ -47,9 +43,9 @@ export interface VM {
      */
     'memory': number;
     /**
-     * List of issues found during inspection
+     * Number of issues found for this VM
      */
-    'issues': Array<string>;
+    'issueCount': number;
     'inspection': InspectionStatus;
 }
 

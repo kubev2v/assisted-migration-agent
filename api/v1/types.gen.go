@@ -30,6 +30,7 @@ const (
 	CollectorStatusStatusConnected  CollectorStatusStatus = "connected"
 	CollectorStatusStatusConnecting CollectorStatusStatus = "connecting"
 	CollectorStatusStatusError      CollectorStatusStatus = "error"
+	CollectorStatusStatusParsing    CollectorStatusStatus = "parsing"
 	CollectorStatusStatusReady      CollectorStatusStatus = "ready"
 )
 
@@ -94,6 +95,24 @@ type CollectorStatus struct {
 // CollectorStatusStatus defines model for CollectorStatus.Status.
 type CollectorStatusStatus string
 
+// GuestNetwork defines model for GuestNetwork.
+type GuestNetwork struct {
+	// Device Name of the network device inside the guest OS
+	Device *string `json:"device,omitempty"`
+
+	// Ip IP address assigned to this interface
+	Ip *string `json:"ip,omitempty"`
+
+	// Mac MAC address as seen by the guest OS
+	Mac *string `json:"mac,omitempty"`
+
+	// Network Network name as reported by the guest OS
+	Network *string `json:"network,omitempty"`
+
+	// PrefixLength Network prefix length (subnet mask in CIDR notation)
+	PrefixLength *int32 `json:"prefixLength,omitempty"`
+}
+
 // InspectionStatus defines model for InspectionStatus.
 type InspectionStatus struct {
 	// Error Error message when state is error
@@ -126,9 +145,6 @@ type VM struct {
 	// Cluster Cluster name
 	Cluster string `json:"cluster"`
 
-	// Datacenter Datacenter name
-	Datacenter string `json:"datacenter"`
-
 	// DiskSize Total disk size in MB
 	DiskSize int64 `json:"diskSize"`
 
@@ -136,8 +152,8 @@ type VM struct {
 	Id         string           `json:"id"`
 	Inspection InspectionStatus `json:"inspection"`
 
-	// Issues List of issues found during inspection
-	Issues []string `json:"issues"`
+	// IssueCount Number of issues found for this VM
+	IssueCount int `json:"issueCount"`
 
 	// Memory Memory size in MB
 	Memory int64 `json:"memory"`
@@ -145,7 +161,7 @@ type VM struct {
 	// Name VM name
 	Name string `json:"name"`
 
-	// VCenterState vCenter state (e.g., green, yellow, red)
+	// VCenterState vCenter state (e.g., poweredOn, poweredOff, suspended)
 	VCenterState string `json:"vCenterState"`
 }
 
@@ -165,13 +181,22 @@ type VMListResponse struct {
 	Vms   []VM `json:"vms"`
 }
 
+// VMNIC defines model for VMNIC.
+type VMNIC struct {
+	// Index Index of the NIC within the VM
+	Index *int `json:"index,omitempty"`
+
+	// Mac MAC address of the virtual NIC
+	Mac *string `json:"mac,omitempty"`
+
+	// Network Reference to the network this NIC is connected to
+	Network *string `json:"network,omitempty"`
+}
+
 // GetVMsParams defines parameters for GetVMs.
 type GetVMsParams struct {
-	// Issues Filter by issues (OR logic - matches VMs with any of the specified issues)
-	Issues *[]string `form:"issues,omitempty" json:"issues,omitempty"`
-
-	// Datacenters Filter by datacenters (OR logic - matches VMs in any of the specified datacenters)
-	Datacenters *[]string `form:"datacenters,omitempty" json:"datacenters,omitempty"`
+	// MinIssues Filter VMs with at least this many issues
+	MinIssues *int `form:"minIssues,omitempty" json:"minIssues,omitempty"`
 
 	// Clusters Filter by clusters (OR logic - matches VMs in any of the specified clusters)
 	Clusters *[]string `form:"clusters,omitempty" json:"clusters,omitempty"`
@@ -191,7 +216,7 @@ type GetVMsParams struct {
 	// Status Filter by status (OR logic - matches VMs with any of the specified statuses)
 	Status *[]string `form:"status,omitempty" json:"status,omitempty"`
 
-	// Sort Sort fields with direction (e.g., "name:asc" or "datacenter:desc,name:asc"). Valid fields are name, vCenterState, datacenter, cluster, diskSize, memory.
+	// Sort Sort fields with direction (e.g., "name:asc" or "cluster:desc,name:asc"). Valid fields are name, vCenterState, cluster, diskSize, memory, issues.
 	Sort *[]string `form:"sort,omitempty" json:"sort,omitempty"`
 
 	// Page Page number for pagination

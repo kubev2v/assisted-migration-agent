@@ -1,14 +1,13 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import type { VM, VMListResponse } from '@generated/index';
+import type { VM, VMDetails, VMListResponse } from '@generated/index';
 import { apiClient } from '@shared/api/client';
 import type { ApiError } from './collectorSlice';
 import { extractApiError } from './collectorSlice';
 
 export interface VMFilters {
-  datacenters?: string[];
   clusters?: string[];
   status?: string[];
-  issues?: string[];
+  minIssues?: number;
   diskSizeMin?: number;
   diskSizeMax?: number;
   memorySizeMin?: number;
@@ -27,6 +26,10 @@ interface VMState {
   loading: boolean;
   error: ApiError | null;
   initialized: boolean;
+  selectedVMId: string | null;
+  selectedVMDetails: VMDetails | null;
+  detailLoading: boolean;
+  detailError: ApiError | null;
 }
 
 const initialState: VMState = {
@@ -40,6 +43,10 @@ const initialState: VMState = {
   loading: false,
   error: null,
   initialized: false,
+  selectedVMId: null,
+  selectedVMDetails: null,
+  detailLoading: false,
+  detailError: null,
 };
 
 export interface FetchVMsParams {
@@ -60,8 +67,7 @@ export const fetchVMs = createAsyncThunk(
       const sort = params?.sort ?? state.vm.sort;
 
       const response = await apiClient.getVMs(
-        filters.issues,
-        filters.datacenters,
+        filters.minIssues,
         filters.clusters,
         filters.diskSizeMin,
         filters.diskSizeMax,
@@ -75,6 +81,18 @@ export const fetchVMs = createAsyncThunk(
       return response.data;
     } catch (error) {
       return rejectWithValue(extractApiError(error, 'Failed to fetch VMs'));
+    }
+  }
+);
+
+export const fetchVMDetails = createAsyncThunk(
+  'vm/fetchVMDetails',
+  async (id: string, { rejectWithValue }) => {
+    try {
+      const response = await apiClient.getVM(id);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(extractApiError(error, 'Failed to fetch VM details'));
     }
   }
 );
@@ -100,6 +118,16 @@ const vmSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
+    selectVM: (state, action: PayloadAction<string>) => {
+      state.selectedVMId = action.payload;
+      state.selectedVMDetails = null;
+      state.detailError = null;
+    },
+    clearSelectedVM: (state) => {
+      state.selectedVMId = null;
+      state.selectedVMDetails = null;
+      state.detailError = null;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -119,9 +147,21 @@ const vmSlice = createSlice({
         state.loading = false;
         state.initialized = true;
         state.error = action.payload as ApiError;
+      })
+      .addCase(fetchVMDetails.pending, (state) => {
+        state.detailLoading = true;
+        state.detailError = null;
+      })
+      .addCase(fetchVMDetails.fulfilled, (state, action: PayloadAction<VMDetails>) => {
+        state.detailLoading = false;
+        state.selectedVMDetails = action.payload;
+      })
+      .addCase(fetchVMDetails.rejected, (state, action) => {
+        state.detailLoading = false;
+        state.detailError = action.payload as ApiError;
       });
   },
 });
 
-export const { setPage, setPageSize, setFilters, setSort, clearError } = vmSlice.actions;
+export const { setPage, setPageSize, setFilters, setSort, clearError, selectVM, clearSelectedVM } = vmSlice.actions;
 export default vmSlice.reducer;

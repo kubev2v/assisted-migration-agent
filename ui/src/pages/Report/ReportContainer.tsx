@@ -12,12 +12,15 @@ import {
   TabTitleText,
 } from "@patternfly/react-core";
 import { useAppSelector, useAppDispatch } from "@shared/store";
-import { fetchVMs, setPage, setPageSize, setSort } from "@shared/reducers";
+import { fetchVMs, setPage, setPageSize, setSort, setFilters } from "@shared/reducers";
+import type { VMFilters } from "@shared/reducers/vmSlice";
 import { Infra, InventoryData, VMs } from "@generated/index";
-import { DataSharingAlert } from "@shared/components";
+import { DataSharingAlert, DataSharingModal } from "@shared/components";
+import { changeAgentMode } from "@shared/reducers/agentSlice";
+import { AgentModeRequestModeEnum } from "@generated/index";
 import Header from "./Header";
 import Report from "./Report";
-import { VMTable } from "./VirtualMachines";
+import { VirtualMachinesView } from "./VirtualMachines";
 import { buildClusterViewModel, ClusterOption } from "./assessment-report/clusterView";
 
 const ReportContainer: React.FC = () => {
@@ -28,6 +31,8 @@ const ReportContainer: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string | number>(0);
   const [selectedClusterId, setSelectedClusterId] = useState<string>("all");
   const [isClusterSelectOpen, setIsClusterSelectOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isShareLoading, setIsShareLoading] = useState(false);
 
   // Fetch VMs when tab switches to Virtual Machines or on initial load
   useEffect(() => {
@@ -49,6 +54,11 @@ const ReportContainer: React.FC = () => {
   const handleSortChange = (newSort: string[]) => {
     dispatch(setSort(newSort));
     dispatch(fetchVMs({ sort: newSort }));
+  };
+
+  const handleFilterChange = (newFilters: VMFilters) => {
+    dispatch(setFilters(newFilters));
+    dispatch(fetchVMs({ filters: newFilters }));
   };
 
   if (!inventory) {
@@ -82,9 +92,22 @@ const ReportContainer: React.FC = () => {
   const totalClusters = clusters ? Object.keys(clusters).length : 0;
   const isDataShared = mode === "connected";
 
-  const handleShare = () => {
-    // TODO: Implement share functionality
-    console.log("Share data with Red Hat");
+  const handleShareClick = () => {
+    setIsShareModalOpen(true);
+  };
+
+  const handleShareConfirm = async () => {
+    setIsShareLoading(true);
+    try {
+      await dispatch(changeAgentMode(AgentModeRequestModeEnum.Connected));
+      setIsShareModalOpen(false);
+    } finally {
+      setIsShareLoading(false);
+    }
+  };
+
+  const handleShareCancel = () => {
+    setIsShareModalOpen(false);
   };
 
   return (
@@ -102,7 +125,7 @@ const ReportContainer: React.FC = () => {
         {/* Data Sharing Alert - shown when not shared */}
         {!isDataShared && (
           <StackItem>
-            <DataSharingAlert onShare={handleShare} />
+            <DataSharingAlert onShare={handleShareClick} />
           </StackItem>
         )}
 
@@ -162,7 +185,7 @@ const ReportContainer: React.FC = () => {
             </Tab>
             <Tab eventKey={1} title={<TabTitleText>Virtual Machines</TabTitleText>}>
               <div style={{ marginTop: "24px" }}>
-                <VMTable
+                <VirtualMachinesView
                   vms={vmState.vms}
                   total={vmState.total}
                   page={vmState.page}
@@ -170,15 +193,24 @@ const ReportContainer: React.FC = () => {
                   pageCount={vmState.pageCount}
                   loading={vmState.loading}
                   sort={vmState.sort}
+                  filters={vmState.filters}
                   onPageChange={handlePageChange}
                   onPageSizeChange={handlePageSizeChange}
                   onSortChange={handleSortChange}
+                  onFilterChange={handleFilterChange}
                 />
               </div>
             </Tab>
           </Tabs>
         </StackItem>
       </Stack>
+
+      <DataSharingModal
+        isOpen={isShareModalOpen}
+        onConfirm={handleShareConfirm}
+        onCancel={handleShareCancel}
+        isLoading={isShareLoading}
+      />
     </div>
   );
 };

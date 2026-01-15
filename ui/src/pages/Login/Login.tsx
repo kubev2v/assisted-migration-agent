@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Card,
   CardBody,
@@ -24,8 +24,28 @@ import {
 import { CollectorStatusStatusEnum } from "@generated/index";
 import { ApiError } from "@shared/reducers/collectorSlice";
 import { Credentials } from "@models";
-import VCenterLoginForm from "./VCenterLoginForm";
-import CollectionProgress from "./VCenterLoginForm/CollectionProgress";
+import LoginForm from "./LoginForm";
+import CollectionProgress from "./CollectionProgress";
+
+const getProgressInfo = (
+  status: CollectorStatusStatusEnum
+): { percentage: number; statusText: string } => {
+  switch (status) {
+    case CollectorStatusStatusEnum.Connecting:
+      return { percentage: 25, statusText: "Connecting to vCenter..." };
+    case CollectorStatusStatusEnum.Connected:
+      return {
+        percentage: 50,
+        statusText: "Connected, starting collection...",
+      };
+    case CollectorStatusStatusEnum.Collecting:
+      return { percentage: 75, statusText: "Collecting inventory data..." };
+    case CollectorStatusStatusEnum.Parsing:
+      return { percentage: 90, statusText: "Parsing..." };
+    default:
+      return { percentage: 0, statusText: "" };
+  }
+};
 
 interface LoginProps {
   version?: string;
@@ -48,20 +68,7 @@ function Login({
 }: LoginProps) {
   const [isDataShared, setIsDataShared] = useState(initialIsDataShared);
 
-  const getProgressInfo = () => {
-    switch (status) {
-      case CollectorStatusStatusEnum.Connecting:
-        return { percentage: 25, statusText: "Connecting to vCenter..." };
-      case CollectorStatusStatusEnum.Connected:
-        return { percentage: 50, statusText: "Connected, starting collection..." };
-      case CollectorStatusStatusEnum.Collecting:
-        return { percentage: 75, statusText: "Collecting inventory data..." };
-      default:
-        return { percentage: 0, statusText: "" };
-    }
-  };
-
-  const progressInfo = getProgressInfo();
+  const progressInfo = useMemo(() => getProgressInfo(status), [status]);
 
   const handleCollect = (credentials: Credentials) => {
     onCollect(credentials, isDataShared);
@@ -163,11 +170,10 @@ function Login({
       />
 
       <CardBody>
-        <VCenterLoginForm
+        <LoginForm
           collect={handleCollect}
           cancelCollection={onCancel}
           isLoading={isCollecting}
-          isDataShared={isDataShared}
           dataSharingComponent={
             <DataSharing
               variant="checkbox"

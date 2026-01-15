@@ -21,10 +21,9 @@ type SortField struct {
 }
 
 type VMListParams struct {
-	Datacenters   []string
 	Clusters      []string
 	Statuses      []string
-	Issues        []string
+	MinIssues     int
 	DiskSizeMin   *int64
 	DiskSizeMax   *int64
 	MemorySizeMin *int64
@@ -34,12 +33,11 @@ type VMListParams struct {
 	Offset        uint64
 }
 
-type VMListResult struct {
-	VMs   []models.VM
-	Total int
+func (s *VMService) Get(ctx context.Context, id string) (*models.VM, error) {
+	return s.store.VM().Get(ctx, id)
 }
 
-func (s *VMService) List(ctx context.Context, params VMListParams) ([]models.VM, int, error) {
+func (s *VMService) List(ctx context.Context, params VMListParams) ([]models.VMSummary, int, error) {
 	opts := s.buildListOptions(params)
 
 	if len(params.Sort) == 0 {
@@ -48,15 +46,14 @@ func (s *VMService) List(ctx context.Context, params VMListParams) ([]models.VM,
 
 	vms, err := s.store.VM().List(ctx, opts...)
 	if err != nil {
-		return []models.VM{}, 0, err
+		return nil, 0, err
 	}
 
 	// Get total count without pagination
 	countOpts := s.buildListOptions(VMListParams{
-		Datacenters:   params.Datacenters,
 		Clusters:      params.Clusters,
 		Statuses:      params.Statuses,
-		Issues:        params.Issues,
+		MinIssues:     params.MinIssues,
 		DiskSizeMin:   params.DiskSizeMin,
 		DiskSizeMax:   params.DiskSizeMax,
 		MemorySizeMin: params.MemorySizeMin,
@@ -64,7 +61,7 @@ func (s *VMService) List(ctx context.Context, params VMListParams) ([]models.VM,
 	})
 	total, err := s.store.VM().Count(ctx, countOpts...)
 	if err != nil {
-		return []models.VM{}, 0, err
+		return nil, 0, err
 	}
 
 	return vms, total, nil
@@ -73,17 +70,14 @@ func (s *VMService) List(ctx context.Context, params VMListParams) ([]models.VM,
 func (s *VMService) buildListOptions(params VMListParams) []store.ListOption {
 	var opts []store.ListOption
 
-	if len(params.Datacenters) > 0 {
-		opts = append(opts, store.ByDatacenters(params.Datacenters...))
-	}
 	if len(params.Clusters) > 0 {
 		opts = append(opts, store.ByClusters(params.Clusters...))
 	}
 	if len(params.Statuses) > 0 {
 		opts = append(opts, store.ByStatus(params.Statuses...))
 	}
-	if len(params.Issues) > 0 {
-		opts = append(opts, store.ByIssues(params.Issues...))
+	if params.MinIssues > 0 {
+		opts = append(opts, store.ByIssues(params.MinIssues))
 	}
 
 	// Handle disk size filter (values in MB)

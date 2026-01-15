@@ -16,6 +16,8 @@ const (
 	CollectorStateConnected CollectorState = "connected"
 	// CollectorStateCollecting - async collection in progress
 	CollectorStateCollecting CollectorState = "collecting"
+	// CollectorStateParsing - parsing collected data into duckdb
+	CollectorStateParsing CollectorState = "parsing"
 	// CollectorStateCollected - collection complete (auto-transitions to ready)
 	CollectorStateCollected CollectorState = "collected"
 	// CollectorStateError - error during connecting or collecting

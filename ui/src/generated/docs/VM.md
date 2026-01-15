@@ -7,12 +7,11 @@ Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **name** | **string** | VM name | [default to undefined]
 **id** | **string** | VM ID | [default to undefined]
-**vCenterState** | **string** | vCenter state (e.g., green, yellow, red) | [default to undefined]
-**datacenter** | **string** | Datacenter name | [default to undefined]
+**vCenterState** | **string** | vCenter state (e.g., poweredOn, poweredOff, suspended) | [default to undefined]
 **cluster** | **string** | Cluster name | [default to undefined]
 **diskSize** | **number** | Total disk size in MB | [default to undefined]
 **memory** | **number** | Memory size in MB | [default to undefined]
-**issues** | **Array&lt;string&gt;** | List of issues found during inspection | [default to undefined]
+**issueCount** | **number** | Number of issues found for this VM | [default to undefined]
 **inspection** | [**InspectionStatus**](InspectionStatus.md) |  | [default to undefined]
 
 ## Example
@@ -24,11 +23,10 @@ const instance: VM = {
     name,
     id,
     vCenterState,
-    datacenter,
     cluster,
     diskSize,
     memory,
-    issues,
+    issueCount,
     inspection,
 };
 ```

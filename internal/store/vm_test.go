@@ -4,9 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
-	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -25,9 +23,6 @@ var _ = Describe("VMStore", func() {
 		db, err = store.NewDB(":memory:")
 		Expect(err).NotTo(HaveOccurred())
 
-		err = migrations.Run(ctx, db)
-		Expect(err).NotTo(HaveOccurred())
-
 		s = store.NewStore(db)
 	})
 
@@ -37,46 +32,83 @@ var _ = Describe("VMStore", func() {
 		}
 	})
 
+	// Helper to insert test data into vinfo table
+	insertVM := func(id, name, powerState, cluster string, memory int32) {
+		_, err := db.ExecContext(ctx, `
+			INSERT INTO vinfo ("VM ID", "VM", "Powerstate", "Cluster", "Memory")
+			VALUES (?, ?, ?, ?, ?)
+		`, id, name, powerState, cluster, memory)
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	// Helper to insert disk data into vdisk table
+	insertDisk := func(vmID string, capacityMiB int64) {
+		_, err := db.ExecContext(ctx, `
+			INSERT INTO vdisk ("VM ID", "Capacity MiB")
+			VALUES (?, ?)
+		`, vmID, capacityMiB)
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	// Helper to insert concerns for a VM
+	insertConcern := func(vmID, concernID, label string) {
+		_, err := db.ExecContext(ctx, `
+			INSERT INTO concerns ("VM_ID", "Concern_ID", "Label", "Category", "Assessment")
+			VALUES (?, ?, ?, 'Warning', 'Needs attention')
+		`, vmID, concernID, label)
+		Expect(err).NotTo(HaveOccurred())
+	}
+
 	Describe("List", func() {
 		BeforeEach(func() {
-			vms := []models.VM{
-				{ID: "vm-1", Name: "web-server-1", State: "running", Datacenter: "dc1", Cluster: "cluster-a", DiskSize: 100, Memory: 4096},
-				{ID: "vm-2", Name: "web-server-2", State: "running", Datacenter: "dc1", Cluster: "cluster-a", DiskSize: 200, Memory: 8192},
-				{ID: "vm-3", Name: "db-server-1", State: "stopped", Datacenter: "dc1", Cluster: "cluster-b", DiskSize: 500, Memory: 16384},
-				{ID: "vm-4", Name: "app-server-1", State: "running", Datacenter: "dc2", Cluster: "cluster-c", DiskSize: 150, Memory: 8192},
-				{ID: "vm-5", Name: "app-server-2", State: "error", Datacenter: "dc2", Cluster: "cluster-c", DiskSize: 150, Memory: 32768},
-			}
-			err := s.VM().Insert(ctx, vms...)
+			// Create schema first
+			_, err := db.ExecContext(ctx, `
+				CREATE TABLE IF NOT EXISTS vinfo (
+					"VM ID" VARCHAR,
+					"VM" VARCHAR,
+					"Powerstate" VARCHAR,
+					"Cluster" VARCHAR,
+					"Datacenter" VARCHAR,
+					"Memory" INTEGER DEFAULT 0
+				);
+				CREATE TABLE IF NOT EXISTS concerns (
+					"VM_ID" VARCHAR,
+					"Concern_ID" VARCHAR,
+					"Label" VARCHAR,
+					"Category" VARCHAR,
+					"Assessment" VARCHAR
+				);
+				CREATE TABLE IF NOT EXISTS vdisk (
+					"VM ID" VARCHAR,
+					"Capacity MiB" BIGINT DEFAULT 0
+				);
+			`)
 			Expect(err).NotTo(HaveOccurred())
+
+			// Insert test VMs
+			insertVM("vm-1", "web-server-1", "poweredOn", "cluster-a", 4096)
+			insertVM("vm-2", "web-server-2", "poweredOn", "cluster-a", 8192)
+			insertVM("vm-3", "db-server-1", "poweredOff", "cluster-b", 16384)
+			insertVM("vm-4", "app-server-1", "poweredOn", "cluster-c", 8192)
+			insertVM("vm-5", "app-server-2", "suspended", "cluster-c", 32768)
+
+			// Insert disk data
+			insertDisk("vm-1", 100)
+			insertDisk("vm-2", 200)
+			insertDisk("vm-3", 500)
+			insertDisk("vm-4", 150)
+			insertDisk("vm-5", 150)
+
+			// Insert some concerns
+			insertConcern("vm-3", "concern-1", "High CPU usage")
+			insertConcern("vm-3", "concern-2", "Outdated OS")
+			insertConcern("vm-5", "concern-3", "Network issue")
 		})
 
 		It("should return all VMs without filters", func() {
 			vms, err := s.VM().List(ctx)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vms).To(HaveLen(5))
-		})
-
-		Context("ByDatacenters", func() {
-			It("should filter by single datacenter", func() {
-				vms, err := s.VM().List(ctx, store.ByDatacenters("dc1"))
-				Expect(err).NotTo(HaveOccurred())
-				Expect(vms).To(HaveLen(3))
-				for _, vm := range vms {
-					Expect(vm.Datacenter).To(Equal("dc1"))
-				}
-			})
-
-			It("should filter by multiple datacenters (OR)", func() {
-				vms, err := s.VM().List(ctx, store.ByDatacenters("dc1", "dc2"))
-				Expect(err).NotTo(HaveOccurred())
-				Expect(vms).To(HaveLen(5))
-			})
-
-			It("should return empty when datacenter not found", func() {
-				vms, err := s.VM().List(ctx, store.ByDatacenters("dc-nonexistent"))
-				Expect(err).NotTo(HaveOccurred())
-				Expect(vms).To(BeEmpty())
-			})
 		})
 
 		Context("ByClusters", func() {
@@ -98,18 +130,34 @@ var _ = Describe("VMStore", func() {
 
 		Context("ByStatus", func() {
 			It("should filter by single status", func() {
-				vms, err := s.VM().List(ctx, store.ByStatus("running"))
+				vms, err := s.VM().List(ctx, store.ByStatus("poweredOn"))
 				Expect(err).NotTo(HaveOccurred())
 				Expect(vms).To(HaveLen(3))
 				for _, vm := range vms {
-					Expect(vm.State).To(Equal("running"))
+					Expect(vm.PowerState).To(Equal("poweredOn"))
 				}
 			})
 
 			It("should filter by multiple statuses (OR)", func() {
-				vms, err := s.VM().List(ctx, store.ByStatus("running", "stopped"))
+				vms, err := s.VM().List(ctx, store.ByStatus("poweredOn", "poweredOff"))
 				Expect(err).NotTo(HaveOccurred())
 				Expect(vms).To(HaveLen(4))
+			})
+		})
+
+		Context("ByIssues", func() {
+			It("should filter VMs with at least N issues", func() {
+				vms, err := s.VM().List(ctx, store.ByIssues(2))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(vms).To(HaveLen(1))
+				Expect(vms[0].ID).To(Equal("vm-3"))
+				Expect(vms[0].IssueCount).To(Equal(2))
+			})
+
+			It("should filter VMs with at least 1 issue", func() {
+				vms, err := s.VM().List(ctx, store.ByIssues(1))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(vms).To(HaveLen(2)) // vm-3 and vm-5
 			})
 		})
 
@@ -166,17 +214,41 @@ var _ = Describe("VMStore", func() {
 			})
 		})
 
+		Context("WithSort", func() {
+			It("should sort by name ascending", func() {
+				vms, err := s.VM().List(ctx, store.WithSort([]store.SortParam{{Field: "name", Desc: false}}))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(vms).To(HaveLen(5))
+				Expect(vms[0].Name).To(Equal("app-server-1"))
+				Expect(vms[1].Name).To(Equal("app-server-2"))
+			})
+
+			It("should sort by memory descending", func() {
+				vms, err := s.VM().List(ctx, store.WithSort([]store.SortParam{{Field: "memory", Desc: true}}))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(vms).To(HaveLen(5))
+				Expect(vms[0].Memory).To(Equal(int32(32768)))
+			})
+
+			It("should sort by issues descending", func() {
+				vms, err := s.VM().List(ctx, store.WithSort([]store.SortParam{{Field: "issues", Desc: true}}))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(vms).To(HaveLen(5))
+				Expect(vms[0].IssueCount).To(Equal(2)) // vm-3 has 2 issues
+			})
+		})
+
 		Context("combined filters", func() {
-			It("should combine datacenter and status filters (AND)", func() {
+			It("should combine cluster and status filters (AND)", func() {
 				vms, err := s.VM().List(ctx,
-					store.ByDatacenters("dc1"),
-					store.ByStatus("running"),
+					store.ByClusters("cluster-a"),
+					store.ByStatus("poweredOn"),
 				)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(vms).To(HaveLen(2))
 				for _, vm := range vms {
-					Expect(vm.Datacenter).To(Equal("dc1"))
-					Expect(vm.State).To(Equal("running"))
+					Expect(vm.Cluster).To(Equal("cluster-a"))
+					Expect(vm.PowerState).To(Equal("poweredOn"))
 				}
 			})
 
@@ -191,7 +263,7 @@ var _ = Describe("VMStore", func() {
 
 			It("should combine multiple filters with pagination", func() {
 				vms, err := s.VM().List(ctx,
-					store.ByStatus("running"),
+					store.ByStatus("poweredOn"),
 					store.WithLimit(1),
 					store.WithOffset(1),
 				)
@@ -203,13 +275,37 @@ var _ = Describe("VMStore", func() {
 
 	Describe("Count", func() {
 		BeforeEach(func() {
-			vms := []models.VM{
-				{ID: "vm-1", Name: "vm1", State: "running", Datacenter: "dc1", Cluster: "cluster-a", DiskSize: 100, Memory: 4096},
-				{ID: "vm-2", Name: "vm2", State: "running", Datacenter: "dc1", Cluster: "cluster-a", DiskSize: 200, Memory: 8192},
-				{ID: "vm-3", Name: "vm3", State: "stopped", Datacenter: "dc2", Cluster: "cluster-b", DiskSize: 500, Memory: 16384},
-			}
-			err := s.VM().Insert(ctx, vms...)
+			// Create schema first
+			_, err := db.ExecContext(ctx, `
+				CREATE TABLE IF NOT EXISTS vinfo (
+					"VM ID" VARCHAR,
+					"VM" VARCHAR,
+					"Powerstate" VARCHAR,
+					"Cluster" VARCHAR,
+					"Datacenter" VARCHAR,
+					"Memory" INTEGER DEFAULT 0
+				);
+				CREATE TABLE IF NOT EXISTS concerns (
+					"VM_ID" VARCHAR,
+					"Concern_ID" VARCHAR,
+					"Label" VARCHAR,
+					"Category" VARCHAR,
+					"Assessment" VARCHAR
+				);
+				CREATE TABLE IF NOT EXISTS vdisk (
+					"VM ID" VARCHAR,
+					"Capacity MiB" BIGINT DEFAULT 0
+				);
+			`)
 			Expect(err).NotTo(HaveOccurred())
+
+			insertVM("vm-1", "vm1", "poweredOn", "cluster-a", 4096)
+			insertVM("vm-2", "vm2", "poweredOn", "cluster-a", 8192)
+			insertVM("vm-3", "vm3", "poweredOff", "cluster-b", 16384)
+
+			insertDisk("vm-1", 100)
+			insertDisk("vm-2", 200)
+			insertDisk("vm-3", 500)
 		})
 
 		It("should count all VMs without filters", func() {
@@ -219,7 +315,7 @@ var _ = Describe("VMStore", func() {
 		})
 
 		It("should count VMs with filter", func() {
-			count, err := s.VM().Count(ctx, store.ByStatus("running"))
+			count, err := s.VM().Count(ctx, store.ByStatus("poweredOn"))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(count).To(Equal(2))
 		})

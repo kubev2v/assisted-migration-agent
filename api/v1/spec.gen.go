@@ -149,19 +149,11 @@ func (siw *ServerInterfaceWrapper) GetVMs(c *gin.Context) {
 	// Parameter object where we will unmarshal all parameters from the context
 	var params GetVMsParams
 
-	// ------------- Optional query parameter "issues" -------------
+	// ------------- Optional query parameter "minIssues" -------------
 
-	err = runtime.BindQueryParameter("form", true, false, "issues", c.Request.URL.Query(), &params.Issues)
+	err = runtime.BindQueryParameter("form", true, false, "minIssues", c.Request.URL.Query(), &params.MinIssues)
 	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter issues: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	// ------------- Optional query parameter "datacenters" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "datacenters", c.Request.URL.Query(), &params.Datacenters)
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter datacenters: %w", err), http.StatusBadRequest)
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter minIssues: %w", err), http.StatusBadRequest)
 		return
 	}
 

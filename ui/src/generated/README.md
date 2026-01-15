@@ -56,6 +56,7 @@ Class | Method | HTTP request | Description
 *DefaultApi* | [**getCollectorStatus**](docs/DefaultApi.md#getcollectorstatus) | **GET** /collector | Get collector status
 *DefaultApi* | [**getInspectorStatus**](docs/DefaultApi.md#getinspectorstatus) | **GET** /vms/inspector | Get inspector status
 *DefaultApi* | [**getInventory**](docs/DefaultApi.md#getinventory) | **GET** /inventory | Get collected inventory
+*DefaultApi* | [**getVM**](docs/DefaultApi.md#getvm) | **GET** /vms/{id} | Get details about a vm
 *DefaultApi* | [**getVMInspectionStatus**](docs/DefaultApi.md#getvminspectionstatus) | **GET** /vms/{id}/inspector | Get inspection status for a specific VM
 *DefaultApi* | [**getVMs**](docs/DefaultApi.md#getvms) | **GET** /vms | Get list of VMs with filtering and pagination
 *DefaultApi* | [**removeVMsFromInspection**](docs/DefaultApi.md#removevmsfrominspection) | **DELETE** /vms/inspector | Remove VMs from inspection queue or stop inspector entirely
@@ -74,6 +75,7 @@ Class | Method | HTTP request | Description
  - [Datastore](docs/Datastore.md)
  - [DiskSizeTierSummary](docs/DiskSizeTierSummary.md)
  - [DiskTypeSummary](docs/DiskTypeSummary.md)
+ - [GuestNetwork](docs/GuestNetwork.md)
  - [Histogram](docs/Histogram.md)
  - [Host](docs/Host.md)
  - [Infra](docs/Infra.md)
@@ -86,7 +88,11 @@ Class | Method | HTTP request | Description
  - [OsInfo](docs/OsInfo.md)
  - [VCenter](docs/VCenter.md)
  - [VM](docs/VM.md)
+ - [VMDetails](docs/VMDetails.md)
+ - [VMDevice](docs/VMDevice.md)
+ - [VMDisk](docs/VMDisk.md)
  - [VMListResponse](docs/VMListResponse.md)
+ - [VMNIC](docs/VMNIC.md)
  - [VMResourceBreakdown](docs/VMResourceBreakdown.md)
  - [VMs](docs/VMs.md)
 

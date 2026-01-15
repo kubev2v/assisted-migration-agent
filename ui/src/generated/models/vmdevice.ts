@@ -14,22 +14,10 @@
 
 
 
-export interface CollectorStatus {
-    'status': CollectorStatusStatusEnum;
+export interface VMDevice {
     /**
-     * Error message when status is error
+     * Type of virtual device (e.g., cdrom, floppy, usb, serial, parallel)
      */
-    'error'?: string;
+    'kind'?: string;
 }
-
-export enum CollectorStatusStatusEnum {
-    Ready = 'ready',
-    Connecting = 'connecting',
-    Connected = 'connected',
-    Collecting = 'collecting',
-    Parsing = 'parsing',
-    Collected = 'collected',
-    Error = 'error'
-}
-
 

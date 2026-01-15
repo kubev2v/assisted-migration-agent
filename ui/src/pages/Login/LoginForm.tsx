@@ -10,27 +10,25 @@ import {
 } from "@patternfly/react-core";
 import { Credentials } from "@models";
 
-interface VCenterLoginFormProps {
+interface LoginFormProps {
     collect: (credentials: Credentials) => void;
     cancelCollection?: () => void;
     isLoading?: boolean;
     isDisabled?: boolean;
-    isDataShared: boolean;
     dataSharingComponent: ReactNode;
     informationComponent: ReactNode;
     progressComponent?: ReactNode;
 }
 
-function VCenterLoginForm({
+function LoginForm({
     collect,
     cancelCollection,
     isLoading = false,
     isDisabled = false,
-    isDataShared,
     dataSharingComponent,
     informationComponent,
     progressComponent,
-}: VCenterLoginFormProps) {
+}: LoginFormProps) {
     const [url, setUrl] = useState("");
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
@@ -41,7 +39,7 @@ function VCenterLoginForm({
     const handleSubmit = (event: React.FormEvent) => {
         event.preventDefault();
         if (isFormValid && !isLoading && !isDisabled) {
-            collect({ url, username, password, isDataShared });
+            collect({ url, username, password });
         }
     };
 
@@ -91,8 +89,8 @@ function VCenterLoginForm({
             </Flex>
 
             <ActionGroup style={{ marginTop: 0 }}>
-                <Flex 
-                    alignItems={{ default: "alignItemsCenter" }} 
+                <Flex
+                    alignItems={{ default: "alignItemsCenter" }}
                     gap={{ default: "gapMd" }}
                     style={{ minHeight: "36px" }}
                 >
@@ -124,5 +122,5 @@ function VCenterLoginForm({
     );
 }
 
-export default VCenterLoginForm;
-export type { VCenterLoginFormProps };
+export default LoginForm;
+export type { LoginFormProps };

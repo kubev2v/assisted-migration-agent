@@ -33,6 +33,7 @@ type Collector interface {
 	VerifyCredentials(ctx context.Context, creds *models.Credentials) error
 	Collect(ctx context.Context, creds *models.Credentials) error
 	DB() libmodel.DB
+	DBPath() string
 	Close()
 }
 
@@ -121,7 +122,7 @@ func (c *VSphereCollector) Close() {
 		c.container.Delete(c.collector.Owner())
 	}
 	if c.db != nil {
-		_ = c.db.Close(true)
+		_ = c.db.Close(false)
 	}
 	// clean up wal files
 	_ = os.Remove(fmt.Sprintf("%s-wal", c.dbPath))

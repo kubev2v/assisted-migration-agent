@@ -14,22 +14,18 @@
 
 
 
-export interface CollectorStatus {
-    'status': CollectorStatusStatusEnum;
+export interface VMNIC {
     /**
-     * Error message when status is error
+     * MAC address of the virtual NIC
      */
-    'error'?: string;
+    'mac'?: string;
+    /**
+     * Reference to the network this NIC is connected to
+     */
+    'network'?: string;
+    /**
+     * Index of the NIC within the VM
+     */
+    'index'?: number;
 }
-
-export enum CollectorStatusStatusEnum {
-    Ready = 'ready',
-    Connecting = 'connecting',
-    Connected = 'connected',
-    Collecting = 'collecting',
-    Parsing = 'parsing',
-    Collected = 'collected',
-    Error = 'error'
-}
-
 

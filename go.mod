@@ -12,8 +12,8 @@ require (
 	github.com/gin-gonic/gin v1.11.0
 	github.com/google/uuid v1.6.0
 	github.com/jzelinskie/cobrautil/v2 v2.0.0-20240819150235-f7fe73942d0f
-	github.com/kubev2v/forklift v0.0.0-20251204092501-13418ce68fe3
-	github.com/kubev2v/migration-planner v0.3.1-0.20260106130926-b32fdd201af8
+	github.com/kubev2v/forklift v0.0.0-20260109132042-6ac29b3130c3
+	github.com/kubev2v/migration-planner v0.3.1-0.20260113101025-c6d53c1f14c5
 	github.com/oapi-codegen/runtime v1.1.2
 	github.com/onsi/ginkgo/v2 v2.27.2
 	github.com/onsi/gomega v1.38.2
@@ -54,6 +54,7 @@ require (
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.11 // indirect
+	github.com/georgysavva/scany/v2 v2.1.4 // indirect
 	github.com/getkin/kin-openapi v0.133.0 // indirect
 	github.com/gin-contrib/cors v1.7.6 // indirect
 	github.com/gin-contrib/sse v1.1.0 // indirect
@@ -61,20 +62,20 @@ require (
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-logr/zapr v1.3.0 // indirect
-	github.com/go-openapi/jsonpointer v0.22.1 // indirect
-	github.com/go-openapi/jsonreference v0.21.2 // indirect
-	github.com/go-openapi/swag v0.25.1 // indirect
-	github.com/go-openapi/swag/cmdutils v0.25.1 // indirect
-	github.com/go-openapi/swag/conv v0.25.1 // indirect
-	github.com/go-openapi/swag/fileutils v0.25.1 // indirect
-	github.com/go-openapi/swag/jsonname v0.25.1 // indirect
-	github.com/go-openapi/swag/jsonutils v0.25.1 // indirect
-	github.com/go-openapi/swag/loading v0.25.1 // indirect
-	github.com/go-openapi/swag/mangling v0.25.1 // indirect
-	github.com/go-openapi/swag/netutils v0.25.1 // indirect
-	github.com/go-openapi/swag/stringutils v0.25.1 // indirect
-	github.com/go-openapi/swag/typeutils v0.25.1 // indirect
-	github.com/go-openapi/swag/yamlutils v0.25.1 // indirect
+	github.com/go-openapi/jsonpointer v0.22.4 // indirect
+	github.com/go-openapi/jsonreference v0.21.4 // indirect
+	github.com/go-openapi/swag v0.25.4 // indirect
+	github.com/go-openapi/swag/cmdutils v0.25.4 // indirect
+	github.com/go-openapi/swag/conv v0.25.4 // indirect
+	github.com/go-openapi/swag/fileutils v0.25.4 // indirect
+	github.com/go-openapi/swag/jsonname v0.25.4 // indirect
+	github.com/go-openapi/swag/jsonutils v0.25.4 // indirect
+	github.com/go-openapi/swag/loading v0.25.4 // indirect
+	github.com/go-openapi/swag/mangling v0.25.4 // indirect
+	github.com/go-openapi/swag/netutils v0.25.4 // indirect
+	github.com/go-openapi/swag/stringutils v0.25.4 // indirect
+	github.com/go-openapi/swag/typeutils v0.25.4 // indirect
+	github.com/go-openapi/swag/yamlutils v0.25.4 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-playground/validator/v10 v10.28.0 // indirect
@@ -88,7 +89,7 @@ require (
 	github.com/google/flatbuffers v25.9.23+incompatible // indirect
 	github.com/google/gnostic-models v0.7.1 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/pprof v0.0.0-20251208000136-3d256cb9ff16 // indirect
+	github.com/google/pprof v0.0.0-20260106004452-d7df1bf2cac7 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/hashicorp/go-version v1.7.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
@@ -113,8 +114,8 @@ require (
 	github.com/oasdiff/yaml v0.0.0-20250309154309-f31be36b4037 // indirect
 	github.com/oasdiff/yaml3 v0.0.0-20250309153720-d2182401db90 // indirect
 	github.com/open-policy-agent/opa v1.6.0 // indirect
-	github.com/openshift/api v0.0.0-20251205114208-5eb46a7b4ce8 // indirect
-	github.com/openshift/client-go v0.0.0-20251205093018-96a6cbc1420c // indirect
+	github.com/openshift/api v0.0.0-20260107103503-6d35063ca179 // indirect
+	github.com/openshift/client-go v0.0.0-20260108185524-48f4ccfc4e13 // indirect
 	github.com/openshift/custom-resource-status v1.1.2 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/perimeterx/marshmallow v1.1.5 // indirect
@@ -156,7 +157,7 @@ require (
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/arch v0.22.0 // indirect
 	golang.org/x/crypto v0.46.0 // indirect
-	golang.org/x/exp v0.0.0-20251209150349-8475f28825e9 // indirect
+	golang.org/x/exp v0.0.0-20251219203646-944ab1f22d93 // indirect
 	golang.org/x/mod v0.31.0 // indirect
 	golang.org/x/net v0.48.0 // indirect
 	golang.org/x/oauth2 v0.32.0 // indirect
@@ -177,7 +178,7 @@ require (
 	k8s.io/client-go v0.34.1 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20251125145642-4e65d59e963e // indirect
-	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4 // indirect
+	k8s.io/utils v0.0.0-20260108192941-914a6e750570 // indirect
 	kubevirt.io/api v1.6.2 // indirect
 	kubevirt.io/containerized-data-importer-api v1.63.1 // indirect
 	kubevirt.io/controller-lifecycle-operator-sdk/api v0.2.4 // indirect

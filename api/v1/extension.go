@@ -9,21 +9,20 @@ func (a *AgentStatus) FromModel(m models.AgentStatus) {
 	a.Mode = AgentStatusMode(m.Console.Target)
 }
 
-// NewVMFromModel converts a models.VM to an API VM.
-func NewVMFromModel(vm models.VM) VM {
-	apiVM := VM{
+// NewVMFromSummary converts a models.VMSummary to an API VM.
+func NewVMFromSummary(vm models.VMSummary) VM {
+	return VM{
 		Id:           vm.ID,
 		Name:         vm.Name,
 		Cluster:      vm.Cluster,
-		Datacenter:   vm.Datacenter,
 		DiskSize:     vm.DiskSize,
-		Memory:       vm.Memory,
-		VCenterState: vm.State,
-		Issues:       vm.Issues,
-		Inspection:   NewInspectionStatus(vm.InspectionState, vm.InspectionError),
+		Memory:       int64(vm.Memory),
+		VCenterState: vm.PowerState,
+		IssueCount:   vm.IssueCount,
+		Inspection: InspectionStatus{
+			State: InspectionStatusStatePending,
+		},
 	}
-
-	return apiVM
 }
 
 func NewCollectorStatus(status models.CollectorStatus) CollectorStatus {
@@ -121,4 +120,93 @@ func FlatStatus(s models.InspectionStatus) (string, string) {
 	}
 
 	return s.State.Value(), errStr
+func NewVMDetailsFromModel(vm models.VM) VMDetails {
+	details := VMDetails{
+		Id:              vm.ID,
+		Name:            vm.Name,
+		PowerState:      vm.PowerState,
+		ConnectionState: vm.ConnectionState,
+		CpuCount:        vm.CpuCount,
+		CoresPerSocket:  vm.CoresPerSocket,
+		MemoryMB:        vm.MemoryMB,
+		Disks:           make([]VMDisk, 0, len(vm.Disks)),
+		Nics:            make([]VMNIC, 0, len(vm.NICs)),
+	}
+
+	if vm.UUID != "" {
+		details.Uuid = &vm.UUID
+	}
+	if vm.Firmware != "" {
+		details.Firmware = &vm.Firmware
+	}
+	if vm.Host != "" {
+		details.Host = &vm.Host
+	}
+	if vm.Datacenter != "" {
+		details.Datacenter = &vm.Datacenter
+	}
+	if vm.Cluster != "" {
+		details.Cluster = &vm.Cluster
+	}
+	if vm.Folder != "" {
+		details.Folder = &vm.Folder
+	}
+	if vm.GuestName != "" {
+		details.GuestName = &vm.GuestName
+	}
+	if vm.GuestID != "" {
+		details.GuestId = &vm.GuestID
+	}
+	if vm.HostName != "" {
+		details.HostName = &vm.HostName
+	}
+	if vm.IPAddress != "" {
+		details.IpAddress = &vm.IPAddress
+	}
+	if vm.StorageUsed > 0 {
+		details.StorageUsed = &vm.StorageUsed
+	}
+	if vm.ToolsStatus != "" {
+		details.ToolsStatus = &vm.ToolsStatus
+	}
+	if vm.ToolsRunningStatus != "" {
+		details.ToolsRunningStatus = &vm.ToolsRunningStatus
+	}
+
+	details.IsTemplate = &vm.IsTemplate
+	details.FaultToleranceEnabled = &vm.FaultToleranceEnabled
+	details.NestedHVEnabled = &vm.NestedHVEnabled
+
+	for _, d := range vm.Disks {
+		// Convert MiB to bytes (parser returns capacity in MiB)
+		capacityBytes := d.Capacity * 1024 * 1024
+		disk := VMDisk{
+			File:     &d.File,
+			Capacity: &capacityBytes,
+			Shared:   &d.Shared,
+			Rdm:      &d.RDM,
+			Bus:      &d.Bus,
+			Mode:     &d.Mode,
+		}
+		if d.Key != 0 {
+			key := d.Key
+			disk.Key = &key
+		}
+		details.Disks = append(details.Disks, disk)
+	}
+
+	for _, n := range vm.NICs {
+		nic := VMNIC{
+			Mac:     &n.MAC,
+			Network: &n.Network,
+			Index:   &n.Index,
+		}
+		details.Nics = append(details.Nics, nic)
+	}
+
+	if len(vm.Issues) > 0 {
+		details.Issues = &vm.Issues
+	}
+
+	return details
 }
