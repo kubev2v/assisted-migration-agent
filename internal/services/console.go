@@ -81,37 +81,43 @@ func newConsoleService(cfg config.Agent, s *scheduler.Scheduler, client *console
 	}
 }
 
-// IsDataSharingAllowed checks if the user has allowed data sharing.
-func (c *Console) IsDataSharingAllowed(ctx context.Context) (bool, error) {
+func (c *Console) GetMode(ctx context.Context) (models.AgentMode, error) {
 	config, err := c.store.Configuration().Get(ctx)
 	if err != nil {
-		return false, err
+		return models.AgentModeDisconnected, err
 	}
-	return config.AgentMode == models.AgentModeConnected, nil
+	return config.AgentMode, nil
 }
 
-func (c *Console) SetMode(mode models.AgentMode) {
-	c.mu.Lock()
-	prevTarget := c.state.Target
+func (c *Console) SetMode(ctx context.Context, mode models.AgentMode) error {
+	prevMode, _ := c.GetMode(ctx)
+
+	err := c.store.Configuration().Save(ctx, &models.Configuration{AgentMode: mode})
+	if err != nil {
+		return err
+	}
 
 	switch mode {
 	case models.AgentModeConnected:
+		c.mu.Lock()
 		c.state.Target = models.ConsoleStatusConnected
 		c.mu.Unlock()
-		zap.S().Debugw("starting run loop for connected mode")
-		go c.run()
+		if prevMode != models.AgentModeConnected {
+			zap.S().Debugw("starting run loop for connected mode")
+			go c.run()
+		}
 	case models.AgentModeDisconnected:
+		c.mu.Lock()
 		c.state.Target = models.ConsoleStatusDisconnected
 		c.mu.Unlock()
-		if prevTarget == models.ConsoleStatusConnected {
+		if prevMode == models.AgentModeConnected {
 			zap.S().Debugw("stopping run loop for disconnected mode")
 			c.close <- struct{}{}
 		}
-	default:
-		c.mu.Unlock()
 	}
 
-	zap.S().Named("console_service").Infow("agent mode changed", "current", mode, "target", prevTarget)
+	zap.S().Named("console_service").Infow("agent mode changed", "mode", mode)
+	return nil
 }
 
 func (c *Console) Status() models.ConsoleStatus {

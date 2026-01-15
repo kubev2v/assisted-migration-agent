@@ -39,7 +39,10 @@ func (h *Handler) SetAgentMode(c *gin.Context) {
 		return
 	}
 
-	h.consoleSrv.SetMode(mode)
+	if err := h.consoleSrv.SetMode(c.Request.Context(), mode); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to set agent mode"})
+		return
+	}
 
 	status := h.consoleSrv.Status()
 	var resp v1.AgentStatus
