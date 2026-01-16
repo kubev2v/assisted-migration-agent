@@ -49,7 +49,7 @@ func (c *CollectorService) Start(ctx context.Context, creds *models.Credentials)
 		return srvErrors.NewCollectionInProgressError()
 	}
 
-	runCtx, cancel := context.WithCancel(ctx)
+	runCtx, cancel := context.WithCancel(context.Background())
 	c.cancel = cancel
 	c.done = make(chan any)
 
