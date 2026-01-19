@@ -66,6 +66,18 @@ var _ = Describe("Migrations", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
+		It("should create vm_inspection table", func() {
+			err := migrations.Run(ctx, db)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify vm_inspection table exists by inserting data
+			_, err = db.ExecContext(ctx, `
+				INSERT INTO vm_inspection (vm_moid, status)
+				VALUES ('vm-123', 'pending')
+			`)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
 		It("should be idempotent", func() {
 			// Run migrations twice
 			err := migrations.Run(ctx, db)

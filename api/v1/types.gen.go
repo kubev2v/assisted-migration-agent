@@ -36,17 +36,22 @@ const (
 
 // Defines values for InspectionStatusState.
 const (
+	InspectionStatusStateCanceled  InspectionStatusState = "canceled"
 	InspectionStatusStateCompleted InspectionStatusState = "completed"
 	InspectionStatusStateError     InspectionStatusState = "error"
+	InspectionStatusStateNotFound  InspectionStatusState = "not_found"
 	InspectionStatusStatePending   InspectionStatusState = "pending"
 	InspectionStatusStateRunning   InspectionStatusState = "running"
 )
 
 // Defines values for InspectorStatusState.
 const (
-	InspectorStatusStateError   InspectorStatusState = "error"
-	InspectorStatusStateReady   InspectorStatusState = "ready"
-	InspectorStatusStateRunning InspectorStatusState = "running"
+	InspectorStatusStateCanceled InspectorStatusState = "canceled"
+	InspectorStatusStateDone     InspectorStatusState = "done"
+	InspectorStatusStateError    InspectorStatusState = "error"
+	InspectorStatusStateReady    InspectorStatusState = "ready"
+	InspectorStatusStateRunning  InspectorStatusState = "running"
+	InspectorStatusStateStarted  InspectorStatusState = "started"
 )
 
 // AgentModeRequest defines model for AgentModeRequest.
@@ -123,6 +128,14 @@ type InspectionStatus struct {
 
 // InspectionStatusState Current inspection state
 type InspectionStatusState string
+
+// InspectorStartRequest defines model for InspectorStartRequest.
+type InspectorStartRequest struct {
+	VcenterCredentials VcenterCredentials `json:"VcenterCredentials"`
+
+	// VmIds Array of VM Moid
+	VmIds VMIdArray `json:"vmIds"`
+}
 
 // InspectorStatus defines model for InspectorStatus.
 type InspectorStatus struct {
@@ -282,8 +295,8 @@ type VMDisk struct {
 	Shared *bool `json:"shared,omitempty"`
 }
 
-// VMIdArray Array of VM IDs
-type VMIdArray = []int
+// VMIdArray Array of VM Moid
+type VMIdArray = []string
 
 // VMListResponse defines model for VMListResponse.
 type VMListResponse struct {
@@ -308,6 +321,15 @@ type VMNIC struct {
 
 	// Network Reference to the network this NIC is connected to
 	Network *string `json:"network,omitempty"`
+}
+
+// VcenterCredentials defines model for VcenterCredentials.
+type VcenterCredentials struct {
+	Password string `json:"password"`
+
+	// Url vCenter URL
+	Url      string `json:"url"`
+	Username string `json:"username"`
 }
 
 // GetVMsParams defines parameters for GetVMs.
@@ -349,11 +371,8 @@ type SetAgentModeJSONRequestBody = AgentModeRequest
 // StartCollectorJSONRequestBody defines body for StartCollector for application/json ContentType.
 type StartCollectorJSONRequestBody = CollectorStartRequest
 
-// RemoveVMsFromInspectionJSONRequestBody defines body for RemoveVMsFromInspection for application/json ContentType.
-type RemoveVMsFromInspectionJSONRequestBody = VMIdArray
-
 // AddVMsToInspectionJSONRequestBody defines body for AddVMsToInspection for application/json ContentType.
 type AddVMsToInspectionJSONRequestBody = VMIdArray
 
 // StartInspectionJSONRequestBody defines body for StartInspection for application/json ContentType.
-type StartInspectionJSONRequestBody = VMIdArray
+type StartInspectionJSONRequestBody = InspectorStartRequest

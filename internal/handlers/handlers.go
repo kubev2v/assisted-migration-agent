@@ -9,13 +9,21 @@ type Handler struct {
 	collectorSrv *services.CollectorService
 	inventorySrv *services.InventoryService
 	vmSrv        *services.VMService
+	inspectorSrv *services.InspectorService
 }
 
-func New(consoleSrv *services.Console, collector *services.CollectorService, invSrv *services.InventoryService, vmSrv *services.VMService) *Handler {
+func New(
+	consoleSrv *services.Console,
+	collector *services.CollectorService,
+	invSrv *services.InventoryService,
+	vmSrv *services.VMService,
+	inspectorSrv *services.InspectorService,
+) *Handler {
 	return &Handler{
 		consoleSrv:   consoleSrv,
 		collectorSrv: collector,
 		inventorySrv: invSrv,
 		vmSrv:        vmSrv,
+		inspectorSrv: inspectorSrv,
 	}
 }

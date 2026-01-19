@@ -12,3 +12,11 @@ CREATE TABLE IF NOT EXISTS inventory (
     updated_at TIMESTAMP DEFAULT now(),
     CHECK (id = 1)
 );
+
+-- VM Inspection status table
+CREATE TABLE IF NOT EXISTS vm_inspection (
+    vm_moid VARCHAR PRIMARY KEY,
+    status VARCHAR NOT NULL,
+    error VARCHAR
+--     FOREIGN KEY (vm_moid) REFERENCES vinfo("VM ID") -- we can add this in case vinfo is created before
+);

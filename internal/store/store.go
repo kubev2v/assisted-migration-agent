@@ -14,6 +14,7 @@ type Store struct {
 	inventory     *InventoryStore
 	vm            *VMStore
 	credentials   *CredentialsStore
+	inspection    *InspectionStore
 }
 
 func NewStore(db *sql.DB) *Store {
@@ -26,6 +27,7 @@ func NewStore(db *sql.DB) *Store {
 		inventory:     NewInventoryStore(qi),
 		vm:            NewVMStore(qi, parser),
 		credentials:   NewCredentialsStore(qi),
+		inspection:    NewInspectionStore(qi),
 	}
 }
 
@@ -47,6 +49,10 @@ func (s *Store) VM() *VMStore {
 
 func (s *Store) Credentials() *CredentialsStore {
 	return s.credentials
+}
+
+func (s *Store) Inspection() *InspectionStore {
+	return s.inspection
 }
 
 func (s *Store) Close() error {

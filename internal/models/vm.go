@@ -9,6 +9,7 @@ type VMSummary struct {
 	Memory     int32 // MB
 	DiskSize   int64 // MB (stored as MiB in DB, treated as MB)
 	IssueCount int
+	Status     InspectionStatus
 }
 
 type VM struct {
