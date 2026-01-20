@@ -29,7 +29,6 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/server"
 	"github.com/kubev2v/assisted-migration-agent/internal/services"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
-	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	collectorv1 "github.com/kubev2v/assisted-migration-agent/pkg/collector/v1"
 	"github.com/kubev2v/assisted-migration-agent/pkg/console"
 	"github.com/kubev2v/assisted-migration-agent/pkg/scheduler"
@@ -76,7 +75,7 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 			s := store.NewStore(db)
 			defer s.Close()
 
-			if err := migrations.Run(ctx, db); err != nil {
+			if err := s.Migrate(context.Background()); err != nil {
 				zap.S().Errorw("failed to run migrations", "error", err)
 				return err
 			}

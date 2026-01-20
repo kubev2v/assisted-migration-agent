@@ -5,6 +5,8 @@ import (
 	"database/sql"
 
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
+
+	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 )
 
 type Store struct {
@@ -27,6 +29,18 @@ func NewStore(db *sql.DB) *Store {
 		vm:            NewVMStore(qi, parser),
 		credentials:   NewCredentialsStore(qi),
 	}
+}
+
+func (s *Store) Migrate(ctx context.Context) error {
+	if err := s.parser.Init(); err != nil {
+		return err
+	}
+
+	if err := migrations.Run(ctx, s.db); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *Store) Parser() *duckdb_parser.Parser {

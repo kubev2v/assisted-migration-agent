@@ -9,7 +9,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/google/uuid"
-	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
@@ -117,7 +116,6 @@ func (b *V1WorkBuilder) parsing() models.WorkUnit {
 
 				sqlitePath := b.collector.DBPath()
 
-				var validator duckdb_parser.Validator
 				// if b.opaPoliciesDir != "" {
 				// 	opaValidator, err := opa.NewValidatorFromDir(b.opaPoliciesDir)
 				// 	if err != nil {
@@ -133,13 +131,7 @@ func (b *V1WorkBuilder) parsing() models.WorkUnit {
 				}
 				zap.S().Named("collector_service").Debugw("sqlite file ready", "path", sqlitePath)
 
-				parser := duckdb_parser.New(b.store.DB(), validator)
-				if err := parser.Init(); err != nil {
-					zap.S().Named("collector_service").Errorw("failed to initialize parser schema", "error", err)
-					return nil, err
-				}
-
-				result, err := parser.IngestSqlite(ctx, sqlitePath)
+				result, err := b.store.Parser().IngestSqlite(ctx, sqlitePath)
 				if err != nil {
 					zap.S().Named("collector_service").Errorw("failed to ingest sqlite data", "error", err)
 					return nil, err
