@@ -22,6 +22,7 @@ import (
 	"github.com/spf13/pflag"
 	"go.uber.org/zap"
 
+	"github.com/go-extras/cobraflags"
 	v1 "github.com/kubev2v/assisted-migration-agent/api/v1"
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
 	"github.com/kubev2v/assisted-migration-agent/internal/handlers"
@@ -154,6 +155,7 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 	}
 
 	registerFlags(runCmd, cfg)
+	cobraflags.CobraOnInitialize("AGENT", runCmd)
 
 	return runCmd
 }
