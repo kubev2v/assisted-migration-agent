@@ -38,6 +38,7 @@ func NewServer(cfg *config.Configuration, registerHandlerFn func(router *gin.Rou
 		gin.SetMode(gin.ReleaseMode)
 	}
 	engine := gin.New()
+	engine.MaxMultipartMemory = 64 << 20 // max 64Mb
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf("0.0.0.0:%d", cfg.Server.HTTPPort),

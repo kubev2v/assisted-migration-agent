@@ -31,6 +31,9 @@ type ServerInterface interface {
 	// Get collected inventory
 	// (GET /inventory)
 	GetInventory(c *gin.Context)
+	// Upload VDDK tarball
+	// (POST /vddk)
+	PostVddk(c *gin.Context)
 	// Get list of VMs with filtering and pagination
 	// (GET /vms)
 	GetVMs(c *gin.Context, params GetVMsParams)
@@ -139,6 +142,19 @@ func (siw *ServerInterfaceWrapper) GetInventory(c *gin.Context) {
 	}
 
 	siw.Handler.GetInventory(c)
+}
+
+// PostVddk operation middleware
+func (siw *ServerInterfaceWrapper) PostVddk(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.PostVddk(c)
 }
 
 // GetVMs operation middleware
@@ -372,6 +388,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.GET(options.BaseURL+"/collector", wrapper.GetCollectorStatus)
 	router.POST(options.BaseURL+"/collector", wrapper.StartCollector)
 	router.GET(options.BaseURL+"/inventory", wrapper.GetInventory)
+	router.POST(options.BaseURL+"/vddk", wrapper.PostVddk)
 	router.GET(options.BaseURL+"/vms", wrapper.GetVMs)
 	router.DELETE(options.BaseURL+"/vms/inspector", wrapper.RemoveVMsFromInspection)
 	router.GET(options.BaseURL+"/vms/inspector", wrapper.GetInspectorStatus)
