@@ -331,6 +331,46 @@ paths:
           description: Inspector not running
         '500':
           description: Internal server error
+  /vddk:
+    post:
+      summary: Upload VDDK tarball
+      requestBody:
+        required: true
+        content:
+          multiple/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: VDDK tarball
+      responses:
+        '200':
+          description: Upload successfull
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - md5
+                  - bytes
+                properties:
+                  md5:
+                    type: string
+                    description: md5 sum of the uploaded tarball
+                  bytes:
+                    type: integer
+                    format: int64
+                    description: written bytes
+        '413':
+          description: File exceeds 64MB limit
+        '400':
+          description: Bad request
+        '500':
+          description: Internal server error
 
 components:
   schemas:
