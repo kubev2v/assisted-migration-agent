@@ -84,7 +84,6 @@ func newConsoleService(cfg config.Agent, s *scheduler.Scheduler, client *console
 			target:  defaultStatus.Target,
 		},
 		client:              client,
-		close:               make(chan any, 1),
 		store:               store,
 		collector:           collector,
 		legacyStatusEnabled: cfg.LegacyStatusEnabled,
@@ -122,6 +121,7 @@ func (c *Console) SetMode(ctx context.Context, mode models.AgentMode) error {
 	case models.AgentModeConnected:
 		c.state.SetTarget(models.ConsoleStatusConnected)
 		zap.S().Debugw("starting run loop for connected mode")
+		c.close = make(chan any, 1)
 		go c.run()
 	case models.AgentModeDisconnected:
 		c.state.SetTarget(models.ConsoleStatusDisconnected)
@@ -162,6 +162,7 @@ func (c *Console) run() {
 		tick.Stop()
 		c.state.SetCurrent(models.ConsoleStatusDisconnected)
 		zap.S().Named("console_service").Info("service stopped sending requests to console.rh.com")
+		c.close = nil
 	}()
 
 	// use exponential backoff if server is unreachable.
@@ -217,6 +218,16 @@ func (c *Console) run() {
 			b.Reset()
 			nextAllowedTime = time.Time{}
 		}
+	}
+}
+
+func (c *Console) Stop() {
+	c.mu.Lock()
+	closeCh := c.close
+	c.mu.Unlock()
+
+	if closeCh != nil {
+		closeCh <- struct{}{}
 	}
 }
 

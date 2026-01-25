@@ -613,6 +613,96 @@ var _ = Describe("Console Service", func() {
 		})
 	})
 
+	Describe("Stop", func() {
+		It("should stop the run loop when called", func() {
+			requestReceived := make(chan bool, 10)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				requestReceived <- true
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer server.Close()
+
+			client, err := console.NewConsoleClient(server.URL, "")
+			Expect(err).NotTo(HaveOccurred())
+
+			consoleSrv := services.NewConsoleService(cfg, sched, client, collector, st)
+			err = consoleSrv.SetMode(context.Background(), models.AgentModeConnected)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Wait for first request to ensure loop is running
+			Eventually(requestReceived, 500*time.Millisecond).Should(Receive())
+
+			// Stop the service
+			consoleSrv.Stop()
+
+			// Drain any pending requests
+			for len(requestReceived) > 0 {
+				<-requestReceived
+			}
+
+			// Should not receive more requests after stop
+			Consistently(requestReceived, 200*time.Millisecond).ShouldNot(Receive())
+		})
+
+		It("should not block when called twice", func() {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer server.Close()
+
+			client, err := console.NewConsoleClient(server.URL, "")
+			Expect(err).NotTo(HaveOccurred())
+
+			consoleSrv := services.NewConsoleService(cfg, sched, client, collector, st)
+			err = consoleSrv.SetMode(context.Background(), models.AgentModeConnected)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Give time for loop to start
+			time.Sleep(100 * time.Millisecond)
+
+			// First stop
+			done := make(chan struct{})
+			go func() {
+				consoleSrv.Stop()
+				close(done)
+			}()
+			Eventually(done, 500*time.Millisecond).Should(BeClosed())
+
+			// Give time for the run loop to process stop and exit
+			time.Sleep(100 * time.Millisecond)
+
+			// Second stop should not block (close channel is nil now)
+			done2 := make(chan struct{})
+			go func() {
+				consoleSrv.Stop()
+				close(done2)
+			}()
+			Eventually(done2, 500*time.Millisecond).Should(BeClosed())
+		})
+
+		It("should not block when called without starting the loop", func() {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer server.Close()
+
+			client, err := console.NewConsoleClient(server.URL, "")
+			Expect(err).NotTo(HaveOccurred())
+
+			// Create service but don't start the loop (stay in disconnected mode)
+			consoleSrv := services.NewConsoleService(cfg, sched, client, collector, st)
+
+			// Stop should not block even though loop was never started
+			done := make(chan struct{})
+			go func() {
+				consoleSrv.Stop()
+				close(done)
+			}()
+			Eventually(done, 500*time.Millisecond).Should(BeClosed())
+		})
+
+	})
+
 	Describe("Backoff", func() {
 		It("should apply exponential backoff on transient errors", func() {
 			requestTimes := make(chan time.Time, 20)

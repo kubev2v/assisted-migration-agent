@@ -84,7 +84,6 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 
 			// init scheduler
 			sched := scheduler.NewScheduler(cfg.Agent.NumWorkers)
-			defer sched.Close()
 
 			// read jwt token for agent
 			jwt := ""
@@ -149,6 +148,12 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 			wg.Wait()
 
 			zap.S().Info("server shutdown")
+
+			consoleSrv.Stop()
+			collectorSrv.Stop()
+			sched.Close()
+
+			zap.S().Info("services and scheduler closed")
 
 			return nil
 		},
