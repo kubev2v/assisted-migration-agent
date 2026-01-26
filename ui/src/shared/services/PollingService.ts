@@ -7,7 +7,8 @@ export function isCollectorRunning(status: CollectorStatusStatusEnum): boolean {
   return (
     status === CollectorStatusStatusEnum.Connecting ||
     status === CollectorStatusStatusEnum.Connected ||
-    status === CollectorStatusStatusEnum.Collecting
+    status === CollectorStatusStatusEnum.Collecting ||
+    status === CollectorStatusStatusEnum.Parsing
   );
 }
 
