@@ -54,46 +54,25 @@ bin/agent run \
 
 ## Command Line Flags
 
-### Agent
-
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--agent-id` | (required) | Unique identifier (UUID) for this agent |
-| `--source-id` | (required) | Source identifier (UUID) for this agent |
-| `--mode` | `disconnected` | Agent mode: `connected` or `disconnected` |
-| `--data-folder` | (none) | Path to persistent data folder. If not set, uses in-memory database |
-| `--opa-policies-folder` | (none) | Path to OPA policies folder for VM validation |
+| `--agent-id` | *required* | Unique identifier (UUID) for this agent |
+| `--source-id` | *required* | Source identifier (UUID) for this agent |
+| `--mode` | `disconnected` | `connected` \| `disconnected` |
+| `--data-folder` | — | Path to persistent data folder (uses in-memory if not set) |
+| `--opa-policies-folder` | — | Path to OPA policies folder for VM validation |
 | `--num-workers` | `3` | Number of scheduler workers |
-| `--version` | (none) | Agent version to report to console |
-
-### Server
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--server-http-port` | `8000` | Port on which the HTTP server listens |
-| `--server-mode` | `dev` | Server mode: `dev` or `prod`. Production mode enables HTTPS with self-signed certificates |
-| `--server-statics-folder` | (none) | Path to static files folder. Required when server mode is `prod` |
-
-### Console
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--console-url` | `http://localhost:7443` | URL of the migration planner console |
-| `--console-update-interval` | `5s` | Interval for console status updates |
-
-### Authentication
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--authentication-enabled` | `false` | Enable authentication when connecting to console |
-| `--authentication-jwt-filepath` | (none) | Path to JWT file. Required when authentication is enabled |
-
-### Logging
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--log-format` | `console` | Log format: `console` or `json` |
-| `--log-level` | `debug` | Log level: `debug`, `info`, `warn`, `error` |
+| `--version` | `v0.0.0` | Agent version to report to console |
+| `--legacy-status-enabled` | `true` | Use legacy status like waiting-for-credentials |
+| `--server-http-port` | `8000` | HTTP server port |
+| `--server-mode` | `dev` | `dev` \| `prod` (prod enables HTTPS with self-signed certs) |
+| `--server-statics-folder` | — | Path to static files (required when `--server-mode=prod`) |
+| `--console-url` | `http://localhost:7443` | Migration planner console URL |
+| `--console-update-interval` | `5s` | Status update interval |
+| `--authentication-enabled` | `true` | Enable console authentication |
+| `--authentication-jwt-filepath` | — | Path to JWT file (required when `--authentication-enabled`) |
+| `--log-format` | `console` | `console` \| `json` |
+| `--log-level` | `debug` | `debug` \| `info` \| `warn` \| `error` |
 
 ## Development
 
