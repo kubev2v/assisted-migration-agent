@@ -296,6 +296,7 @@ func (c *InspectorService) setState(s models.InspectorState) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.status.State = s
+	c.status.Error = nil
 }
 
 func (c *InspectorService) setErrorStatus(err error) {
