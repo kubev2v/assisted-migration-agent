@@ -111,7 +111,10 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 			// create inspector service
 			inspectorSrv := services.NewInspectorService(sched, s).WithBuilder(models.UnimplementedInspectorWorkBuilder{})
 
-			consoleSrv := services.NewConsoleService(cfg.Agent, sched, consoleClient, collectorSrv, s)
+			consoleSrv, err := services.NewConsoleService(cfg.Agent, sched, consoleClient, collectorSrv, s)
+			if err != nil {
+				return fmt.Errorf("failed to create console service: %w", err)
+			}
 			inventorySrv := services.NewInventoryService(s)
 			vmSrv := services.NewVMService(s)
 

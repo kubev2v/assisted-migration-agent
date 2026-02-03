@@ -46,7 +46,7 @@ type Console struct {
 	legacyStatusEnabled bool
 }
 
-func NewConsoleService(cfg config.Agent, s *scheduler.Scheduler, client *console.Client, collector Collector, st *store.Store) *Console {
+func NewConsoleService(cfg config.Agent, s *scheduler.Scheduler, client *console.Client, collector Collector, st *store.Store) (*Console, error) {
 	targetStatus, err := models.ParseConsoleStatusType(cfg.Mode)
 	if err != nil {
 		targetStatus = models.ConsoleStatusDisconnected
@@ -61,7 +61,12 @@ func NewConsoleService(cfg config.Agent, s *scheduler.Scheduler, client *console
 	if err == nil && config.AgentMode == models.AgentModeConnected {
 		defaultStatus.Target = models.ConsoleStatusConnected
 	}
+
 	c := newConsoleService(cfg, s, client, collector, st, defaultStatus)
+
+	if err := c.store.Configuration().Save(context.Background(), &models.Configuration{AgentMode: models.AgentMode(defaultStatus.Target)}); err != nil {
+		return nil, err
+	}
 
 	if defaultStatus.Target == models.ConsoleStatusConnected {
 		go c.run()
@@ -69,7 +74,7 @@ func NewConsoleService(cfg config.Agent, s *scheduler.Scheduler, client *console
 
 	zap.S().Named("console_service").Infow("agent mode", "current", defaultStatus.Current, "target", defaultStatus.Target)
 
-	return c
+	return c, nil
 }
 
 func newConsoleService(cfg config.Agent, s *scheduler.Scheduler, client *console.Client, collector Collector, store *store.Store, defaultStatus models.ConsoleStatus) *Console {
@@ -121,7 +126,6 @@ func (c *Console) SetMode(ctx context.Context, mode models.AgentMode) error {
 	case models.AgentModeConnected:
 		c.state.SetTarget(models.ConsoleStatusConnected)
 		zap.S().Debugw("starting run loop for connected mode")
-		c.close = make(chan any, 1)
 		go c.run()
 	case models.AgentModeDisconnected:
 		c.state.SetTarget(models.ConsoleStatusDisconnected)
@@ -158,6 +162,7 @@ func (c *Console) Status() models.ConsoleStatus {
 func (c *Console) run() {
 	c.state.SetCurrent(models.ConsoleStatusConnected)
 	tick := time.NewTicker(c.updateInterval)
+	c.close = make(chan any, 1)
 	defer func() {
 		tick.Stop()
 		c.state.SetCurrent(models.ConsoleStatusDisconnected)
