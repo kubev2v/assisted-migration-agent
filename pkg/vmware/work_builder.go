@@ -2,6 +2,7 @@ package vmware
 
 import (
 	"context"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -21,14 +22,22 @@ func NewInspectorWorkBuilder(operator VMOperator) *InsWorkBuilder {
 }
 
 // Build creates the sequence of WorkUnits for the Inspector workflow.
-func (b *InsWorkBuilder) Build(id string) []models.InspectorWorkUnit {
+func (b *InsWorkBuilder) Build(id string) models.VMWorkflow {
 	return b.vmWork(id)
 }
 
-func (b *InsWorkBuilder) vmWork(id string) []models.InspectorWorkUnit {
-	var units []models.InspectorWorkUnit
+func (b *InsWorkBuilder) vmWork(id string) models.VMWorkflow {
+	return models.VMWorkflow{
+		Validate:       b.validate(id),
+		CreateSnapshot: b.createSnapshot(id),
+		Inspect:        b.inspect(id),
+		Save:           b.save(id),
+		RemoveSnapshot: b.removeSnapshot(id),
+	}
+}
 
-	inspect := models.InspectorWorkUnit{
+func (b *InsWorkBuilder) validate(id string) models.InspectorWorkUnit {
+	return models.InspectorWorkUnit{
 		Work: func() func(ctx context.Context) (any, error) {
 			return func(ctx context.Context) (any, error) {
 				zap.S().Named("inspector_service").Info("validate privileges on VM")
@@ -38,6 +47,16 @@ func (b *InsWorkBuilder) vmWork(id string) []models.InspectorWorkUnit {
 					return nil, err
 				}
 
+				return nil, nil
+			}
+		},
+	}
+}
+
+func (b *InsWorkBuilder) createSnapshot(id string) models.InspectorWorkUnit {
+	return models.InspectorWorkUnit{
+		Work: func() func(ctx context.Context) (any, error) {
+			return func(ctx context.Context) (any, error) {
 				zap.S().Named("inspector_service").Infow("creating VM snapshot", "vmId", id)
 				req := CreateSnapshotRequest{
 					VmId:         id,
@@ -54,7 +73,39 @@ func (b *InsWorkBuilder) vmWork(id string) []models.InspectorWorkUnit {
 
 				zap.S().Named("inspector_service").Infow("VM snapshot created", "vmId", id)
 
-				// Todo: add the inspection logic here
+				return nil, nil
+			}
+		},
+	}
+}
+
+func (b *InsWorkBuilder) inspect(id string) models.InspectorWorkUnit {
+	return models.InspectorWorkUnit{
+		Work: func() func(ctx context.Context) (any, error) {
+			return func(ctx context.Context) (any, error) {
+
+				return nil, nil
+			}
+		},
+	}
+}
+
+func (b *InsWorkBuilder) save(id string) models.InspectorWorkUnit {
+	return models.InspectorWorkUnit{
+		Work: func() func(ctx context.Context) (any, error) {
+			return func(ctx context.Context) (any, error) {
+
+				return nil, nil
+			}
+		},
+	}
+}
+
+func (b *InsWorkBuilder) removeSnapshot(id string) models.InspectorWorkUnit {
+	return models.InspectorWorkUnit{
+		Work: func() func(ctx context.Context) (any, error) {
+			return func(ctx context.Context) (any, error) {
+				zap.S().Named("inspector_service").Infow("removing VM snapshot", "vmId", id)
 
 				removeSnapReq := RemoveSnapshotRequest{
 					VmId:         id,
@@ -73,8 +124,46 @@ func (b *InsWorkBuilder) vmWork(id string) []models.InspectorWorkUnit {
 			}
 		},
 	}
+}
 
-	units = append(units, inspect)
+type UnimplementedInspectionWorkBuilder struct{}
 
-	return units
+func (u UnimplementedInspectionWorkBuilder) Build(id string) models.VMWorkflow {
+	return models.VMWorkflow{
+		Validate: models.InspectorWorkUnit{
+			Work: func() func(ctx context.Context) (any, error) {
+				return UnimplementedVMWorkUnit(time.Second, "unimplemented Validate step finished for: %s", id)
+			},
+		},
+		CreateSnapshot: models.InspectorWorkUnit{
+			Work: func() func(ctx context.Context) (any, error) {
+				return UnimplementedVMWorkUnit(time.Second, "unimplemented CreateSnapshot step finished for: %s", id)
+			},
+		},
+		Inspect: models.InspectorWorkUnit{
+			Work: func() func(ctx context.Context) (any, error) {
+				return UnimplementedVMWorkUnit(time.Second, "unimplemented Inspect step finished for: %s", id)
+			},
+		},
+		Save: models.InspectorWorkUnit{
+			Work: func() func(ctx context.Context) (any, error) {
+				return UnimplementedVMWorkUnit(time.Second, "unimplemented Save step finished for: %s", id)
+			},
+		},
+		RemoveSnapshot: models.InspectorWorkUnit{
+			Work: func() func(ctx context.Context) (any, error) {
+				return UnimplementedVMWorkUnit(time.Second, "unimplemented RemoveSnapshot step finished for: %s", id)
+			},
+		},
+	}
+}
+
+func UnimplementedVMWorkUnit(delay time.Duration, msg string, args ...string) func(ctx context.Context) (any, error) {
+	return func(ctx context.Context) (any, error) {
+		time.Sleep(delay)
+		if msg != "" {
+			zap.S().Named("inspector_service").Infof(msg, args)
+		}
+		return nil, nil
+	}
 }

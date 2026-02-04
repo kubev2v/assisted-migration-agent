@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kubev2v/assisted-migration-agent/pkg/vmware"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -29,7 +31,7 @@ func getVCenterCredentials() *models.Credentials {
 	}
 }
 
-// testsMockInspectorWorkBuilder implements models.InspectorWorkBuilder for testing
+// testsMockInspectorWorkBuilder implements models.InspectionWorkBuilder for testing
 type testsMockInspectorWorkBuilder struct {
 	vmWorkErr map[string]error // per-VM errors
 	workDelay time.Duration
@@ -62,9 +64,9 @@ func (m *testsMockInspectorWorkBuilder) getInspectedVMs() []string {
 	return result
 }
 
-func (m *testsMockInspectorWorkBuilder) Build(vmID string) []models.InspectorWorkUnit {
-	return []models.InspectorWorkUnit{
-		{
+func (m *testsMockInspectorWorkBuilder) Build(vmID string) models.VMWorkflow {
+	return models.VMWorkflow{
+		Validate: models.InspectorWorkUnit{
 			Work: func() func(ctx context.Context) (any, error) {
 				return func(ctx context.Context) (any, error) {
 					if m.workDelay > 0 {
@@ -85,6 +87,26 @@ func (m *testsMockInspectorWorkBuilder) Build(vmID string) []models.InspectorWor
 
 					return nil, nil
 				}
+			},
+		},
+		CreateSnapshot: models.InspectorWorkUnit{
+			Work: func() func(ctx context.Context) (any, error) {
+				return vmware.UnimplementedVMWorkUnit(0, "")
+			},
+		},
+		Inspect: models.InspectorWorkUnit{
+			Work: func() func(ctx context.Context) (any, error) {
+				return vmware.UnimplementedVMWorkUnit(0, "")
+			},
+		},
+		Save: models.InspectorWorkUnit{
+			Work: func() func(ctx context.Context) (any, error) {
+				return vmware.UnimplementedVMWorkUnit(0, "")
+			},
+		},
+		RemoveSnapshot: models.InspectorWorkUnit{
+			Work: func() func(ctx context.Context) (any, error) {
+				return vmware.UnimplementedVMWorkUnit(0, "")
 			},
 		},
 	}
