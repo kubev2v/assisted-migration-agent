@@ -23,7 +23,7 @@ import (
 type InspectorService struct {
 	scheduler *scheduler.Scheduler[any]
 	store     *store.Store
-	builder   models.InspectorWorkBuilder
+	builder   models.InspectionWorkBuilder
 
 	status models.InspectorStatus
 
@@ -31,8 +31,10 @@ type InspectorService struct {
 
 	done chan any
 
+	vmCancels map[string]context.CancelFunc
+	cancel    context.CancelFunc
+
 	vsphereClient *govmomi.Client
-	cancel        context.CancelFunc
 	cred          *models.Credentials
 }
 
@@ -42,6 +44,7 @@ func NewInspectorService(s *scheduler.Scheduler[any], store *store.Store) *Inspe
 		scheduler: s,
 		status:    models.InspectorStatus{State: models.InspectorStateReady},
 		store:     store,
+		vmCancels: make(map[string]context.CancelFunc),
 	}
 }
 
@@ -174,6 +177,21 @@ func (c *InspectorService) CancelVmsInspection(ctx context.Context, vmIDs ...str
 		return fmt.Errorf("failed to update inspection table: %w", err)
 	}
 
+	// Cancel running VMs
+	gf := store.NewInspectionQueryFilter().ByStatus(models.InspectionStateRunning)
+	if len(vmIDs) > 0 {
+		gf = gf.ByVmIDs(vmIDs...)
+	}
+
+	runningVms, err := c.store.Inspection().List(ctx, gf)
+	if err != nil {
+		return fmt.Errorf("failed to list runnning inspections: %w", err)
+	}
+
+	for k := range runningVms {
+		c.StopVM(k)
+	}
+
 	return nil
 }
 
@@ -186,7 +204,7 @@ func (c *InspectorService) IsBusy() bool {
 	}
 }
 
-func (c *InspectorService) WithBuilder(builder models.InspectorWorkBuilder) *InspectorService {
+func (c *InspectorService) WithBuilder(builder models.InspectionWorkBuilder) *InspectorService {
 	c.builder = builder
 	return c
 }
@@ -229,19 +247,27 @@ func (c *InspectorService) run(ctx context.Context, done chan any) {
 
 		if err := c.runVMWork(ctx, id, c.builder.Build(id)); err != nil {
 			var e *srvErrors.InspectorWorkError
+			var i *srvErrors.InspectionCanceledError
 			switch {
 			case errors.As(err, &e):
 				if setError := c.setVmErrorStatus(ctx, id, err); setError != nil {
-					c.setErrorStatus(err)
+					c.setErrorStatus(setError)
 					return
 				}
 				continue // VM failed, move to next VM
+			case errors.As(err, &i):
+				if setError := c.setVmState(ctx, id, models.InspectionStateCanceled); setError != nil {
+					c.setErrorStatus(setError)
+					return
+				}
+				zap.S().Debugw("vm inspection canceled", "vmID", id)
+				continue // VM canceled, try next VM
 			case errors.Is(err, context.Canceled):
 				c.setState(models.InspectorStateCanceled)
-				return
-			default:
-				c.setErrorStatus(err)
-				return
+				if err := c.setVmState(ctx, id, models.InspectionStateCanceled); err != nil {
+					c.setErrorStatus(err)
+				}
+				return // Parent ctx canceled, stop work
 			}
 		}
 
@@ -258,18 +284,46 @@ func (c *InspectorService) run(ctx context.Context, done chan any) {
 	zap.S().Info("inspector finished work")
 }
 
-func (c *InspectorService) runVMWork(ctx context.Context, id string, units []models.InspectorWorkUnit) error {
+func (c *InspectorService) runVMWork(ctx context.Context, id string, workflow models.VMWorkflow) error {
+	vmCtx, vmCancel := context.WithCancel(ctx)
+
+	c.mu.Lock()
+	c.vmCancels[id] = vmCancel
+	c.mu.Unlock()
+
+	defer func() {
+		vmCancel()
+		c.mu.Lock()
+		delete(c.vmCancels, id)
+		c.mu.Unlock()
+	}()
+
+	units := []models.InspectorWorkUnit{
+		workflow.Validate,
+		workflow.CreateSnapshot,
+		workflow.Inspect,
+		workflow.Save,
+	}
+
+	// In any case we would to try removing the snapshot
+	defer c.scheduler.AddWork(func(ctx context.Context) (any, error) {
+		return workflow.RemoveSnapshot.Work()(context.Background())
+	})
+
 	for _, unit := range units {
 
 		future := c.scheduler.AddWork(func(ctx context.Context) (any, error) {
-			return unit.Work()(ctx)
+			return unit.Work()(vmCtx)
 		})
 
 		select {
-		// Todo: handle the context done case. we may want to run some cleanup tasks
 		case <-ctx.Done():
 			future.Stop()
 			return context.Canceled
+
+		case <-vmCtx.Done():
+			future.Stop()
+			return srvErrors.NewInspectionCanceledError(id)
 
 		case result := <-future.C():
 			if result.Err != nil {
@@ -325,4 +379,17 @@ func (c *InspectorService) setVmErrorStatus(ctx context.Context, vmID string, er
 	}
 
 	return nil
+}
+
+func (c *InspectorService) StopVM(vmID string) {
+	c.mu.Lock()
+	cancel, exists := c.vmCancels[vmID]
+	c.mu.Unlock()
+
+	if !exists {
+		return
+	}
+
+	// Trigger the context cancellation for this specific VM
+	cancel()
 }
