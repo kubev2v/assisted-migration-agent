@@ -779,7 +779,7 @@ var _ = Describe("VMs Handlers Integration", func() {
 			var response v1.VMDetails
 			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
 			Expect(response.Disks).To(HaveLen(2))
-			Expect(*response.Disks[0].Capacity).To(Equal(int64(500 * 1024 * 1024)))
+			Expect(*response.Disks[0].Capacity).To(Equal(int64(500 * 1024 * 1024 * 1024 * 1024)))
 		})
 
 		It("should return VM with NICs", func() {

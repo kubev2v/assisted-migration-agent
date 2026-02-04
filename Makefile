@@ -1,4 +1,4 @@
-.PHONY: generate generate.proto build build.e2e run help tidy tidy-check clean lint format check-format check-generate validate-all image
+.PHONY: generate generate.proto build build.e2e e2e run help tidy tidy-check clean lint format check-format check-generate validate-all image
 
 PODMAN ?= podman
 GIT_COMMIT=$(shell git rev-list -1 HEAD --abbrev-commit)
@@ -19,6 +19,8 @@ GO_BUILD_FLAGS := ${GO_BUILD_FLAGS}
 help:
 	@echo "Targets:"
 	@echo "    build:           build the agent binary"
+	@echo "    build.e2e:       build the e2e test binary"
+	@echo "    e2e:             run e2e tests"
 	@echo "    image:           build container image"
 	@echo "    run:             run the agent"
 	@echo "    run.ui:          start React dev server"
@@ -43,6 +45,13 @@ build.e2e:
 	@echo "Building e2e binary..."
 	go build -tags "exclude_graphdriver_btrfs containers_image_openpgp" -o bin/e2e ./test/e2e
 	@echo "Build complete: bin/e2e"
+
+E2E_AGENT_IMAGE ?= $(IMAGE_NAME):$(IMAGE_TAG)
+E2E_BACKEND_IMAGE ?= quay.io/kubev2v/migration-planner-api:latest
+
+e2e: build.e2e
+	@echo "🧪 Running e2e tests..."
+	./bin/e2e -agent-image=$(E2E_AGENT_IMAGE) -backend-image=$(E2E_BACKEND_IMAGE) --ginkgo.v
 
 # Build container image
 image:

@@ -58,8 +58,8 @@ func NewConsoleService(cfg config.Agent, s *scheduler.Scheduler, client *console
 	}
 
 	config, err := st.Configuration().Get(context.Background())
-	if err == nil && config.AgentMode == models.AgentModeConnected {
-		defaultStatus.Target = models.ConsoleStatusConnected
+	if err == nil {
+		defaultStatus.Target = models.ConsoleStatusType(config.AgentMode)
 	}
 
 	c := newConsoleService(cfg, s, client, collector, st, defaultStatus)

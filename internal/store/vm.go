@@ -140,7 +140,7 @@ func vmFromParser(pvm parsermodels.VM) models.VM {
 	for i, n := range pvm.NICs {
 		nics = append(nics, models.NIC{
 			MAC:     n.MAC,
-			Network: n.Network,
+			Network: n.Network.ID,
 			Index:   i,
 		})
 	}

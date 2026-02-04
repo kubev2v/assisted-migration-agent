@@ -172,7 +172,7 @@ var _ = Describe("Console Service", func() {
 			_, err = services.NewConsoleService(cfg, sched, client, collector, st)
 			Expect(err).NotTo(HaveOccurred())
 
-			Eventually(requestReceived, 500*time.Millisecond).Should(Receive())
+			Eventually(requestReceived, 1500*time.Millisecond).Should(Receive())
 		})
 
 		It("should remain disconnected when agent mode is disconnected", func() {

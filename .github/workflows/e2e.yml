@@ -53,11 +53,14 @@ jobs:
         run: make build.e2e
 
       - name: Pull test images
-        run: podman pull docker.io/library/postgres:17
+        run: |
+          podman pull docker.io/library/postgres:17
+          podman pull docker.io/vmware/vcsim:latest
 
       - name: Run e2e tests
         run: |
           ./bin/e2e \
-            --backend-image=${{ env.BACKEND_IMAGE }}:${{ env.BACKEND_TAG }} \
-            --agent-image=${{ env.AGENT_IMAGE }} \
-            --podman-socket=${{ env.PODMAN_SOCKET }}
+            -backend-image=${{ env.BACKEND_IMAGE }}:${{ env.BACKEND_TAG }} \
+            -agent-image=${{ env.AGENT_IMAGE }} \
+            -podman-socket=${{ env.PODMAN_SOCKET }} \
+            --ginkgo.v

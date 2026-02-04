@@ -2,6 +2,8 @@ package store
 
 import (
 	"database/sql"
+	"fmt"
+	"path/filepath"
 
 	_ "github.com/duckdb/duckdb-go/v2"
 )
@@ -18,6 +20,16 @@ func NewDB(path string) (*sql.DB, error) {
 	if err := conn.Ping(); err != nil {
 		_ = conn.Close()
 		return nil, err
+	}
+
+	// Configure extension directory to the same folder as the database
+	// This prevents DuckDB from trying to write to ~/.duckdb which may be read-only
+	if path != ":memory:" {
+		extDir := filepath.Dir(path)
+		if _, err := conn.Exec(fmt.Sprintf("SET extension_directory = '%s'", extDir)); err != nil {
+			_ = conn.Close()
+			return nil, fmt.Errorf("setting extension directory: %w", err)
+		}
 	}
 
 	return conn, nil
