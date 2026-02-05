@@ -18,7 +18,6 @@ require (
 	github.com/jzelinskie/cobrautil/v2 v2.0.0-20240819150235-f7fe73942d0f
 	github.com/kubev2v/forklift v0.0.0-20260130164321-c17a5c5a3baa
 	github.com/kubev2v/migration-planner v0.4.1-0.20260203094707-e49cf70017c7
-	github.com/lib/pq v1.10.0
 	github.com/oapi-codegen/runtime v1.1.2
 	github.com/onsi/ginkgo/v2 v2.27.2
 	github.com/onsi/gomega v1.38.2

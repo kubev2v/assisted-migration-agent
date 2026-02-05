@@ -1,19 +1,6 @@
-# Stage 1: Build the UI
-FROM --platform=linux/amd64 node:22-slim AS ui-builder
-
-WORKDIR /ui
-
-# Copy package files first for better caching
-COPY ui/package.json ui/package-lock.json ./
-
-# Install dependencies
-RUN npm ci
-
-# Copy UI source
-COPY ui/ ./
-
-# Build production bundle
-RUN npm run build
+# Stage 1: Fetch the UI
+ARG AGENT_UI_IMAGE_TAG=latest
+FROM --platform=linux/amd64 quay.io/assisted-migration/migration-planner-agent-ui:${AGENT_UI_IMAGE_TAG} AS ui-builder
 
 # Stage 2: Build the backend
 FROM --platform=linux/amd64 golang:1.24 AS backend-builder
@@ -50,7 +37,8 @@ WORKDIR /app
 COPY --from=backend-builder /app/bin/agent /app/agent
 
 # Copy UI static files from ui builder
-COPY --from=ui-builder /ui/dist /app/static
+COPY --from=ui-builder /apps/agent-ui/dist /app/static
+RUN chown -R 1001:0 /app/static
 
 # Create data directory
 RUN mkdir -p /var/lib/agent && chown -R 1001:0 /var/lib/agent

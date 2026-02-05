@@ -9,6 +9,7 @@ MAIN_PATH=./main.go
 
 IMAGE_NAME ?= assisted-migration-agent
 IMAGE_TAG ?= latest
+AGENT_UI_IMAGE_TAG ?= latest
 
 GOBASE=$(shell pwd)
 GOBIN=$(GOBASE)/bin
@@ -61,7 +62,7 @@ e2e.clean:
 # Build container image
 image:
 	@echo "📦 Building container image $(IMAGE_NAME):$(IMAGE_TAG)..."
-	$(PODMAN) build --build-arg GIT_COMMIT=$(GIT_COMMIT) -t $(IMAGE_NAME):$(IMAGE_TAG) -f Containerfile .
+	$(PODMAN) build --build-arg GIT_COMMIT=$(GIT_COMMIT) --build-arg AGENT_UI_IMAGE_TAG=$(AGENT_UI_IMAGE_TAG) -t $(IMAGE_NAME):$(IMAGE_TAG) -f Containerfile .
 	@echo "✅ Image built: $(IMAGE_NAME):$(IMAGE_TAG)"
 
 clean:
