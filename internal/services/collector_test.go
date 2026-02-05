@@ -115,39 +115,62 @@ var _ = Describe("CollectorService", func() {
 	})
 
 	Describe("NewCollectorService", func() {
+		// Given a newly created collector service
+		// When we check the status
+		// Then the state should be ready
 		It("should create a service with ready state", func() {
+			// Act
 			status := srv.GetStatus()
+
+			// Assert
 			Expect(status.State).To(Equal(models.CollectorStateReady))
 		})
 	})
 
 	Describe("GetStatus", func() {
+		// Given a collector service that has not been started
+		// When we get the status
+		// Then it should return ready state
 		It("should return ready state initially", func() {
+			// Act
 			status := srv.GetStatus()
+
+			// Assert
 			Expect(status.State).To(Equal(models.CollectorStateReady))
 		})
 	})
 
 	Describe("Stop", func() {
+		// Given a collector service
+		// When we stop the collector
+		// Then the state should reset to ready
 		It("should reset state to ready", func() {
+			// Act
 			srv.Stop()
-
 			status := srv.GetStatus()
+
+			// Assert
 			Expect(status.State).To(Equal(models.CollectorStateReady))
 		})
 	})
 
 	Describe("Start", func() {
+		// Given a collector service with valid credentials
+		// When we start the collector
+		// Then it should reach collected state and inventory should be available
 		It("should verify credentials and start collection", func() {
+			// Arrange
 			creds := &models.Credentials{
 				URL:      "https://vcenter.example.com",
 				Username: "admin",
 				Password: "secret",
 			}
 
+			// Act
 			err := srv.Start(ctx, creds)
 			Expect(err).NotTo(HaveOccurred())
 
+			// Assert
 			Eventually(func() models.CollectorState {
 				return srv.GetStatus().State
 			}).Should(Equal(models.CollectorStateCollected))
@@ -157,41 +180,51 @@ var _ = Describe("CollectorService", func() {
 			Expect(inv).ToNot(BeNil())
 		})
 
+		// Given a collector service with a work builder that fails verification
+		// When we start the collector
+		// Then it should reach error state
 		It("should return error when credentials verification fails", func() {
+			// Arrange
 			srv = services.NewCollectorService(sched, st, &mockWorkBuilder{
 				store:     st,
 				verifyErr: errors.New("connection refused"),
 			})
-
 			creds := &models.Credentials{
 				URL:      "https://vcenter.example.com",
 				Username: "admin",
 				Password: "secret",
 			}
 
+			// Act
 			err := srv.Start(ctx, creds)
 			Expect(err).ToNot(HaveOccurred())
 
+			// Assert
 			Eventually(func() models.CollectorState {
 				return srv.GetStatus().State
 			}).Should(Equal(models.CollectorStateError))
 		})
 
+		// Given a collector service with a work builder that fails collection
+		// When we start the collector
+		// Then it should reach error state with collection failed message
 		It("should set error state when collection fails", func() {
+			// Arrange
 			srv = services.NewCollectorService(sched, st, &mockWorkBuilder{
 				store:      st,
 				collectErr: errors.New("collection failed"),
 			})
-
 			creds := &models.Credentials{
 				URL:      "https://vcenter.example.com",
 				Username: "admin",
 				Password: "secret",
 			}
 
+			// Act
 			err := srv.Start(ctx, creds)
 			Expect(err).NotTo(HaveOccurred())
 
+			// Assert
 			Eventually(func() models.CollectorState {
 				return srv.GetStatus().State
 			}).Should(Equal(models.CollectorStateError))
@@ -200,21 +233,26 @@ var _ = Describe("CollectorService", func() {
 			Expect(status.Error.Error()).To(ContainSubstring("collection failed"))
 		})
 
+		// Given a collector service with a work builder that fails processing
+		// When we start the collector
+		// Then it should reach error state with processing failed message
 		It("should set error state when processor fails", func() {
+			// Arrange
 			srv = services.NewCollectorService(sched, st, &mockWorkBuilder{
 				store:      st,
 				processErr: errors.New("processing failed"),
 			})
-
 			creds := &models.Credentials{
 				URL:      "https://vcenter.example.com",
 				Username: "admin",
 				Password: "secret",
 			}
 
+			// Act
 			err := srv.Start(ctx, creds)
 			Expect(err).NotTo(HaveOccurred())
 
+			// Assert
 			Eventually(func() models.CollectorState {
 				return srv.GetStatus().State
 			}).Should(Equal(models.CollectorStateError))
@@ -223,17 +261,23 @@ var _ = Describe("CollectorService", func() {
 			Expect(status.Error.Error()).To(ContainSubstring("processing failed"))
 		})
 
+		// Given a collector service that is already running
+		// When we try to start it again
+		// Then it should return an error
 		It("should return error when collection already in progress", func() {
+			// Arrange
 			creds := &models.Credentials{
 				URL:      "https://vcenter.example.com",
 				Username: "admin",
 				Password: "secret",
 			}
-
 			err := srv.Start(ctx, creds)
 			Expect(err).NotTo(HaveOccurred())
 
+			// Act
 			err = srv.Start(ctx, creds)
+
+			// Assert
 			Expect(err).To(HaveOccurred())
 		})
 	})

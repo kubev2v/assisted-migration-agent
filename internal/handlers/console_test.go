@@ -39,12 +39,18 @@ var _ = Describe("Console Handlers", func() {
 	})
 
 	Describe("GetAgentStatus", func() {
+		// Given a console service in disconnected mode
+		// When we request the agent status
+		// Then it should return disconnected status
 		It("should return disconnected status", func() {
+			// Arrange
 			req := httptest.NewRequest(http.MethodGet, "/agent", nil)
 			w := httptest.NewRecorder()
 
+			// Act
 			router.ServeHTTP(w, req)
 
+			// Assert
 			Expect(w.Code).To(Equal(http.StatusOK))
 
 			var response v1.AgentStatus
@@ -54,7 +60,11 @@ var _ = Describe("Console Handlers", func() {
 			Expect(response.Mode).To(Equal(v1.AgentStatusModeDisconnected))
 		})
 
+		// Given a console service in connected mode
+		// When we request the agent status
+		// Then it should return connected status
 		It("should return connected status", func() {
+			// Arrange
 			mockConsole.StatusResult = models.ConsoleStatus{
 				Current: models.ConsoleStatusConnected,
 				Target:  models.ConsoleStatusConnected,
@@ -63,8 +73,10 @@ var _ = Describe("Console Handlers", func() {
 			req := httptest.NewRequest(http.MethodGet, "/agent", nil)
 			w := httptest.NewRecorder()
 
+			// Act
 			router.ServeHTTP(w, req)
 
+			// Assert
 			Expect(w.Code).To(Equal(http.StatusOK))
 
 			var response v1.AgentStatus
@@ -74,7 +86,11 @@ var _ = Describe("Console Handlers", func() {
 			Expect(response.Mode).To(Equal(v1.AgentStatusModeConnected))
 		})
 
+		// Given a console service with an error
+		// When we request the agent status
+		// Then it should include the error in the response
 		It("should include error when present", func() {
+			// Arrange
 			mockConsole.StatusResult = models.ConsoleStatus{
 				Current: models.ConsoleStatusDisconnected,
 				Target:  models.ConsoleStatusConnected,
@@ -84,8 +100,10 @@ var _ = Describe("Console Handlers", func() {
 			req := httptest.NewRequest(http.MethodGet, "/agent", nil)
 			w := httptest.NewRecorder()
 
+			// Act
 			router.ServeHTTP(w, req)
 
+			// Assert
 			Expect(w.Code).To(Equal(http.StatusOK))
 
 			var response v1.AgentStatus
@@ -96,13 +114,19 @@ var _ = Describe("Console Handlers", func() {
 	})
 
 	Describe("SetAgentMode", func() {
+		// Given an invalid JSON request body
+		// When we try to set the agent mode
+		// Then it should return 400 Bad Request
 		It("should return 400 for invalid JSON body", func() {
+			// Arrange
 			req := httptest.NewRequest(http.MethodPost, "/agent", bytes.NewReader([]byte("invalid json")))
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
+			// Act
 			router.ServeHTTP(w, req)
 
+			// Assert
 			Expect(w.Code).To(Equal(http.StatusBadRequest))
 
 			var response map[string]any
@@ -111,7 +135,11 @@ var _ = Describe("Console Handlers", func() {
 			Expect(response["error"]).To(ContainSubstring("invalid request body"))
 		})
 
+		// Given a request with an invalid mode value
+		// When we try to set the agent mode
+		// Then it should return 400 Bad Request
 		It("should return 400 for invalid mode", func() {
+			// Arrange
 			body := map[string]string{"mode": "invalid"}
 			bodyBytes, _ := json.Marshal(body)
 
@@ -119,8 +147,10 @@ var _ = Describe("Console Handlers", func() {
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
+			// Act
 			router.ServeHTTP(w, req)
 
+			// Assert
 			Expect(w.Code).To(Equal(http.StatusBadRequest))
 
 			var response map[string]any
@@ -129,7 +159,11 @@ var _ = Describe("Console Handlers", func() {
 			Expect(response["error"]).To(ContainSubstring("invalid mode"))
 		})
 
+		// Given a valid request to set mode to connected
+		// When we set the agent mode
+		// Then the console service should be set to connected mode
 		It("should set mode to connected", func() {
+			// Arrange
 			body := v1.AgentModeRequest{Mode: v1.AgentModeRequestModeConnected}
 			bodyBytes, _ := json.Marshal(body)
 
@@ -137,14 +171,20 @@ var _ = Describe("Console Handlers", func() {
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
+			// Act
 			router.ServeHTTP(w, req)
 
+			// Assert
 			Expect(w.Code).To(Equal(http.StatusOK))
 			Expect(mockConsole.SetModeCallCount).To(Equal(1))
 			Expect(mockConsole.LastModeSet).To(Equal(models.AgentModeConnected))
 		})
 
+		// Given a valid request to set mode to disconnected
+		// When we set the agent mode
+		// Then the console service should be set to disconnected mode
 		It("should set mode to disconnected", func() {
+			// Arrange
 			body := v1.AgentModeRequest{Mode: v1.AgentModeRequestModeDisconnected}
 			bodyBytes, _ := json.Marshal(body)
 
@@ -152,14 +192,20 @@ var _ = Describe("Console Handlers", func() {
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
+			// Act
 			router.ServeHTTP(w, req)
 
+			// Assert
 			Expect(w.Code).To(Equal(http.StatusOK))
 			Expect(mockConsole.SetModeCallCount).To(Equal(1))
 			Expect(mockConsole.LastModeSet).To(Equal(models.AgentModeDisconnected))
 		})
 
+		// Given a console service that returns a mode conflict error
+		// When we try to set the agent mode
+		// Then it should return 409 Conflict
 		It("should return 409 for mode conflict error", func() {
+			// Arrange
 			mockConsole.SetModeError = errors.NewModeConflictError("console stopped")
 
 			body := v1.AgentModeRequest{Mode: v1.AgentModeRequestModeConnected}
@@ -169,12 +215,18 @@ var _ = Describe("Console Handlers", func() {
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
+			// Act
 			router.ServeHTTP(w, req)
 
+			// Assert
 			Expect(w.Code).To(Equal(http.StatusConflict))
 		})
 
+		// Given a console service that returns an internal error
+		// When we try to set the agent mode
+		// Then it should return 500 Internal Server Error
 		It("should return 500 for other errors", func() {
+			// Arrange
 			mockConsole.SetModeError = stderrors.New("database error")
 
 			body := v1.AgentModeRequest{Mode: v1.AgentModeRequestModeConnected}
@@ -184,8 +236,10 @@ var _ = Describe("Console Handlers", func() {
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
+			// Act
 			router.ServeHTTP(w, req)
 
+			// Assert
 			Expect(w.Code).To(Equal(http.StatusInternalServerError))
 		})
 	})
