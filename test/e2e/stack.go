@@ -10,6 +10,14 @@ const (
 	VcsimUsername        = "core"
 	VcsimPassword        = "123456"
 	AgentVolumeName      = "test-agent-data"
+
+	// Database configuration
+	dbType     = "pgsql"
+	dbHost     = "localhost"
+	dbPort     = "5432"
+	dbName     = "planner"
+	dbUser     = "planner"
+	dbPassword = "adminpass"
 )
 
 type Stack struct {
@@ -29,20 +37,33 @@ func (s *Stack) StartPostgres() error {
 	_, err := s.Runner.StartContainer(
 		NewContainerConfig(dbContainerName, "docker.io/library/postgres:17").
 			WithPort(5432, 5432).
-			WithEnvVar("POSTGRES_USER", "planner").
-			WithEnvVar("POSTGRES_PASSWORD", "adminpass").
-			WithEnvVar("POSTGRES_DB", "planner"),
+			WithEnvVar("POSTGRES_USER", dbUser).
+			WithEnvVar("POSTGRES_PASSWORD", dbPassword).
+			WithEnvVar("POSTGRES_DB", dbName),
 	)
 	return err
 }
 
 func (s *Stack) StartBackend() error {
-	_, err := s.Runner.StartContainer(
-		NewContainerConfig(backendContainerName, s.cfg.BackendImage).
-			WithPort(7443, 7443).
-			WithPort(3443, 3443).
-			WithEnvVar("DATABASE_URL", s.cfg.Database),
-	)
+	cfg := NewContainerConfig(backendContainerName, s.cfg.BackendImage).
+		WithPort(7443, 7443).
+		WithPort(3443, 3443).
+		WithEnvVar("DB_TYPE", dbType).
+		WithEnvVar("DB_HOST", dbHost).
+		WithEnvVar("DB_PORT", dbPort).
+		WithEnvVar("DB_NAME", dbName).
+		WithEnvVar("DB_USER", dbUser).
+		WithEnvVar("DB_PASS", dbPassword).
+		WithEnvVar("MIGRATION_PLANNER_MIGRATIONS_FOLDER", "/app/migrations").
+		WithEnvVar("MIGRATION_PLANNER_AUTH", "none").
+		WithEnvVar("MIGRATION_PLANNER_AGENT_AUTH_ENABLED", "false")
+
+	if s.cfg.IsoPath != "" {
+		cfg = cfg.WithBindMount(s.cfg.IsoPath, "/iso").
+			WithEnvVar("MIGRATION_PLANNER_ISO_PATH", "/iso/rhcos-live-iso.x86_64.iso")
+	}
+
+	_, err := s.Runner.StartContainer(cfg)
 	return err
 }
 

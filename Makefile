@@ -51,7 +51,12 @@ E2E_BACKEND_IMAGE ?= quay.io/kubev2v/migration-planner-api:latest
 
 e2e: build.e2e
 	@echo "🧪 Running e2e tests..."
-	./bin/e2e -agent-image=$(E2E_AGENT_IMAGE) -backend-image=$(E2E_BACKEND_IMAGE) --ginkgo.v
+	./bin/e2e -agent-image=$(E2E_AGENT_IMAGE) -backend-image=$(E2E_BACKEND_IMAGE) --ginkgo.v -iso-path=$(E2E_ISO_PATH)
+
+e2e.clean:
+	$(PODMAN) rm --force test-planner || true
+	$(PODMAN) rm --force test-planner-db || true
+	$(PODMAN) rm --force test-planner-agent || true
 
 # Build container image
 image:

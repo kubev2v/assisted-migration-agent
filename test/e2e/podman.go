@@ -10,28 +10,31 @@ import (
 	"github.com/containers/podman/v5/pkg/bindings/network"
 	"github.com/containers/podman/v5/pkg/bindings/volumes"
 	"github.com/containers/podman/v5/pkg/specgen"
+	specs "github.com/opencontainers/runtime-spec/specs-go"
 	nettypes "go.podman.io/common/libnetwork/types"
 )
 
 const NetworkName = "planner"
 
 type ContainerConfig struct {
-	name    string
-	image   string
-	cmd     []string
-	ports   map[int]int
-	envVars map[string]string
-	volumes map[string]string
+	name       string
+	image      string
+	cmd        []string
+	ports      map[int]int
+	envVars    map[string]string
+	volumes    map[string]string
+	bindMounts map[string]string // hostPath -> containerPath
 }
 
 // NewContainerConfig creates a new ContainerConfig with mandatory name and image.
 func NewContainerConfig(name, image string) *ContainerConfig {
 	return &ContainerConfig{
-		name:    name,
-		image:   image,
-		ports:   make(map[int]int),
-		envVars: make(map[string]string),
-		volumes: make(map[string]string),
+		name:       name,
+		image:      image,
+		ports:      make(map[int]int),
+		envVars:    make(map[string]string),
+		volumes:    make(map[string]string),
+		bindMounts: make(map[string]string),
 	}
 }
 
@@ -58,6 +61,12 @@ func (c *ContainerConfig) WithEnvVars(envVars map[string]string) *ContainerConfi
 // WithVolume adds a named volume mapping (volumeName -> containerPath).
 func (c *ContainerConfig) WithVolume(volumeName, containerPath string) *ContainerConfig {
 	c.volumes[volumeName] = containerPath
+	return c
+}
+
+// WithBindMount adds a bind mount mapping (hostPath -> containerPath).
+func (c *ContainerConfig) WithBindMount(hostPath, containerPath string) *ContainerConfig {
+	c.bindMounts[hostPath] = containerPath
 	return c
 }
 
@@ -103,6 +112,18 @@ func (p *PodmanRunner) StartContainer(cfg *ContainerConfig) (string, error) {
 			s.Volumes = append(s.Volumes, &specgen.NamedVolume{
 				Name: volumeName,
 				Dest: containerPath,
+			})
+		}
+	}
+
+	if len(cfg.bindMounts) > 0 {
+		s.Mounts = make([]specs.Mount, 0, len(cfg.bindMounts))
+		for hostPath, containerPath := range cfg.bindMounts {
+			s.Mounts = append(s.Mounts, specs.Mount{
+				Type:        "bind",
+				Source:      hostPath,
+				Destination: containerPath,
+				Options:     []string{"rbind", "ro"},
 			})
 		}
 	}

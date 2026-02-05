@@ -17,12 +17,13 @@ import (
 type configuration struct {
 	BackendImage         string
 	BackendAgentEndpoint string
+	BackendUserEndpoint  string
 	AgentProxyUrl        string
 	AgentAPIUrl          string
 	AgentImage           string
-	Database             string
 	PodmanSocket         string
 	KeepContainers       bool
+	IsoPath              string
 }
 
 var (
@@ -37,9 +38,6 @@ func (c configuration) Validate() error {
 	if c.AgentImage == "" {
 		return errors.New("agent container image is empty")
 	}
-	if c.Database == "" {
-		return errors.New("database url is empty")
-	}
 	if _, err := url.Parse(c.BackendAgentEndpoint); err != nil {
 		return fmt.Errorf("failed to parse agent endpoint: %v", err)
 	}
@@ -52,11 +50,12 @@ func (c configuration) Validate() error {
 func main() {
 	flag.StringVar(&cfg.AgentImage, "agent-image", "", "Agent container image")
 	flag.StringVar(&cfg.BackendImage, "backend-image", "", "Backend container image")
-	flag.StringVar(&cfg.BackendAgentEndpoint, "backend-agent-endpoint", "http://localhost:7443", "Agent endpoint on backend")
+	flag.StringVar(&cfg.BackendAgentEndpoint, "backend-agent-endpoint", "http://localhost:7443", "Agent endpoint on backend (port 7443)")
+	flag.StringVar(&cfg.BackendUserEndpoint, "backend-user-endpoint", "http://localhost:3443", "User endpoint on backend (port 3443)")
 	flag.StringVar(&cfg.AgentProxyUrl, "agent-proxy-url", "http://localhost:8080", "Agent proxy url")
 	flag.StringVar(&cfg.AgentAPIUrl, "agent-api-url", "https://localhost:8000", "Agent local API url")
-	flag.StringVar(&cfg.Database, "db-url", "postgresql://planner:adminpass@localhost:5432/planner", "Database url like postgresql://user:secret@localhost/dbname")
 	flag.StringVar(&cfg.PodmanSocket, "podman-socket", "unix:///run/user/1000/podman/podman.sock", "Podman socket path")
+	flag.StringVar(&cfg.IsoPath, "iso-path", "", "Path to directory containing rhcos-live-iso.x86_64.iso")
 	flag.BoolVar(&cfg.KeepContainers, "keep-containers", false, "Keep containers running after test completion (useful for debugging)")
 	flag.Parse()
 

@@ -43,7 +43,7 @@ jobs:
       - name: Build backend API container
         run: |
           cd migration-planner
-          make migration-planner-api-container MIGRATION_PLANNER_API_IMAGE=${{ env.BACKEND_IMAGE }} MIGRATION_PLANNER_API_IMAGE_TAG=${{ env.BACKEND_TAG }}
+          make migration-planner-api-container MIGRATION_PLANNER_IMAGE=${{ env.BACKEND_IMAGE }} MIGRATION_PLANNER_IMAGE_TAG=${{ env.BACKEND_TAG }}
 
       - name: Build agent container
         run: |
@@ -57,10 +57,17 @@ jobs:
           podman pull docker.io/library/postgres:17
           podman pull docker.io/vmware/vcsim:latest
 
+      - name: Download RHCOS ISO
+        run: |
+          mkdir -p iso
+          curl --silent -C - -o iso/rhcos-live-iso.x86_64.iso \
+            https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live-iso.x86_64.iso
+
       - name: Run e2e tests
         run: |
           ./bin/e2e \
             -backend-image=${{ env.BACKEND_IMAGE }}:${{ env.BACKEND_TAG }} \
             -agent-image=${{ env.AGENT_IMAGE }} \
             -podman-socket=${{ env.PODMAN_SOCKET }} \
+            -iso-path=${{ github.workspace }}/iso \
             --ginkgo.v

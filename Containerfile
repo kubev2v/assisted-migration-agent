@@ -60,5 +60,5 @@ USER 1001
 # Expose HTTP port
 EXPOSE 8000
 
-ENTRYPOINT ["/app/agent", "run", "--server-mode", "prod", "--server-statics-folder", "/app/static", "--data-folder", "/var/lib/agent"]
+ENTRYPOINT ["/app/agent", "run", "--server-mode", "prod", "--server-statics-folder", "/app/static", "--data-folder", "/var/lib/agent", "--legacy-status-enabled"]
 CMD []

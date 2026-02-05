@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+
+	"go.uber.org/zap"
 )
 
 type Request struct {
@@ -39,6 +41,8 @@ func NewProxy(target *url.URL) (*Proxy, chan Request) {
 
 func (p *Proxy) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		zap.S().Infow("proxy request", "method", r.Method, "path", r.URL.Path)
+
 		var requestBody []byte
 		if r.Body != nil {
 			requestBody, _ = io.ReadAll(r.Body)
@@ -56,6 +60,9 @@ func (p *Proxy) Handler() http.Handler {
 
 		p.proxy.ServeHTTP(recorder, r)
 
+		zap.S().Infow("proxy response", "method", r.Method, "path", r.URL.Path, "status", recorder.statusCode)
+
+		zap.S().Infow("request body", "body", string(requestBody))
 		p.requests <- Request{
 			Request:      clonedReq,
 			RequestBody:  requestBody,
