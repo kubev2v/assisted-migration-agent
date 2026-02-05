@@ -3,9 +3,12 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/kubev2v/assisted-migration-agent/test/e2e/agent"
 
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
@@ -64,11 +67,11 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 		})
 
 		Context("mode at startup", func() {
-			var agentActioner *Actioner
+			var agentActioner *agent.AgentApi
 
 			BeforeEach(func() {
 				obs = NewObserver(requests)
-				agentActioner = NewActioner(cfg.AgentAPIUrl)
+				agentActioner = agent.DefaultAgentApi(cfg.AgentAPIUrl)
 			})
 
 			AfterEach(func() {
@@ -104,7 +107,11 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 				Expect(err).ToNot(HaveOccurred(), "failed to start agent")
 				GinkgoWriter.Printf("Agent started with ID: %s container ID: %s\n", agentID, containerID)
 
-				err = agentActioner.WaitForReady(30 * time.Second)
+				Eventually(func() error {
+					_, err := agentActioner.Status()
+					return err
+				}, 30*time.Second, 1*time.Second).Should(BeNil())
+
 				Expect(err).ToNot(HaveOccurred(), "agent not ready")
 
 				// Act
@@ -136,7 +143,10 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 				Expect(err).ToNot(HaveOccurred(), "failed to start agent")
 				GinkgoWriter.Printf("Agent started with ID: %s container ID: %s\n", agentID, containerID)
 
-				err = agentActioner.WaitForReady(30 * time.Second)
+				Eventually(func() error {
+					_, err := agentActioner.Status()
+					return err
+				}, 30*time.Second, 1*time.Second).Should(BeNil())
 				Expect(err).ToNot(HaveOccurred(), "agent not ready")
 
 				// Act
@@ -150,11 +160,11 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 		})
 
 		Context("mode switching", func() {
-			var agentActioner *Actioner
+			var agentActioner *agent.AgentApi
 
 			BeforeEach(func() {
 				obs = NewObserver(requests)
-				agentActioner = NewActioner(cfg.AgentAPIUrl)
+				agentActioner = agent.DefaultAgentApi(cfg.AgentAPIUrl)
 			})
 
 			AfterEach(func() {
@@ -190,7 +200,10 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 				Expect(err).ToNot(HaveOccurred(), "failed to start agent")
 				GinkgoWriter.Printf("Agent started with ID: %s container ID: %s\n", agentID, containerID)
 
-				err = agentActioner.WaitForReady(30 * time.Second)
+				Eventually(func() error {
+					_, err := agentActioner.Status()
+					return err
+				}, 30*time.Second, 1*time.Second).Should(BeNil())
 				Expect(err).ToNot(HaveOccurred(), "agent not ready")
 
 				time.Sleep(5 * time.Second)
@@ -231,7 +244,10 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 				Expect(err).ToNot(HaveOccurred(), "failed to start agent")
 				GinkgoWriter.Printf("Agent started with ID: %s container ID: %s\n", agentID, containerID)
 
-				err = agentActioner.WaitForReady(30 * time.Second)
+				Eventually(func() error {
+					_, err := agentActioner.Status()
+					return err
+				}, 30*time.Second, 1*time.Second).Should(BeNil())
 				Expect(err).ToNot(HaveOccurred(), "agent not ready")
 
 				initialReqs := obs.Requests()
@@ -271,7 +287,10 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 				Expect(err).ToNot(HaveOccurred(), "failed to start agent")
 				GinkgoWriter.Printf("Agent started with ID: %s container ID: %s\n", agentID, containerID)
 
-				err = agentActioner.WaitForReady(30 * time.Second)
+				Eventually(func() error {
+					_, err := agentActioner.Status()
+					return err
+				}, 30*time.Second, 1*time.Second).Should(BeNil())
 				Expect(err).ToNot(HaveOccurred(), "agent not ready")
 
 				status, err := agentActioner.SetAgentMode("disconnected")
@@ -282,10 +301,13 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 				err = stack.Runner.RestartContainer(AgentContainerName)
 				Expect(err).ToNot(HaveOccurred(), "failed to restart agent")
 
-				err = agentActioner.WaitForReady(30 * time.Second)
+				Eventually(func() error {
+					_, err := agentActioner.Status()
+					return err
+				}, 30*time.Second, 1*time.Second).Should(BeNil())
 				Expect(err).ToNot(HaveOccurred(), "agent not ready after restart")
 
-				status, err = agentActioner.GetAgentStatus()
+				status, err = agentActioner.Status()
 				Expect(err).ToNot(HaveOccurred(), "failed to get agent status")
 
 				// Assert
@@ -295,7 +317,7 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 		})
 
 		Context("collector", func() {
-			var agentActioner *Actioner
+			var agentActioner *agent.AgentApi
 
 			BeforeAll(func() {
 				GinkgoWriter.Println("Starting vcsim...")
@@ -307,7 +329,24 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 						TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 					},
 				}
-				err = WaitForReady(client, "https://localhost:8989/sdk", 30*time.Second)
+
+				Eventually(func() error {
+					_, err := agentActioner.Status()
+					return err
+				}, 30*time.Second, 1*time.Second).Should(BeNil())
+
+				Eventually(func() error {
+					resp, err := client.Get("https://localhost:8989/sdk")
+					if err != nil {
+						return err
+					}
+					defer resp.Body.Close()
+					if resp.StatusCode >= 500 {
+						return fmt.Errorf("server error: %d", resp.StatusCode)
+					}
+					return nil
+				}, 30*time.Second, 1*time.Second).Should(BeNil())
+
 				Expect(err).ToNot(HaveOccurred(), "vcsim not ready")
 			})
 
@@ -322,7 +361,7 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 
 			BeforeEach(func() {
 				obs = NewObserver(requests)
-				agentActioner = NewActioner(cfg.AgentAPIUrl)
+				agentActioner = agent.DefaultAgentApi(cfg.AgentAPIUrl)
 			})
 
 			AfterEach(func() {
@@ -358,7 +397,10 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 				Expect(err).ToNot(HaveOccurred(), "failed to start agent")
 				GinkgoWriter.Printf("Agent started with ID: %s container ID: %s\n", agentID, containerID)
 
-				err = agentActioner.WaitForReady(30 * time.Second)
+				Eventually(func() error {
+					_, err := agentActioner.Status()
+					return err
+				}, 30*time.Second, 1*time.Second).Should(BeNil())
 				Expect(err).ToNot(HaveOccurred(), "agent not ready")
 
 				// Act
@@ -374,7 +416,7 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 					return status.Status
 				}, 60*time.Second, 2*time.Second).Should(Equal("collected"))
 
-				inventory, err := agentActioner.GetInventory()
+				inventory, err := agentActioner.Inventory()
 				Expect(err).ToNot(HaveOccurred(), "failed to get inventory")
 
 				// Assert
@@ -401,7 +443,10 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 				Expect(err).ToNot(HaveOccurred(), "failed to start agent")
 				GinkgoWriter.Printf("Agent started with ID: %s container ID: %s\n", agentID, containerID)
 
-				err = agentActioner.WaitForReady(30 * time.Second)
+				Eventually(func() error {
+					_, err := agentActioner.Status()
+					return err
+				}, 30*time.Second, 1*time.Second).Should(BeNil())
 				Expect(err).ToNot(HaveOccurred(), "agent not ready")
 
 				// Act
@@ -439,7 +484,10 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 				Expect(err).ToNot(HaveOccurred(), "failed to start agent")
 				GinkgoWriter.Printf("Agent started with ID: %s container ID: %s\n", agentID, containerID)
 
-				err = agentActioner.WaitForReady(30 * time.Second)
+				Eventually(func() error {
+					_, err := agentActioner.Status()
+					return err
+				}, 30*time.Second, 1*time.Second).Should(BeNil())
 				Expect(err).ToNot(HaveOccurred(), "agent not ready")
 
 				// Act
@@ -477,7 +525,10 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 				Expect(err).ToNot(HaveOccurred(), "failed to start agent")
 				GinkgoWriter.Printf("Agent started with ID: %s container ID: %s\n", agentID, containerID)
 
-				err = agentActioner.WaitForReady(30 * time.Second)
+				Eventually(func() error {
+					_, err := agentActioner.Status()
+					return err
+				}, 30*time.Second, 1*time.Second).Should(BeNil())
 				Expect(err).ToNot(HaveOccurred(), "agent not ready")
 
 				_, err = agentActioner.StartCollector("https://localhost:8989/sdk", "baduser", "badpass")
@@ -504,7 +555,7 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 					return status.Status
 				}, 60*time.Second, 2*time.Second).Should(Equal("collected"))
 
-				inventory, err := agentActioner.GetInventory()
+				inventory, err := agentActioner.Inventory()
 				Expect(err).ToNot(HaveOccurred(), "failed to get inventory")
 
 				// Assert
@@ -531,7 +582,10 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 				Expect(err).ToNot(HaveOccurred(), "failed to start agent")
 				GinkgoWriter.Printf("Agent started with ID: %s container ID: %s\n", agentID, containerID)
 
-				err = agentActioner.WaitForReady(30 * time.Second)
+				Eventually(func() error {
+					_, err := agentActioner.Status()
+					return err
+				}, 30*time.Second, 1*time.Second).Should(BeNil())
 				Expect(err).ToNot(HaveOccurred(), "agent not ready")
 
 				_, err = agentActioner.StartCollector("https://localhost:8989/sdk", VcsimUsername, VcsimPassword)
@@ -545,7 +599,7 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 					return status.Status
 				}, 60*time.Second, 2*time.Second).Should(Equal("collected"))
 
-				inventory, err := agentActioner.GetInventory()
+				inventory, err := agentActioner.Inventory()
 				Expect(err).ToNot(HaveOccurred(), "failed to get inventory")
 				Expect(inventory).ToNot(BeNil(), "expected inventory to be available before restart")
 
@@ -553,13 +607,16 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 				err = stack.Runner.RestartContainer(AgentContainerName)
 				Expect(err).ToNot(HaveOccurred(), "failed to restart agent")
 
-				err = agentActioner.WaitForReady(30 * time.Second)
+				Eventually(func() error {
+					_, err := agentActioner.Status()
+					return err
+				}, 30*time.Second, 1*time.Second).Should(BeNil())
 				Expect(err).ToNot(HaveOccurred(), "agent not ready after restart")
 
 				collectorStatus, err := agentActioner.GetCollectorStatus()
 				Expect(err).ToNot(HaveOccurred(), "failed to get collector status")
 
-				inventory, err = agentActioner.GetInventory()
+				inventory, err = agentActioner.Inventory()
 				Expect(err).ToNot(HaveOccurred(), "failed to get inventory after restart")
 
 				// Assert
@@ -584,7 +641,18 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 			Expect(err).ToNot(HaveOccurred(), "failed to start backend")
 
 			// Wait for backend to be ready
-			err = WaitForReady(http.DefaultClient, cfg.BackendAgentEndpoint+"/health", 30*time.Second)
+			Eventually(func() error {
+				resp, err := http.DefaultClient.Get(cfg.BackendAgentEndpoint + "/health")
+				if err != nil {
+					return err
+				}
+				defer resp.Body.Close()
+				if resp.StatusCode >= 500 {
+					return fmt.Errorf("server error: %d", resp.StatusCode)
+				}
+				return nil
+			}, 30*time.Second, 1*time.Second).Should(BeNil())
+
 			Expect(err).ToNot(HaveOccurred(), "backend not ready")
 
 			backendActioner = NewBackendActioner(cfg.BackendUserEndpoint)
@@ -628,12 +696,12 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 
 		Context("mode at startup", func() {
 			var (
-				agentActioner *Actioner
+				agentActioner *agent.AgentApi
 				sourceID      string
 			)
 
 			BeforeEach(func() {
-				agentActioner = NewActioner(cfg.AgentAPIUrl)
+				agentActioner = agent.DefaultAgentApi(cfg.AgentAPIUrl)
 
 				var err error
 				sourceID, err = backendActioner.CreateSource("test-source-" + uuid.NewString()[:8])
@@ -675,7 +743,10 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 				Expect(err).ToNot(HaveOccurred(), "failed to start agent")
 				GinkgoWriter.Printf("Agent started with ID: %s container ID: %s\n", agentID, containerID)
 
-				err = agentActioner.WaitForReady(30 * time.Second)
+				Eventually(func() error {
+					_, err := agentActioner.Status()
+					return err
+				}, 30*time.Second, 1*time.Second).Should(BeNil())
 				Expect(err).ToNot(HaveOccurred(), "agent not ready")
 
 				// Act
@@ -692,12 +763,12 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 
 		Context("mode switch", func() {
 			var (
-				agentActioner *Actioner
+				agentActioner *agent.AgentApi
 				sourceID      string
 			)
 
 			BeforeEach(func() {
-				agentActioner = NewActioner(cfg.AgentAPIUrl)
+				agentActioner = agent.DefaultAgentApi(cfg.AgentAPIUrl)
 
 				var err error
 				sourceID, err = backendActioner.CreateSource("test-source-" + uuid.NewString()[:8])
@@ -739,7 +810,10 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 				Expect(err).ToNot(HaveOccurred(), "failed to start agent")
 				GinkgoWriter.Printf("Agent started with ID: %s container ID: %s\n", agentID, containerID)
 
-				err = agentActioner.WaitForReady(30 * time.Second)
+				Eventually(func() error {
+					_, err := agentActioner.Status()
+					return err
+				}, 30*time.Second, 1*time.Second).Should(BeNil())
 				Expect(err).ToNot(HaveOccurred(), "agent not ready")
 
 				// Act
@@ -758,7 +832,7 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 
 		Context("collector", func() {
 			var (
-				agentActioner *Actioner
+				agentActioner *agent.AgentApi
 				sourceID      string
 			)
 
@@ -773,7 +847,17 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 						TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 					},
 				}
-				err = WaitForReady(client, "https://localhost:8989/sdk", 30*time.Second)
+				Eventually(func() error {
+					resp, err := client.Get("https://localhost:8989/sdk")
+					if err != nil {
+						return err
+					}
+					defer resp.Body.Close()
+					if resp.StatusCode >= 500 {
+						return fmt.Errorf("server error: %d", resp.StatusCode)
+					}
+					return nil
+				}, 30*time.Second, 1*time.Second).Should(BeNil())
 				Expect(err).ToNot(HaveOccurred(), "vcsim not ready")
 			})
 
@@ -787,7 +871,7 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 			})
 
 			BeforeEach(func() {
-				agentActioner = NewActioner(cfg.AgentAPIUrl)
+				agentActioner = agent.DefaultAgentApi(cfg.AgentAPIUrl)
 
 				var err error
 				sourceID, err = backendActioner.CreateSource("test-source-" + uuid.NewString()[:8])
@@ -829,7 +913,10 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 				Expect(err).ToNot(HaveOccurred(), "failed to start agent")
 				GinkgoWriter.Printf("Agent started with ID: %s container ID: %s\n", agentID, containerID)
 
-				err = agentActioner.WaitForReady(30 * time.Second)
+				Eventually(func() error {
+					_, err := agentActioner.Status()
+					return err
+				}, 30*time.Second, 1*time.Second).Should(BeNil())
 				Expect(err).ToNot(HaveOccurred(), "agent not ready")
 
 				// Act

@@ -1,0 +1,297 @@
+package service
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"path"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/kubev2v/migration-planner/api/v1alpha1"
+	"go.uber.org/zap"
+)
+
+// CreateAssessment creates a new assessment per the OpenAPI spec
+func (s *PlannerSvc) CreateAssessment(name, sourceType string, sourceId *uuid.UUID, inventory *v1alpha1.Inventory) (*v1alpha1.Assessment, error) {
+	zap.S().Infof("[PlannerService] Create assessment [user: %s, organization: %s]", s.credentials.Username, s.credentials.Organization)
+
+	body := v1alpha1.CreateAssessmentJSONRequestBody{
+		Name:       name,
+		SourceType: sourceType,
+		Inventory:  inventory,
+	}
+	if sourceId != nil {
+		sid := *sourceId
+		body.SourceId = &sid
+	}
+
+	reqBody, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := s.api.PostRequest(apiV1AssessmentsPath, reqBody)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	bodyBytes, err := io.ReadAll(res.Body)
+	defer func() { _ = res.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	if res.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("create assessment failed with status code: %d", res.StatusCode)
+	}
+
+	if !strings.Contains(res.Header.Get("Content-Type"), "json") {
+		return nil, fmt.Errorf("Content-Type isn't json")
+	}
+
+	var dest v1alpha1.Assessment
+	if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+		return nil, err
+	}
+
+	return &dest, nil
+}
+
+func (s *PlannerSvc) CreateAssessmentFromRvtools(name, filepath string) (*v1alpha1.Assessment, error) {
+	zap.S().Infof("[PlannerService] Create assessment from RVTools (async) [user: %s, organization: %s]", s.credentials.Username, s.credentials.Organization)
+
+	// Create the async job
+	job, err := s.CreateRVToolsJob(name, filepath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Poll until completed or failed
+	const maxRetries = 60
+	const pollInterval = time.Second
+
+	for i := 0; i < maxRetries; i++ {
+		job, err = s.GetJob(job.Id)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get job status: %w", err)
+		}
+
+		switch job.Status {
+		case v1alpha1.Completed:
+			if job.AssessmentId == nil {
+				return nil, fmt.Errorf("job completed but no assessment ID returned")
+			}
+			return s.GetAssessment(*job.AssessmentId)
+		case v1alpha1.Failed:
+			errMsg := "unknown error"
+			if job.Error != nil {
+				errMsg = *job.Error
+			}
+			return nil, fmt.Errorf("job failed: %s", errMsg)
+		case v1alpha1.Cancelled:
+			return nil, fmt.Errorf("job was cancelled")
+		case v1alpha1.Pending, v1alpha1.Parsing, v1alpha1.Validating:
+			// Still processing, continue polling
+			zap.S().Infof("[PlannerService] Job %d status: %s, waiting...", job.Id, job.Status)
+			time.Sleep(pollInterval)
+		default:
+			return nil, fmt.Errorf("unknown job status: %s", job.Status)
+		}
+	}
+
+	return nil, fmt.Errorf("job timed out after %d seconds", maxRetries)
+}
+
+// CreateRVToolsJob creates a new async RVTools processing job
+func (s *PlannerSvc) CreateRVToolsJob(name, filepath string) (*v1alpha1.Job, error) {
+	zap.S().Infof("[PlannerService] Create RVTools job [user: %s, organization: %s]", s.credentials.Username, s.credentials.Organization)
+
+	res, err := s.api.MultipartRequest(apiV1AssessmentsRVToolsPath, filepath, name)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	bodyBytes, err := io.ReadAll(res.Body)
+	defer func() { _ = res.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	if res.StatusCode != http.StatusAccepted {
+		return nil, fmt.Errorf("failed to create RVTools job. status: %d", res.StatusCode)
+	}
+
+	var dest v1alpha1.Job
+	if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+		return nil, err
+	}
+
+	return &dest, nil
+}
+
+// GetJob retrieves a job by ID
+func (s *PlannerSvc) GetJob(id int64) (*v1alpha1.Job, error) {
+	res, err := s.api.GetRequest(fmt.Sprintf("%s/%d", apiV1AssessmentsJobsPath, id))
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	bodyBytes, err := io.ReadAll(res.Body)
+	defer func() { _ = res.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get job. status: %d", res.StatusCode)
+	}
+
+	var dest v1alpha1.Job
+	if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+		return nil, err
+	}
+
+	return &dest, nil
+}
+
+// CancelJob cancels a job by ID
+func (s *PlannerSvc) CancelJob(id int64) (*v1alpha1.Job, error) {
+	zap.S().Infof("[PlannerService] Cancel job %d [user: %s, organization: %s]", id, s.credentials.Username, s.credentials.Organization)
+
+	res, err := s.api.DeleteRequest(fmt.Sprintf("%s/%d", apiV1AssessmentsJobsPath, id))
+	if err != nil {
+		return nil, err
+	}
+
+	bodyBytes, err := io.ReadAll(res.Body)
+	defer func() { _ = res.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to cancel job. status: %d", res.StatusCode)
+	}
+
+	var dest v1alpha1.Job
+	if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+		return nil, err
+	}
+
+	return &dest, nil
+}
+
+// GetAssessment retrieves a specific assessment by ID
+func (s *PlannerSvc) GetAssessment(id uuid.UUID) (*v1alpha1.Assessment, error) {
+	zap.S().Infof("[PlannerService] Get assessment [user: %s, organization: %s]", s.credentials.Username, s.credentials.Organization)
+
+	res, err := s.api.GetRequest(path.Join(apiV1AssessmentsPath, id.String()))
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	bodyBytes, err := io.ReadAll(res.Body)
+	defer func() { _ = res.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get assessment. status: %d", res.StatusCode)
+	}
+
+	var dest v1alpha1.Assessment
+	if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+		return nil, err
+	}
+
+	return &dest, nil
+}
+
+// GetAssessments lists all assessments
+func (s *PlannerSvc) GetAssessments() (*v1alpha1.AssessmentList, error) {
+	zap.S().Infof("[PlannerService] Get assessments [user: %s, organization: %s]", s.credentials.Username, s.credentials.Organization)
+
+	res, err := s.api.GetRequest(apiV1AssessmentsPath)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	bodyBytes, err := io.ReadAll(res.Body)
+	defer func() { _ = res.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to list assessments. status: %d", res.StatusCode)
+	}
+
+	var dest v1alpha1.AssessmentList
+	if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+		return nil, err
+	}
+
+	return &dest, nil
+}
+
+// UpdateAssessment updates an assessment's name
+func (s *PlannerSvc) UpdateAssessment(id uuid.UUID, name string) (*v1alpha1.Assessment, error) {
+	zap.S().Infof("[PlannerService] Update assessment [user: %s, organization: %s]", s.credentials.Username, s.credentials.Organization)
+
+	body := v1alpha1.UpdateAssessmentJSONRequestBody{
+		Name: &name,
+	}
+	reqBody, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := s.api.PutRequest(path.Join(apiV1AssessmentsPath, id.String()), reqBody)
+	if err != nil {
+		return nil, err
+	}
+
+	bodyBytes, err := io.ReadAll(res.Body)
+	defer func() { _ = res.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to update assessment. status: %d", res.StatusCode)
+	}
+
+	var dest v1alpha1.Assessment
+	if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+		return nil, err
+	}
+
+	return &dest, nil
+}
+
+// RemoveAssessment deletes a specific assessment by ID
+func (s *PlannerSvc) RemoveAssessment(id uuid.UUID) error {
+	zap.S().Infof("[PlannerService] Delete assessment [user: %s, organization: %s]", s.credentials.Username, s.credentials.Organization)
+
+	res, err := s.api.DeleteRequest(path.Join(apiV1AssessmentsPath, id.String()))
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	// Spec returns 200 with Assessment body
+	if res.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(res.Body)
+		return fmt.Errorf("failed to delete assessment. status: %d, body: %s", res.StatusCode, strings.TrimSpace(string(b)))
+	}
+	return nil
+}
