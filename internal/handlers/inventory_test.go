@@ -31,28 +31,40 @@ var _ = Describe("Inventory Handlers", func() {
 	})
 
 	Describe("GetInventory", func() {
+		// Given inventory data exists in the store
+		// When we request the inventory
+		// Then it should return the inventory data as JSON
 		It("should return inventory data", func() {
+			// Arrange
 			inventoryData := []byte(`{"vms":[{"id":"vm-1","name":"Test VM"}]}`)
 			mockInventory.InventoryResult = &models.Inventory{Data: inventoryData}
 
 			req := httptest.NewRequest(http.MethodGet, "/inventory", nil)
 			w := httptest.NewRecorder()
 
+			// Act
 			router.ServeHTTP(w, req)
 
+			// Assert
 			Expect(w.Code).To(Equal(http.StatusOK))
 			Expect(w.Header().Get("Content-Type")).To(Equal("application/json"))
 			Expect(w.Body.Bytes()).To(Equal(inventoryData))
 		})
 
+		// Given no inventory has been collected yet
+		// When we request the inventory
+		// Then it should return 404 Not Found
 		It("should return 404 when inventory not found", func() {
+			// Arrange
 			mockInventory.InventoryError = srvErrors.NewResourceNotFoundError("inventory not collected yet")
 
 			req := httptest.NewRequest(http.MethodGet, "/inventory", nil)
 			w := httptest.NewRecorder()
 
+			// Act
 			router.ServeHTTP(w, req)
 
+			// Assert
 			Expect(w.Code).To(Equal(http.StatusNotFound))
 
 			var response map[string]any
@@ -61,14 +73,20 @@ var _ = Describe("Inventory Handlers", func() {
 			Expect(response["error"]).To(ContainSubstring("inventory not collected yet"))
 		})
 
+		// Given an internal error occurs when fetching inventory
+		// When we request the inventory
+		// Then it should return 500 Internal Server Error
 		It("should return 500 for other errors", func() {
+			// Arrange
 			mockInventory.InventoryError = errors.New("database error")
 
 			req := httptest.NewRequest(http.MethodGet, "/inventory", nil)
 			w := httptest.NewRecorder()
 
+			// Act
 			router.ServeHTTP(w, req)
 
+			// Assert
 			Expect(w.Code).To(Equal(http.StatusInternalServerError))
 
 			var response map[string]any

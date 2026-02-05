@@ -91,15 +91,27 @@ var _ = Describe("VMStore", func() {
 			insertConcern("vm-5", "concern-3", "Network issue")
 		})
 
+		// Given VMs in the database
+		// When we list without filters
+		// Then it should return all VMs
 		It("should return all VMs without filters", func() {
+			// Act
 			vms, err := s.VM().List(ctx)
+
+			// Assert
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vms).To(HaveLen(5))
 		})
 
 		Context("ByClusters", func() {
+			// Given VMs in different clusters
+			// When we filter by a single cluster
+			// Then it should return only VMs in that cluster
 			It("should filter by single cluster", func() {
+				// Act
 				vms, err := s.VM().List(ctx, store.ByClusters("cluster-a"))
+
+				// Assert
 				Expect(err).NotTo(HaveOccurred())
 				Expect(vms).To(HaveLen(2))
 				for _, vm := range vms {
@@ -107,16 +119,28 @@ var _ = Describe("VMStore", func() {
 				}
 			})
 
+			// Given VMs in different clusters
+			// When we filter by multiple clusters
+			// Then it should return VMs in any of those clusters (OR)
 			It("should filter by multiple clusters (OR)", func() {
+				// Act
 				vms, err := s.VM().List(ctx, store.ByClusters("cluster-a", "cluster-b"))
+
+				// Assert
 				Expect(err).NotTo(HaveOccurred())
 				Expect(vms).To(HaveLen(3))
 			})
 		})
 
 		Context("ByStatus", func() {
+			// Given VMs with different power states
+			// When we filter by a single status
+			// Then it should return only VMs with that status
 			It("should filter by single status", func() {
+				// Act
 				vms, err := s.VM().List(ctx, store.ByStatus("poweredOn"))
+
+				// Assert
 				Expect(err).NotTo(HaveOccurred())
 				Expect(vms).To(HaveLen(3))
 				for _, vm := range vms {
@@ -124,32 +148,56 @@ var _ = Describe("VMStore", func() {
 				}
 			})
 
+			// Given VMs with different power states
+			// When we filter by multiple statuses
+			// Then it should return VMs with any of those statuses (OR)
 			It("should filter by multiple statuses (OR)", func() {
+				// Act
 				vms, err := s.VM().List(ctx, store.ByStatus("poweredOn", "poweredOff"))
+
+				// Assert
 				Expect(err).NotTo(HaveOccurred())
 				Expect(vms).To(HaveLen(4))
 			})
 		})
 
 		Context("ByIssues", func() {
+			// Given VMs with different issue counts
+			// When we filter by minimum issue count of 2
+			// Then it should return only VMs with at least 2 issues
 			It("should filter VMs with at least N issues", func() {
+				// Act
 				vms, err := s.VM().List(ctx, store.ByIssues(2))
+
+				// Assert
 				Expect(err).NotTo(HaveOccurred())
 				Expect(vms).To(HaveLen(1))
 				Expect(vms[0].ID).To(Equal("vm-3"))
 				Expect(vms[0].IssueCount).To(Equal(2))
 			})
 
+			// Given VMs with different issue counts
+			// When we filter by minimum issue count of 1
+			// Then it should return VMs with at least 1 issue
 			It("should filter VMs with at least 1 issue", func() {
+				// Act
 				vms, err := s.VM().List(ctx, store.ByIssues(1))
+
+				// Assert
 				Expect(err).NotTo(HaveOccurred())
 				Expect(vms).To(HaveLen(2)) // vm-3 and vm-5
 			})
 		})
 
 		Context("ByDiskSizeRange", func() {
+			// Given VMs with different disk sizes
+			// When we filter by disk size range
+			// Then it should return only VMs within that range
 			It("should filter by disk size range", func() {
+				// Act
 				vms, err := s.VM().List(ctx, store.ByDiskSizeRange(100, 200))
+
+				// Assert
 				Expect(err).NotTo(HaveOccurred())
 				Expect(vms).To(HaveLen(3))
 				for _, vm := range vms {
@@ -158,16 +206,28 @@ var _ = Describe("VMStore", func() {
 				}
 			})
 
+			// Given VMs with specific disk sizes
+			// When we filter by a range that matches no VMs
+			// Then it should return empty result
 			It("should return empty when no VMs in range", func() {
+				// Act
 				vms, err := s.VM().List(ctx, store.ByDiskSizeRange(1000, 2000))
+
+				// Assert
 				Expect(err).NotTo(HaveOccurred())
 				Expect(vms).To(BeEmpty())
 			})
 		})
 
 		Context("ByMemorySizeRange", func() {
+			// Given VMs with different memory sizes
+			// When we filter by memory size range
+			// Then it should return only VMs within that range
 			It("should filter by memory size range", func() {
+				// Act
 				vms, err := s.VM().List(ctx, store.ByMemorySizeRange(8000, 20000))
+
+				// Assert
 				Expect(err).NotTo(HaveOccurred())
 				Expect(vms).To(HaveLen(3))
 				for _, vm := range vms {
@@ -178,21 +238,33 @@ var _ = Describe("VMStore", func() {
 		})
 
 		Context("WithLimit and WithOffset", func() {
+			// Given multiple VMs in the database
+			// When we list with a limit
+			// Then it should return only that many results
 			It("should limit results", func() {
+				// Act
 				vms, err := s.VM().List(ctx, store.WithLimit(2))
+
+				// Assert
 				Expect(err).NotTo(HaveOccurred())
 				Expect(vms).To(HaveLen(2))
 			})
 
+			// Given multiple VMs in the database
+			// When we list with offset and limit
+			// Then it should return paginated results
 			It("should offset results", func() {
+				// Arrange
 				firstPage, err := s.VM().List(ctx, store.WithDefaultSort(), store.WithLimit(2))
 				Expect(err).NotTo(HaveOccurred())
 				Expect(firstPage).To(HaveLen(2))
 
+				// Act
 				secondPage, err := s.VM().List(ctx, store.WithDefaultSort(), store.WithOffset(2), store.WithLimit(2))
+
+				// Assert
 				Expect(err).NotTo(HaveOccurred())
 				Expect(secondPage).To(HaveLen(2))
-
 				for _, vm := range secondPage {
 					Expect(vm.ID).NotTo(Equal(firstPage[0].ID))
 					Expect(vm.ID).NotTo(Equal(firstPage[1].ID))
@@ -201,23 +273,41 @@ var _ = Describe("VMStore", func() {
 		})
 
 		Context("WithSort", func() {
+			// Given VMs with different names
+			// When we sort by name ascending
+			// Then results should be ordered alphabetically
 			It("should sort by name ascending", func() {
+				// Act
 				vms, err := s.VM().List(ctx, store.WithSort([]store.SortParam{{Field: "name", Desc: false}}))
+
+				// Assert
 				Expect(err).NotTo(HaveOccurred())
 				Expect(vms).To(HaveLen(5))
 				Expect(vms[0].Name).To(Equal("app-server-1"))
 				Expect(vms[1].Name).To(Equal("app-server-2"))
 			})
 
+			// Given VMs with different memory sizes
+			// When we sort by memory descending
+			// Then results should be ordered from highest to lowest memory
 			It("should sort by memory descending", func() {
+				// Act
 				vms, err := s.VM().List(ctx, store.WithSort([]store.SortParam{{Field: "memory", Desc: true}}))
+
+				// Assert
 				Expect(err).NotTo(HaveOccurred())
 				Expect(vms).To(HaveLen(5))
 				Expect(vms[0].Memory).To(Equal(int32(32768)))
 			})
 
+			// Given VMs with different issue counts
+			// When we sort by issues descending
+			// Then results should be ordered from most to least issues
 			It("should sort by issues descending", func() {
+				// Act
 				vms, err := s.VM().List(ctx, store.WithSort([]store.SortParam{{Field: "issues", Desc: true}}))
+
+				// Assert
 				Expect(err).NotTo(HaveOccurred())
 				Expect(vms).To(HaveLen(5))
 				Expect(vms[0].IssueCount).To(Equal(2)) // vm-3 has 2 issues
@@ -225,11 +315,17 @@ var _ = Describe("VMStore", func() {
 		})
 
 		Context("combined filters", func() {
+			// Given VMs in different clusters with different statuses
+			// When we combine cluster and status filters
+			// Then it should return VMs matching both conditions (AND)
 			It("should combine cluster and status filters (AND)", func() {
+				// Act
 				vms, err := s.VM().List(ctx,
 					store.ByClusters("cluster-a"),
 					store.ByStatus("poweredOn"),
 				)
+
+				// Assert
 				Expect(err).NotTo(HaveOccurred())
 				Expect(vms).To(HaveLen(2))
 				for _, vm := range vms {
@@ -238,21 +334,33 @@ var _ = Describe("VMStore", func() {
 				}
 			})
 
+			// Given VMs in different clusters with different memory sizes
+			// When we combine cluster and memory range filters
+			// Then it should return VMs matching both conditions
 			It("should combine cluster and memory range filters", func() {
+				// Act
 				vms, err := s.VM().List(ctx,
 					store.ByClusters("cluster-a"),
 					store.ByMemorySizeRange(4000, 10000),
 				)
+
+				// Assert
 				Expect(err).NotTo(HaveOccurred())
 				Expect(vms).To(HaveLen(2))
 			})
 
+			// Given VMs with different statuses
+			// When we combine status filter with pagination
+			// Then it should return paginated filtered results
 			It("should combine multiple filters with pagination", func() {
+				// Act
 				vms, err := s.VM().List(ctx,
 					store.ByStatus("poweredOn"),
 					store.WithLimit(1),
 					store.WithOffset(1),
 				)
+
+				// Assert
 				Expect(err).NotTo(HaveOccurred())
 				Expect(vms).To(HaveLen(1))
 			})
@@ -273,14 +381,26 @@ var _ = Describe("VMStore", func() {
 			insertDisk("vm-3", 500)
 		})
 
+		// Given VMs in the database
+		// When we count without filters
+		// Then it should return the total count
 		It("should count all VMs without filters", func() {
+			// Act
 			count, err := s.VM().Count(ctx)
+
+			// Assert
 			Expect(err).NotTo(HaveOccurred())
 			Expect(count).To(Equal(3))
 		})
 
+		// Given VMs with different statuses
+		// When we count with a status filter
+		// Then it should return only the count of matching VMs
 		It("should count VMs with filter", func() {
+			// Act
 			count, err := s.VM().Count(ctx, store.ByStatus("poweredOn"))
+
+			// Assert
 			Expect(err).NotTo(HaveOccurred())
 			Expect(count).To(Equal(2))
 		})
