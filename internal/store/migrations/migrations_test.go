@@ -37,7 +37,7 @@ var _ = Describe("Migrations", func() {
 		}
 	})
 
-	Describe("Run", func() {
+	Context("Run", func() {
 		It("should run all migrations successfully", func() {
 			err := migrations.Run(ctx, db)
 			Expect(err).NotTo(HaveOccurred())
@@ -95,6 +95,51 @@ var _ = Describe("Migrations", func() {
 			Expect(rows.Err()).NotTo(HaveOccurred())
 
 			Expect(versions).To(ContainElements(1))
+		})
+
+		// Given migrations have been applied
+		// When we check the version ordering
+		// Then versions should be sequential starting from 1
+		It("should apply migrations in sequential order", func() {
+			err := migrations.Run(ctx, db)
+			Expect(err).NotTo(HaveOccurred())
+
+			rows, err := db.QueryContext(ctx, `SELECT version FROM schema_migrations ORDER BY version`)
+			Expect(err).NotTo(HaveOccurred())
+			defer rows.Close()
+
+			var versions []int
+			for rows.Next() {
+				var v int
+				Expect(rows.Scan(&v)).To(Succeed())
+				versions = append(versions, v)
+			}
+			Expect(rows.Err()).NotTo(HaveOccurred())
+
+			// Versions should be sequential
+			for i, v := range versions {
+				Expect(v).To(Equal(i + 1))
+			}
+		})
+
+		// Given migrations have been applied
+		// When we check the vm_inspection_status table
+		// Then it should exist and accept inserts
+		It("should create vm_inspection_status table", func() {
+			err := migrations.Run(ctx, db)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Insert a row into vinfo first (FK constraint)
+			_, err = db.ExecContext(ctx, `
+				INSERT INTO vinfo ("VM ID", "VM") VALUES ('vm-1', 'test-vm')
+			`)
+			Expect(err).NotTo(HaveOccurred())
+
+			_, err = db.ExecContext(ctx, `
+				INSERT INTO vm_inspection_status ("VM ID", status)
+				VALUES ('vm-1', 'pending')
+			`)
+			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 })

@@ -52,11 +52,14 @@ var _ = Describe("VMs Handlers", func() {
 		router.PATCH("/vms/inspector", handler.AddVMsToInspection)
 		router.DELETE("/vms/inspector", handler.StopInspection)
 		router.GET("/vms/:id/inspector", func(c *gin.Context) {
-			handler.GetVMInspectionStatus(c, "0")
+			handler.GetVMInspectionStatus(c, c.Param("id"))
+		})
+		router.DELETE("/vms/:id/inspector", func(c *gin.Context) {
+			handler.RemoveVMFromInspection(c, c.Param("id"))
 		})
 	})
 
-	Describe("GetVMs", func() {
+	Context("GetVMs", func() {
 		// Given no VMs exist in the store
 		// When we request the VM list
 		// Then it should return an empty list with proper pagination
@@ -292,7 +295,7 @@ var _ = Describe("VMs Handlers", func() {
 		})
 	})
 
-	Describe("GetVM", func() {
+	Context("GetVM", func() {
 		// Given a VM exists with the requested ID
 		// When we request the VM details
 		// Then it should return the full VM details
@@ -348,7 +351,7 @@ var _ = Describe("VMs Handlers", func() {
 		})
 	})
 
-	Describe("Inspector endpoints", func() {
+	Context("Inspector endpoints", func() {
 		// Given an inspector service
 		// When we request the inspector status
 		// Then it should return the current status
@@ -557,6 +560,152 @@ var _ = Describe("VMs Handlers", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(response.State).To(Equal(v1.VmInspectionStatusStatePending))
 		})
+
+		// Given a GetVmStatus internal error (not ResourceNotFoundError)
+		// When we request inspection status
+		// Then it should return 500 Internal Server Error
+		It("GetVMInspectionStatus should return 500 for internal error", func() {
+			// Arrange
+			mockInspector.GetVmStatusError = errors.New("database error")
+
+			req := httptest.NewRequest(http.MethodGet, "/vms/123/inspector", nil)
+			w := httptest.NewRecorder()
+
+			// Act
+			router.ServeHTTP(w, req)
+
+			// Assert
+			Expect(w.Code).To(Equal(http.StatusInternalServerError))
+		})
+
+		// Given a VM that has been cancelled
+		// When we remove it from inspection
+		// Then it should return 200 with the VM status
+		It("RemoveVMFromInspection should return status on success", func() {
+			// Arrange
+			mockInspector.GetVmStatusResult = models.InspectionStatus{
+				State: models.InspectionStateCanceled,
+			}
+
+			req := httptest.NewRequest(http.MethodDelete, "/vms/vm-1/inspector", nil)
+			w := httptest.NewRecorder()
+
+			// Act
+			router.ServeHTTP(w, req)
+
+			// Assert
+			Expect(w.Code).To(Equal(http.StatusOK))
+			Expect(mockInspector.CancelVmsInspectionCallCount).To(Equal(1))
+
+			var response v1.VmInspectionStatus
+			err := json.Unmarshal(w.Body.Bytes(), &response)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(response.State).To(Equal(v1.VmInspectionStatusStateCanceled))
+		})
+
+		// Given CancelVmsInspection returns an error
+		// When we remove a VM from inspection
+		// Then it should return 500 Internal Server Error
+		It("RemoveVMFromInspection should return 500 when cancel fails", func() {
+			// Arrange
+			mockInspector.CancelVmsInspectionError = errors.New("cancel failed")
+
+			req := httptest.NewRequest(http.MethodDelete, "/vms/vm-1/inspector", nil)
+			w := httptest.NewRecorder()
+
+			// Act
+			router.ServeHTTP(w, req)
+
+			// Assert
+			Expect(w.Code).To(Equal(http.StatusInternalServerError))
+		})
+
+		// Given cancel succeeds but GetVmStatus returns ResourceNotFoundError
+		// When we remove a VM from inspection
+		// Then it should return 404 Not Found
+		It("RemoveVMFromInspection should return 404 when VM not found after cancel", func() {
+			// Arrange
+			mockInspector.GetVmStatusError = srvErrors.NewResourceNotFoundError("vm inspection status", "vm-1")
+
+			req := httptest.NewRequest(http.MethodDelete, "/vms/vm-1/inspector", nil)
+			w := httptest.NewRecorder()
+
+			// Act
+			router.ServeHTTP(w, req)
+
+			// Assert
+			Expect(w.Code).To(Equal(http.StatusNotFound))
+		})
+
+		// Given cancel succeeds but GetVmStatus returns an internal error
+		// When we remove a VM from inspection
+		// Then it should return 500 Internal Server Error
+		It("RemoveVMFromInspection should return 500 when GetVmStatus fails", func() {
+			// Arrange
+			mockInspector.GetVmStatusError = errors.New("database error")
+
+			req := httptest.NewRequest(http.MethodDelete, "/vms/vm-1/inspector", nil)
+			w := httptest.NewRecorder()
+
+			// Act
+			router.ServeHTTP(w, req)
+
+			// Assert
+			Expect(w.Code).To(Equal(http.StatusInternalServerError))
+		})
+
+		// Given the inspector service returns an error on Stop
+		// When we stop the inspection
+		// Then it should return 500 Internal Server Error
+		It("StopInspection should return 500 when stop fails", func() {
+			// Arrange
+			mockInspector.StopError = errors.New("stop failed")
+
+			req := httptest.NewRequest(http.MethodDelete, "/vms/inspector", nil)
+			w := httptest.NewRecorder()
+
+			// Act
+			router.ServeHTTP(w, req)
+
+			// Assert
+			Expect(w.Code).To(Equal(http.StatusInternalServerError))
+		})
+
+		// Given the inspector service returns an error on Start
+		// When we start the inspection with valid input
+		// Then it should return 500 Internal Server Error
+		It("StartInspection should return 500 when start fails", func() {
+			// Arrange
+			mockInspector.StartError = errors.New("start failed")
+			body := `{"vcenterCredentials":{"url":"https://test","username":"user","password":"pass"},"vmIds":["vm-1"]}`
+			req := httptest.NewRequest(http.MethodPost, "/vms/inspector", strings.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			// Act
+			router.ServeHTTP(w, req)
+
+			// Assert
+			Expect(w.Code).To(Equal(http.StatusInternalServerError))
+		})
+
+		// Given the inspector service returns an error on Add
+		// When we add VMs to inspection
+		// Then it should return 400 Bad Request
+		It("AddVMsToInspection should return 400 when add fails", func() {
+			// Arrange
+			mockInspector.AddError = errors.New("inspector not running")
+			body := `["vm-1","vm-2"]`
+			req := httptest.NewRequest(http.MethodPatch, "/vms/inspector", strings.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			// Act
+			router.ServeHTTP(w, req)
+
+			// Assert
+			Expect(w.Code).To(Equal(http.StatusBadRequest))
+		})
 	})
 })
 
@@ -610,7 +759,7 @@ var _ = Describe("VMs Handlers Integration", func() {
 		}
 	})
 
-	Describe("GetVMs with real data", func() {
+	Context("GetVMs with real data", func() {
 		It("should return all 10 VMs", func() {
 			req := httptest.NewRequest(http.MethodGet, "/vms?pageSize=50", nil)
 			w := httptest.NewRecorder()
@@ -880,7 +1029,7 @@ var _ = Describe("VMs Handlers Integration", func() {
 		})
 	})
 
-	Describe("GetVM with real data", func() {
+	Context("GetVM with real data", func() {
 		It("should return VM details by ID", func() {
 			req := httptest.NewRequest(http.MethodGet, "/vms/vm-003", nil)
 			w := httptest.NewRecorder()

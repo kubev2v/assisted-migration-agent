@@ -4,12 +4,12 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
+	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
+	"github.com/kubev2v/assisted-migration-agent/test"
 )
 
 var _ = Describe("VMStore", func() {
@@ -26,10 +26,10 @@ var _ = Describe("VMStore", func() {
 		db, err = store.NewDB(":memory:")
 		Expect(err).NotTo(HaveOccurred())
 
-		err = migrations.Run(ctx, db)
-		Expect(err).NotTo(HaveOccurred())
-
 		s = store.NewStore(db)
+
+		err = s.Migrate(ctx)
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	AfterEach(func() {
@@ -65,13 +65,8 @@ var _ = Describe("VMStore", func() {
 		Expect(err).NotTo(HaveOccurred())
 	}
 
-	Describe("List", func() {
+	Context("List", func() {
 		BeforeEach(func() {
-			// Create schema first
-			err := migrations.Run(ctx, db)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(err).NotTo(HaveOccurred())
-
 			// Insert test VMs
 			insertVM("vm-1", "web-server-1", "poweredOn", "cluster-a", 4096)
 			insertVM("vm-2", "web-server-2", "poweredOn", "cluster-a", 8192)
@@ -368,11 +363,8 @@ var _ = Describe("VMStore", func() {
 		})
 	})
 
-	Describe("Count", func() {
+	Context("Count", func() {
 		BeforeEach(func() {
-			err := migrations.Run(ctx, db)
-			Expect(err).NotTo(HaveOccurred())
-
 			insertVM("vm-1", "vm1", "poweredOn", "cluster-a", 4096)
 			insertVM("vm-2", "vm2", "poweredOn", "cluster-a", 8192)
 			insertVM("vm-3", "vm3", "poweredOff", "cluster-b", 16384)
@@ -404,6 +396,60 @@ var _ = Describe("VMStore", func() {
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
 			Expect(count).To(Equal(2))
+		})
+	})
+
+	Context("Get", func() {
+		BeforeEach(func() {
+			err := test.InsertVMs(ctx, db)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		// Given a VM exists in the database
+		// When we get it by ID
+		// Then it should return full VM details
+		It("should return full VM details by ID", func() {
+			// Act
+			vm, err := s.VM().Get(ctx, "vm-003")
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vm).NotTo(BeNil())
+			Expect(vm.ID).To(Equal("vm-003"))
+			Expect(vm.Name).To(Equal("db-server-1"))
+			Expect(vm.PowerState).To(Equal("poweredOn"))
+			Expect(vm.Cluster).To(Equal("production"))
+			Expect(vm.MemoryMB).To(Equal(int32(16384)))
+			Expect(vm.Firmware).To(Equal("efi"))
+		})
+
+		// Given a VM ID that does not exist
+		// When we get it by ID
+		// Then it should return ResourceNotFoundError
+		It("should return ResourceNotFoundError for non-existent ID", func() {
+			// Act
+			_, err := s.VM().Get(ctx, "non-existent")
+
+			// Assert
+			Expect(err).To(HaveOccurred())
+			Expect(srvErrors.IsResourceNotFoundError(err)).To(BeTrue())
+		})
+
+		// Given a VM with disks, NICs, and concerns
+		// When we get it by ID
+		// Then it should return correct disks, NICs, and issues
+		It("should return correct disks, NICs, and issues from parser", func() {
+			// Act - vm-003 has 2 disks, 2 NICs, and 2 concerns
+			vm, err := s.VM().Get(ctx, "vm-003")
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vm.Disks).To(HaveLen(2))
+			Expect(vm.DiskSize).To(Equal(int64(500+500) * 1024 * 1024)) // parser converts MiB to bytes
+			Expect(vm.NICs).To(HaveLen(2))
+			Expect(vm.Issues).To(HaveLen(2))
+			Expect(vm.Issues).To(ContainElement("High memory usage"))
+			Expect(vm.Issues).To(ContainElement("Outdated VMware Tools"))
 		})
 	})
 })
