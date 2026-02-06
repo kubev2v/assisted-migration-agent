@@ -37,6 +37,15 @@ func NewServiceApi(cred *User) (*ServiceApi, error) {
 	}, nil
 }
 
+// NewServiceApiWithToken creates a ServiceApi using a pre-generated JWT token and explicit base URL.
+func NewServiceApiWithToken(baseURL, token string) *ServiceApi {
+	return &ServiceApi{
+		baseURL:    baseURL,
+		httpClient: &http.Client{},
+		jwtToken:   token,
+	}
+}
+
 // GetRequest makes an HTTP GET request to the specified path, passing the provided token
 // for authorization, and returns the HTTP response
 func (api *ServiceApi) GetRequest(path string) (*http.Response, error) {

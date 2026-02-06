@@ -1,38 +1,56 @@
 /*
 Package main provides end-to-end testing infrastructure for the assisted-migration-agent.
 
-# Components
+# Package Structure
 
-Actioner performs HTTP requests against the agent's local API.
-It provides methods to get/set agent mode, start collector, get collector status,
-and retrieve inventory.
+	test/e2e/
+	├── main.go          Entry point: flags, config, InfraManager setup, Ginkgo runner
+	├── tests.go         Ginkgo test specs (disconnected env, connected env, collector)
+	├── doc.go           This file
+	├── infra/           Infrastructure management
+	│   ├── infra.go     InfraManager interface + AgentConfig + vcsim constants
+	│   ├── container.go ContainerInfraManager (Podman-based)
+	│   ├── vm.go        VMInfraManager (no-op, externally managed)
+	│   ├── podman.go    PodmanRunner + ContainerConfig (low-level Podman API)
+	│   ├── proxy.go     Reverse proxy (sits between agent and backend)
+	│   └── observer.go  Request observer (collects proxy traffic for assertions)
+	├── model/
+	│   └── auth.go      User type for JWT auth
+	├── service/
+	│   ├── agent.go         AgentSvc — HTTP client for the agent's local API
+	│   ├── interfaces.go    PlannerService interface
+	│   ├── service_api.go   ServiceApi — HTTP client with JWT auth
+	│   ├── service.go       PlannerSvc constructor
+	│   ├── source.go        Source API methods on PlannerSvc
+	│   └── assessment.go    Assessment API methods on PlannerSvc
+	└── utils/
+	    ├── auth.go      JWT token generation
+	    ├── command.go   Shell command helpers
+	    ├── file.go      File utilities
+	    └── rvtools.go   RVTools helpers
 
-BackendActioner performs HTTP requests against the migration-planner backend API.
-It provides methods to create/delete sources and retrieve source details including
-agent and inventory information.
+# InfraManager
 
-DbReadWriter provides direct database access for test setup and verification.
-It can read sources, agents, and assessments, as well as create and retrieve
-private keys used for JWT signing.
+InfraManager is the central abstraction for infrastructure lifecycle:
 
-Observer collects HTTP requests intercepted by the Proxy. It runs in a background
-goroutine and accumulates requests that can be retrieved for test assertions.
-Each test should create a new Observer and close it in AfterEach.
+	type InfraManager interface {
+	    StartPostgres() / StopPostgres()
+	    StartBackend()  / StopBackend()
+	    StartVcsim()    / StopVcsim()
+	    StartAgent(cfg) / StopAgent() / RestartAgent() / RemoveAgent()
+	}
 
-Proxy is a reverse proxy that sits between the agent and the backend.
-It forwards all requests to the target backend while cloning request/response
-data and sending it to a channel for observation.
+Two implementations:
+  - ContainerInfraManager — uses Podman to start/stop containers (default).
+  - VMInfraManager — no-op; infrastructure is managed externally (Kind + deploy/e2e.mk).
 
-Stack manages the container lifecycle for test infrastructure using Podman.
-It can start/stop PostgreSQL, the backend service, vcsim, and the agent container.
-Containers run in host network mode for simplified networking.
+Selected via the -infra-mode flag ("container" or "vm").
 
-PodmanRunner is a low-level wrapper around the Podman API for container operations.
-It handles starting, stopping, removing containers, and retrieving logs.
+# Proxy & Observer
 
-# Test Architecture
-
-The test setup uses the following flow:
+The Proxy is an in-process reverse proxy that sits between the agent and the backend.
+It forwards requests while cloning request/response data to a channel.
+The Observer reads from that channel and accumulates requests for test assertions.
 
 	┌─────────┐      ┌─────────┐      ┌─────────┐
 	│  Agent  │─────▶│  Proxy  │─────▶│ Backend │
@@ -43,116 +61,14 @@ The test setup uses the following flow:
 	                 │ Observer │
 	                 └──────────┘
 
-1. The Proxy listens on a local port (e.g., :8080) and forwards requests to the backend.
-2. The Agent is configured to use the Proxy URL instead of the backend directly.
-3. Each request passing through the Proxy is cloned and sent to a channel.
-4. The Observer reads from the channel and accumulates requests for assertions.
+In disconnected mode, the Proxy is used to verify that the agent does NOT contact
+the backend. In connected mode, it is used for logging.
 
-# Test Plan for Disconnected Environment
+# Makefile Targets
 
-Prerequisites:
-  - Postgres container running
-  - Proxy running (to observe requests, no backend needed)
-  - vcsim container running (for collector tests)
-
-## 1. Mode at Startup
-
-### 1.1 Start in Disconnected Mode
-
-Given an agent configured to start in disconnected mode
-When the agent starts up
-Then no requests should be made to the console
-
-### 1.2 Start in Connected Mode
-
-Given an agent configured to start in connected mode
-When the agent starts up
-Then requests should be made to the console
-
-## 2. Mode Switching
-
-### 2.1 Switch from Connected to Disconnected
-
-Given an agent running in connected mode making requests to console
-When the agent mode is switched to disconnected
-Then no new requests should be made to the console
-
-### 2.2 Switch from Disconnected to Connected
-
-Given an agent running in disconnected mode making no requests
-When the agent mode is switched to connected
-Then requests should start being made to the console
-
-### 2.3 Persist Mode After Restart
-
-Given an agent that was switched from connected to disconnected mode
-When the agent container is restarted
-Then the mode should persist as disconnected
-
-## 3. Collector
-
-### 3.1 Collect with Valid Credentials
-
-Given an agent in disconnected mode with vcsim running
-When valid vCenter credentials are provided to the collector
-Then the collector should reach "collected" status and inventory should be available
-
-### 3.2 Error with Bad Credentials
-
-Given an agent in disconnected mode with vcsim running
-When invalid credentials are provided to the collector
-Then the collector should reach "error" status
-
-### 3.3 Error with Bad vCenter URL
-
-Given an agent in disconnected mode
-When an unreachable vCenter URL is provided to the collector
-Then the collector should reach "error" status
-
-### 3.4 Recovery from Error
-
-Given an agent in disconnected mode that failed collection with bad credentials
-When valid credentials are provided on retry
-Then the collector should recover and reach "collected" status
-
-### 3.5 Persist Collected State After Restart
-
-Given an agent that has successfully collected inventory
-When the agent container is restarted
-Then the collector status should persist as "collected" and inventory should still be available
-
-# Test Plan for Connected Environment
-
-Prerequisites:
-  - Postgres container running
-  - Backend container running with:
-  - MIGRATION_PLANNER_AUTH=none (disables user authentication)
-  - MIGRATION_PLANNER_AGENT_AUTH_ENABLED=false (disables agent authentication)
-  - vcsim container running (for collector tests)
-  - Source must be created via backend API before starting agent (agent needs source_id)
-
-## 1. Mode at Startup
-
-### 1.1 Register Agent on Startup
-
-Given an agent configured in connected mode with a valid source ID
-When the agent starts and registers with the backend
-Then the source should have the agent attached with status "waiting-for-credentials"
-
-## 2. Mode Switching
-
-### 2.1 Register After Switching to Connected
-
-Given an agent started in disconnected mode with a valid source ID
-When the agent mode is switched to connected
-Then the source should have the agent attached
-
-## 3. Collector
-
-### 3.1 Push Inventory to Backend
-
-Given an agent in connected mode with valid vCenter credentials
-When the collector successfully gathers inventory
-Then the source should have the inventory populated
+	make e2e                  Run e2e tests (default: container mode)
+	make e2e.container        Run e2e tests in container mode (Podman)
+	make e2e.vm               Run e2e tests in VM mode (externally managed infra)
+	make e2e.container.clean  Remove all e2e test containers and volumes
 */
 package main

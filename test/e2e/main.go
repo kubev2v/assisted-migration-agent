@@ -9,6 +9,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/kubev2v/assisted-migration-agent/test/e2e/infra"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/zap"
@@ -24,19 +26,25 @@ type configuration struct {
 	PodmanSocket         string
 	KeepContainers       bool
 	IsoPath              string
+	InfraMode            string // "container" or "vm"
 }
 
 var (
-	cfg    configuration
-	runner *PodmanRunner
+	cfg          configuration
+	infraManager infra.InfraManager
 )
 
 func (c configuration) Validate() error {
-	if c.BackendImage == "" {
-		return errors.New("backend container image is empty")
+	if c.InfraMode != "container" && c.InfraMode != "vm" {
+		return fmt.Errorf("invalid infra-mode %q: must be 'container' or 'vm'", c.InfraMode)
 	}
-	if c.AgentImage == "" {
-		return errors.New("agent container image is empty")
+	if c.InfraMode == "container" {
+		if c.BackendImage == "" {
+			return errors.New("backend container image is empty")
+		}
+		if c.AgentImage == "" {
+			return errors.New("agent container image is empty")
+		}
 	}
 	if _, err := url.Parse(c.BackendAgentEndpoint); err != nil {
 		return fmt.Errorf("failed to parse agent endpoint: %v", err)
@@ -48,6 +56,7 @@ func (c configuration) Validate() error {
 }
 
 func main() {
+	flag.StringVar(&cfg.InfraMode, "infra-mode", "container", "Infrastructure mode: 'container' (Podman) or 'vm' (externally managed)")
 	flag.StringVar(&cfg.AgentImage, "agent-image", "", "Agent container image")
 	flag.StringVar(&cfg.BackendImage, "backend-image", "", "Backend container image")
 	flag.StringVar(&cfg.BackendAgentEndpoint, "backend-agent-endpoint", "http://localhost:7443", "Agent endpoint on backend (port 7443)")
@@ -68,6 +77,17 @@ func main() {
 
 	if err := cfg.Validate(); err != nil {
 		log.Fatalf("failed to validate configuration: %v", err)
+	}
+
+	switch cfg.InfraMode {
+	case "container":
+		im, err := infra.NewContainerInfraManager(cfg.PodmanSocket, cfg.BackendImage, cfg.AgentImage, cfg.IsoPath)
+		if err != nil {
+			log.Fatalf("failed to create container infra manager: %v", err)
+		}
+		infraManager = im
+	case "vm":
+		infraManager = infra.NewVMInfraManager()
 	}
 
 	RegisterFailHandler(Fail)
