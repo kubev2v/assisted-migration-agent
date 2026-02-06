@@ -1,4 +1,4 @@
-.PHONY: generate generate.proto build build.e2e e2e run help tidy tidy-check clean lint format check-format check-generate validate-all image
+.PHONY: generate generate.proto build build.e2e e2e e2e.container e2e.vm e2e.container.clean run help tidy tidy-check clean lint format check-format check-generate validate-all image
 
 PODMAN ?= podman
 GIT_COMMIT=$(shell git rev-list -1 HEAD --abbrev-commit)
@@ -21,7 +21,10 @@ help:
 	@echo "Targets:"
 	@echo "    build:           build the agent binary"
 	@echo "    build.e2e:       build the e2e test binary"
-	@echo "    e2e:             run e2e tests"
+	@echo "    e2e:             run e2e tests (default: container mode)"
+	@echo "    e2e.container:   run e2e tests in container mode (Podman)"
+	@echo "    e2e.vm:          run e2e tests in VM mode (externally managed infra)"
+	@echo "    e2e.container.clean: remove all e2e test containers and volumes"
 	@echo "    image:           build container image"
 	@echo "    run:             run the agent"
 	@echo "    run.ui:          start React dev server"
@@ -50,15 +53,26 @@ build.e2e:
 E2E_AGENT_IMAGE ?= $(IMAGE_NAME):$(IMAGE_TAG)
 E2E_BACKEND_IMAGE ?= quay.io/kubev2v/migration-planner-api:latest
 E2E_ISO_PATH ?= $(CURDIR)
+E2E_INFRA_MODE ?= container
 
 e2e: build.e2e
-	@echo "🧪 Running e2e tests..."
-	./bin/e2e -agent-image=$(E2E_AGENT_IMAGE) -backend-image=$(E2E_BACKEND_IMAGE) --ginkgo.v -iso-path=$(E2E_ISO_PATH)
+	@echo "🧪 Running e2e tests (infra-mode=$(E2E_INFRA_MODE))..."
+	./bin/e2e -infra-mode=$(E2E_INFRA_MODE) -agent-image=$(E2E_AGENT_IMAGE) -backend-image=$(E2E_BACKEND_IMAGE) --ginkgo.v -iso-path=$(E2E_ISO_PATH)
 
-e2e.clean:
+e2e.container: build.e2e
+	@echo "🧪 Running e2e tests (container mode)..."
+	./bin/e2e -infra-mode=container -agent-image=$(E2E_AGENT_IMAGE) -backend-image=$(E2E_BACKEND_IMAGE) --ginkgo.v -iso-path=$(E2E_ISO_PATH)
+
+e2e.vm: build.e2e
+	@echo "🧪 Running e2e tests (VM mode)..."
+	./bin/e2e -infra-mode=vm --ginkgo.v
+
+e2e.container.clean:
 	$(PODMAN) rm --force test-planner || true
 	$(PODMAN) rm --force test-planner-db || true
 	$(PODMAN) rm --force test-planner-agent || true
+	$(PODMAN) rm --force test-vcsim || true
+	$(PODMAN) volume rm --force test-agent-data || true
 
 # Build container image
 image:

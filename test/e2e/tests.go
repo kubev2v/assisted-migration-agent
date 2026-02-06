@@ -8,44 +8,42 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/kubev2v/assisted-migration-agent/test/e2e/agent"
+	"github.com/kubev2v/assisted-migration-agent/test/e2e/infra"
+	"github.com/kubev2v/assisted-migration-agent/test/e2e/service"
 
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 var _ = Describe("Agent e2e tests", Ordered, func() {
-	var stack *Stack
 
 	BeforeAll(func() {
-		var err error
-		stack, err = NewStack(cfg)
-		Expect(err).ToNot(HaveOccurred(), "failed to create stack")
-
 		GinkgoWriter.Println("Starting postgres...")
-		err = stack.StartPostgres()
+		err := infraManager.StartPostgres()
 		Expect(err).ToNot(HaveOccurred(), "failed to start postgres")
 		time.Sleep(2 * time.Second) // wait for postgres to be ready
 	})
 
 	AfterAll(func() {
-		_ = stack.StopPostgres()
+		_ = infraManager.StopPostgres()
 	})
 
 	Context("disconnected env", func() {
 		var (
-			proxy       *Proxy
-			requests    chan Request
+			proxy       *infra.Proxy
+			requests    chan infra.Request
 			proxyServer *http.Server
-			obs         *Observer
+			obs         *infra.Observer
 		)
 
 		BeforeAll(func() {
 			target, err := url.Parse(cfg.BackendAgentEndpoint)
 			Expect(err).ToNot(HaveOccurred(), "failed to parse backend endpoint")
 
-			proxy, requests = NewProxy(target)
+			proxy, requests = infra.NewProxy(target)
 			proxyServer = &http.Server{
 				Addr:    ":8080",
 				Handler: proxy.Handler(),
@@ -67,11 +65,11 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 		})
 
 		Context("mode at startup", func() {
-			var agentActioner *agent.AgentApi
+			var agentSvc *service.AgentSvc
 
 			BeforeEach(func() {
-				obs = NewObserver(requests)
-				agentActioner = agent.DefaultAgentApi(cfg.AgentAPIUrl)
+				obs = infra.NewObserver(requests)
+				agentSvc = service.DefaultAgentSvc(cfg.AgentAPIUrl)
 			})
 
 			AfterEach(func() {
@@ -81,9 +79,7 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 					return
 				}
 				GinkgoWriter.Println("Stopping agent...")
-				_ = stack.Runner.StopContainer(AgentContainerName)
-				_ = stack.Runner.RemoveContainer(AgentContainerName)
-				_ = stack.Runner.RemoveVolume(AgentVolumeName)
+				_ = infraManager.RemoveAgent()
 				obs.Close()
 			})
 
@@ -93,26 +89,20 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 			It("should not make requests to console when starting in disconnected mode", func() {
 				// Arrange
 				agentID := uuid.NewString()
-				containerID, err := stack.Runner.StartContainer(
-					NewContainerConfig(AgentContainerName, cfg.AgentImage).
-						WithPort(8000, 8000).
-						WithVolume(AgentVolumeName, "/var/lib/agent").
-						WithEnvVar("AGENT_MODE", "disconnected").
-						WithEnvVar("AGENT_AGENT_ID", agentID).
-						WithEnvVar("AGENT_SOURCE_ID", uuid.NewString()).
-						WithEnvVar("AGENT_DATA_FOLDER", "/var/lib/agent").
-						WithEnvVar("AGENT_CONSOLE_URL", cfg.AgentProxyUrl).
-						WithEnvVar("AGENT_CONSOLE_UPDATE_INTERVAL", "1s"),
-				)
+				_, err := infraManager.StartAgent(infra.AgentConfig{
+					AgentID:        agentID,
+					SourceID:       uuid.NewString(),
+					Mode:           "disconnected",
+					ConsoleURL:     cfg.AgentProxyUrl,
+					UpdateInterval: "1s",
+				})
 				Expect(err).ToNot(HaveOccurred(), "failed to start agent")
-				GinkgoWriter.Printf("Agent started with ID: %s container ID: %s\n", agentID, containerID)
+				GinkgoWriter.Printf("Agent started with ID: %s\n", agentID)
 
 				Eventually(func() error {
-					_, err := agentActioner.Status()
+					_, err := agentSvc.Status()
 					return err
 				}, 30*time.Second, 1*time.Second).Should(BeNil())
-
-				Expect(err).ToNot(HaveOccurred(), "agent not ready")
 
 				// Act
 				time.Sleep(5 * time.Second)
@@ -129,25 +119,20 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 			It("should make requests to console when starting in connected mode", func() {
 				// Arrange
 				agentID := uuid.NewString()
-				containerID, err := stack.Runner.StartContainer(
-					NewContainerConfig(AgentContainerName, cfg.AgentImage).
-						WithPort(8000, 8000).
-						WithVolume(AgentVolumeName, "/var/lib/agent").
-						WithEnvVar("AGENT_MODE", "connected").
-						WithEnvVar("AGENT_AGENT_ID", agentID).
-						WithEnvVar("AGENT_SOURCE_ID", uuid.NewString()).
-						WithEnvVar("AGENT_DATA_FOLDER", "/var/lib/agent").
-						WithEnvVar("AGENT_CONSOLE_URL", cfg.AgentProxyUrl).
-						WithEnvVar("AGENT_CONSOLE_UPDATE_INTERVAL", "1s"),
-				)
+				_, err := infraManager.StartAgent(infra.AgentConfig{
+					AgentID:        agentID,
+					SourceID:       uuid.NewString(),
+					Mode:           "connected",
+					ConsoleURL:     cfg.AgentProxyUrl,
+					UpdateInterval: "1s",
+				})
 				Expect(err).ToNot(HaveOccurred(), "failed to start agent")
-				GinkgoWriter.Printf("Agent started with ID: %s container ID: %s\n", agentID, containerID)
+				GinkgoWriter.Printf("Agent started with ID: %s\n", agentID)
 
 				Eventually(func() error {
-					_, err := agentActioner.Status()
+					_, err := agentSvc.Status()
 					return err
 				}, 30*time.Second, 1*time.Second).Should(BeNil())
-				Expect(err).ToNot(HaveOccurred(), "agent not ready")
 
 				// Act
 				time.Sleep(5 * time.Second)
@@ -160,11 +145,11 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 		})
 
 		Context("mode switching", func() {
-			var agentActioner *agent.AgentApi
+			var agentSvc *service.AgentSvc
 
 			BeforeEach(func() {
-				obs = NewObserver(requests)
-				agentActioner = agent.DefaultAgentApi(cfg.AgentAPIUrl)
+				obs = infra.NewObserver(requests)
+				agentSvc = service.DefaultAgentSvc(cfg.AgentAPIUrl)
 			})
 
 			AfterEach(func() {
@@ -174,9 +159,7 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 					return
 				}
 				GinkgoWriter.Println("Stopping agent...")
-				_ = stack.Runner.StopContainer(AgentContainerName)
-				_ = stack.Runner.RemoveContainer(AgentContainerName)
-				_ = stack.Runner.RemoveVolume(AgentVolumeName)
+				_ = infraManager.RemoveAgent()
 				obs.Close()
 			})
 
@@ -186,25 +169,20 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 			It("should stop making requests after switching from connected to disconnected mode", func() {
 				// Arrange
 				agentID := uuid.NewString()
-				containerID, err := stack.Runner.StartContainer(
-					NewContainerConfig(AgentContainerName, cfg.AgentImage).
-						WithPort(8000, 8000).
-						WithVolume(AgentVolumeName, "/var/lib/agent").
-						WithEnvVar("AGENT_MODE", "connected").
-						WithEnvVar("AGENT_AGENT_ID", agentID).
-						WithEnvVar("AGENT_SOURCE_ID", uuid.NewString()).
-						WithEnvVar("AGENT_DATA_FOLDER", "/var/lib/agent").
-						WithEnvVar("AGENT_CONSOLE_URL", cfg.AgentProxyUrl).
-						WithEnvVar("AGENT_CONSOLE_UPDATE_INTERVAL", "1s"),
-				)
+				_, err := infraManager.StartAgent(infra.AgentConfig{
+					AgentID:        agentID,
+					SourceID:       uuid.NewString(),
+					Mode:           "connected",
+					ConsoleURL:     cfg.AgentProxyUrl,
+					UpdateInterval: "1s",
+				})
 				Expect(err).ToNot(HaveOccurred(), "failed to start agent")
-				GinkgoWriter.Printf("Agent started with ID: %s container ID: %s\n", agentID, containerID)
+				GinkgoWriter.Printf("Agent started with ID: %s\n", agentID)
 
 				Eventually(func() error {
-					_, err := agentActioner.Status()
+					_, err := agentSvc.Status()
 					return err
 				}, 30*time.Second, 1*time.Second).Should(BeNil())
-				Expect(err).ToNot(HaveOccurred(), "agent not ready")
 
 				time.Sleep(5 * time.Second)
 				initialReqs := obs.Requests()
@@ -212,7 +190,7 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 				Expect(initialReqs).ToNot(BeEmpty(), "expected requests in connected mode")
 
 				// Act
-				status, err := agentActioner.SetAgentMode("disconnected")
+				status, err := agentSvc.SetAgentMode("disconnected")
 				Expect(err).ToNot(HaveOccurred(), "failed to switch mode")
 				Expect(status.Mode).To(Equal("disconnected"), "expected mode to be disconnected")
 
@@ -230,32 +208,27 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 			It("should start making requests after switching from disconnected to connected mode", func() {
 				// Arrange
 				agentID := uuid.NewString()
-				containerID, err := stack.Runner.StartContainer(
-					NewContainerConfig(AgentContainerName, cfg.AgentImage).
-						WithPort(8000, 8000).
-						WithVolume(AgentVolumeName, "/var/lib/agent").
-						WithEnvVar("AGENT_MODE", "disconnected").
-						WithEnvVar("AGENT_AGENT_ID", agentID).
-						WithEnvVar("AGENT_SOURCE_ID", uuid.NewString()).
-						WithEnvVar("AGENT_DATA_FOLDER", "/var/lib/agent").
-						WithEnvVar("AGENT_CONSOLE_URL", cfg.AgentProxyUrl).
-						WithEnvVar("AGENT_CONSOLE_UPDATE_INTERVAL", "1s"),
-				)
+				_, err := infraManager.StartAgent(infra.AgentConfig{
+					AgentID:        agentID,
+					SourceID:       uuid.NewString(),
+					Mode:           "disconnected",
+					ConsoleURL:     cfg.AgentProxyUrl,
+					UpdateInterval: "1s",
+				})
 				Expect(err).ToNot(HaveOccurred(), "failed to start agent")
-				GinkgoWriter.Printf("Agent started with ID: %s container ID: %s\n", agentID, containerID)
+				GinkgoWriter.Printf("Agent started with ID: %s\n", agentID)
 
 				Eventually(func() error {
-					_, err := agentActioner.Status()
+					_, err := agentSvc.Status()
 					return err
 				}, 30*time.Second, 1*time.Second).Should(BeNil())
-				Expect(err).ToNot(HaveOccurred(), "agent not ready")
 
 				initialReqs := obs.Requests()
 				GinkgoWriter.Printf("Observed %d requests before mode switch\n", len(initialReqs))
 				Expect(initialReqs).To(BeEmpty(), "expected no requests in disconnected mode")
 
 				// Act
-				status, err := agentActioner.SetAgentMode("connected")
+				status, err := agentSvc.SetAgentMode("connected")
 				Expect(err).ToNot(HaveOccurred(), "failed to switch mode")
 				Expect(status.Mode).To(Equal("connected"), "expected mode to be connected")
 
@@ -273,41 +246,35 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 			It("should persist mode after agent restart", func() {
 				// Arrange
 				agentID := uuid.NewString()
-				containerID, err := stack.Runner.StartContainer(
-					NewContainerConfig(AgentContainerName, cfg.AgentImage).
-						WithPort(8000, 8000).
-						WithVolume(AgentVolumeName, "/var/lib/agent").
-						WithEnvVar("AGENT_MODE", "connected").
-						WithEnvVar("AGENT_AGENT_ID", agentID).
-						WithEnvVar("AGENT_SOURCE_ID", uuid.NewString()).
-						WithEnvVar("AGENT_DATA_FOLDER", "/var/lib/agent").
-						WithEnvVar("AGENT_CONSOLE_URL", cfg.AgentProxyUrl).
-						WithEnvVar("AGENT_CONSOLE_UPDATE_INTERVAL", "1s"),
-				)
+				_, err := infraManager.StartAgent(infra.AgentConfig{
+					AgentID:        agentID,
+					SourceID:       uuid.NewString(),
+					Mode:           "connected",
+					ConsoleURL:     cfg.AgentProxyUrl,
+					UpdateInterval: "1s",
+				})
 				Expect(err).ToNot(HaveOccurred(), "failed to start agent")
-				GinkgoWriter.Printf("Agent started with ID: %s container ID: %s\n", agentID, containerID)
+				GinkgoWriter.Printf("Agent started with ID: %s\n", agentID)
 
 				Eventually(func() error {
-					_, err := agentActioner.Status()
+					_, err := agentSvc.Status()
 					return err
 				}, 30*time.Second, 1*time.Second).Should(BeNil())
-				Expect(err).ToNot(HaveOccurred(), "agent not ready")
 
-				status, err := agentActioner.SetAgentMode("disconnected")
+				status, err := agentSvc.SetAgentMode("disconnected")
 				Expect(err).ToNot(HaveOccurred(), "failed to switch mode")
 				Expect(status.Mode).To(Equal("disconnected"), "expected mode to be disconnected")
 
 				// Act
-				err = stack.Runner.RestartContainer(AgentContainerName)
+				err = infraManager.RestartAgent()
 				Expect(err).ToNot(HaveOccurred(), "failed to restart agent")
 
 				Eventually(func() error {
-					_, err := agentActioner.Status()
+					_, err := agentSvc.Status()
 					return err
 				}, 30*time.Second, 1*time.Second).Should(BeNil())
-				Expect(err).ToNot(HaveOccurred(), "agent not ready after restart")
 
-				status, err = agentActioner.Status()
+				status, err = agentSvc.Status()
 				Expect(err).ToNot(HaveOccurred(), "failed to get agent status")
 
 				// Assert
@@ -317,11 +284,11 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 		})
 
 		Context("collector", func() {
-			var agentActioner *agent.AgentApi
+			var agentSvc *service.AgentSvc
 
 			BeforeAll(func() {
 				GinkgoWriter.Println("Starting vcsim...")
-				err := stack.StartVcsim()
+				err := infraManager.StartVcsim()
 				Expect(err).ToNot(HaveOccurred(), "failed to start vcsim")
 
 				client := &http.Client{
@@ -329,11 +296,6 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 						TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 					},
 				}
-
-				Eventually(func() error {
-					_, err := agentActioner.Status()
-					return err
-				}, 30*time.Second, 1*time.Second).Should(BeNil())
 
 				Eventually(func() error {
 					resp, err := client.Get("https://localhost:8989/sdk")
@@ -346,8 +308,6 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 					}
 					return nil
 				}, 30*time.Second, 1*time.Second).Should(BeNil())
-
-				Expect(err).ToNot(HaveOccurred(), "vcsim not ready")
 			})
 
 			AfterAll(func() {
@@ -356,12 +316,12 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 					return
 				}
 				GinkgoWriter.Println("Stopping vcsim...")
-				_ = stack.StopVcsim()
+				_ = infraManager.StopVcsim()
 			})
 
 			BeforeEach(func() {
-				obs = NewObserver(requests)
-				agentActioner = agent.DefaultAgentApi(cfg.AgentAPIUrl)
+				obs = infra.NewObserver(requests)
+				agentSvc = service.DefaultAgentSvc(cfg.AgentAPIUrl)
 			})
 
 			AfterEach(func() {
@@ -371,9 +331,7 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 					return
 				}
 				GinkgoWriter.Println("Stopping agent...")
-				_ = stack.Runner.StopContainer(AgentContainerName)
-				_ = stack.Runner.RemoveContainer(AgentContainerName)
-				_ = stack.Runner.RemoveVolume(AgentVolumeName)
+				_ = infraManager.RemoveAgent()
 				obs.Close()
 			})
 
@@ -383,32 +341,27 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 			It("should collect inventory successfully with valid credentials", func() {
 				// Arrange
 				agentID := uuid.NewString()
-				containerID, err := stack.Runner.StartContainer(
-					NewContainerConfig(AgentContainerName, cfg.AgentImage).
-						WithPort(8000, 8000).
-						WithVolume(AgentVolumeName, "/var/lib/agent").
-						WithEnvVar("AGENT_MODE", "disconnected").
-						WithEnvVar("AGENT_AGENT_ID", agentID).
-						WithEnvVar("AGENT_SOURCE_ID", uuid.NewString()).
-						WithEnvVar("AGENT_DATA_FOLDER", "/var/lib/agent").
-						WithEnvVar("AGENT_CONSOLE_URL", cfg.AgentProxyUrl).
-						WithEnvVar("AGENT_CONSOLE_UPDATE_INTERVAL", "1s"),
-				)
+				_, err := infraManager.StartAgent(infra.AgentConfig{
+					AgentID:        agentID,
+					SourceID:       uuid.NewString(),
+					Mode:           "disconnected",
+					ConsoleURL:     cfg.AgentProxyUrl,
+					UpdateInterval: "1s",
+				})
 				Expect(err).ToNot(HaveOccurred(), "failed to start agent")
-				GinkgoWriter.Printf("Agent started with ID: %s container ID: %s\n", agentID, containerID)
+				GinkgoWriter.Printf("Agent started with ID: %s\n", agentID)
 
 				Eventually(func() error {
-					_, err := agentActioner.Status()
+					_, err := agentSvc.Status()
 					return err
 				}, 30*time.Second, 1*time.Second).Should(BeNil())
-				Expect(err).ToNot(HaveOccurred(), "agent not ready")
 
 				// Act
-				_, err = agentActioner.StartCollector("https://localhost:8989/sdk", VcsimUsername, VcsimPassword)
+				_, err = agentSvc.StartCollector("https://localhost:8989/sdk", infra.VcsimUsername, infra.VcsimPassword)
 				Expect(err).ToNot(HaveOccurred(), "failed to start collector")
 
 				Eventually(func() string {
-					status, err := agentActioner.GetCollectorStatus()
+					status, err := agentSvc.GetCollectorStatus()
 					if err != nil {
 						return "error"
 					}
@@ -416,7 +369,7 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 					return status.Status
 				}, 60*time.Second, 2*time.Second).Should(Equal("collected"))
 
-				inventory, err := agentActioner.Inventory()
+				inventory, err := agentSvc.Inventory()
 				Expect(err).ToNot(HaveOccurred(), "failed to get inventory")
 
 				// Assert
@@ -429,33 +382,28 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 			It("should report error with bad credentials", func() {
 				// Arrange
 				agentID := uuid.NewString()
-				containerID, err := stack.Runner.StartContainer(
-					NewContainerConfig(AgentContainerName, cfg.AgentImage).
-						WithPort(8000, 8000).
-						WithVolume(AgentVolumeName, "/var/lib/agent").
-						WithEnvVar("AGENT_MODE", "disconnected").
-						WithEnvVar("AGENT_AGENT_ID", agentID).
-						WithEnvVar("AGENT_SOURCE_ID", uuid.NewString()).
-						WithEnvVar("AGENT_DATA_FOLDER", "/var/lib/agent").
-						WithEnvVar("AGENT_CONSOLE_URL", cfg.AgentProxyUrl).
-						WithEnvVar("AGENT_CONSOLE_UPDATE_INTERVAL", "1s"),
-				)
+				_, err := infraManager.StartAgent(infra.AgentConfig{
+					AgentID:        agentID,
+					SourceID:       uuid.NewString(),
+					Mode:           "disconnected",
+					ConsoleURL:     cfg.AgentProxyUrl,
+					UpdateInterval: "1s",
+				})
 				Expect(err).ToNot(HaveOccurred(), "failed to start agent")
-				GinkgoWriter.Printf("Agent started with ID: %s container ID: %s\n", agentID, containerID)
+				GinkgoWriter.Printf("Agent started with ID: %s\n", agentID)
 
 				Eventually(func() error {
-					_, err := agentActioner.Status()
+					_, err := agentSvc.Status()
 					return err
 				}, 30*time.Second, 1*time.Second).Should(BeNil())
-				Expect(err).ToNot(HaveOccurred(), "agent not ready")
 
 				// Act
-				_, err = agentActioner.StartCollector("https://localhost:8989/sdk", "baduser", "badpass")
+				_, err = agentSvc.StartCollector("https://localhost:8989/sdk", "baduser", "badpass")
 				Expect(err).ToNot(HaveOccurred(), "failed to start collector")
 
 				// Assert
 				Eventually(func() string {
-					status, err := agentActioner.GetCollectorStatus()
+					status, err := agentSvc.GetCollectorStatus()
 					if err != nil {
 						return ""
 					}
@@ -470,33 +418,28 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 			It("should report error with bad vCenter URL", func() {
 				// Arrange
 				agentID := uuid.NewString()
-				containerID, err := stack.Runner.StartContainer(
-					NewContainerConfig(AgentContainerName, cfg.AgentImage).
-						WithPort(8000, 8000).
-						WithVolume(AgentVolumeName, "/var/lib/agent").
-						WithEnvVar("AGENT_MODE", "disconnected").
-						WithEnvVar("AGENT_AGENT_ID", agentID).
-						WithEnvVar("AGENT_SOURCE_ID", uuid.NewString()).
-						WithEnvVar("AGENT_DATA_FOLDER", "/var/lib/agent").
-						WithEnvVar("AGENT_CONSOLE_URL", cfg.AgentProxyUrl).
-						WithEnvVar("AGENT_CONSOLE_UPDATE_INTERVAL", "1s"),
-				)
+				_, err := infraManager.StartAgent(infra.AgentConfig{
+					AgentID:        agentID,
+					SourceID:       uuid.NewString(),
+					Mode:           "disconnected",
+					ConsoleURL:     cfg.AgentProxyUrl,
+					UpdateInterval: "1s",
+				})
 				Expect(err).ToNot(HaveOccurred(), "failed to start agent")
-				GinkgoWriter.Printf("Agent started with ID: %s container ID: %s\n", agentID, containerID)
+				GinkgoWriter.Printf("Agent started with ID: %s\n", agentID)
 
 				Eventually(func() error {
-					_, err := agentActioner.Status()
+					_, err := agentSvc.Status()
 					return err
 				}, 30*time.Second, 1*time.Second).Should(BeNil())
-				Expect(err).ToNot(HaveOccurred(), "agent not ready")
 
 				// Act
-				_, err = agentActioner.StartCollector("https://localhost:9999/sdk", "user", "pass")
+				_, err = agentSvc.StartCollector("https://localhost:9999/sdk", "user", "pass")
 				Expect(err).ToNot(HaveOccurred(), "failed to start collector")
 
 				// Assert
 				Eventually(func() string {
-					status, err := agentActioner.GetCollectorStatus()
+					status, err := agentSvc.GetCollectorStatus()
 					if err != nil {
 						return ""
 					}
@@ -511,31 +454,26 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 			It("should recover from bad credentials to successful collection", func() {
 				// Arrange
 				agentID := uuid.NewString()
-				containerID, err := stack.Runner.StartContainer(
-					NewContainerConfig(AgentContainerName, cfg.AgentImage).
-						WithPort(8000, 8000).
-						WithVolume(AgentVolumeName, "/var/lib/agent").
-						WithEnvVar("AGENT_MODE", "disconnected").
-						WithEnvVar("AGENT_AGENT_ID", agentID).
-						WithEnvVar("AGENT_SOURCE_ID", uuid.NewString()).
-						WithEnvVar("AGENT_DATA_FOLDER", "/var/lib/agent").
-						WithEnvVar("AGENT_CONSOLE_URL", cfg.AgentProxyUrl).
-						WithEnvVar("AGENT_CONSOLE_UPDATE_INTERVAL", "1s"),
-				)
+				_, err := infraManager.StartAgent(infra.AgentConfig{
+					AgentID:        agentID,
+					SourceID:       uuid.NewString(),
+					Mode:           "disconnected",
+					ConsoleURL:     cfg.AgentProxyUrl,
+					UpdateInterval: "1s",
+				})
 				Expect(err).ToNot(HaveOccurred(), "failed to start agent")
-				GinkgoWriter.Printf("Agent started with ID: %s container ID: %s\n", agentID, containerID)
+				GinkgoWriter.Printf("Agent started with ID: %s\n", agentID)
 
 				Eventually(func() error {
-					_, err := agentActioner.Status()
+					_, err := agentSvc.Status()
 					return err
 				}, 30*time.Second, 1*time.Second).Should(BeNil())
-				Expect(err).ToNot(HaveOccurred(), "agent not ready")
 
-				_, err = agentActioner.StartCollector("https://localhost:8989/sdk", "baduser", "badpass")
+				_, err = agentSvc.StartCollector("https://localhost:8989/sdk", "baduser", "badpass")
 				Expect(err).ToNot(HaveOccurred(), "failed to start collector")
 
 				Eventually(func() string {
-					status, err := agentActioner.GetCollectorStatus()
+					status, err := agentSvc.GetCollectorStatus()
 					if err != nil {
 						return ""
 					}
@@ -543,11 +481,11 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 				}, 30*time.Second, 2*time.Second).Should(Equal("error"))
 
 				// Act
-				_, err = agentActioner.StartCollector("https://localhost:8989/sdk", VcsimUsername, VcsimPassword)
+				_, err = agentSvc.StartCollector("https://localhost:8989/sdk", infra.VcsimUsername, infra.VcsimPassword)
 				Expect(err).ToNot(HaveOccurred(), "failed to start collector")
 
 				Eventually(func() string {
-					status, err := agentActioner.GetCollectorStatus()
+					status, err := agentSvc.GetCollectorStatus()
 					if err != nil {
 						return "error"
 					}
@@ -555,7 +493,7 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 					return status.Status
 				}, 60*time.Second, 2*time.Second).Should(Equal("collected"))
 
-				inventory, err := agentActioner.Inventory()
+				inventory, err := agentSvc.Inventory()
 				Expect(err).ToNot(HaveOccurred(), "failed to get inventory")
 
 				// Assert
@@ -568,55 +506,49 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 			It("should persist collected state and inventory after agent restart", func() {
 				// Arrange
 				agentID := uuid.NewString()
-				containerID, err := stack.Runner.StartContainer(
-					NewContainerConfig(AgentContainerName, cfg.AgentImage).
-						WithPort(8000, 8000).
-						WithVolume(AgentVolumeName, "/var/lib/agent").
-						WithEnvVar("AGENT_MODE", "disconnected").
-						WithEnvVar("AGENT_AGENT_ID", agentID).
-						WithEnvVar("AGENT_SOURCE_ID", uuid.NewString()).
-						WithEnvVar("AGENT_DATA_FOLDER", "/var/lib/agent").
-						WithEnvVar("AGENT_CONSOLE_URL", cfg.AgentProxyUrl).
-						WithEnvVar("AGENT_CONSOLE_UPDATE_INTERVAL", "1s"),
-				)
+				_, err := infraManager.StartAgent(infra.AgentConfig{
+					AgentID:        agentID,
+					SourceID:       uuid.NewString(),
+					Mode:           "disconnected",
+					ConsoleURL:     cfg.AgentProxyUrl,
+					UpdateInterval: "1s",
+				})
 				Expect(err).ToNot(HaveOccurred(), "failed to start agent")
-				GinkgoWriter.Printf("Agent started with ID: %s container ID: %s\n", agentID, containerID)
+				GinkgoWriter.Printf("Agent started with ID: %s\n", agentID)
 
 				Eventually(func() error {
-					_, err := agentActioner.Status()
+					_, err := agentSvc.Status()
 					return err
 				}, 30*time.Second, 1*time.Second).Should(BeNil())
-				Expect(err).ToNot(HaveOccurred(), "agent not ready")
 
-				_, err = agentActioner.StartCollector("https://localhost:8989/sdk", VcsimUsername, VcsimPassword)
+				_, err = agentSvc.StartCollector("https://localhost:8989/sdk", infra.VcsimUsername, infra.VcsimPassword)
 				Expect(err).ToNot(HaveOccurred(), "failed to start collector")
 
 				Eventually(func() string {
-					status, err := agentActioner.GetCollectorStatus()
+					status, err := agentSvc.GetCollectorStatus()
 					if err != nil {
 						return "error"
 					}
 					return status.Status
 				}, 60*time.Second, 2*time.Second).Should(Equal("collected"))
 
-				inventory, err := agentActioner.Inventory()
+				inventory, err := agentSvc.Inventory()
 				Expect(err).ToNot(HaveOccurred(), "failed to get inventory")
 				Expect(inventory).ToNot(BeNil(), "expected inventory to be available before restart")
 
 				// Act
-				err = stack.Runner.RestartContainer(AgentContainerName)
+				err = infraManager.RestartAgent()
 				Expect(err).ToNot(HaveOccurred(), "failed to restart agent")
 
 				Eventually(func() error {
-					_, err := agentActioner.Status()
+					_, err := agentSvc.Status()
 					return err
 				}, 30*time.Second, 1*time.Second).Should(BeNil())
-				Expect(err).ToNot(HaveOccurred(), "agent not ready after restart")
 
-				collectorStatus, err := agentActioner.GetCollectorStatus()
+				collectorStatus, err := agentSvc.GetCollectorStatus()
 				Expect(err).ToNot(HaveOccurred(), "failed to get collector status")
 
-				inventory, err = agentActioner.Inventory()
+				inventory, err = agentSvc.Inventory()
 				Expect(err).ToNot(HaveOccurred(), "failed to get inventory after restart")
 
 				// Assert
@@ -629,15 +561,20 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 
 	Context("connected env", func() {
 		var (
-			backendActioner *BackendActioner
-			proxy           *Proxy
-			proxyServer     *http.Server
-			obs             *Observer
+			plannerSvc  *service.PlannerSvc
+			proxy       *infra.Proxy
+			proxyServer *http.Server
+			obs         *infra.Observer
 		)
 
 		BeforeAll(func() {
+			// Start OIDC server before the backend so JWKS URL is available
+			GinkgoWriter.Println("Starting OIDC server...")
+			err := infraManager.StartOIDC(":9090")
+			Expect(err).ToNot(HaveOccurred(), "failed to start OIDC server")
+
 			GinkgoWriter.Println("Starting backend...")
-			err := stack.StartBackend()
+			err = infraManager.StartBackend()
 			Expect(err).ToNot(HaveOccurred(), "failed to start backend")
 
 			// Wait for backend to be ready
@@ -653,17 +590,15 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 				return nil
 			}, 30*time.Second, 1*time.Second).Should(BeNil())
 
-			Expect(err).ToNot(HaveOccurred(), "backend not ready")
-
-			backendActioner = NewBackendActioner(cfg.BackendUserEndpoint)
+			plannerSvc = service.NewPlannerServiceWithOIDC(cfg.BackendUserEndpoint, infraManager.GenerateToken)
 
 			// Start proxy between agent and backend for logging
 			target, err := url.Parse(cfg.BackendAgentEndpoint)
 			Expect(err).ToNot(HaveOccurred(), "failed to parse backend endpoint")
 
-			var requests chan Request
-			proxy, requests = NewProxy(target)
-			obs = NewObserver(requests)
+			var requests chan infra.Request
+			proxy, requests = infra.NewProxy(target)
+			obs = infra.NewObserver(requests)
 			proxyServer = &http.Server{
 				Addr:    ":8081",
 				Handler: proxy.Handler(),
@@ -691,21 +626,24 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 			if obs != nil {
 				obs.Close()
 			}
-			_ = stack.StopBackend()
+			_ = infraManager.StopBackend()
+			_ = infraManager.StopOIDC()
 		})
 
 		Context("mode at startup", func() {
 			var (
-				agentActioner *agent.AgentApi
-				sourceID      string
+				agentSvc *service.AgentSvc
+				sourceID openapi_types.UUID
+				userSvc  *service.PlannerSvc
 			)
 
 			BeforeEach(func() {
-				agentActioner = agent.DefaultAgentApi(cfg.AgentAPIUrl)
+				agentSvc = service.DefaultAgentSvc(cfg.AgentAPIUrl)
+				userSvc = plannerSvc.WithAuthUser("admin", "admin", "admin@example.com")
 
-				var err error
-				sourceID, err = backendActioner.CreateSource("test-source-" + uuid.NewString()[:8])
+				source, err := userSvc.CreateSource("test-source-" + uuid.NewString()[:8])
 				Expect(err).ToNot(HaveOccurred(), "failed to create source")
+				sourceID = source.Id
 				GinkgoWriter.Printf("Created source: %s\n", sourceID)
 			})
 
@@ -715,12 +653,10 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 					return
 				}
 				GinkgoWriter.Println("Stopping agent...")
-				_ = stack.Runner.StopContainer(AgentContainerName)
-				_ = stack.Runner.RemoveContainer(AgentContainerName)
-				_ = stack.Runner.RemoveVolume(AgentVolumeName)
+				_ = infraManager.RemoveAgent()
 
 				GinkgoWriter.Println("Deleting source...")
-				_ = backendActioner.DeleteSource(sourceID)
+				_ = userSvc.RemoveSource(sourceID)
 			})
 
 			// Given an agent configured in connected mode with a valid source ID
@@ -729,50 +665,47 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 			It("should register agent with backend when starting in connected mode", func() {
 				// Arrange
 				agentID := uuid.NewString()
-				containerID, err := stack.Runner.StartContainer(
-					NewContainerConfig(AgentContainerName, cfg.AgentImage).
-						WithPort(8000, 8000).
-						WithVolume(AgentVolumeName, "/var/lib/agent").
-						WithEnvVar("AGENT_MODE", "connected").
-						WithEnvVar("AGENT_AGENT_ID", agentID).
-						WithEnvVar("AGENT_SOURCE_ID", sourceID).
-						WithEnvVar("AGENT_DATA_FOLDER", "/var/lib/agent").
-						WithEnvVar("AGENT_CONSOLE_URL", cfg.BackendAgentEndpoint).
-						WithEnvVar("AGENT_CONSOLE_UPDATE_INTERVAL", "1s"),
-				)
+				_, err := infraManager.StartAgent(infra.AgentConfig{
+					AgentID:        agentID,
+					SourceID:       sourceID.String(),
+					Mode:           "connected",
+					ConsoleURL:     cfg.BackendAgentEndpoint,
+					UpdateInterval: "1s",
+				})
 				Expect(err).ToNot(HaveOccurred(), "failed to start agent")
-				GinkgoWriter.Printf("Agent started with ID: %s container ID: %s\n", agentID, containerID)
+				GinkgoWriter.Printf("Agent started with ID: %s\n", agentID)
 
 				Eventually(func() error {
-					_, err := agentActioner.Status()
+					_, err := agentSvc.Status()
 					return err
 				}, 30*time.Second, 1*time.Second).Should(BeNil())
-				Expect(err).ToNot(HaveOccurred(), "agent not ready")
 
 				// Act
 				time.Sleep(10 * time.Second) // allow agent to register with backend
-				source, err := backendActioner.GetSource(sourceID)
+				source, err := userSvc.GetSource(sourceID)
 				Expect(err).ToNot(HaveOccurred(), "failed to get source")
 
 				// Assert
 				GinkgoWriter.Printf("Source agent: %+v\n", source.Agent)
 				Expect(source.Agent).ToNot(BeNil(), "expected agent to be attached to source")
-				Expect(source.Agent.Status).To(Equal("waiting-for-credentials"), "expected agent status to be waiting-for-credentials")
+				Expect(string(source.Agent.Status)).To(Equal("waiting-for-credentials"), "expected agent status to be waiting-for-credentials")
 			})
 		})
 
 		Context("mode switch", func() {
 			var (
-				agentActioner *agent.AgentApi
-				sourceID      string
+				agentSvc *service.AgentSvc
+				sourceID openapi_types.UUID
+				userSvc  *service.PlannerSvc
 			)
 
 			BeforeEach(func() {
-				agentActioner = agent.DefaultAgentApi(cfg.AgentAPIUrl)
+				agentSvc = service.DefaultAgentSvc(cfg.AgentAPIUrl)
+				userSvc = plannerSvc.WithAuthUser("admin", "admin", "admin@example.com")
 
-				var err error
-				sourceID, err = backendActioner.CreateSource("test-source-" + uuid.NewString()[:8])
+				source, err := userSvc.CreateSource("test-source-" + uuid.NewString()[:8])
 				Expect(err).ToNot(HaveOccurred(), "failed to create source")
+				sourceID = source.Id
 				GinkgoWriter.Printf("Created source: %s\n", sourceID)
 			})
 
@@ -782,12 +715,10 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 					return
 				}
 				GinkgoWriter.Println("Stopping agent...")
-				_ = stack.Runner.StopContainer(AgentContainerName)
-				_ = stack.Runner.RemoveContainer(AgentContainerName)
-				_ = stack.Runner.RemoveVolume(AgentVolumeName)
+				_ = infraManager.RemoveAgent()
 
 				GinkgoWriter.Println("Deleting source...")
-				_ = backendActioner.DeleteSource(sourceID)
+				_ = userSvc.RemoveSource(sourceID)
 			})
 
 			// Given an agent started in disconnected mode with a valid source ID
@@ -796,32 +727,27 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 			It("should register agent with backend after switching from disconnected to connected", func() {
 				// Arrange
 				agentID := uuid.NewString()
-				containerID, err := stack.Runner.StartContainer(
-					NewContainerConfig(AgentContainerName, cfg.AgentImage).
-						WithPort(8000, 8000).
-						WithVolume(AgentVolumeName, "/var/lib/agent").
-						WithEnvVar("AGENT_MODE", "disconnected").
-						WithEnvVar("AGENT_AGENT_ID", agentID).
-						WithEnvVar("AGENT_SOURCE_ID", sourceID).
-						WithEnvVar("AGENT_DATA_FOLDER", "/var/lib/agent").
-						WithEnvVar("AGENT_CONSOLE_URL", cfg.BackendAgentEndpoint).
-						WithEnvVar("AGENT_CONSOLE_UPDATE_INTERVAL", "1s"),
-				)
+				_, err := infraManager.StartAgent(infra.AgentConfig{
+					AgentID:        agentID,
+					SourceID:       sourceID.String(),
+					Mode:           "disconnected",
+					ConsoleURL:     cfg.BackendAgentEndpoint,
+					UpdateInterval: "1s",
+				})
 				Expect(err).ToNot(HaveOccurred(), "failed to start agent")
-				GinkgoWriter.Printf("Agent started with ID: %s container ID: %s\n", agentID, containerID)
+				GinkgoWriter.Printf("Agent started with ID: %s\n", agentID)
 
 				Eventually(func() error {
-					_, err := agentActioner.Status()
+					_, err := agentSvc.Status()
 					return err
 				}, 30*time.Second, 1*time.Second).Should(BeNil())
-				Expect(err).ToNot(HaveOccurred(), "agent not ready")
 
 				// Act
-				_, err = agentActioner.SetAgentMode("connected")
+				_, err = agentSvc.SetAgentMode("connected")
 				Expect(err).ToNot(HaveOccurred(), "failed to switch mode")
 
 				time.Sleep(5 * time.Second) // allow agent to register with backend
-				source, err := backendActioner.GetSource(sourceID)
+				source, err := userSvc.GetSource(sourceID)
 				Expect(err).ToNot(HaveOccurred(), "failed to get source")
 
 				// Assert
@@ -832,13 +758,14 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 
 		Context("collector", func() {
 			var (
-				agentActioner *agent.AgentApi
-				sourceID      string
+				agentSvc *service.AgentSvc
+				sourceID openapi_types.UUID
+				userSvc  *service.PlannerSvc
 			)
 
 			BeforeAll(func() {
 				GinkgoWriter.Println("Starting vcsim...")
-				err := stack.StartVcsim()
+				err := infraManager.StartVcsim()
 				Expect(err).ToNot(HaveOccurred(), "failed to start vcsim")
 
 				// Wait for vcsim to be ready
@@ -858,7 +785,6 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 					}
 					return nil
 				}, 30*time.Second, 1*time.Second).Should(BeNil())
-				Expect(err).ToNot(HaveOccurred(), "vcsim not ready")
 			})
 
 			AfterAll(func() {
@@ -867,15 +793,16 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 					return
 				}
 				GinkgoWriter.Println("Stopping vcsim...")
-				_ = stack.StopVcsim()
+				_ = infraManager.StopVcsim()
 			})
 
 			BeforeEach(func() {
-				agentActioner = agent.DefaultAgentApi(cfg.AgentAPIUrl)
+				agentSvc = service.DefaultAgentSvc(cfg.AgentAPIUrl)
+				userSvc = plannerSvc.WithAuthUser("admin", "admin", "admin@example.com")
 
-				var err error
-				sourceID, err = backendActioner.CreateSource("test-source-" + uuid.NewString()[:8])
+				source, err := userSvc.CreateSource("test-source-" + uuid.NewString()[:8])
 				Expect(err).ToNot(HaveOccurred(), "failed to create source")
+				sourceID = source.Id
 				GinkgoWriter.Printf("Created source: %s\n", sourceID)
 			})
 
@@ -885,12 +812,10 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 					return
 				}
 				GinkgoWriter.Println("Stopping agent...")
-				_ = stack.Runner.StopContainer(AgentContainerName)
-				_ = stack.Runner.RemoveContainer(AgentContainerName)
-				_ = stack.Runner.RemoveVolume(AgentVolumeName)
+				_ = infraManager.RemoveAgent()
 
 				GinkgoWriter.Println("Deleting source...")
-				_ = backendActioner.DeleteSource(sourceID)
+				_ = userSvc.RemoveSource(sourceID)
 			})
 
 			// Given an agent in connected mode with valid vCenter credentials
@@ -899,33 +824,28 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 			It("should push inventory to backend after successful collection", func() {
 				// Arrange
 				agentID := uuid.NewString()
-				containerID, err := stack.Runner.StartContainer(
-					NewContainerConfig(AgentContainerName, cfg.AgentImage).
-						WithPort(8000, 8000).
-						WithVolume(AgentVolumeName, "/var/lib/agent").
-						WithEnvVar("AGENT_MODE", "connected").
-						WithEnvVar("AGENT_AGENT_ID", agentID).
-						WithEnvVar("AGENT_SOURCE_ID", sourceID).
-						WithEnvVar("AGENT_DATA_FOLDER", "/var/lib/agent").
-						WithEnvVar("AGENT_CONSOLE_URL", "http://localhost:8081").
-						WithEnvVar("AGENT_CONSOLE_UPDATE_INTERVAL", "1s"),
-				)
+				_, err := infraManager.StartAgent(infra.AgentConfig{
+					AgentID:        agentID,
+					SourceID:       sourceID.String(),
+					Mode:           "connected",
+					ConsoleURL:     "http://localhost:8081",
+					UpdateInterval: "1s",
+				})
 				Expect(err).ToNot(HaveOccurred(), "failed to start agent")
-				GinkgoWriter.Printf("Agent started with ID: %s container ID: %s\n", agentID, containerID)
+				GinkgoWriter.Printf("Agent started with ID: %s\n", agentID)
 
 				Eventually(func() error {
-					_, err := agentActioner.Status()
+					_, err := agentSvc.Status()
 					return err
 				}, 30*time.Second, 1*time.Second).Should(BeNil())
-				Expect(err).ToNot(HaveOccurred(), "agent not ready")
 
 				// Act
 				GinkgoWriter.Println("Starting collector with valid credentials...")
-				_, err = agentActioner.StartCollector("https://localhost:8989/sdk", VcsimUsername, VcsimPassword)
+				_, err = agentSvc.StartCollector("https://localhost:8989/sdk", infra.VcsimUsername, infra.VcsimPassword)
 				Expect(err).ToNot(HaveOccurred(), "failed to start collector")
 
 				Eventually(func() string {
-					status, err := agentActioner.GetCollectorStatus()
+					status, err := agentSvc.GetCollectorStatus()
 					if err != nil {
 						return "error"
 					}
@@ -936,7 +856,7 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 				// Give time for inventory to be pushed to backend
 				time.Sleep(5 * time.Second)
 
-				source, err := backendActioner.GetSource(sourceID)
+				source, err := userSvc.GetSource(sourceID)
 				Expect(err).ToNot(HaveOccurred(), "failed to get source")
 
 				// Assert

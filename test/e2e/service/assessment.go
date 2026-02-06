@@ -16,7 +16,7 @@ import (
 
 // CreateAssessment creates a new assessment per the OpenAPI spec
 func (s *PlannerSvc) CreateAssessment(name, sourceType string, sourceId *uuid.UUID, inventory *v1alpha1.Inventory) (*v1alpha1.Assessment, error) {
-	zap.S().Infof("[PlannerService] Create assessment [user: %s, organization: %s]", s.credentials.Username, s.credentials.Organization)
+	zap.S().Info("[PlannerService] Create assessment")
 
 	body := v1alpha1.CreateAssessmentJSONRequestBody{
 		Name:       name,
@@ -62,7 +62,7 @@ func (s *PlannerSvc) CreateAssessment(name, sourceType string, sourceId *uuid.UU
 }
 
 func (s *PlannerSvc) CreateAssessmentFromRvtools(name, filepath string) (*v1alpha1.Assessment, error) {
-	zap.S().Infof("[PlannerService] Create assessment from RVTools (async) [user: %s, organization: %s]", s.credentials.Username, s.credentials.Organization)
+	zap.S().Info("[PlannerService] Create assessment from RVTools (async)")
 
 	// Create the async job
 	job, err := s.CreateRVToolsJob(name, filepath)
@@ -108,7 +108,7 @@ func (s *PlannerSvc) CreateAssessmentFromRvtools(name, filepath string) (*v1alph
 
 // CreateRVToolsJob creates a new async RVTools processing job
 func (s *PlannerSvc) CreateRVToolsJob(name, filepath string) (*v1alpha1.Job, error) {
-	zap.S().Infof("[PlannerService] Create RVTools job [user: %s, organization: %s]", s.credentials.Username, s.credentials.Organization)
+	zap.S().Info("[PlannerService] Create RVTools job")
 
 	res, err := s.api.MultipartRequest(apiV1AssessmentsRVToolsPath, filepath, name)
 	if err != nil {
@@ -162,7 +162,7 @@ func (s *PlannerSvc) GetJob(id int64) (*v1alpha1.Job, error) {
 
 // CancelJob cancels a job by ID
 func (s *PlannerSvc) CancelJob(id int64) (*v1alpha1.Job, error) {
-	zap.S().Infof("[PlannerService] Cancel job %d [user: %s, organization: %s]", id, s.credentials.Username, s.credentials.Organization)
+	zap.S().Infof("[PlannerService] Cancel job %d", id)
 
 	res, err := s.api.DeleteRequest(fmt.Sprintf("%s/%d", apiV1AssessmentsJobsPath, id))
 	if err != nil {
@@ -189,7 +189,7 @@ func (s *PlannerSvc) CancelJob(id int64) (*v1alpha1.Job, error) {
 
 // GetAssessment retrieves a specific assessment by ID
 func (s *PlannerSvc) GetAssessment(id uuid.UUID) (*v1alpha1.Assessment, error) {
-	zap.S().Infof("[PlannerService] Get assessment [user: %s, organization: %s]", s.credentials.Username, s.credentials.Organization)
+	zap.S().Info("[PlannerService] Get assessment")
 
 	res, err := s.api.GetRequest(path.Join(apiV1AssessmentsPath, id.String()))
 	if err != nil {
@@ -217,7 +217,7 @@ func (s *PlannerSvc) GetAssessment(id uuid.UUID) (*v1alpha1.Assessment, error) {
 
 // GetAssessments lists all assessments
 func (s *PlannerSvc) GetAssessments() (*v1alpha1.AssessmentList, error) {
-	zap.S().Infof("[PlannerService] Get assessments [user: %s, organization: %s]", s.credentials.Username, s.credentials.Organization)
+	zap.S().Info("[PlannerService] Get assessments")
 
 	res, err := s.api.GetRequest(apiV1AssessmentsPath)
 	if err != nil {
@@ -245,7 +245,7 @@ func (s *PlannerSvc) GetAssessments() (*v1alpha1.AssessmentList, error) {
 
 // UpdateAssessment updates an assessment's name
 func (s *PlannerSvc) UpdateAssessment(id uuid.UUID, name string) (*v1alpha1.Assessment, error) {
-	zap.S().Infof("[PlannerService] Update assessment [user: %s, organization: %s]", s.credentials.Username, s.credentials.Organization)
+	zap.S().Info("[PlannerService] Update assessment")
 
 	body := v1alpha1.UpdateAssessmentJSONRequestBody{
 		Name: &name,
@@ -280,7 +280,7 @@ func (s *PlannerSvc) UpdateAssessment(id uuid.UUID, name string) (*v1alpha1.Asse
 
 // RemoveAssessment deletes a specific assessment by ID
 func (s *PlannerSvc) RemoveAssessment(id uuid.UUID) error {
-	zap.S().Infof("[PlannerService] Delete assessment [user: %s, organization: %s]", s.credentials.Username, s.credentials.Organization)
+	zap.S().Info("[PlannerService] Delete assessment")
 
 	res, err := s.api.DeleteRequest(path.Join(apiV1AssessmentsPath, id.String()))
 	if err != nil {

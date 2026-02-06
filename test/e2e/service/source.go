@@ -17,8 +17,7 @@ import (
 
 // CreateSource sends a request to create a new source with the given name
 func (s *PlannerSvc) CreateSource(name string) (*api.Source, error) {
-	zap.S().Infof("[PlannerService] Creating source: user: %s, organization: %s",
-		s.credentials.Username, s.credentials.Organization)
+	zap.S().Infof("[PlannerService] Creating source: %s", name)
 
 	params := &v1alpha1.CreateSourceJSONRequestBody{Name: name}
 
@@ -69,8 +68,7 @@ func (s *PlannerSvc) CreateSource(name string) (*api.Source, error) {
 
 // GetImageUrl retrieves the image URL for a specific source by UUID
 func (s *PlannerSvc) GetImageUrl(id uuid.UUID) (string, error) {
-	zap.S().Infof("[PlannerService] Get image url [user: %s, organization: %s]",
-		s.credentials.Username, s.credentials.Organization)
+	zap.S().Infof("[PlannerService] Get image url: %s", id)
 	getImageUrlPath := path.Join(apiV1SourcesPath, id.String(), "image-url")
 	res, err := s.api.GetRequest(getImageUrlPath)
 	if err != nil {
@@ -97,8 +95,7 @@ func (s *PlannerSvc) GetImageUrl(id uuid.UUID) (string, error) {
 
 // GetSource fetches a single source by UUID
 func (s *PlannerSvc) GetSource(id uuid.UUID) (*api.Source, error) {
-	zap.S().Infof("[PlannerService] Get source [user: %s, organization: %s]",
-		s.credentials.Username, s.credentials.Organization)
+	zap.S().Infof("[PlannerService] Get source: %s", id)
 	res, err := s.api.GetRequest(path.Join(apiV1SourcesPath, id.String()))
 	if err != nil {
 		return nil, err
@@ -128,8 +125,7 @@ func (s *PlannerSvc) GetSource(id uuid.UUID) (*api.Source, error) {
 
 // GetSources retrieves a list of all available sources
 func (s *PlannerSvc) GetSources() (*api.SourceList, error) {
-	zap.S().Infof("[PlannerService] Get sources [user: %s, organization: %s]",
-		s.credentials.Username, s.credentials.Organization)
+	zap.S().Info("[PlannerService] Get sources")
 	res, err := s.api.GetRequest(apiV1SourcesPath)
 	if err != nil {
 		return nil, err
@@ -158,8 +154,7 @@ func (s *PlannerSvc) GetSources() (*api.SourceList, error) {
 
 // RemoveSource deletes a specific source by UUID
 func (s *PlannerSvc) RemoveSource(uuid uuid.UUID) error {
-	zap.S().Infof("[PlannerService] Delete source [user: %s, organization: %s]",
-		s.credentials.Username, s.credentials.Organization)
+	zap.S().Infof("[PlannerService] Delete source: %s", uuid)
 	res, err := s.api.DeleteRequest(path.Join(apiV1SourcesPath, uuid.String()))
 	if err != nil {
 		return err
@@ -175,8 +170,7 @@ func (s *PlannerSvc) RemoveSource(uuid uuid.UUID) error {
 
 // RemoveSources deletes all existing sources
 func (s *PlannerSvc) RemoveSources() error {
-	zap.S().Infof("[PlannerService] Delete sources [user: %s, organization: %s]",
-		s.credentials.Username, s.credentials.Organization)
+	zap.S().Info("[PlannerService] Delete sources")
 	res, err := s.api.DeleteRequest(apiV1SourcesPath)
 	if err != nil {
 		return err
@@ -192,8 +186,7 @@ func (s *PlannerSvc) RemoveSources() error {
 
 // UpdateSource updates the inventory of a specific source
 func (s *PlannerSvc) UpdateSource(uuid uuid.UUID, inventory *v1alpha1.Inventory) error {
-	zap.S().Infof("[PlannerService] Update source [user: %s, organization: %s]",
-		s.credentials.Username, s.credentials.Organization)
+	zap.S().Infof("[PlannerService] Update source: %s", uuid)
 	update := v1alpha1.UpdateInventoryJSONRequestBody{
 		AgentId:   uuid,
 		Inventory: *inventory,
