@@ -30,7 +30,7 @@ var _ = Describe("Inventory Handlers", func() {
 		router.GET("/inventory", handler.GetInventory)
 	})
 
-	Describe("GetInventory", func() {
+	Context("GetInventory", func() {
 		// Given inventory data exists in the store
 		// When we request the inventory
 		// Then it should return the inventory data as JSON

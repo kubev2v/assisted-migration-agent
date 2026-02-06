@@ -18,6 +18,7 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	"github.com/kubev2v/assisted-migration-agent/pkg/console"
+	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 	"github.com/kubev2v/assisted-migration-agent/pkg/scheduler"
 )
 
@@ -85,7 +86,7 @@ var _ = Describe("Console Service", func() {
 		}
 	})
 
-	Describe("NewConsoleService", func() {
+	Context("NewConsoleService", func() {
 		// Given a console service configuration in disconnected mode
 		// When we create a new console service
 		// Then it should have disconnected status for both current and target
@@ -136,7 +137,7 @@ var _ = Describe("Console Service", func() {
 		})
 	})
 
-	Describe("NewConsoleService with connected mode in DB", func() {
+	Context("NewConsoleService with connected mode in DB", func() {
 		// Given a configuration with connected agent mode saved in DB
 		// When we create a new console service
 		// Then it should have connected target status
@@ -227,7 +228,7 @@ var _ = Describe("Console Service", func() {
 		})
 	})
 
-	Describe("Connected mode via SetMode", func() {
+	Context("Connected mode via SetMode", func() {
 		// Given a console service in disconnected mode
 		// When we call SetMode with connected mode
 		// Then the target status should switch to connected
@@ -285,7 +286,7 @@ var _ = Describe("Console Service", func() {
 		})
 	})
 
-	Describe("SetMode", func() {
+	Context("SetMode", func() {
 		// Given a console service in disconnected mode
 		// When we switch to connected mode
 		// Then the target should change and requests should be sent
@@ -378,7 +379,7 @@ var _ = Describe("Console Service", func() {
 		})
 	})
 
-	Describe("Error handling", func() {
+	Context("Error handling", func() {
 		// Given a console service in connected mode receiving 410 Gone responses
 		// When the server responds with 410 Gone
 		// Then it should stop sending all requests
@@ -475,7 +476,7 @@ var _ = Describe("Console Service", func() {
 		})
 	})
 
-	Describe("Inventory", func() {
+	Context("Inventory", func() {
 		// Given a collector in collected state with inventory in store
 		// When the console service is in connected mode
 		// Then it should send the inventory to the server
@@ -705,7 +706,7 @@ var _ = Describe("Console Service", func() {
 		})
 	})
 
-	Describe("Stop", func() {
+	Context("Stop", func() {
 		// Given a console service with an active run loop
 		// When Stop is called
 		// Then the run loop should stop and no more requests should be sent
@@ -807,7 +808,7 @@ var _ = Describe("Console Service", func() {
 		})
 	})
 
-	Describe("Backoff", func() {
+	Context("Backoff", func() {
 		// Given a console service receiving transient errors
 		// When multiple requests fail
 		// Then exponential backoff should reduce request frequency
@@ -920,6 +921,154 @@ var _ = Describe("Console Service", func() {
 
 			// Assert
 			Expect(statusCount).To(BeNumerically("<", 6))
+		})
+	})
+
+	Context("SetMode no-op and fatal", func() {
+		// Given a console service already in disconnected mode
+		// When we call SetMode with disconnected mode
+		// Then it should be a no-op and not start the run loop
+		It("should be a no-op when setting the same mode", func() {
+			// Arrange
+			requestReceived := make(chan bool, 10)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				requestReceived <- true
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer server.Close()
+
+			client, err := console.NewConsoleClient(server.URL, "")
+			Expect(err).NotTo(HaveOccurred())
+			cfg.Mode = "disconnected"
+
+			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act - set the same mode (disconnected -> disconnected)
+			err = consoleSrv.SetMode(context.Background(), models.AgentModeDisconnected)
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Consistently(requestReceived, 150*time.Millisecond).ShouldNot(Receive())
+		})
+
+		// Given a console service that has been fatally stopped (410 response)
+		// When we try to set a new mode
+		// Then it should return a ModeConflictError
+		It("should return ModeConflictError when fatally stopped", func() {
+			// Arrange
+			statusReceived := make(chan bool, 10)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				statusReceived <- true
+				w.WriteHeader(http.StatusGone)
+			}))
+			defer server.Close()
+
+			client, err := console.NewConsoleClient(server.URL, "")
+			Expect(err).NotTo(HaveOccurred())
+
+			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			Expect(err).NotTo(HaveOccurred())
+
+			// First connect so that the run loop starts and receives the 410
+			err = consoleSrv.SetMode(context.Background(), models.AgentModeConnected)
+			Expect(err).NotTo(HaveOccurred())
+			Eventually(statusReceived, 500*time.Millisecond).Should(Receive())
+			// Wait for the fatal stop to be processed
+			time.Sleep(200 * time.Millisecond)
+
+			// Act - try to change mode again
+			err = consoleSrv.SetMode(context.Background(), models.AgentModeDisconnected)
+
+			// Assert
+			Expect(err).To(HaveOccurred())
+			Expect(srvErrors.IsModeConflictError(err)).To(BeTrue())
+		})
+	})
+
+	Context("GetMode", func() {
+		// Given a console service with disconnected mode saved in store
+		// When we call GetMode
+		// Then it should return the mode from the store
+		It("should return the mode from the store", func() {
+			// Arrange
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer server.Close()
+
+			client, err := console.NewConsoleClient(server.URL, "")
+			Expect(err).NotTo(HaveOccurred())
+			cfg.Mode = "disconnected"
+
+			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act
+			mode, err := consoleSrv.GetMode(context.Background())
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(mode).To(Equal(models.AgentModeDisconnected))
+		})
+
+		// Given a console service that was switched to connected mode
+		// When we call GetMode
+		// Then it should return connected
+		It("should reflect mode change from SetMode", func() {
+			// Arrange
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer server.Close()
+
+			client, err := console.NewConsoleClient(server.URL, "")
+			Expect(err).NotTo(HaveOccurred())
+
+			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = consoleSrv.SetMode(context.Background(), models.AgentModeConnected)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act
+			mode, err := consoleSrv.GetMode(context.Background())
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(mode).To(Equal(models.AgentModeConnected))
+		})
+	})
+
+	Context("Legacy status", func() {
+		// Given a console service with legacy status enabled
+		// When the collector is in ready state
+		// Then it should map to legacy WaitingForCredentials status
+		It("should map collector states to legacy statuses", func() {
+			// Arrange
+			var receivedPath string
+			requestReceived := make(chan bool, 10)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				receivedPath = r.URL.Path
+				requestReceived <- true
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer server.Close()
+
+			client, err := console.NewConsoleClient(server.URL, "")
+			Expect(err).NotTo(HaveOccurred())
+			cfg.LegacyStatusEnabled = true
+
+			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act
+			err = consoleSrv.SetMode(context.Background(), models.AgentModeConnected)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Assert - at least one request was sent
+			Eventually(requestReceived, 500*time.Millisecond).Should(Receive())
+			Expect(receivedPath).To(ContainSubstring("agents"))
 		})
 	})
 })

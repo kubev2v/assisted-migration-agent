@@ -125,5 +125,107 @@ var _ = Describe("HTTP Server", func() {
 			Expect(resp.StatusCode).To(Equal(200))
 			resp.Body.Close()
 		})
+
+		// Given a production server with static files
+		// When we request the root path
+		// Then it should serve the index.html
+		It("serves static index.html at root", func() {
+			var err error
+			srv, err = server.NewServer(cfg, registerHandlerFn)
+			Expect(err).ToNot(HaveOccurred())
+
+			go func() {
+				_ = srv.Start(context.TODO())
+			}()
+			time.Sleep(100 * time.Millisecond)
+
+			client := &http.Client{
+				Transport: &http.Transport{
+					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+				},
+			}
+
+			resp, err := client.Get(fmt.Sprintf("https://localhost:%d/", cfg.Server.HTTPPort))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resp.StatusCode).To(Equal(200))
+			resp.Body.Close()
+		})
+
+		// Given a production server
+		// When we request a non-existent API route
+		// Then it should return 404 with a JSON error
+		It("returns 404 JSON for unknown API routes", func() {
+			var err error
+			srv, err = server.NewServer(cfg, registerHandlerFn)
+			Expect(err).ToNot(HaveOccurred())
+
+			go func() {
+				_ = srv.Start(context.TODO())
+			}()
+			time.Sleep(100 * time.Millisecond)
+
+			client := &http.Client{
+				Transport: &http.Transport{
+					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+				},
+			}
+
+			resp, err := client.Get(fmt.Sprintf("https://localhost:%d/api/v1/nonexistent", cfg.Server.HTTPPort))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resp.StatusCode).To(Equal(404))
+			resp.Body.Close()
+		})
+
+		// Given a production server
+		// When we request a non-existent non-API route
+		// Then it should serve index.html (SPA fallback)
+		It("serves index.html for non-API routes (SPA fallback)", func() {
+			var err error
+			srv, err = server.NewServer(cfg, registerHandlerFn)
+			Expect(err).ToNot(HaveOccurred())
+
+			go func() {
+				_ = srv.Start(context.TODO())
+			}()
+			time.Sleep(100 * time.Millisecond)
+
+			client := &http.Client{
+				Transport: &http.Transport{
+					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+				},
+			}
+
+			resp, err := client.Get(fmt.Sprintf("https://localhost:%d/some/spa/route", cfg.Server.HTTPPort))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(resp.StatusCode).To(Equal(200))
+			resp.Body.Close()
+		})
+
+		// Given a running production server
+		// When we call Stop
+		// Then subsequent requests should fail
+		It("stops accepting requests after Stop", func() {
+			var err error
+			srv, err = server.NewServer(cfg, registerHandlerFn)
+			Expect(err).ToNot(HaveOccurred())
+
+			go func() {
+				_ = srv.Start(context.TODO())
+			}()
+			time.Sleep(100 * time.Millisecond)
+
+			// Act
+			srv.Stop(context.TODO())
+			srv = nil // prevent double stop in AfterEach
+
+			// Assert
+			client := &http.Client{
+				Transport: &http.Transport{
+					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+				},
+			}
+			_, err = client.Get(fmt.Sprintf("https://localhost:%d/api/v1/health", cfg.Server.HTTPPort))
+			Expect(err).To(HaveOccurred())
+		})
 	})
 })

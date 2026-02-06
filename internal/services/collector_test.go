@@ -114,7 +114,7 @@ var _ = Describe("CollectorService", func() {
 		}
 	})
 
-	Describe("NewCollectorService", func() {
+	Context("NewCollectorService", func() {
 		// Given a newly created collector service
 		// When we check the status
 		// Then the state should be ready
@@ -127,7 +127,7 @@ var _ = Describe("CollectorService", func() {
 		})
 	})
 
-	Describe("GetStatus", func() {
+	Context("GetStatus", func() {
 		// Given a collector service that has not been started
 		// When we get the status
 		// Then it should return ready state
@@ -140,7 +140,7 @@ var _ = Describe("CollectorService", func() {
 		})
 	})
 
-	Describe("Stop", func() {
+	Context("Stop", func() {
 		// Given a collector service
 		// When we stop the collector
 		// Then the state should reset to ready
@@ -154,7 +154,7 @@ var _ = Describe("CollectorService", func() {
 		})
 	})
 
-	Describe("Start", func() {
+	Context("Start", func() {
 		// Given a collector service with valid credentials
 		// When we start the collector
 		// Then it should reach collected state and inventory should be available
@@ -279,6 +279,80 @@ var _ = Describe("CollectorService", func() {
 
 			// Assert
 			Expect(err).To(HaveOccurred())
+		})
+
+		// Given a collector service that has already collected inventory
+		// When we try to start it again
+		// Then it should be a no-op (canCollect returns false)
+		It("should be a no-op when already in collected state", func() {
+			// Arrange
+			creds := &models.Credentials{
+				URL:      "https://vcenter.example.com",
+				Username: "admin",
+				Password: "secret",
+			}
+			err := srv.Start(ctx, creds)
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(func() models.CollectorState {
+				return srv.GetStatus().State
+			}).Should(Equal(models.CollectorStateCollected))
+
+			// Act - try to start again after collected
+			err = srv.Start(ctx, creds)
+
+			// Assert - no error, remains in collected state
+			Expect(err).NotTo(HaveOccurred())
+			Expect(srv.GetStatus().State).To(Equal(models.CollectorStateCollected))
+		})
+	})
+
+	Context("NewCollectorService with existing inventory", func() {
+		// Given inventory already exists in the store
+		// When we create a new collector service
+		// Then it should start in collected state
+		It("should start in collected state when inventory exists", func() {
+			// Arrange
+			err := st.Inventory().Save(ctx, []byte(`{"vms":[]}`))
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act
+			collectorSrv := services.NewCollectorService(sched, st, &mockWorkBuilder{store: st})
+
+			// Assert
+			Expect(collectorSrv.GetStatus().State).To(Equal(models.CollectorStateCollected))
+		})
+	})
+
+	Context("Stop cancellation", func() {
+		// Given a running collector
+		// When we stop it during collection
+		// Then it should cancel and return to ready state
+		It("should cancel running collection and return to ready", func() {
+			// Arrange
+			creds := &models.Credentials{
+				URL:      "https://vcenter.example.com",
+				Username: "admin",
+				Password: "secret",
+			}
+			err := srv.Start(ctx, creds)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act
+			srv.Stop()
+
+			// Assert - should be either ready (cancelled) or collected (finished before cancel)
+			state := srv.GetStatus().State
+			Expect(state).To(BeElementOf(models.CollectorStateReady, models.CollectorStateCollected))
+		})
+
+		// Given a collector service that is not running
+		// When we call Stop
+		// Then it should not panic or block
+		It("should be safe to call Stop when not running", func() {
+			// Act & Assert - should not panic
+			srv.Stop()
+			Expect(srv.GetStatus().State).To(Equal(models.CollectorStateReady))
 		})
 	})
 })
