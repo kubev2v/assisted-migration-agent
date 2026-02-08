@@ -388,19 +388,10 @@ components:
     CollectorStartRequest:
       type: object
       required:
-        - url
-        - username
-        - password
+        - credentials
       properties:
-        url:
-          type: string
-          format: uri
-          description: vCenter URL
-        username:
-          type: string
-        password:
-          type: string
-          format: password
+        credentials:
+          $ref: '#/components/schemas/VcenterCredentials'
 
     CollectorStatus:
       type: object

@@ -129,8 +129,10 @@ var _ = Describe("Collector Handlers", func() {
 		It("should return 400 when url is missing", func() {
 			// Arrange
 			body := v1.CollectorStartRequest{
-				Username: "admin",
-				Password: "secret",
+				Credentials: v1.VcenterCredentials{
+					Username: "admin",
+					Password: "secret",
+				},
 			}
 			bodyBytes, _ := json.Marshal(body)
 			req := httptest.NewRequest(http.MethodPost, "/collector", bytes.NewReader(bodyBytes))
@@ -154,8 +156,10 @@ var _ = Describe("Collector Handlers", func() {
 		It("should return 400 when username is missing", func() {
 			// Arrange
 			body := v1.CollectorStartRequest{
-				Url:      "https://vcenter.example.com",
-				Password: "secret",
+				Credentials: v1.VcenterCredentials{
+					Url:      "https://vcenter.example.com",
+					Password: "secret",
+				},
 			}
 			bodyBytes, _ := json.Marshal(body)
 			req := httptest.NewRequest(http.MethodPost, "/collector", bytes.NewReader(bodyBytes))
@@ -175,8 +179,10 @@ var _ = Describe("Collector Handlers", func() {
 		It("should return 400 when password is missing", func() {
 			// Arrange
 			body := v1.CollectorStartRequest{
-				Url:      "https://vcenter.example.com",
-				Username: "admin",
+				Credentials: v1.VcenterCredentials{
+					Url:      "https://vcenter.example.com",
+					Username: "admin",
+				},
 			}
 			bodyBytes, _ := json.Marshal(body)
 			req := httptest.NewRequest(http.MethodPost, "/collector", bytes.NewReader(bodyBytes))
@@ -196,9 +202,11 @@ var _ = Describe("Collector Handlers", func() {
 		It("should return 400 for invalid URL format", func() {
 			// Arrange
 			body := v1.CollectorStartRequest{
-				Url:      "not-a-valid-url",
-				Username: "admin",
-				Password: "secret",
+				Credentials: v1.VcenterCredentials{
+					Url:      "not-a-valid-url",
+					Username: "admin",
+					Password: "secret",
+				},
 			}
 			bodyBytes, _ := json.Marshal(body)
 			req := httptest.NewRequest(http.MethodPost, "/collector", bytes.NewReader(bodyBytes))
@@ -222,9 +230,11 @@ var _ = Describe("Collector Handlers", func() {
 		It("should start collector with valid credentials", func() {
 			// Arrange
 			body := v1.CollectorStartRequest{
-				Url:      "https://vcenter.example.com",
-				Username: "admin",
-				Password: "secret",
+				Credentials: v1.VcenterCredentials{
+					Url:      "https://vcenter.example.com",
+					Username: "admin",
+					Password: "secret",
+				},
 			}
 			bodyBytes, _ := json.Marshal(body)
 			req := httptest.NewRequest(http.MethodPost, "/collector", bytes.NewReader(bodyBytes))
@@ -246,9 +256,11 @@ var _ = Describe("Collector Handlers", func() {
 			// Arrange
 			mockCollector.StartError = srvErrors.NewCollectionInProgressError()
 			body := v1.CollectorStartRequest{
-				Url:      "https://vcenter.example.com",
-				Username: "admin",
-				Password: "secret",
+				Credentials: v1.VcenterCredentials{
+					Url:      "https://vcenter.example.com",
+					Username: "admin",
+					Password: "secret",
+				},
 			}
 			bodyBytes, _ := json.Marshal(body)
 			req := httptest.NewRequest(http.MethodPost, "/collector", bytes.NewReader(bodyBytes))
@@ -269,9 +281,11 @@ var _ = Describe("Collector Handlers", func() {
 			// Arrange
 			mockCollector.StartError = errors.New("unexpected error")
 			body := v1.CollectorStartRequest{
-				Url:      "https://vcenter.example.com",
-				Username: "admin",
-				Password: "secret",
+				Credentials: v1.VcenterCredentials{
+					Url:      "https://vcenter.example.com",
+					Username: "admin",
+					Password: "secret",
+				},
 			}
 			bodyBytes, _ := json.Marshal(body)
 			req := httptest.NewRequest(http.MethodPost, "/collector", bytes.NewReader(bodyBytes))

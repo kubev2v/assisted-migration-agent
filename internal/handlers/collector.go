@@ -29,22 +29,22 @@ func (h *Handler) StartCollector(c *gin.Context) {
 	}
 
 	// Validate required fields
-	if req.Url == "" || req.Username == "" || req.Password == "" {
+	if req.Credentials.Url == "" || req.Credentials.Username == "" || req.Credentials.Password == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "url, username, and password are required"})
 		return
 	}
 
 	// Validate URL format
-	parsedURL, err := url.Parse(req.Url)
+	parsedURL, err := url.Parse(req.Credentials.Url)
 	if err != nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid url format"})
 		return
 	}
 
 	creds := &models.Credentials{
-		URL:      req.Url,
-		Username: req.Username,
-		Password: req.Password,
+		URL:      req.Credentials.Url,
+		Username: req.Credentials.Username,
+		Password: req.Credentials.Password,
 	}
 
 	// Start collection (saves creds, verifies, starts async job)
