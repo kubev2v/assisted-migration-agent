@@ -57,6 +57,7 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 				"agent", helpers.Flatten(cfg.Agent.DebugMap()),
 				"server", helpers.Flatten(cfg.Server.DebugMap()),
 				"console", helpers.Flatten(cfg.Console.DebugMap()),
+				"auth", helpers.Flatten(cfg.Auth.DebugMap()),
 			)
 
 			ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGQUIT)

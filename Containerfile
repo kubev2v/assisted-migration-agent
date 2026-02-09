@@ -40,13 +40,13 @@ COPY --from=backend-builder /tmp/agent /app/agent
 COPY --from=ui-builder /apps/agent-ui/dist /app/static
 RUN chown -R 1001:0 /app/static
 
-# Create data directory
+# Create data directory (mounted via AGENT_DATA_FOLDER)
 RUN mkdir -p /var/lib/agent && chown -R 1001:0 /var/lib/agent
 
 USER 1001
 
-# Expose HTTP port
-EXPOSE 8000
+# Expose HTTP port (configurable via AGENT_SERVER_HTTP_PORT)
+EXPOSE 3333
 
-ENTRYPOINT ["/app/agent", "run", "--server-mode", "prod", "--server-statics-folder", "/app/static", "--data-folder", "/var/lib/agent", "--legacy-status-enabled"]
-CMD []
+ENTRYPOINT ["/app/agent"]
+CMD ["run"]
