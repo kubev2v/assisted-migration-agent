@@ -47,6 +47,8 @@ func NewServer(cfg *config.Configuration, registerHandlerFn func(router *gin.Rou
 
 	if cfg.Server.ServerMode == ProductionServer {
 		engine.Static("/static", cfg.Server.StaticsFolder)
+		// Serve assets at /assets/ to match HTML references
+		engine.Static("/assets", path.Join(cfg.Server.StaticsFolder, "assets"))
 		engine.StaticFile("/", path.Join(cfg.Server.StaticsFolder, "index.html"))
 		engine.StaticFile("/favicon.ico", path.Join(cfg.Server.StaticsFolder, "favicon.ico"))
 

@@ -3,7 +3,11 @@ ARG AGENT_UI_IMAGE_TAG=latest
 FROM --platform=linux/amd64 quay.io/assisted-migration/migration-planner-agent-ui:${AGENT_UI_IMAGE_TAG} AS ui-builder
 
 # Stage 2: Build the backend
-FROM --platform=linux/amd64 registry.access.redhat.com/ubi10/go-toolset AS backend-builder
+FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/ubi-minimal AS backend-builder
+
+# Install Go and build tools (needed for duckdb bindings)
+RUN microdnf install -y golang git make gcc gcc-c++ && \
+    microdnf clean all
 
 WORKDIR /app
 
@@ -26,7 +30,7 @@ ARG GIT_COMMIT=unknown
 RUN make build GIT_COMMIT=${GIT_COMMIT} BINARY_PATH=/tmp/agent
 
 # Stage 3: Final runtime image
-FROM --platform=linux/amd64 registry.access.redhat.com/ubi10/ubi-minimal
+FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/ubi-minimal
 
 RUN microdnf install -y ca-certificates tzdata && \
     microdnf clean all
@@ -45,8 +49,8 @@ RUN mkdir -p /var/lib/agent && chown -R 1001:0 /var/lib/agent
 
 USER 1001
 
-# Expose HTTP port (configurable via AGENT_SERVER_HTTP_PORT)
-EXPOSE 3333
+# Expose HTTP port (configurable via --server-http-port, default: 8000)
+EXPOSE 8000
 
 ENTRYPOINT ["/app/agent"]
 CMD ["run"]

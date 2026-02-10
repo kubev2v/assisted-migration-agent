@@ -26,6 +26,7 @@ help:
 	@echo "    e2e.vm:          run e2e tests in VM mode (externally managed infra)"
 	@echo "    e2e.container.clean: remove all e2e test containers and volumes"
 	@echo "    image:           build container image"
+	@echo "    run.image:       run container image locally (requires AGENT_ID and SOURCE_ID)"
 	@echo "    run:             run the agent"
 	@echo "    run.ui:          start React dev server"
 	@echo "    clean:           clean up binaries and tools"
@@ -79,6 +80,39 @@ image:
 	@echo "📦 Building container image $(IMAGE_NAME):$(IMAGE_TAG)..."
 	$(PODMAN) build --build-arg GIT_COMMIT=$(GIT_COMMIT) --build-arg AGENT_UI_IMAGE_TAG=$(AGENT_UI_IMAGE_TAG) -t $(IMAGE_NAME):$(IMAGE_TAG) -f Containerfile .
 	@echo "✅ Image built: $(IMAGE_NAME):$(IMAGE_TAG)"
+
+# Run container image locally
+# Usage: make run.image AGENT_ID=<uuid> SOURCE_ID=<uuid>
+# Example: make run.image AGENT_ID=550e8400-e29b-41d4-a716-446655440000 SOURCE_ID=6ba7b810-9dad-11d1-80b4-00c04fd430c8
+AGENT_ID ?=
+SOURCE_ID ?=
+CONTAINER_NAME ?= migration-planner-agent
+run.image: image
+	@if [ -z "$(AGENT_ID)" ] || [ -z "$(SOURCE_ID)" ]; then \
+		echo "❌ Error: AGENT_ID and SOURCE_ID are required"; \
+		echo "Usage: make run.image AGENT_ID=<uuid> SOURCE_ID=<uuid>"; \
+		exit 1; \
+	fi
+	@echo "🛑 Stopping existing container if running..."
+	@$(PODMAN) stop $(CONTAINER_NAME) 2>/dev/null || true
+	@$(PODMAN) rm $(CONTAINER_NAME) 2>/dev/null || true
+	@echo "🚀 Starting container $(CONTAINER_NAME)..."
+	@echo "   Image: $(IMAGE_NAME):$(IMAGE_TAG)"
+	@echo "   Agent ID: $(AGENT_ID)"
+	@echo "   Source ID: $(SOURCE_ID)"
+	@echo "   UI available at: https://localhost:8000"
+	$(PODMAN) run -d \
+		--name $(CONTAINER_NAME) \
+		-p 8000:8000 \
+		$(IMAGE_NAME):$(IMAGE_TAG) \
+		run \
+		--agent-id $(AGENT_ID) \
+		--source-id $(SOURCE_ID) \
+		--server-mode prod \
+		--server-statics-folder /app/static \
+		--data-folder /var/lib/agent \
+		--console-url http://host.containers.internal:7443
+	@echo "✅ Container started. View logs with: podman logs -f $(CONTAINER_NAME)"
 
 clean:
 	@echo "🗑️ Removing $(BINARY_PATH)..."
