@@ -23,7 +23,6 @@
 // Constructors:
 //   - NewResourceNotFoundError(kind string) - Generic resource not found
 //   - NewInventoryNotFoundError() - Inventory not collected yet
-//   - NewCredentialsNotFoundError() - Credentials not configured
 //   - NewConfigurationNotFoundError() - Configuration not found
 //
 // Usage:

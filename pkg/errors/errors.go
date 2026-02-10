@@ -20,10 +20,6 @@ func NewInventoryNotFoundError() *ResourceNotFoundError {
 	return NewResourceNotFoundError("inventory", "")
 }
 
-func NewCredentialsNotFoundError() *ResourceNotFoundError {
-	return NewResourceNotFoundError("credentials", "")
-}
-
 func NewConfigurationNotFoundError() *ResourceNotFoundError {
 	return NewResourceNotFoundError("configuration", "")
 }

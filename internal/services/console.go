@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
-	stderrors "errors"
 	"fmt"
 	"sync"
 	"time"
@@ -21,10 +20,6 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/pkg/errors"
 	"github.com/kubev2v/assisted-migration-agent/pkg/scheduler"
 )
-
-// errInventoryNotChanged is a sentinel error used to signal that no inventory
-// request was made because the inventory hasn't changed.
-var errInventoryNotChanged = stderrors.New("inventory not changed")
 
 type Collector interface {
 	GetStatus() models.CollectorStatus
@@ -194,9 +189,6 @@ func (c *Console) run() {
 		select {
 		case result := <-future.C():
 			if result.Err != nil {
-				if stderrors.Is(result.Err, errInventoryNotChanged) {
-					goto backoff
-				}
 				c.state.SetError(result.Err)
 				// If the error from console.rh.com is 4xx stop the service
 				// 4xx errors cannot be recovered and it is useless to keep sending requests
@@ -214,7 +206,6 @@ func (c *Console) run() {
 			return
 		}
 
-	backoff:
 		// if there's an error activate backoff, otherwise reset it
 		if c.state.GetError() != nil {
 			nextAllowedTime = now.Add(b.NextBackOff())
@@ -254,22 +245,24 @@ func (c *Console) dispatch() *scheduler.Future[scheduler.Result[any]] {
 			return nil, err
 		}
 
-		// dispatch inventory
-		data, changed, err := c.getInventoryIfChanged(ctx)
+		inventory, err := c.store.Inventory().Get(ctx)
+		if err != nil {
+			if errors.IsResourceNotFoundError(err) {
+				return struct{}{}, nil
+			}
+			return nil, err
+		}
+
+		changed, err := c.isInventoryChanged(inventory)
 		if err != nil {
 			return nil, err
 		}
 
 		if !changed {
-			return nil, errInventoryNotChanged
+			return struct{}{}, nil
 		}
 
-		inventory := models.Inventory{}
-		if err := json.Unmarshal(data, &inventory); err != nil {
-			return nil, err
-		}
-
-		if err := c.client.UpdateSourceStatus(ctx, c.sourceID, c.agentID, inventory); err != nil {
+		if err := c.client.UpdateSourceStatus(ctx, c.sourceID, c.agentID, *inventory); err != nil {
 			return nil, err
 		}
 
@@ -279,24 +272,19 @@ func (c *Console) dispatch() *scheduler.Future[scheduler.Result[any]] {
 	})
 }
 
-func (c *Console) getInventoryIfChanged(ctx context.Context) ([]byte, bool, error) {
-	inventory, err := c.store.Inventory().Get(ctx)
-	if err != nil {
-		return nil, false, err
-	}
-
+func (c *Console) isInventoryChanged(inventory *models.Inventory) (bool, error) {
 	data, err := json.Marshal(inventory)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to marshal inventory: %w", err)
+		return false, fmt.Errorf("failed to marshal inventory: %w", err)
 	}
 
 	hash := fmt.Sprintf("%x", sha256.Sum256(data))
 	if hash == c.inventoryLastHash {
-		return nil, false, nil
+		return false, nil
 	}
 
 	c.inventoryLastHash = hash
-	return data, true, nil
+	return true, nil
 }
 
 // consoleState holds the console status with its own mutex for thread-safe access.

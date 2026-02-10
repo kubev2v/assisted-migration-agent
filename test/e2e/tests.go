@@ -731,6 +731,49 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 				GinkgoWriter.Printf("Source agent: %+v\n", source.Agent)
 				Expect(source.Agent).ToNot(BeNil(), "expected agent to be attached to source after mode switch")
 			})
+
+			// Given an agent started in disconnected mode without inventory
+			// When the agent mode is switched to connected
+			// Then the agent should communicate with backend without errors
+			It("should communicate with backend without errors when no inventory is collected", func() {
+				// Arrange
+				agentID := uuid.NewString()
+				_, err := infraManager.StartAgent(infra.AgentConfig{
+					AgentID:        agentID,
+					SourceID:       sourceID.String(),
+					Mode:           "disconnected",
+					ConsoleURL:     "http://localhost:8081", // Use proxy to observe requests
+					UpdateInterval: "1s",
+				})
+				Expect(err).ToNot(HaveOccurred(), "failed to start agent")
+				GinkgoWriter.Printf("Agent started with ID: %s\n", agentID)
+
+				Eventually(func() error {
+					_, err := agentSvc.Status()
+					return err
+				}, 30*time.Second, 1*time.Second).Should(BeNil())
+
+				// Act - switch to connected mode without collecting inventory
+				_, err = agentSvc.SetAgentMode("connected")
+				Expect(err).ToNot(HaveOccurred(), "failed to switch mode")
+
+				// Wait for agent to make requests to backend
+				time.Sleep(5 * time.Second)
+
+				// Assert - check agent status has no error
+				status, err := agentSvc.Status()
+				Expect(err).ToNot(HaveOccurred(), "failed to get agent status")
+				GinkgoWriter.Printf("Agent status: mode=%s, console_connection=%s, error=%s\n",
+					status.Mode, status.ConsoleConnection, status.Error)
+
+				Expect(status.Mode).To(Equal("connected"), "expected mode to be connected")
+				Expect(status.Error).To(BeEmpty(), "expected no error in agent status")
+
+				// Assert - verify requests were made to backend via observer
+				reqs := obs.Requests()
+				GinkgoWriter.Printf("Observed %d requests to backend\n", len(reqs))
+				Expect(reqs).ToNot(BeEmpty(), "expected requests to be made to backend")
+			})
 		})
 
 		Context("collector", func() {
