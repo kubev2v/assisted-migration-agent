@@ -156,6 +156,8 @@ func (c *ContainerInfraManager) StartAgent(cfg AgentConfig) (string, error) {
 	containerCfg := NewContainerConfig(agentContainerName, c.agentImage).
 		WithPort(8000, 8000).
 		WithVolume(agentVolumeName, "/var/lib/agent").
+		WithEnvVar("AGENT_SERVER_MODE", "prod").
+		WithEnvVar("AGENT_SERVER_STATICS_FOLDER", "/app/static").
 		WithEnvVar("AGENT_MODE", cfg.Mode).
 		WithEnvVar("AGENT_AGENT_ID", cfg.AgentID).
 		WithEnvVar("AGENT_SOURCE_ID", cfg.SourceID).
