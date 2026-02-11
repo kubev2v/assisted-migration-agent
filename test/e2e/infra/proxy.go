@@ -90,8 +90,6 @@ func NewProxy(name, targetName string, target *url.URL, port string) *Proxy {
 
 func (p *Proxy) handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		zap.S().Infow("proxy request", "proxy", p.name, "target", p.targetName, "method", r.Method, "path", r.URL.Path)
-
 		var requestBody []byte
 		if r.Body != nil {
 			requestBody, _ = io.ReadAll(r.Body)
@@ -109,9 +107,15 @@ func (p *Proxy) handler() http.Handler {
 
 		p.proxy.ServeHTTP(recorder, r)
 
-		zap.S().Infow("proxy response", "proxy", p.name, "target", p.targetName, "method", r.Method, "path", r.URL.Path, "status", recorder.statusCode)
-
-		zap.S().Infow("request body", "proxy", p.name, "body", string(requestBody))
+		zap.S().Infow("proxy",
+			"name", p.name,
+			"target", p.targetName,
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", recorder.statusCode,
+			"request_body", string(requestBody),
+			"response_body", string(recorder.body.Bytes()),
+		)
 
 		if p.requests == nil {
 			return

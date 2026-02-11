@@ -19,7 +19,7 @@ type sourceApi interface {
 	GetSources() (*v1alpha1.SourceList, error)
 	RemoveSource(uuid.UUID) error
 	RemoveSources() error
-	UpdateSource(uuid.UUID, *v1alpha1.Inventory) error
+	UpdateSource(sourceID, agentID uuid.UUID, inventory *v1alpha1.Inventory) error
 }
 
 type imageApi interface {

@@ -185,10 +185,10 @@ func (s *PlannerSvc) RemoveSources() error {
 }
 
 // UpdateSource updates the inventory of a specific source
-func (s *PlannerSvc) UpdateSource(uuid uuid.UUID, inventory *v1alpha1.Inventory) error {
-	zap.S().Infof("[PlannerService] Update source: %s", uuid)
+func (s *PlannerSvc) UpdateSource(sourceID, agentID uuid.UUID, inventory *v1alpha1.Inventory) error {
+	zap.S().Infof("[PlannerService] Update source: %s with agent: %s", sourceID, agentID)
 	update := v1alpha1.UpdateInventoryJSONRequestBody{
-		AgentId:   uuid,
+		AgentId:   agentID,
 		Inventory: *inventory,
 	}
 
@@ -197,7 +197,7 @@ func (s *PlannerSvc) UpdateSource(uuid uuid.UUID, inventory *v1alpha1.Inventory)
 		return err
 	}
 
-	res, err := s.api.PutRequest(path.Join(apiV1SourcesPath, uuid.String(), "inventory"), reqBody)
+	res, err := s.api.PutRequest(path.Join(apiV1SourcesPath, sourceID.String(), "inventory"), reqBody)
 	if err != nil {
 		return err
 	}
@@ -205,7 +205,7 @@ func (s *PlannerSvc) UpdateSource(uuid uuid.UUID, inventory *v1alpha1.Inventory)
 
 	if res.StatusCode != http.StatusOK {
 		return fmt.Errorf("failed to update source with uuid: %s. "+
-			"response status code: %d", uuid.String(), res.StatusCode)
+			"response status code: %d", sourceID.String(), res.StatusCode)
 	}
 
 	return err

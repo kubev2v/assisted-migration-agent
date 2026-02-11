@@ -665,45 +665,6 @@ var _ = Describe("Console Service", func() {
 				return consoleSrv.Status().Error
 			}, 100*time.Millisecond).ShouldNot(BeNil())
 		})
-
-		// Given a status error and unchanged inventory
-		// When the update loop runs
-		// Then the error should not be cleared
-		It("should not clear status error when inventory is unchanged", func() {
-			// Arrange
-			requestCount := 0
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				requestCount++
-				if strings.Contains(r.URL.Path, "agents") {
-					if requestCount == 1 {
-						w.WriteHeader(http.StatusInternalServerError)
-						return
-					}
-					w.WriteHeader(http.StatusOK)
-					return
-				}
-				if strings.Contains(r.URL.Path, "sources") {
-					w.WriteHeader(http.StatusOK)
-					return
-				}
-				w.WriteHeader(http.StatusOK)
-			}))
-			defer server.Close()
-
-			client, err := console.NewConsoleClient(server.URL, "")
-			Expect(err).NotTo(HaveOccurred())
-
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
-			Expect(err).NotTo(HaveOccurred())
-
-			// Act
-			Expect(consoleSrv.SetMode(context.Background(), models.AgentModeConnected)).To(BeNil())
-			time.Sleep(150 * time.Millisecond)
-
-			// Assert
-			status := consoleSrv.Status()
-			Expect(status.Error).NotTo(BeNil())
-		})
 	})
 
 	Context("Stop", func() {

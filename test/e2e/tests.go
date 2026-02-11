@@ -884,6 +884,66 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 				Expect(source.Inventory).ToNot(BeNil(), "expected inventory to be populated")
 				Expect(source.Inventory.VcenterId).ToNot(BeEmpty(), "expected vcenter_id to be set")
 			})
+
+			// Given an agent that switches to disconnected mode before collecting
+			// When the inventory is collected and manually uploaded to the backend
+			// Then the source should have the inventory populated
+			It("should manually upload inventory from disconnected agent to backend", func() {
+				// Arrange - Start agent in connected mode first
+				agentID := uuid.NewString()
+				_, err := infraManager.StartAgent(infra.AgentConfig{
+					AgentID:        agentID,
+					SourceID:       sourceID.String(),
+					Mode:           "connected",
+					ConsoleURL:     "http://localhost:8081",
+					UpdateInterval: "1s",
+				})
+				Expect(err).ToNot(HaveOccurred(), "failed to start agent")
+				GinkgoWriter.Printf("Agent started with ID: %s\n", agentID)
+
+				Eventually(func() error {
+					_, err := agentSvc.Status()
+					return err
+				}, 30*time.Second, 1*time.Second).Should(BeNil())
+
+				// Switch to disconnected mode before collecting
+				GinkgoWriter.Println("Switching agent to disconnected mode...")
+				status, err := agentSvc.SetAgentMode("disconnected")
+				Expect(err).ToNot(HaveOccurred(), "failed to switch to disconnected mode")
+				Expect(status.Mode).To(Equal("disconnected"))
+
+				// Act - Collect inventory in disconnected mode
+				GinkgoWriter.Println("Starting collector with valid credentials...")
+				_, err = agentSvc.StartCollector("https://localhost:8989/sdk", infra.VcsimUsername, infra.VcsimPassword)
+				Expect(err).ToNot(HaveOccurred(), "failed to start collector")
+
+				Eventually(func() string {
+					status, err := agentSvc.GetCollectorStatus()
+					if err != nil {
+						return "error"
+					}
+					GinkgoWriter.Printf("Collector status: %s %s\n", status.Status, status.Error)
+					return status.Status
+				}, 60*time.Second, 2*time.Second).Should(Equal("collected"))
+
+				// Get inventory from agent
+				inventory, err := agentSvc.Inventory()
+				Expect(err).ToNot(HaveOccurred(), "failed to get inventory")
+				Expect(inventory).ToNot(BeNil(), "expected inventory to be available")
+				GinkgoWriter.Printf("Collected inventory with vcenter_id: %s\n", inventory.VcenterId)
+
+				// Manually upload inventory to backend
+				GinkgoWriter.Println("Manually uploading inventory to backend...")
+				err = userSvc.UpdateSource(sourceID, openapi_types.UUID(uuid.MustParse(agentID)), inventory)
+				Expect(err).ToNot(HaveOccurred(), "failed to upload inventory to backend")
+
+				// Assert - Verify inventory was uploaded
+				source, err := userSvc.GetSource(sourceID)
+				Expect(err).ToNot(HaveOccurred(), "failed to get source")
+				GinkgoWriter.Printf("Source inventory after upload: vcenter_id=%s\n", source.Inventory.VcenterId)
+				Expect(source.Inventory).ToNot(BeNil(), "expected inventory to be populated")
+				Expect(source.Inventory.VcenterId).To(Equal(inventory.VcenterId), "expected vcenter_id to match")
+			})
 		})
 	})
 })

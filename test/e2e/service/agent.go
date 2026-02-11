@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"go.uber.org/zap"
 )
 
@@ -180,7 +181,7 @@ func (a *AgentSvc) GetCollectorStatus() (*CollectorStatus, error) {
 }
 
 // Inventory retrieves the inventory data collected by the agent
-func (a *AgentSvc) Inventory() (map[string]interface{}, error) {
+func (a *AgentSvc) Inventory() (*v1alpha1.Inventory, error) {
 	req, err := http.NewRequest(http.MethodGet, a.baseURL+"/api/v1/inventory", nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
@@ -200,10 +201,10 @@ func (a *AgentSvc) Inventory() (map[string]interface{}, error) {
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	var inventory map[string]interface{}
+	var inventory v1alpha1.Inventory
 	if err := json.NewDecoder(resp.Body).Decode(&inventory); err != nil {
 		return nil, fmt.Errorf("decoding response: %w", err)
 	}
 
-	return inventory, nil
+	return &inventory, nil
 }
