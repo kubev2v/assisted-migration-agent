@@ -250,13 +250,13 @@ var _ = Describe("Console Service", func() {
 			err = consoleSrv.SetMode(context.Background(), models.AgentModeConnected)
 			Expect(err).NotTo(HaveOccurred())
 
-			// Assert
+			// Assert - Check Current immediately after SetMode returns to minimize race with run() goroutine
+			status := consoleSrv.Status()
+			Expect(status.Current).To(Equal(models.ConsoleStatusDisconnected))
+
 			Eventually(func() models.ConsoleStatusType {
 				return consoleSrv.Status().Target
 			}, 500*time.Millisecond).Should(Equal(models.ConsoleStatusConnected))
-
-			status := consoleSrv.Status()
-			Expect(status.Current).To(Equal(models.ConsoleStatusDisconnected))
 		})
 
 		// Given a console service in disconnected mode
