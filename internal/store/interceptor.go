@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"sync"
 
 	"go.uber.org/zap"
 )
@@ -10,6 +11,7 @@ import (
 type queryInterceptor struct {
 	db     *sql.DB
 	logger *zap.SugaredLogger
+	mu     sync.Mutex
 }
 
 func newQueryInterceptor(db *sql.DB) *queryInterceptor {
@@ -30,6 +32,9 @@ func (q *queryInterceptor) QueryContext(ctx context.Context, query string, args 
 }
 
 func (q *queryInterceptor) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
 	q.logger.Debugw("exec", "query", query, "args", args)
 	return q.db.ExecContext(ctx, query, args...)
 }

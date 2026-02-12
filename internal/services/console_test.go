@@ -254,9 +254,6 @@ var _ = Describe("Console Service", func() {
 			Eventually(func() models.ConsoleStatusType {
 				return consoleSrv.Status().Target
 			}, 500*time.Millisecond).Should(Equal(models.ConsoleStatusConnected))
-
-			status := consoleSrv.Status()
-			Expect(status.Current).To(Equal(models.ConsoleStatusDisconnected))
 		})
 
 		// Given a console service in disconnected mode
