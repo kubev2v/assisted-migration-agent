@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/kubev2v/assisted-migration-agent/test/e2e/infra"
 	"github.com/kubev2v/assisted-migration-agent/test/e2e/service"
 
@@ -271,10 +273,11 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 		Context("collector", func() {
 			var agentSvc *service.AgentSvc
 
-			BeforeAll(func() {
+			BeforeEach(func() {
 				GinkgoWriter.Println("Starting vcsim...")
 				err := infraManager.StartVcsim()
 				Expect(err).ToNot(HaveOccurred(), "failed to start vcsim")
+				time.Sleep(1 * time.Second) // allow vcsim to initialize
 
 				client := &http.Client{
 					Transport: &http.Transport{
@@ -293,31 +296,23 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 					}
 					return nil
 				}, 30*time.Second, 1*time.Second).Should(BeNil())
-			})
 
-			AfterAll(func() {
-				if cfg.KeepContainers {
-					GinkgoWriter.Println("Keeping vcsim container running (--keep-containers flag set)")
-					return
-				}
-				GinkgoWriter.Println("Stopping vcsim...")
-				_ = infraManager.StopVcsim()
-			})
-
-			BeforeEach(func() {
 				obs = infra.NewObserver(requests)
 				agentSvc = service.DefaultAgentSvc(cfg.AgentAPIUrl)
 			})
 
 			AfterEach(func() {
 				if cfg.KeepContainers {
-					GinkgoWriter.Println("Keeping agent container running (--keep-containers flag set)")
+					GinkgoWriter.Println("Keeping agent and vcsim containers running (--keep-containers flag set)")
 					obs.Close()
 					return
 				}
 				GinkgoWriter.Println("Stopping agent...")
 				_ = infraManager.RemoveAgent()
 				obs.Close()
+
+				GinkgoWriter.Println("Stopping vcsim...")
+				_ = infraManager.StopVcsim()
 			})
 
 			// Given an agent in disconnected mode with vcsim running
@@ -783,10 +778,11 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 				userSvc  *service.PlannerSvc
 			)
 
-			BeforeAll(func() {
+			BeforeEach(func() {
 				GinkgoWriter.Println("Starting vcsim...")
 				err := infraManager.StartVcsim()
 				Expect(err).ToNot(HaveOccurred(), "failed to start vcsim")
+				time.Sleep(1 * time.Second) // allow vcsim to initialize
 
 				// Wait for vcsim to be ready
 				client := &http.Client{
@@ -805,18 +801,7 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 					}
 					return nil
 				}, 30*time.Second, 1*time.Second).Should(BeNil())
-			})
 
-			AfterAll(func() {
-				if cfg.KeepContainers {
-					GinkgoWriter.Println("Keeping vcsim container running (--keep-containers flag set)")
-					return
-				}
-				GinkgoWriter.Println("Stopping vcsim...")
-				_ = infraManager.StopVcsim()
-			})
-
-			BeforeEach(func() {
 				agentSvc = service.DefaultAgentSvc(cfg.AgentAPIUrl)
 				userSvc = plannerSvc.WithAuthUser("admin", "admin", "admin@example.com")
 
@@ -828,7 +813,7 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 
 			AfterEach(func() {
 				if cfg.KeepContainers {
-					GinkgoWriter.Println("Keeping agent container running (--keep-containers flag set)")
+					GinkgoWriter.Println("Keeping agent and vcsim containers running (--keep-containers flag set)")
 					return
 				}
 				GinkgoWriter.Println("Stopping agent...")
@@ -836,6 +821,9 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 
 				GinkgoWriter.Println("Deleting source...")
 				_ = userSvc.RemoveSource(sourceID)
+
+				GinkgoWriter.Println("Stopping vcsim...")
+				_ = infraManager.StopVcsim()
 			})
 
 			// Given an agent in connected mode with valid vCenter credentials
@@ -943,6 +931,116 @@ var _ = Describe("Agent e2e tests", Ordered, func() {
 				GinkgoWriter.Printf("Source inventory after upload: vcenter_id=%s\n", source.Inventory.VcenterId)
 				Expect(source.Inventory).ToNot(BeNil(), "expected inventory to be populated")
 				Expect(source.Inventory.VcenterId).To(Equal(inventory.VcenterId), "expected vcenter_id to match")
+			})
+
+			// Given an agent in connected mode with vcsim running
+			// When invalid credentials are provided to the collector
+			// Then the backend should have statusInfo containing the error message
+			It("should report error with statusInfo on backend for bad credentials", func() {
+				// Arrange
+				agentID := uuid.NewString()
+				_, err := infraManager.StartAgent(infra.AgentConfig{
+					AgentID:        agentID,
+					SourceID:       sourceID.String(),
+					Mode:           "connected",
+					ConsoleURL:     "http://localhost:8081",
+					UpdateInterval: "1s",
+				})
+				Expect(err).ToNot(HaveOccurred(), "failed to start agent")
+				GinkgoWriter.Printf("Agent started with ID: %s\n", agentID)
+
+				Eventually(func() error {
+					_, err := agentSvc.Status()
+					return err
+				}, 30*time.Second, 1*time.Second).Should(BeNil())
+
+				// Act
+				GinkgoWriter.Println("Starting collector with invalid credentials...")
+				_, err = agentSvc.StartCollector("https://localhost:8989/sdk", "baduser", "badpass")
+				Expect(err).ToNot(HaveOccurred(), "failed to start collector")
+
+				// Wait for collector to reach error state
+				Eventually(func() string {
+					status, err := agentSvc.GetCollectorStatus()
+					if err != nil {
+						return ""
+					}
+					GinkgoWriter.Printf("Collector status: %s %s\n", status.Status, status.Error)
+					return status.Status
+				}, 30*time.Second, 2*time.Second).Should(Equal("error"))
+
+				// Give time for status to be pushed to backend
+				time.Sleep(3 * time.Second)
+
+				// Assert - check statusInfo on backend
+				source, err := userSvc.GetSource(sourceID)
+				Expect(err).ToNot(HaveOccurred(), "failed to get source")
+
+				GinkgoWriter.Printf("Source agent: %+v\n", source.Agent)
+				Expect(source.Agent).ToNot(BeNil(), "expected agent to be present on source")
+				Expect(string(source.Agent.Status)).To(Equal("error"), "expected agent status to be error")
+				Expect(source.Agent.StatusInfo).To(ContainSubstring("invalid credentials"), "expected statusInfo to contain error message")
+			})
+
+			// Given an agent in connected mode that has collected and pushed inventory
+			// When the agent is restarted
+			// Then the inventory should still be available on the backend
+			It("should preserve inventory on backend after agent restart", func() {
+				// Arrange
+				agentID := uuid.NewString()
+				_, err := infraManager.StartAgent(infra.AgentConfig{
+					AgentID:        agentID,
+					SourceID:       sourceID.String(),
+					Mode:           "connected",
+					ConsoleURL:     "http://localhost:8081",
+					UpdateInterval: "1s",
+				})
+				Expect(err).ToNot(HaveOccurred(), "failed to start agent")
+				GinkgoWriter.Printf("Agent started with ID: %s\n", agentID)
+
+				Eventually(func() error {
+					_, err := agentSvc.Status()
+					return err
+				}, 30*time.Second, 1*time.Second).Should(BeNil())
+
+				// Act
+				GinkgoWriter.Println("Starting collector with valid credentials...")
+				_, err = agentSvc.StartCollector("https://localhost:8989/sdk", infra.VcsimUsername, infra.VcsimPassword)
+				Expect(err).ToNot(HaveOccurred(), "failed to start collector")
+
+				Eventually(func() string {
+					status, err := agentSvc.GetCollectorStatus()
+					if err != nil {
+						return "error"
+					}
+					GinkgoWriter.Printf("Collector status: %s %s\n", status.Status, status.Error)
+					return status.Status
+				}, 60*time.Second, 2*time.Second).Should(Equal("collected"))
+
+				// Give time for inventory to be pushed to backend
+				time.Sleep(5 * time.Second)
+
+				source, err := userSvc.GetSource(sourceID)
+				Expect(err).ToNot(HaveOccurred(), "failed to get source")
+
+				// Assert
+				GinkgoWriter.Printf("Source inventory: %+v\n", source.Inventory)
+				Expect(source.Inventory).ToNot(BeNil(), "expected inventory to be populated")
+				Expect(source.Inventory.VcenterId).ToNot(BeEmpty(), "expected vcenter_id to be set")
+
+				err = infraManager.RestartAgent()
+				Expect(err).To(BeNil())
+				zap.S().Info("Agent restarted")
+
+				<-time.After(5 * time.Second)
+
+				source, err = userSvc.GetSource(sourceID)
+				Expect(err).ToNot(HaveOccurred(), "failed to get source")
+
+				// Assert
+				GinkgoWriter.Printf("Source inventory: %+v\n", source.Inventory)
+				Expect(source.Inventory).ToNot(BeNil(), "expected inventory to be populated")
+				Expect(source.Inventory.VcenterId).ToNot(BeEmpty(), "expected vcenter_id to be set")
 			})
 		})
 	})

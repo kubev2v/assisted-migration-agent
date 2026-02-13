@@ -171,7 +171,7 @@ var _ = Describe("CollectorService", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Assert
-			Eventually(func() models.CollectorState {
+			Eventually(func() models.CollectorStateType {
 				return srv.GetStatus().State
 			}).Should(Equal(models.CollectorStateCollected))
 
@@ -200,7 +200,7 @@ var _ = Describe("CollectorService", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			// Assert
-			Eventually(func() models.CollectorState {
+			Eventually(func() models.CollectorStateType {
 				return srv.GetStatus().State
 			}).Should(Equal(models.CollectorStateError))
 		})
@@ -225,7 +225,7 @@ var _ = Describe("CollectorService", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Assert
-			Eventually(func() models.CollectorState {
+			Eventually(func() models.CollectorStateType {
 				return srv.GetStatus().State
 			}).Should(Equal(models.CollectorStateError))
 
@@ -253,7 +253,7 @@ var _ = Describe("CollectorService", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Assert
-			Eventually(func() models.CollectorState {
+			Eventually(func() models.CollectorStateType {
 				return srv.GetStatus().State
 			}).Should(Equal(models.CollectorStateError))
 
@@ -294,7 +294,7 @@ var _ = Describe("CollectorService", func() {
 			err := srv.Start(ctx, creds)
 			Expect(err).NotTo(HaveOccurred())
 
-			Eventually(func() models.CollectorState {
+			Eventually(func() models.CollectorStateType {
 				return srv.GetStatus().State
 			}).Should(Equal(models.CollectorStateCollected))
 

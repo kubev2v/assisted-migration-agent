@@ -6,9 +6,3 @@ type Credentials struct {
 	Username string
 	Password string
 }
-
-type VCenterCredentials struct {
-	URL      string
-	Username string
-	Password string
-}

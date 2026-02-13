@@ -41,11 +41,11 @@ func NewConsoleClient(baseURL string, jwt string) (*Client, error) {
 
 // UpdateAgentStatus sends agent status to console.redhat.com
 // PUT /api/v1/agents/{id}/status
-func (c *Client) UpdateAgentStatus(ctx context.Context, agentID uuid.UUID, sourceID uuid.UUID, version string, collectorStatus models.CollectorStatusType) error {
+func (c *Client) UpdateAgentStatus(ctx context.Context, agentID uuid.UUID, sourceID uuid.UUID, version, status, statusInfo string) error {
 	body := apiAgent.AgentStatusUpdate{
 		CredentialUrl: "http://10.10.10.1:3443",
-		Status:        string(collectorStatus),
-		StatusInfo:    string(collectorStatus),
+		Status:        status,
+		StatusInfo:    statusInfo,
 		SourceId:      sourceID,
 		Version:       version,
 	}

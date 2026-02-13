@@ -3,6 +3,8 @@ package services_test
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -24,10 +26,11 @@ import (
 
 // MockCollector implements Collector interface for testing
 type MockCollector struct {
-	state models.CollectorState
+	state models.CollectorStateType
+	err   error
 }
 
-func NewMockCollector(state models.CollectorState) *MockCollector {
+func NewMockCollector(state models.CollectorStateType) *MockCollector {
 	return &MockCollector{
 		state: state,
 	}
@@ -36,11 +39,16 @@ func NewMockCollector(state models.CollectorState) *MockCollector {
 func (m *MockCollector) GetStatus() models.CollectorStatus {
 	return models.CollectorStatus{
 		State: m.state,
+		Error: m.err,
 	}
 }
 
-func (m *MockCollector) SetState(state models.CollectorState) {
+func (m *MockCollector) SetState(state models.CollectorStateType) {
 	m.state = state
+}
+
+func (m *MockCollector) SetError(err error) {
+	m.err = err
 }
 
 var _ = Describe("Console Service", func() {
@@ -1027,6 +1035,129 @@ var _ = Describe("Console Service", func() {
 			// Assert - at least one request was sent
 			Eventually(requestReceived, 500*time.Millisecond).Should(Receive())
 			Expect(receivedPath).To(ContainSubstring("agents"))
+		})
+	})
+
+	Context("Error status", func() {
+		// Given a console service in connected mode with collector in error state
+		// When the collector has an invalid credentials error
+		// Then statusInfo should contain the error message
+		It("should send error message in statusInfo when collector has invalid credentials error", func() {
+			// Arrange
+			var receivedStatusInfo string
+			requestReceived := make(chan bool, 10)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if strings.Contains(r.URL.Path, "agents") {
+					var body struct {
+						StatusInfo string `json:"statusInfo"`
+					}
+					if err := json.NewDecoder(r.Body).Decode(&body); err == nil {
+						receivedStatusInfo = body.StatusInfo
+					}
+					requestReceived <- true
+				}
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer server.Close()
+
+			client, err := console.NewConsoleClient(server.URL, "")
+			Expect(err).NotTo(HaveOccurred())
+
+			collector.SetState(models.CollectorStateError)
+			collector.SetError(errors.New("invalid credentials"))
+
+			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act
+			err = consoleSrv.SetMode(context.Background(), models.AgentModeConnected)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Assert
+			Eventually(requestReceived, 500*time.Millisecond).Should(Receive())
+			Expect(receivedStatusInfo).To(Equal("invalid credentials"))
+		})
+
+		// Given a console service in connected mode with collector in error state
+		// When the collector has a vCenter connection error
+		// Then statusInfo should contain the error message
+		It("should send error message in statusInfo for vCenter connection errors", func() {
+			// Arrange
+			var receivedStatusInfo string
+			requestReceived := make(chan bool, 10)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if strings.Contains(r.URL.Path, "agents") {
+					var body struct {
+						StatusInfo string `json:"statusInfo"`
+					}
+					if err := json.NewDecoder(r.Body).Decode(&body); err == nil {
+						receivedStatusInfo = body.StatusInfo
+					}
+					requestReceived <- true
+				}
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer server.Close()
+
+			client, err := console.NewConsoleClient(server.URL, "")
+			Expect(err).NotTo(HaveOccurred())
+
+			collector.SetState(models.CollectorStateError)
+			collector.SetError(errors.New("connection refused"))
+
+			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act
+			err = consoleSrv.SetMode(context.Background(), models.AgentModeConnected)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Assert
+			Eventually(requestReceived, 500*time.Millisecond).Should(Receive())
+			Expect(receivedStatusInfo).To(Equal("connection refused"))
+		})
+
+		// Given a console service in connected mode with collector not in error state
+		// When the status is sent
+		// Then statusInfo should equal the status (not an error message)
+		It("should send status as statusInfo when collector is not in error state", func() {
+			// Arrange
+			var receivedStatus string
+			var receivedStatusInfo string
+			requestReceived := make(chan bool, 10)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if strings.Contains(r.URL.Path, "agents") {
+					var body struct {
+						Status     string `json:"status"`
+						StatusInfo string `json:"statusInfo"`
+					}
+					if err := json.NewDecoder(r.Body).Decode(&body); err == nil {
+						receivedStatus = body.Status
+						receivedStatusInfo = body.StatusInfo
+					}
+					requestReceived <- true
+				}
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer server.Close()
+
+			client, err := console.NewConsoleClient(server.URL, "")
+			Expect(err).NotTo(HaveOccurred())
+
+			collector.SetState(models.CollectorStateCollected)
+			collector.SetError(nil)
+
+			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act
+			err = consoleSrv.SetMode(context.Background(), models.AgentModeConnected)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Assert
+			Eventually(requestReceived, 500*time.Millisecond).Should(Receive())
+			Expect(receivedStatus).To(Equal("collected"))
+			Expect(receivedStatusInfo).To(Equal("collected"))
 		})
 	})
 })

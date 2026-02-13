@@ -229,19 +229,17 @@ func (c *Console) Stop() {
 
 func (c *Console) dispatch() *scheduler.Future[scheduler.Result[any]] {
 	return c.scheduler.AddWork(func(ctx context.Context) (any, error) {
-		collectorStatus := models.CollectorStatusType(c.collector.GetStatus().State)
+		collectorStatus := c.collector.GetStatus()
+		status := string(collectorStatus.State)
 		if c.legacyStatusEnabled {
-			switch c.collector.GetStatus().State {
-			case models.CollectorStateReady:
-				collectorStatus = models.CollectorLegacyStatusWaitingForCredentials
-			case models.CollectorStateConnecting, models.CollectorStateCollecting, models.CollectorStateParsing:
-				collectorStatus = models.CollectorLegacyStatusCollecting
-			case models.CollectorStateCollected:
-				collectorStatus = models.CollectorLegacyStatusCollected
-			}
+			status = string(collectorStatus.State.ToV1())
+		}
+		statusInfo := status
+		if collectorStatus.State == models.CollectorStateError {
+			statusInfo = collectorStatus.Error.Error()
 		}
 
-		if err := c.client.UpdateAgentStatus(ctx, c.agentID, c.sourceID, c.version, collectorStatus); err != nil {
+		if err := c.client.UpdateAgentStatus(ctx, c.agentID, c.sourceID, c.version, status, statusInfo); err != nil {
 			return nil, err
 		}
 
