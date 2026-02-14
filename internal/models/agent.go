@@ -33,24 +33,7 @@ type ConsoleStatus struct {
 	Error   error
 }
 
-type CollectorStatusType string
-
-const (
-	CollectorStatusReady      CollectorStatusType = "ready"
-	CollectorStatusConnecting CollectorStatusType = "connecting"
-	CollectorStatusConnected  CollectorStatusType = "connected"
-	CollectorStatusCollecting CollectorStatusType = "collecting"
-	CollectorStatusCollected  CollectorStatusType = "collected"
-	CollectorStatusError      CollectorStatusType = "error"
-
-	// V1 agent status
-	CollectorLegacyStatusWaitingForCredentials CollectorStatusType = "waiting-for-credentials"
-	CollectorLegacyStatusCollecting            CollectorStatusType = "gathering-initial-inventory"
-	CollectorLegacyStatusError                 CollectorStatusType = "error"
-	CollectorLegacyStatusCollected                                 = "up-to-date"
-)
-
 type AgentStatus struct {
 	Console   ConsoleStatus
-	Collector CollectorStatusType
+	Collector CollectorStatus
 }

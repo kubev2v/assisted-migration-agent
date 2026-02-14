@@ -4,29 +4,50 @@ import (
 	"context"
 )
 
-// CollectorState represents the current state of the collector.
-type CollectorState string
+// CollectorStateType represents the current state of the collector.
+type CollectorStateType string
 
 const (
 	// CollectorStateReady - credentials saved, waiting for collection request
-	CollectorStateReady CollectorState = "ready"
+	CollectorStateReady CollectorStateType = "ready"
 	// CollectorStateConnecting - verifying credentials with vCenter
-	CollectorStateConnecting CollectorState = "connecting"
+	CollectorStateConnecting CollectorStateType = "connecting"
 	// CollectorStateConnected - credentials verified
-	CollectorStateConnected CollectorState = "connected"
+	CollectorStateConnected CollectorStateType = "connected"
 	// CollectorStateCollecting - async collection in progress
-	CollectorStateCollecting CollectorState = "collecting"
+	CollectorStateCollecting CollectorStateType = "collecting"
 	// CollectorStateParsing - parsing collected data into duckdb
-	CollectorStateParsing CollectorState = "parsing"
+	CollectorStateParsing CollectorStateType = "parsing"
 	// CollectorStateCollected - collection complete (auto-transitions to ready)
-	CollectorStateCollected CollectorState = "collected"
+	CollectorStateCollected CollectorStateType = "collected"
 	// CollectorStateError - error during connecting or collecting
-	CollectorStateError CollectorState = "error"
+	CollectorStateError CollectorStateType = "error"
+
+	// V1 agent status
+	CollectorLegacyStateWaitingForCredentials CollectorStateType = "waiting-for-credentials"
+	CollectorLegacyStateCollecting            CollectorStateType = "gathering-initial-inventory"
+	CollectorLegacyStateError                 CollectorStateType = "error"
+	CollectorLegacyStateCollected             CollectorStateType = "up-to-date"
 )
+
+func (c CollectorStateType) ToV1() CollectorStateType {
+	switch c {
+	case CollectorStateReady:
+		return CollectorLegacyStateWaitingForCredentials
+	case CollectorStateConnecting, CollectorStateCollecting, CollectorStateParsing:
+		return CollectorLegacyStateCollecting
+	case CollectorStateCollected:
+		return CollectorLegacyStateCollected
+	case CollectorLegacyStateError:
+		return CollectorLegacyStateError
+	default:
+		return "unknown state"
+	}
+}
 
 // CollectorStatus holds the current collector state and metadata.
 type CollectorStatus struct {
-	State CollectorState
+	State CollectorStateType
 	Error error
 }
 
