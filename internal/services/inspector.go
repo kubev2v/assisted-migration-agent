@@ -10,8 +10,6 @@ import (
 
 	"github.com/vmware/govmomi"
 
-	"github.com/kubev2v/assisted-migration-agent/internal/store/filters"
-
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/pkg/vmware"
 
@@ -163,7 +161,7 @@ func (c *InspectorService) CancelVmsInspection(ctx context.Context, vmIDs ...str
 		return srvErrors.NewInspectorNotRunningError()
 	}
 
-	filter := filters.NewInspectionUpdateFilter().ByStatus(models.InspectionStatePending)
+	filter := store.NewInspectionUpdateFilter().ByStatus(models.InspectionStatePending)
 
 	if len(vmIDs) > 0 {
 		filter = filter.ByVmIDs(vmIDs...)
@@ -310,7 +308,7 @@ func (c *InspectorService) setErrorStatus(err error) {
 }
 
 func (c *InspectorService) setVmState(ctx context.Context, vmID string, s models.InspectionState) error {
-	if err := c.store.Inspection().Update(ctx, filters.NewInspectionUpdateFilter().ByVmIDs(vmID),
+	if err := c.store.Inspection().Update(ctx, store.NewInspectionUpdateFilter().ByVmIDs(vmID),
 		models.InspectionStatus{State: s}); err != nil {
 		return fmt.Errorf("updating vm %s in store: %w", vmID, err)
 	}
@@ -319,7 +317,7 @@ func (c *InspectorService) setVmState(ctx context.Context, vmID string, s models
 }
 
 func (c *InspectorService) setVmErrorStatus(ctx context.Context, vmID string, err error) error {
-	if err := c.store.Inspection().Update(ctx, filters.NewInspectionUpdateFilter().ByVmIDs(vmID), models.InspectionStatus{
+	if err := c.store.Inspection().Update(ctx, store.NewInspectionUpdateFilter().ByVmIDs(vmID), models.InspectionStatus{
 		State: models.InspectionStateError,
 		Error: err,
 	}); err != nil {

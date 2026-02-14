@@ -1,16 +1,9 @@
-package filters
+package store
 
 import (
 	sq "github.com/Masterminds/squirrel"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
-)
-
-// Column name constants for vm_inspection_status table
-const (
-	inspectionColVmID     = `"VM ID"`
-	inspectionColStatus   = "status"
-	inspectionColSequence = "sequence"
 )
 
 type InspectionFilterFunc func(sq.SelectBuilder) sq.SelectBuilder

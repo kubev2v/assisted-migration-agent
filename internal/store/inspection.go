@@ -9,7 +9,6 @@ import (
 	sq "github.com/Masterminds/squirrel"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
-	"github.com/kubev2v/assisted-migration-agent/internal/store/filters"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
@@ -60,7 +59,7 @@ func (s *InspectionStore) Get(ctx context.Context, vmID string) (*models.Inspect
 }
 
 // List returns inspection statuses matching the filter. If filter is nil, returns all.
-func (s *InspectionStore) List(ctx context.Context, filter *filters.InspectionQueryFilter) (map[string]models.InspectionStatus, error) {
+func (s *InspectionStore) List(ctx context.Context, filter *InspectionQueryFilter) (map[string]models.InspectionStatus, error) {
 	builder := sq.Select(inspectionColVmID, inspectionColStatus, inspectionColError).From(inspectionTable)
 
 	if filter != nil {
@@ -156,7 +155,7 @@ func (s *InspectionStore) Add(ctx context.Context, vmIDs []string, status models
 }
 
 // Update updates inspection status for VMs matching the filter.
-func (s *InspectionStore) Update(ctx context.Context, filter *filters.InspectionUpdateFilter, status models.InspectionStatus) error {
+func (s *InspectionStore) Update(ctx context.Context, filter *InspectionUpdateFilter, status models.InspectionStatus) error {
 	var errStr *string
 	if status.Error != nil {
 		e := status.Error.Error()

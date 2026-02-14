@@ -13,7 +13,6 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/services"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
-	"github.com/kubev2v/assisted-migration-agent/internal/store/filters"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 	"github.com/kubev2v/assisted-migration-agent/pkg/scheduler"
@@ -342,7 +341,7 @@ var _ = Describe("InspectorService", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				// vm-1, vm-2, vm-3 should be canceled (vm-0 is running, not pending)
-				statuses, err := st.Inspection().List(ctx, filters.NewInspectionQueryFilter().ByStatus(models.InspectionStateCanceled))
+				statuses, err := st.Inspection().List(ctx, store.NewInspectionQueryFilter().ByStatus(models.InspectionStateCanceled))
 				Expect(err).NotTo(HaveOccurred())
 				Expect(statuses).To(HaveLen(3))
 			})
@@ -350,7 +349,7 @@ var _ = Describe("InspectorService", func() {
 			It("should not cancel already completed VMs", func() {
 				// Mark vm-1 as completed
 				err := st.Inspection().Update(ctx,
-					filters.NewInspectionUpdateFilter().ByVmIDs("vm-1"),
+					store.NewInspectionUpdateFilter().ByVmIDs("vm-1"),
 					models.InspectionStatus{State: models.InspectionStateCompleted})
 				Expect(err).NotTo(HaveOccurred())
 
@@ -656,7 +655,7 @@ var _ = Describe("InspectionStore", func() {
 
 			// Mark vm-2 as completed
 			err = st.Inspection().Update(ctx,
-				filters.NewInspectionUpdateFilter().ByVmIDs("vm-2"),
+				store.NewInspectionUpdateFilter().ByVmIDs("vm-2"),
 				models.InspectionStatus{State: models.InspectionStateCompleted})
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -669,7 +668,7 @@ var _ = Describe("InspectionStore", func() {
 
 		It("should filter by status", func() {
 			statuses, err := st.Inspection().List(ctx,
-				filters.NewInspectionQueryFilter().ByStatus(models.InspectionStatePending))
+				store.NewInspectionQueryFilter().ByStatus(models.InspectionStatePending))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(statuses).To(HaveLen(2))
 			Expect(statuses).To(HaveKey("vm-1"))
@@ -678,7 +677,7 @@ var _ = Describe("InspectionStore", func() {
 
 		It("should filter by VM IDs", func() {
 			statuses, err := st.Inspection().List(ctx,
-				filters.NewInspectionQueryFilter().ByVmIDs("vm-1", "vm-2"))
+				store.NewInspectionQueryFilter().ByVmIDs("vm-1", "vm-2"))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(statuses).To(HaveLen(2))
 			Expect(statuses).To(HaveKey("vm-1"))
@@ -687,7 +686,7 @@ var _ = Describe("InspectionStore", func() {
 
 		It("should apply limit", func() {
 			statuses, err := st.Inspection().List(ctx,
-				filters.NewInspectionQueryFilter().Limit(2))
+				store.NewInspectionQueryFilter().Limit(2))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(statuses).To(HaveLen(2))
 		})
@@ -714,7 +713,7 @@ var _ = Describe("InspectionStore", func() {
 
 			// Mark vm-1 as completed
 			err = st.Inspection().Update(ctx,
-				filters.NewInspectionUpdateFilter().ByVmIDs("vm-1"),
+				store.NewInspectionUpdateFilter().ByVmIDs("vm-1"),
 				models.InspectionStatus{State: models.InspectionStateCompleted})
 			Expect(err).NotTo(HaveOccurred())
 
@@ -738,7 +737,7 @@ var _ = Describe("InspectionStore", func() {
 
 		It("should update status for specific VM", func() {
 			err := st.Inspection().Update(ctx,
-				filters.NewInspectionUpdateFilter().ByVmIDs("vm-1"),
+				store.NewInspectionUpdateFilter().ByVmIDs("vm-1"),
 				models.InspectionStatus{State: models.InspectionStateRunning})
 			Expect(err).NotTo(HaveOccurred())
 
@@ -750,7 +749,7 @@ var _ = Describe("InspectionStore", func() {
 		It("should update status with error", func() {
 			testErr := errors.New("inspection failed")
 			err := st.Inspection().Update(ctx,
-				filters.NewInspectionUpdateFilter().ByVmIDs("vm-1"),
+				store.NewInspectionUpdateFilter().ByVmIDs("vm-1"),
 				models.InspectionStatus{State: models.InspectionStateError, Error: testErr})
 			Expect(err).NotTo(HaveOccurred())
 
@@ -763,7 +762,7 @@ var _ = Describe("InspectionStore", func() {
 
 		It("should update multiple VMs by status", func() {
 			err := st.Inspection().Update(ctx,
-				filters.NewInspectionUpdateFilter().ByStatus(models.InspectionStatePending),
+				store.NewInspectionUpdateFilter().ByStatus(models.InspectionStatePending),
 				models.InspectionStatus{State: models.InspectionStateCanceled})
 			Expect(err).NotTo(HaveOccurred())
 
@@ -806,7 +805,7 @@ var _ = Describe("InspectionStore", func() {
 
 			// Mark as completed and get next
 			err = st.Inspection().Update(ctx,
-				filters.NewInspectionUpdateFilter().ByVmIDs("vm-c"),
+				store.NewInspectionUpdateFilter().ByVmIDs("vm-c"),
 				models.InspectionStatus{State: models.InspectionStateCompleted})
 			Expect(err).NotTo(HaveOccurred())
 
@@ -816,7 +815,7 @@ var _ = Describe("InspectionStore", func() {
 
 			// Mark as completed and get next
 			err = st.Inspection().Update(ctx,
-				filters.NewInspectionUpdateFilter().ByVmIDs("vm-a"),
+				store.NewInspectionUpdateFilter().ByVmIDs("vm-a"),
 				models.InspectionStatus{State: models.InspectionStateCompleted})
 			Expect(err).NotTo(HaveOccurred())
 
