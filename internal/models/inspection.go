@@ -38,3 +38,16 @@ type InspectionStatus struct {
 	State InspectionState
 	Error error
 }
+
+// VMWorkflow represents a collection of steps needed by one vm during the workflow.
+type VMWorkflow struct {
+	Validate       InspectorWorkUnit
+	CreateSnapshot InspectorWorkUnit
+	Inspect        InspectorWorkUnit
+	Save           InspectorWorkUnit
+	RemoveSnapshot InspectorWorkUnit
+}
+
+type InspectionWorkBuilder interface {
+	Build(string) VMWorkflow
+}

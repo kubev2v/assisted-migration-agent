@@ -13,6 +13,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/kubev2v/assisted-migration-agent/pkg/vmware"
+
 	"github.com/ecordell/optgen/helpers"
 	"github.com/fatih/color"
 	"github.com/gin-gonic/gin"
@@ -111,7 +113,7 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 			collectorSrv := services.NewCollectorService(sched, s, workBuilder)
 
 			// create inspector service
-			inspectorSrv := services.NewInspectorService(sched, s).WithBuilder(models.UnimplementedInspectorWorkBuilder{})
+			inspectorSrv := services.NewInspectorService(sched, s).WithBuilder(vmware.UnimplementedInspectionWorkBuilder{})
 
 			consoleSrv, err := services.NewConsoleService(cfg.Agent, sched, consoleClient, collectorSrv, s)
 			if err != nil {

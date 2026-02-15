@@ -25,7 +25,7 @@ import (
 type InspectorService struct {
 	scheduler *scheduler.Scheduler
 	store     *store.Store
-	builder   models.InspectorWorkBuilder
+	builder   models.InspectionWorkBuilder
 
 	status models.InspectorStatus
 
@@ -188,7 +188,7 @@ func (c *InspectorService) IsBusy() bool {
 	}
 }
 
-func (c *InspectorService) WithBuilder(builder models.InspectorWorkBuilder) *InspectorService {
+func (c *InspectorService) WithBuilder(builder models.InspectionWorkBuilder) *InspectorService {
 	c.builder = builder
 	return c
 }
@@ -234,12 +234,15 @@ func (c *InspectorService) run(ctx context.Context, done chan any) {
 			switch {
 			case errors.As(err, &e):
 				if setError := c.setVmErrorStatus(ctx, id, err); setError != nil {
-					c.setErrorStatus(err)
+					c.setErrorStatus(setError)
 					return
 				}
 				continue // VM failed, move to next VM
 			case errors.Is(err, context.Canceled):
 				c.setState(models.InspectorStateCanceled)
+				if err := c.setVmState(ctx, id, models.InspectionStateCanceled); err != nil {
+					c.setErrorStatus(err)
+				}
 				return
 			default:
 				c.setErrorStatus(err)
@@ -260,7 +263,20 @@ func (c *InspectorService) run(ctx context.Context, done chan any) {
 	zap.S().Info("inspector finished work")
 }
 
-func (c *InspectorService) runVMWork(ctx context.Context, id string, units []models.InspectorWorkUnit) error {
+func (c *InspectorService) runVMWork(ctx context.Context, id string, workflow models.VMWorkflow) error {
+	units := []models.InspectorWorkUnit{
+		workflow.Validate,
+		workflow.CreateSnapshot,
+		workflow.Inspect,
+		workflow.Save,
+	}
+
+	// In any case we would to try removing the snapshot
+	defer c.scheduler.AddWork(func(ctx context.Context) (any, error) {
+		return workflow.RemoveSnapshot.Work()(context.Background())
+	})
+
+	// Todo: add a channel that can stop the running vm
 	for _, unit := range units {
 
 		future := c.scheduler.AddWork(func(ctx context.Context) (any, error) {
@@ -268,7 +284,6 @@ func (c *InspectorService) runVMWork(ctx context.Context, id string, units []mod
 		})
 
 		select {
-		// Todo: handle the context done case. we may want to run some cleanup tasks
 		case <-ctx.Done():
 			future.Stop()
 			return context.Canceled
