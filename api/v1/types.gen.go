@@ -80,13 +80,7 @@ type AgentStatusConsoleConnection string
 type AgentStatusMode string
 
 // CollectorStartRequest defines model for CollectorStartRequest.
-type CollectorStartRequest struct {
-	Password string `json:"password"`
-
-	// Url vCenter URL
-	Url      string `json:"url"`
-	Username string `json:"username"`
-}
+type CollectorStartRequest = VcenterCredentials
 
 // CollectorStatus defines model for CollectorStatus.
 type CollectorStatus struct {
