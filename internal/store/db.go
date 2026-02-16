@@ -16,6 +16,10 @@ func NewDB(path string) (*sql.DB, error) {
 		return nil, err
 	}
 
+	// DuckDB is single-writer; a single connection prevents idle pool
+	// connections from blocking WAL checkpointing.
+	conn.SetMaxOpenConns(1)
+
 	// Verify connection works
 	if err := conn.Ping(); err != nil {
 		_ = conn.Close()

@@ -27,7 +27,7 @@ func (s *VMStore) List(ctx context.Context, opts ...ListOption) ([]models.VMSumm
 		`v."VM ID" AS id`,
 		`v."VM" AS name`,
 		`v."Powerstate" AS power_state`,
-		`v."Cluster" AS cluster`,
+		`COALESCE(v."Cluster", '') AS cluster`,
 		`v."Memory" AS memory`,
 		`COALESCE(d.total_disk, 0) AS disk_size`,
 		`COALESCE(c.issue_count, 0) AS issue_count`,

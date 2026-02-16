@@ -36,5 +36,12 @@ func (q *queryInterceptor) ExecContext(ctx context.Context, query string, args .
 	defer q.mu.Unlock()
 
 	q.logger.Debugw("exec", "query", query, "args", args)
-	return q.db.ExecContext(ctx, query, args...)
+	result, err := q.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return result, err
+	}
+	if _, cpErr := q.db.ExecContext(ctx, "FORCE CHECKPOINT"); cpErr != nil {
+		q.logger.Warnw("checkpoint failed", "error", cpErr)
+	}
+	return result, nil
 }

@@ -122,6 +122,10 @@ func (b *WorkBuilder) parsing() models.WorkUnit {
 					return nil, err
 				}
 
+				if err := b.store.Checkpoint(); err != nil {
+					zap.S().Named("collector_service").Warnw("checkpoint after ingest failed", "error", err)
+				}
+
 				if result.HasErrors() {
 					zap.S().Named("collector_service").Errorw("schema validation errors", "errors", result.Errors)
 					return nil, fmt.Errorf("schema validation failed: %v", result.Errors)

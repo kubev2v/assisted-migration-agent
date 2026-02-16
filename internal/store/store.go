@@ -63,6 +63,12 @@ func (s *Store) Inspection() *InspectionStore {
 	return s.inspection
 }
 
+// Checkpoint forces a WAL flush to the main database file.
+func (s *Store) Checkpoint() error {
+	_, err := s.db.Exec("FORCE CHECKPOINT")
+	return err
+}
+
 func (s *Store) Close() error {
 	return s.db.Close()
 }
