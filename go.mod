@@ -17,7 +17,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jzelinskie/cobrautil/v2 v2.0.0-20240819150235-f7fe73942d0f
 	github.com/kubev2v/forklift v0.0.0-20260205232711-33db63493541
-	github.com/kubev2v/migration-planner v0.4.1-0.20260216162507-c1b327d7f7da
+	github.com/kubev2v/migration-planner v0.4.1-0.20260217144448-c2e36309d157
 	github.com/oapi-codegen/runtime v1.1.2
 	github.com/onsi/ginkgo/v2 v2.27.2
 	github.com/onsi/gomega v1.38.2
