@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net/url"
-	"os"
 	"time"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
@@ -124,9 +123,6 @@ func (c *VSphereCollector) Close() {
 	if c.db != nil {
 		_ = c.db.Close(false)
 	}
-	// clean up wal files
-	_ = os.Remove(fmt.Sprintf("%s-wal", c.dbPath))
-	_ = os.Remove(fmt.Sprintf("%s-shm", c.dbPath))
 }
 
 // createProvider creates a forklift Provider object from credentials.
