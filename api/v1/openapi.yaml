@@ -536,6 +536,12 @@ components:
         issueCount:
           type: integer
           description: Number of issues found for this VM
+        migratable:
+          type: boolean
+          description: True if the vm is migratable for MTV. False otherwise 
+        template:
+          type: boolean
+          description: True if the vm is a template. False otherwise
         inspection:
           $ref: '#/components/schemas/VmInspectionStatus'
 
@@ -616,9 +622,12 @@ components:
           type: integer
           format: int64
           description: Total storage space consumed by the VM in bytes
-        isTemplate:
+        template:
           type: boolean
           description: Whether the VM is a template rather than a regular VM
+        migratable:
+          type: boolean
+          description: Whether the VM can be migrated (true if no critical issues)
         faultToleranceEnabled:
           type: boolean
           description: Whether VMware Fault Tolerance is enabled, which maintains a live shadow VM for instant failover

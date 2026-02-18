@@ -46,6 +46,7 @@ type Concern struct {
 	VMID      string
 	ConcernID string
 	Label     string
+	Category  string
 }
 
 var VMs = []VM{
@@ -84,12 +85,12 @@ var NICs = []NIC{
 }
 
 var Concerns = []Concern{
-	{"vm-003", "concern-001", "High memory usage"},
-	{"vm-003", "concern-002", "Outdated VMware Tools"},
-	{"vm-004", "concern-003", "No backup configured"},
-	{"vm-007", "concern-004", "Suspended state"},
-	{"vm-007", "concern-005", "Network disconnected"},
-	{"vm-007", "concern-006", "Storage warning"},
+	{"vm-003", "concern-001", "High memory usage", "Warning"},
+	{"vm-003", "concern-002", "Outdated VMware Tools", "Warning"},
+	{"vm-004", "concern-003", "No backup configured", "Warning"},
+	{"vm-007", "concern-004", "Suspended state", "Warning"},
+	{"vm-007", "concern-005", "RDM disk detected", "Critical"},
+	{"vm-007", "concern-006", "Storage warning", "Warning"},
 }
 
 // InsertVMs inserts all test VM data into the database.
@@ -143,8 +144,8 @@ func InsertVMs(ctx context.Context, db *sql.DB) error {
 	for _, c := range Concerns {
 		_, err := db.ExecContext(ctx, `
 			INSERT INTO concerns ("VM_ID", "Concern_ID", "Label", "Category", "Assessment")
-			VALUES (?, ?, ?, 'Warning', 'Needs attention')
-		`, c.VMID, c.ConcernID, c.Label)
+			VALUES (?, ?, ?, ?, 'Needs attention')
+		`, c.VMID, c.ConcernID, c.Label, c.Category)
 		if err != nil {
 			return err
 		}

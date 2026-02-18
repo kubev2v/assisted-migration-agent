@@ -2,14 +2,16 @@ package models
 
 // VMSummary represents a lightweight VM record for list views.
 type VMSummary struct {
-	ID         string
-	Name       string
-	PowerState string
-	Cluster    string
-	Memory     int32 // MB
-	DiskSize   int64 // MB (stored as MiB in DB, treated as MB)
-	IssueCount int
-	Status     InspectionStatus
+	ID           string
+	Name         string
+	PowerState   string
+	Cluster      string
+	Memory       int32 // MB
+	DiskSize     int64 // MB (stored as MiB in DB, treated as MB)
+	IssueCount   int
+	IsMigratable bool
+	IsTemplate   bool
+	Status       InspectionStatus
 }
 
 type VM struct {
@@ -38,6 +40,7 @@ type VM struct {
 	StorageUsed int64
 
 	IsTemplate            bool
+	IsMigratable          bool
 	FaultToleranceEnabled bool
 	NestedHVEnabled       bool
 

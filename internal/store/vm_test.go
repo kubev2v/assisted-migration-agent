@@ -41,9 +41,18 @@ var _ = Describe("VMStore", func() {
 	// Helper to insert test data into vinfo table
 	insertVM := func(id, name, powerState, cluster string, memory int32) {
 		_, err := db.ExecContext(ctx, `
-			INSERT INTO vinfo ("VM ID", "VM", "Powerstate", "Cluster", "Memory")
-			VALUES (?, ?, ?, ?, ?)
+			INSERT INTO vinfo ("VM ID", "VM", "Powerstate", "Cluster", "Memory", "Template")
+			VALUES (?, ?, ?, ?, ?, false)
 		`, id, name, powerState, cluster, memory)
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	// Helper to insert VM with template flag
+	insertVMWithTemplate := func(id, name, powerState, cluster string, memory int32, isTemplate bool) {
+		_, err := db.ExecContext(ctx, `
+			INSERT INTO vinfo ("VM ID", "VM", "Powerstate", "Cluster", "Memory", "Template")
+			VALUES (?, ?, ?, ?, ?, ?)
+		`, id, name, powerState, cluster, memory, isTemplate)
 		Expect(err).NotTo(HaveOccurred())
 	}
 
@@ -57,11 +66,11 @@ var _ = Describe("VMStore", func() {
 	}
 
 	// Helper to insert concerns for a VM
-	insertConcern := func(vmID, concernID, label string) {
+	insertConcern := func(vmID, concernID, label, category string) {
 		_, err := db.ExecContext(ctx, `
 			INSERT INTO concerns ("VM_ID", "Concern_ID", "Label", "Category", "Assessment")
-			VALUES (?, ?, ?, 'Warning', 'Needs attention')
-		`, vmID, concernID, label)
+			VALUES (?, ?, ?, ?, 'Needs attention')
+		`, vmID, concernID, label, category)
 		Expect(err).NotTo(HaveOccurred())
 	}
 
@@ -82,9 +91,9 @@ var _ = Describe("VMStore", func() {
 			insertDisk("vm-5", 150)
 
 			// Insert some concerns
-			insertConcern("vm-3", "concern-1", "High CPU usage")
-			insertConcern("vm-3", "concern-2", "Outdated OS")
-			insertConcern("vm-5", "concern-3", "Network issue")
+			insertConcern("vm-3", "concern-1", "High CPU usage", "Warning")
+			insertConcern("vm-3", "concern-2", "Outdated OS", "Warning")
+			insertConcern("vm-5", "concern-3", "Network issue", "Warning")
 		})
 
 		// Given VMs in the database
@@ -361,6 +370,122 @@ var _ = Describe("VMStore", func() {
 				Expect(vms).To(HaveLen(1))
 			})
 		})
+
+		Context("IsMigratable", func() {
+			BeforeEach(func() {
+				// Add critical concern to vm-3, making it non-migratable
+				insertConcern("vm-3", "concern-critical", "RDM disk detected", "Critical")
+			})
+
+			// Given VMs with different concern categories
+			// When we list VMs
+			// Then VMs with critical concerns should have IsMigratable=false
+			It("should set IsMigratable=false for VMs with critical concerns", func() {
+				// Act
+				vms, err := s.VM().List(ctx, store.WithDefaultSort())
+
+				// Assert
+				Expect(err).NotTo(HaveOccurred())
+
+				// Find vm-3 which has a critical concern
+				var vm3Found bool
+				for _, vm := range vms {
+					if vm.ID == "vm-3" {
+						vm3Found = true
+						Expect(vm.IsMigratable).To(BeFalse(), "vm-3 should not be migratable due to critical concern")
+					}
+				}
+				Expect(vm3Found).To(BeTrue(), "vm-3 should be in the list")
+			})
+
+			// Given VMs with only warning concerns
+			// When we list VMs
+			// Then VMs with only warning concerns should have IsMigratable=true
+			It("should set IsMigratable=true for VMs with only warning concerns", func() {
+				// Act
+				vms, err := s.VM().List(ctx, store.WithDefaultSort())
+
+				// Assert
+				Expect(err).NotTo(HaveOccurred())
+
+				// Find vm-5 which has only warning concerns
+				var vm5Found bool
+				for _, vm := range vms {
+					if vm.ID == "vm-5" {
+						vm5Found = true
+						Expect(vm.IsMigratable).To(BeTrue(), "vm-5 should be migratable (only warning concerns)")
+					}
+				}
+				Expect(vm5Found).To(BeTrue(), "vm-5 should be in the list")
+			})
+
+			// Given VMs with no concerns
+			// When we list VMs
+			// Then VMs with no concerns should have IsMigratable=true
+			It("should set IsMigratable=true for VMs with no concerns", func() {
+				// Act
+				vms, err := s.VM().List(ctx, store.WithDefaultSort())
+
+				// Assert
+				Expect(err).NotTo(HaveOccurred())
+
+				// Find vm-1 which has no concerns
+				var vm1Found bool
+				for _, vm := range vms {
+					if vm.ID == "vm-1" {
+						vm1Found = true
+						Expect(vm.IsMigratable).To(BeTrue(), "vm-1 should be migratable (no concerns)")
+					}
+				}
+				Expect(vm1Found).To(BeTrue(), "vm-1 should be in the list")
+			})
+		})
+
+		Context("IsTemplate", func() {
+			BeforeEach(func() {
+				// Insert a template VM
+				insertVMWithTemplate("vm-template", "template-server", "poweredOff", "cluster-a", 2048, true)
+			})
+
+			// Given VMs including templates
+			// When we list VMs
+			// Then template VMs should have IsTemplate=true
+			It("should set IsTemplate=true for template VMs", func() {
+				// Act
+				vms, err := s.VM().List(ctx, store.WithDefaultSort())
+
+				// Assert
+				Expect(err).NotTo(HaveOccurred())
+
+				// Find the template VM
+				var templateFound bool
+				for _, vm := range vms {
+					if vm.ID == "vm-template" {
+						templateFound = true
+						Expect(vm.IsTemplate).To(BeTrue(), "vm-template should be marked as template")
+					}
+				}
+				Expect(templateFound).To(BeTrue(), "vm-template should be in the list")
+			})
+
+			// Given regular VMs
+			// When we list VMs
+			// Then regular VMs should have IsTemplate=false
+			It("should set IsTemplate=false for regular VMs", func() {
+				// Act
+				vms, err := s.VM().List(ctx, store.WithDefaultSort())
+
+				// Assert
+				Expect(err).NotTo(HaveOccurred())
+
+				// Check that regular VMs are not templates
+				for _, vm := range vms {
+					if vm.ID != "vm-template" {
+						Expect(vm.IsTemplate).To(BeFalse(), "%s should not be marked as template", vm.ID)
+					}
+				}
+			})
+		})
 	})
 
 	Context("Count", func() {
@@ -450,6 +575,54 @@ var _ = Describe("VMStore", func() {
 			Expect(vm.Issues).To(HaveLen(2))
 			Expect(vm.Issues).To(ContainElement("High memory usage"))
 			Expect(vm.Issues).To(ContainElement("Outdated VMware Tools"))
+		})
+
+		// Given a VM with only warning concerns
+		// When we get it by ID
+		// Then it should have IsMigratable=true
+		It("should set IsMigratable=true for VMs with only warning concerns", func() {
+			// Act - vm-003 has only warning concerns
+			vm, err := s.VM().Get(ctx, "vm-003")
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vm.IsMigratable).To(BeTrue(), "vm-003 should be migratable (only warning concerns)")
+		})
+
+		// Given a VM with critical concerns
+		// When we get it by ID
+		// Then it should have IsMigratable=false
+		It("should set IsMigratable=false for VMs with critical concerns", func() {
+			// Act - vm-007 has a critical concern (RDM disk detected)
+			vm, err := s.VM().Get(ctx, "vm-007")
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vm.IsMigratable).To(BeFalse(), "vm-007 should not be migratable (has critical concern)")
+		})
+
+		// Given a VM with no concerns
+		// When we get it by ID
+		// Then it should have IsMigratable=true
+		It("should set IsMigratable=true for VMs with no concerns", func() {
+			// Act - vm-001 has no concerns
+			vm, err := s.VM().Get(ctx, "vm-001")
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vm.IsMigratable).To(BeTrue(), "vm-001 should be migratable (no concerns)")
+		})
+
+		// Given a template VM
+		// When we get it by ID
+		// Then it should have IsTemplate=true
+		It("should return IsTemplate=true for template VMs", func() {
+			// Act - vm-010 is a template
+			vm, err := s.VM().Get(ctx, "vm-010")
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vm.IsTemplate).To(BeTrue(), "vm-010 should be marked as template")
 		})
 	})
 })

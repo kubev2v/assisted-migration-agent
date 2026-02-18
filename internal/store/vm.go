@@ -32,9 +32,12 @@ func (s *VMStore) List(ctx context.Context, opts ...ListOption) ([]models.VMSumm
 		`COALESCE(d.total_disk, 0) AS disk_size`,
 		`COALESCE(c.issue_count, 0) AS issue_count`,
 		`COALESCE(i.status, 'not_found') AS status`,
+		`v."Template" as template`,
+		`COALESCE(crit.critical_count, 0) = 0 AS migratable`,
 		`COALESCE(i.error, '') AS error`,
 	).From("vinfo v").
 		LeftJoin(`(SELECT "VM_ID", COUNT(*) AS issue_count FROM concerns GROUP BY "VM_ID") c ON v."VM ID" = c."VM_ID"`).
+		LeftJoin(`(SELECT "VM_ID", COUNT(*) AS critical_count FROM concerns WHERE "Category" = 'Critical' GROUP BY "VM_ID") crit ON v."VM ID" = crit."VM_ID"`).
 		LeftJoin(`(SELECT "VM ID", SUM("Capacity MiB") AS total_disk FROM vdisk GROUP BY "VM ID") d ON v."VM ID" = d."VM ID"`).
 		LeftJoin(`vm_inspection_status i ON v."VM ID" = i."VM ID"`)
 
@@ -66,6 +69,8 @@ func (s *VMStore) List(ctx context.Context, opts ...ListOption) ([]models.VMSumm
 			&vm.DiskSize,
 			&vm.IssueCount,
 			&vm.Status.State,
+			&vm.IsTemplate,
+			&vm.IsMigratable,
 			&sqlErr,
 		)
 		if err != nil {
@@ -118,8 +123,12 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 
 func vmFromParser(pvm parsermodels.VM) models.VM {
 	issues := make([]string, 0, len(pvm.Concerns))
+	criticalCount := 0
 	for _, c := range pvm.Concerns {
 		issues = append(issues, c.Label)
+		if c.Category == "Critical" {
+			criticalCount++
+		}
 	}
 
 	disks := make([]models.Disk, 0, len(pvm.Disks))
@@ -165,6 +174,7 @@ func vmFromParser(pvm parsermodels.VM) models.VM {
 		DiskSize:              totalDiskCapacityMiB,
 		StorageUsed:           int64(pvm.StorageUsed),
 		IsTemplate:            pvm.IsTemplate,
+		IsMigratable:          criticalCount == 0,
 		FaultToleranceEnabled: pvm.FaultToleranceEnabled,
 		Disks:                 disks,
 		NICs:                  nics,

@@ -28,6 +28,8 @@ func NewVMFromSummary(vm models.VMSummary) VM {
 		Memory:       int64(vm.Memory),
 		VCenterState: vm.PowerState,
 		IssueCount:   vm.IssueCount,
+		Migratable:   &vm.IsMigratable,
+		Template:     &vm.IsTemplate,
 		Inspection:   NewInspectionStatus(vm.Status),
 	}
 }
@@ -124,7 +126,8 @@ func NewVMDetailsFromModel(vm models.VM) VMDetails {
 		details.ToolsRunningStatus = &vm.ToolsRunningStatus
 	}
 
-	details.IsTemplate = &vm.IsTemplate
+	details.Template = &vm.IsTemplate
+	details.Migratable = &vm.IsMigratable
 	details.FaultToleranceEnabled = &vm.FaultToleranceEnabled
 	details.NestedHVEnabled = &vm.NestedHVEnabled
 

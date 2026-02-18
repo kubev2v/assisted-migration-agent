@@ -154,8 +154,14 @@ type VM struct {
 	// Memory Memory size in MB
 	Memory int64 `json:"memory"`
 
+	// Migratable True if the vm is migratable for MTV. False otherwise
+	Migratable *bool `json:"migratable,omitempty"`
+
 	// Name VM name
 	Name string `json:"name"`
+
+	// Template True if the vm is a template. False otherwise
+	Template *bool `json:"template,omitempty"`
 
 	// VCenterState vCenter state (e.g., poweredOn, poweredOff, suspended)
 	VCenterState string `json:"vCenterState"`
@@ -218,14 +224,14 @@ type VMDetails struct {
 	// IpAddress Primary IP address of the guest OS as reported by VMware Tools
 	IpAddress *string `json:"ipAddress,omitempty"`
 
-	// IsTemplate Whether the VM is a template rather than a regular VM
-	IsTemplate *bool `json:"isTemplate,omitempty"`
-
 	// Issues List of issue identifiers affecting this VM
 	Issues *[]string `json:"issues,omitempty"`
 
 	// MemoryMB Amount of memory allocated to the VM in megabytes
 	MemoryMB int32 `json:"memoryMB"`
+
+	// Migratable Whether the VM can be migrated (true if no critical issues)
+	Migratable *bool `json:"migratable,omitempty"`
 
 	// Name Display name of the VM
 	Name string `json:"name"`
@@ -241,6 +247,9 @@ type VMDetails struct {
 
 	// StorageUsed Total storage space consumed by the VM in bytes
 	StorageUsed *int64 `json:"storageUsed,omitempty"`
+
+	// Template Whether the VM is a template rather than a regular VM
+	Template *bool `json:"template,omitempty"`
 
 	// ToolsRunningStatus Whether VMware Tools is currently running in the guest OS
 	ToolsRunningStatus *string `json:"toolsRunningStatus,omitempty"`
