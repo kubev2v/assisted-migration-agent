@@ -74,27 +74,29 @@ var _ = Describe("AgentStatus.FromModel", func() {
 	})
 })
 
-var _ = Describe("NewVMFromSummary", func() {
-	// Given a VMSummary with all fields populated
+var _ = Describe("NewVirtualMachineFromSummary", func() {
+	// Given a VirtualMachineSummary with all fields populated
 	// When we convert it to API VM
 	// Then it should map all fields correctly
-	It("should convert VMSummary to VM", func() {
-		summary := models.VMSummary{
+	It("should convert VirtualMachineSummary to VirtualMachine", func() {
+		summary := models.VirtualMachineSummary{
 			ID:         "vm-123",
 			Name:       "Test VM",
 			PowerState: "poweredOn",
 			Cluster:    "cluster-1",
+			Datacenter: "DC1",
 			Memory:     4096,
 			DiskSize:   102400,
 			IssueCount: 3,
 		}
 
-		vm := v1.NewVMFromSummary(summary)
+		vm := v1.NewVirtualMachineFromSummary(summary)
 
 		Expect(vm.Id).To(Equal("vm-123"))
 		Expect(vm.Name).To(Equal("Test VM"))
 		Expect(vm.VCenterState).To(Equal("poweredOn"))
 		Expect(vm.Cluster).To(Equal("cluster-1"))
+		Expect(vm.Datacenter).To(Equal("DC1"))
 		Expect(vm.Memory).To(Equal(int64(4096)))
 		Expect(vm.DiskSize).To(Equal(int64(102400)))
 		Expect(vm.IssueCount).To(Equal(3))
@@ -106,13 +108,13 @@ var _ = Describe("NewVMFromSummary", func() {
 		// When we convert it to API VM
 		// Then Migratable should be true
 		It("should set Migratable=true when VM is migratable", func() {
-			summary := models.VMSummary{
+			summary := models.VirtualMachineSummary{
 				ID:           "vm-migratable",
 				Name:         "Migratable VM",
 				IsMigratable: true,
 			}
 
-			vm := v1.NewVMFromSummary(summary)
+			vm := v1.NewVirtualMachineFromSummary(summary)
 
 			Expect(vm.Migratable).NotTo(BeNil())
 			Expect(*vm.Migratable).To(BeTrue())
@@ -122,13 +124,13 @@ var _ = Describe("NewVMFromSummary", func() {
 		// When we convert it to API VM
 		// Then Migratable should be false
 		It("should set Migratable=false when VM is not migratable", func() {
-			summary := models.VMSummary{
+			summary := models.VirtualMachineSummary{
 				ID:           "vm-not-migratable",
 				Name:         "Non-Migratable VM",
 				IsMigratable: false,
 			}
 
-			vm := v1.NewVMFromSummary(summary)
+			vm := v1.NewVirtualMachineFromSummary(summary)
 
 			Expect(vm.Migratable).NotTo(BeNil())
 			Expect(*vm.Migratable).To(BeFalse())
@@ -140,13 +142,13 @@ var _ = Describe("NewVMFromSummary", func() {
 		// When we convert it to API VM
 		// Then Template should be true
 		It("should set Template=true when VM is a template", func() {
-			summary := models.VMSummary{
+			summary := models.VirtualMachineSummary{
 				ID:         "vm-template",
 				Name:       "Template VM",
 				IsTemplate: true,
 			}
 
-			vm := v1.NewVMFromSummary(summary)
+			vm := v1.NewVirtualMachineFromSummary(summary)
 
 			Expect(vm.Template).NotTo(BeNil())
 			Expect(*vm.Template).To(BeTrue())
@@ -156,13 +158,13 @@ var _ = Describe("NewVMFromSummary", func() {
 		// When we convert it to API VM
 		// Then Template should be false
 		It("should set Template=false when VM is not a template", func() {
-			summary := models.VMSummary{
+			summary := models.VirtualMachineSummary{
 				ID:         "vm-regular",
 				Name:       "Regular VM",
 				IsTemplate: false,
 			}
 
-			vm := v1.NewVMFromSummary(summary)
+			vm := v1.NewVirtualMachineFromSummary(summary)
 
 			Expect(vm.Template).NotTo(BeNil())
 			Expect(*vm.Template).To(BeFalse())
@@ -262,7 +264,7 @@ var _ = Describe("NewCollectorStatusWithError", func() {
 	})
 })
 
-var _ = Describe("NewVMDetailsFromModel", func() {
+var _ = Describe("NewVirtualMachineDetailFromModel", func() {
 	Context("required fields", func() {
 		// Given a VM with required fields
 		// When we convert it to VMDetails
@@ -278,7 +280,7 @@ var _ = Describe("NewVMDetailsFromModel", func() {
 				MemoryMB:        16384,
 			}
 
-			details := v1.NewVMDetailsFromModel(vm)
+			details := v1.NewVirtualMachineDetailFromModel(vm)
 
 			Expect(details.Id).To(Equal("vm-456"))
 			Expect(details.Name).To(Equal("Production VM"))
@@ -314,7 +316,7 @@ var _ = Describe("NewVMDetailsFromModel", func() {
 				ToolsRunningStatus: "guestToolsRunning",
 			}
 
-			details := v1.NewVMDetailsFromModel(vm)
+			details := v1.NewVirtualMachineDetailFromModel(vm)
 
 			Expect(details.Uuid).NotTo(BeNil())
 			Expect(*details.Uuid).To(Equal("550e8400-e29b-41d4-a716-446655440000"))
@@ -342,7 +344,7 @@ var _ = Describe("NewVMDetailsFromModel", func() {
 				ConnectionState: "connected",
 			}
 
-			details := v1.NewVMDetailsFromModel(vm)
+			details := v1.NewVirtualMachineDetailFromModel(vm)
 
 			Expect(details.Uuid).To(BeNil())
 			Expect(details.Firmware).To(BeNil())
@@ -372,7 +374,7 @@ var _ = Describe("NewVMDetailsFromModel", func() {
 				StorageUsed:     1073741824,
 			}
 
-			details := v1.NewVMDetailsFromModel(vm)
+			details := v1.NewVirtualMachineDetailFromModel(vm)
 
 			Expect(details.StorageUsed).NotTo(BeNil())
 			Expect(*details.StorageUsed).To(Equal(int64(1073741824)))
@@ -390,7 +392,7 @@ var _ = Describe("NewVMDetailsFromModel", func() {
 				StorageUsed:     0,
 			}
 
-			details := v1.NewVMDetailsFromModel(vm)
+			details := v1.NewVirtualMachineDetailFromModel(vm)
 
 			Expect(details.StorageUsed).To(BeNil())
 		})
@@ -412,7 +414,7 @@ var _ = Describe("NewVMDetailsFromModel", func() {
 				NestedHVEnabled:       false,
 			}
 
-			details := v1.NewVMDetailsFromModel(vm)
+			details := v1.NewVirtualMachineDetailFromModel(vm)
 
 			Expect(details.Template).NotTo(BeNil())
 			Expect(*details.Template).To(BeTrue())
@@ -436,7 +438,7 @@ var _ = Describe("NewVMDetailsFromModel", func() {
 				IsMigratable:    false,
 			}
 
-			details := v1.NewVMDetailsFromModel(vm)
+			details := v1.NewVirtualMachineDetailFromModel(vm)
 
 			Expect(details.Migratable).NotTo(BeNil())
 			Expect(*details.Migratable).To(BeFalse())
@@ -454,7 +456,7 @@ var _ = Describe("NewVMDetailsFromModel", func() {
 				IsTemplate:      false,
 			}
 
-			details := v1.NewVMDetailsFromModel(vm)
+			details := v1.NewVirtualMachineDetailFromModel(vm)
 
 			Expect(details.Template).NotTo(BeNil())
 			Expect(*details.Template).To(BeFalse())
@@ -493,7 +495,7 @@ var _ = Describe("NewVMDetailsFromModel", func() {
 				},
 			}
 
-			details := v1.NewVMDetailsFromModel(vm)
+			details := v1.NewVirtualMachineDetailFromModel(vm)
 
 			Expect(details.Disks).To(HaveLen(2))
 
@@ -526,7 +528,7 @@ var _ = Describe("NewVMDetailsFromModel", func() {
 				},
 			}
 
-			details := v1.NewVMDetailsFromModel(vm)
+			details := v1.NewVirtualMachineDetailFromModel(vm)
 
 			Expect(details.Disks).To(HaveLen(1))
 			Expect(details.Disks[0].Key).To(BeNil())
@@ -549,7 +551,7 @@ var _ = Describe("NewVMDetailsFromModel", func() {
 				},
 			}
 
-			details := v1.NewVMDetailsFromModel(vm)
+			details := v1.NewVirtualMachineDetailFromModel(vm)
 
 			Expect(details.Nics).To(HaveLen(2))
 
@@ -578,7 +580,7 @@ var _ = Describe("NewVMDetailsFromModel", func() {
 				Issues:          []string{"ISSUE_001", "ISSUE_002", "ISSUE_003"},
 			}
 
-			details := v1.NewVMDetailsFromModel(vm)
+			details := v1.NewVirtualMachineDetailFromModel(vm)
 
 			Expect(details.Issues).NotTo(BeNil())
 			Expect(*details.Issues).To(HaveLen(3))
@@ -597,7 +599,7 @@ var _ = Describe("NewVMDetailsFromModel", func() {
 				Issues:          []string{},
 			}
 
-			details := v1.NewVMDetailsFromModel(vm)
+			details := v1.NewVirtualMachineDetailFromModel(vm)
 
 			Expect(details.Issues).To(BeNil())
 		})

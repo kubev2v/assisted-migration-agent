@@ -120,7 +120,7 @@ type GuestNetwork struct {
 type InspectorStartRequest struct {
 	VcenterCredentials VcenterCredentials `json:"VcenterCredentials"`
 
-	// VmIds Array of VM id
+	// VmIds Array of VirtualMachine id
 	VmIds VMIdArray `json:"vmIds"`
 }
 
@@ -135,131 +135,6 @@ type InspectorStatus struct {
 
 // InspectorStatusState Inspector state
 type InspectorStatusState string
-
-// VM defines model for VM.
-type VM struct {
-	// Cluster Cluster name
-	Cluster string `json:"cluster"`
-
-	// DiskSize Total disk size in MB
-	DiskSize int64 `json:"diskSize"`
-
-	// Id VM ID
-	Id         string             `json:"id"`
-	Inspection VmInspectionStatus `json:"inspection"`
-
-	// IssueCount Number of issues found for this VM
-	IssueCount int `json:"issueCount"`
-
-	// Memory Memory size in MB
-	Memory int64 `json:"memory"`
-
-	// Migratable True if the vm is migratable for MTV. False otherwise
-	Migratable *bool `json:"migratable,omitempty"`
-
-	// Name VM name
-	Name string `json:"name"`
-
-	// Template True if the vm is a template. False otherwise
-	Template *bool `json:"template,omitempty"`
-
-	// VCenterState vCenter state (e.g., poweredOn, poweredOff, suspended)
-	VCenterState string `json:"vCenterState"`
-}
-
-// VMDetails defines model for VMDetails.
-type VMDetails struct {
-	// Cluster Name of the cluster containing the VM
-	Cluster *string `json:"cluster,omitempty"`
-
-	// ConnectionState State of the connection between vCenter and the VM's host (connected, disconnected, orphaned, or inaccessible)
-	ConnectionState string `json:"connectionState"`
-
-	// CoresPerSocket Number of CPU cores per virtual socket
-	CoresPerSocket int32 `json:"coresPerSocket"`
-
-	// CpuAffinity List of physical CPU IDs the VM is pinned to for scheduling
-	CpuAffinity *[]int32 `json:"cpuAffinity,omitempty"`
-
-	// CpuCount Total number of virtual CPUs allocated to the VM
-	CpuCount int32 `json:"cpuCount"`
-
-	// Datacenter Name of the datacenter containing the VM
-	Datacenter *string `json:"datacenter,omitempty"`
-
-	// Devices List of other virtual devices attached to the VM
-	Devices *[]VMDevice `json:"devices,omitempty"`
-
-	// Disks List of virtual disks attached to the VM
-	Disks []VMDisk `json:"disks"`
-
-	// FaultToleranceEnabled Whether VMware Fault Tolerance is enabled, which maintains a live shadow VM for instant failover
-	FaultToleranceEnabled *bool `json:"faultToleranceEnabled,omitempty"`
-
-	// Firmware Firmware type used by the VM (bios or efi)
-	Firmware *string `json:"firmware,omitempty"`
-
-	// Folder Reference to the inventory folder containing the VM
-	Folder *string `json:"folder,omitempty"`
-
-	// GuestId VMware identifier for the guest OS type (e.g., rhel8_64Guest)
-	GuestId *string `json:"guestId,omitempty"`
-
-	// GuestName Full name of the guest operating system as reported by VMware Tools
-	GuestName *string `json:"guestName,omitempty"`
-
-	// GuestNetworks Network configuration inside the guest OS as reported by VMware Tools
-	GuestNetworks *[]GuestNetwork `json:"guestNetworks,omitempty"`
-
-	// Host Reference to the ESXi host where the VM is running
-	Host *string `json:"host,omitempty"`
-
-	// HostName Hostname of the guest OS as reported by VMware Tools
-	HostName *string `json:"hostName,omitempty"`
-
-	// Id Unique identifier for the VM in vCenter
-	Id         string              `json:"id"`
-	Inspection *VmInspectionStatus `json:"inspection,omitempty"`
-
-	// IpAddress Primary IP address of the guest OS as reported by VMware Tools
-	IpAddress *string `json:"ipAddress,omitempty"`
-
-	// Issues List of issue identifiers affecting this VM
-	Issues *[]string `json:"issues,omitempty"`
-
-	// MemoryMB Amount of memory allocated to the VM in megabytes
-	MemoryMB int32 `json:"memoryMB"`
-
-	// Migratable Whether the VM can be migrated (true if no critical issues)
-	Migratable *bool `json:"migratable,omitempty"`
-
-	// Name Display name of the VM
-	Name string `json:"name"`
-
-	// NestedHVEnabled Whether nested virtualization is enabled, allowing hypervisors to run inside the VM
-	NestedHVEnabled *bool `json:"nestedHVEnabled,omitempty"`
-
-	// Nics List of virtual network interface cards attached to the VM
-	Nics []VMNIC `json:"nics"`
-
-	// PowerState Current power state of the VM (poweredOn, poweredOff, or suspended)
-	PowerState string `json:"powerState"`
-
-	// StorageUsed Total storage space consumed by the VM in bytes
-	StorageUsed *int64 `json:"storageUsed,omitempty"`
-
-	// Template Whether the VM is a template rather than a regular VM
-	Template *bool `json:"template,omitempty"`
-
-	// ToolsRunningStatus Whether VMware Tools is currently running in the guest OS
-	ToolsRunningStatus *string `json:"toolsRunningStatus,omitempty"`
-
-	// ToolsStatus Installation status of VMware Tools (toolsNotInstalled, toolsNotRunning, toolsOld, toolsOk)
-	ToolsStatus *string `json:"toolsStatus,omitempty"`
-
-	// Uuid Universally unique identifier assigned by vCenter
-	Uuid *string `json:"uuid,omitempty"`
-}
 
 // VMDevice defines model for VMDevice.
 type VMDevice struct {
@@ -278,7 +153,7 @@ type VMDisk struct {
 	// File Path to the VMDK file in the datastore
 	File *string `json:"file,omitempty"`
 
-	// Key Unique key identifying this disk within the VM
+	// Key Unique key identifying this disk within the VirtualMachine
 	Key *int32 `json:"key,omitempty"`
 
 	// Mode Disk mode (e.g., persistent, independent_persistent, independent_nonpersistent)
@@ -291,25 +166,12 @@ type VMDisk struct {
 	Shared *bool `json:"shared,omitempty"`
 }
 
-// VMIdArray Array of VM id
+// VMIdArray Array of VirtualMachine id
 type VMIdArray = []string
-
-// VMListResponse defines model for VMListResponse.
-type VMListResponse struct {
-	// Page Current page number
-	Page int `json:"page"`
-
-	// PageCount Total number of pages
-	PageCount int `json:"pageCount"`
-
-	// Total Total number of VMs matching the filter
-	Total int  `json:"total"`
-	Vms   []VM `json:"vms"`
-}
 
 // VMNIC defines model for VMNIC.
 type VMNIC struct {
-	// Index Index of the NIC within the VM
+	// Index Index of the NIC within the VirtualMachine
 	Index *int `json:"index,omitempty"`
 
 	// Mac MAC address of the virtual NIC
@@ -335,6 +197,147 @@ type VersionInfo struct {
 
 	// Version Agent version (e.g. v2.0.0)
 	Version string `json:"version"`
+}
+
+// VirtualMachine defines model for VirtualMachine.
+type VirtualMachine struct {
+	// Cluster Cluster name
+	Cluster string `json:"cluster"`
+
+	// Datacenter Datacenter name
+	Datacenter string `json:"datacenter"`
+
+	// DiskSize Total disk size in MB
+	DiskSize int64 `json:"diskSize"`
+
+	// Id VirtualMachine ID in vCenter
+	Id         string             `json:"id"`
+	Inspection VmInspectionStatus `json:"inspection"`
+
+	// IssueCount Number of issues found for this VirtualMachine
+	IssueCount int `json:"issueCount"`
+
+	// Memory Memory size in MB
+	Memory int64 `json:"memory"`
+
+	// Migratable True if the vm is migratable for MTV. False otherwise
+	Migratable *bool `json:"migratable,omitempty"`
+
+	// Name VirtualMachine name
+	Name string `json:"name"`
+
+	// Template True if the vm is a template. False otherwise
+	Template *bool `json:"template,omitempty"`
+
+	// VCenterState vCenter state (e.g., poweredOn, poweredOff, suspended)
+	VCenterState string `json:"vCenterState"`
+}
+
+// VirtualMachineDetail defines model for VirtualMachineDetail.
+type VirtualMachineDetail struct {
+	// Cluster Name of the cluster containing the VirtualMachine
+	Cluster *string `json:"cluster,omitempty"`
+
+	// ConnectionState State of the connection between vCenter and the VirtualMachine's host (connected, disconnected, orphaned, or inaccessible)
+	ConnectionState string `json:"connectionState"`
+
+	// CoresPerSocket Number of CPU cores per virtual socket
+	CoresPerSocket int32 `json:"coresPerSocket"`
+
+	// CpuAffinity List of physical CPU IDs the VirtualMachine is pinned to for scheduling
+	CpuAffinity *[]int32 `json:"cpuAffinity,omitempty"`
+
+	// CpuCount Total number of virtual CPUs allocated to the VirtualMachine
+	CpuCount int32 `json:"cpuCount"`
+
+	// Datacenter Name of the datacenter containing the VirtualMachine
+	Datacenter *string `json:"datacenter,omitempty"`
+
+	// Devices List of other virtual devices attached to the VirtualMachine
+	Devices *[]VMDevice `json:"devices,omitempty"`
+
+	// Disks List of virtual disks attached to the VirtualMachine
+	Disks []VMDisk `json:"disks"`
+
+	// FaultToleranceEnabled Whether VMware Fault Tolerance is enabled, which maintains a live shadow VirtualMachine for instant failover
+	FaultToleranceEnabled *bool `json:"faultToleranceEnabled,omitempty"`
+
+	// Firmware Firmware type used by the VirtualMachine (bios or efi)
+	Firmware *string `json:"firmware,omitempty"`
+
+	// Folder Reference to the inventory folder containing the VirtualMachine
+	Folder *string `json:"folder,omitempty"`
+
+	// GuestId VMware identifier for the guest OS type (e.g., rhel8_64Guest)
+	GuestId *string `json:"guestId,omitempty"`
+
+	// GuestName Full name of the guest operating system as reported by VMware Tools
+	GuestName *string `json:"guestName,omitempty"`
+
+	// GuestNetworks Network configuration inside the guest OS as reported by VMware Tools
+	GuestNetworks *[]GuestNetwork `json:"guestNetworks,omitempty"`
+
+	// Host Reference to the ESXi host where the VirtualMachine is running
+	Host *string `json:"host,omitempty"`
+
+	// HostName Hostname of the guest OS as reported by VMware Tools
+	HostName *string `json:"hostName,omitempty"`
+
+	// Id Unique identifier for the VirtualMachine in vCenter
+	Id         string              `json:"id"`
+	Inspection *VmInspectionStatus `json:"inspection,omitempty"`
+
+	// IpAddress Primary IP address of the guest OS as reported by VMware Tools
+	IpAddress *string `json:"ipAddress,omitempty"`
+
+	// Issues List of issue identifiers affecting this VirtualMachine
+	Issues *[]string `json:"issues,omitempty"`
+
+	// MemoryMB Amount of memory allocated to the VirtualMachine in megabytes
+	MemoryMB int32 `json:"memoryMB"`
+
+	// Migratable Whether the VirtualMachine can be migrated (true if no critical issues)
+	Migratable *bool `json:"migratable,omitempty"`
+
+	// Name Display name of the VirtualMachine
+	Name string `json:"name"`
+
+	// NestedHVEnabled Whether nested virtualization is enabled, allowing hypervisors to run inside the VirtualMachine
+	NestedHVEnabled *bool `json:"nestedHVEnabled,omitempty"`
+
+	// Nics List of virtual network interface cards attached to the VirtualMachine
+	Nics []VMNIC `json:"nics"`
+
+	// PowerState Current power state of the VirtualMachine (poweredOn, poweredOff, or suspended)
+	PowerState string `json:"powerState"`
+
+	// StorageUsed Total storage space consumed by the VirtualMachine in bytes
+	StorageUsed *int64 `json:"storageUsed,omitempty"`
+
+	// Template Whether the VirtualMachine is a template rather than a regular VirtualMachine
+	Template *bool `json:"template,omitempty"`
+
+	// ToolsRunningStatus Whether VMware Tools is currently running in the guest OS
+	ToolsRunningStatus *string `json:"toolsRunningStatus,omitempty"`
+
+	// ToolsStatus Installation status of VMware Tools (toolsNotInstalled, toolsNotRunning, toolsOld, toolsOk)
+	ToolsStatus *string `json:"toolsStatus,omitempty"`
+
+	// Uuid Universally unique identifier assigned by vCenter
+	Uuid *string `json:"uuid,omitempty"`
+}
+
+// VirtualMachineListResponse defines model for VirtualMachineListResponse.
+type VirtualMachineListResponse struct {
+	// Page Current page number
+	Page int `json:"page"`
+
+	// PageCount Total number of pages
+	PageCount int `json:"pageCount"`
+
+	// Total Total number of VMs matching the filter
+	Total int              `json:"total"`
+	Vms   []VirtualMachine `json:"vms"`
 }
 
 // VmInspectionStatus defines model for VmInspectionStatus.

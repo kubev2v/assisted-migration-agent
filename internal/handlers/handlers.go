@@ -28,7 +28,7 @@ type ConsoleService interface {
 
 // VMService defines the interface for VM operations.
 type VMService interface {
-	List(ctx context.Context, params services.VMListParams) ([]models.VMSummary, int, error)
+	List(ctx context.Context, params services.VMListParams) ([]models.VirtualMachineSummary, int, error)
 	Get(ctx context.Context, id string) (*models.VM, error)
 }
 

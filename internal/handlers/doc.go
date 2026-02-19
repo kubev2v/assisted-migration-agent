@@ -257,8 +257,8 @@
 // functions defined in api/v1/extension.go:
 //
 //   - v1.NewCollectorStatus(models.CollectorStatus) → v1.CollectorStatus
-//   - v1.NewVMFromSummary(models.VMSummary) → v1.VM
-//   - v1.NewVMDetailsFromModel(models.VM) → v1.VMDetails
+//   - v1.NewVirtualMachineFromSummary(models.VirtualMachineSummary) → v1.VirtualMachine
+//   - v1.NewVirtualMachineDetailFromModel(models.VM) → v1.VirtualMachineDetail
 //   - v1.AgentStatus.FromModel(models.AgentStatus)
 //
 // # Framework

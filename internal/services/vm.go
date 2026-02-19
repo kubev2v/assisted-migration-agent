@@ -37,7 +37,7 @@ func (s *VMService) Get(ctx context.Context, id string) (*models.VM, error) {
 	return s.store.VM().Get(ctx, id)
 }
 
-func (s *VMService) List(ctx context.Context, params VMListParams) ([]models.VMSummary, int, error) {
+func (s *VMService) List(ctx context.Context, params VMListParams) ([]models.VirtualMachineSummary, int, error) {
 	opts := s.buildListOptions(params)
 
 	if len(params.Sort) == 0 {

@@ -66,7 +66,7 @@ var _ = Describe("VMs Handlers", func() {
 		// Then it should return an empty list with proper pagination
 		It("should return empty list when no VMs", func() {
 			// Arrange
-			mockVM.ListResult = []models.VMSummary{}
+			mockVM.ListResult = []models.VirtualMachineSummary{}
 			mockVM.ListTotal = 0
 
 			req := httptest.NewRequest(http.MethodGet, "/vms", nil)
@@ -78,7 +78,7 @@ var _ = Describe("VMs Handlers", func() {
 			// Assert
 			Expect(w.Code).To(Equal(http.StatusOK))
 
-			var response v1.VMListResponse
+			var response v1.VirtualMachineListResponse
 			err := json.Unmarshal(w.Body.Bytes(), &response)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(response.Vms).To(HaveLen(0))
@@ -92,7 +92,7 @@ var _ = Describe("VMs Handlers", func() {
 		// Then it should return all VMs with their details
 		It("should return list of VMs", func() {
 			// Arrange
-			mockVM.ListResult = []models.VMSummary{
+			mockVM.ListResult = []models.VirtualMachineSummary{
 				{ID: "vm-1", Name: "VM 1", Cluster: "cluster-1", DiskSize: 1024, Memory: 2048, PowerState: "poweredOn"},
 				{ID: "vm-2", Name: "VM 2", Cluster: "cluster-1", DiskSize: 2048, Memory: 4096, PowerState: "poweredOff"},
 			}
@@ -107,7 +107,7 @@ var _ = Describe("VMs Handlers", func() {
 			// Assert
 			Expect(w.Code).To(Equal(http.StatusOK))
 
-			var response v1.VMListResponse
+			var response v1.VirtualMachineListResponse
 			err := json.Unmarshal(w.Body.Bytes(), &response)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(response.Vms).To(HaveLen(2))
@@ -121,7 +121,7 @@ var _ = Describe("VMs Handlers", func() {
 		// Then it should apply the correct offset and limit
 		It("should handle pagination parameters", func() {
 			// Arrange
-			mockVM.ListResult = []models.VMSummary{}
+			mockVM.ListResult = []models.VirtualMachineSummary{}
 			mockVM.ListTotal = 50
 
 			req := httptest.NewRequest(http.MethodGet, "/vms?page=2&pageSize=10", nil)
@@ -141,7 +141,7 @@ var _ = Describe("VMs Handlers", func() {
 		// Then it should limit the page size to the maximum
 		It("should limit page size to max", func() {
 			// Arrange
-			mockVM.ListResult = []models.VMSummary{}
+			mockVM.ListResult = []models.VirtualMachineSummary{}
 			mockVM.ListTotal = 0
 
 			req := httptest.NewRequest(http.MethodGet, "/vms?pageSize=200", nil)
@@ -260,7 +260,7 @@ var _ = Describe("VMs Handlers", func() {
 		// Then it should apply the sort parameters correctly
 		It("should accept valid sort parameters", func() {
 			// Arrange
-			mockVM.ListResult = []models.VMSummary{}
+			mockVM.ListResult = []models.VirtualMachineSummary{}
 			mockVM.ListTotal = 0
 
 			req := httptest.NewRequest(http.MethodGet, "/vms?sort=name:asc&sort=cluster:desc", nil)
@@ -321,7 +321,7 @@ var _ = Describe("VMs Handlers", func() {
 			// Assert
 			Expect(w.Code).To(Equal(http.StatusOK))
 
-			var response v1.VMDetails
+			var response v1.VirtualMachineDetail
 			err := json.Unmarshal(w.Body.Bytes(), &response)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(response.Id).To(Equal("vm-1"))
@@ -769,7 +769,7 @@ var _ = Describe("VMs Handlers Integration", func() {
 
 			Expect(w.Code).To(Equal(http.StatusOK))
 
-			var response v1.VMListResponse
+			var response v1.VirtualMachineListResponse
 			err := json.Unmarshal(w.Body.Bytes(), &response)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(response.Total).To(Equal(10))
@@ -782,7 +782,7 @@ var _ = Describe("VMs Handlers Integration", func() {
 			w := httptest.NewRecorder()
 			router.ServeHTTP(w, req)
 
-			var page1 v1.VMListResponse
+			var page1 v1.VirtualMachineListResponse
 			Expect(json.Unmarshal(w.Body.Bytes(), &page1)).To(Succeed())
 			Expect(page1.Page).To(Equal(1))
 			Expect(page1.PageCount).To(Equal(4)) // 10 VMs / 3 per page = 4 pages
@@ -794,7 +794,7 @@ var _ = Describe("VMs Handlers Integration", func() {
 			w = httptest.NewRecorder()
 			router.ServeHTTP(w, req)
 
-			var page2 v1.VMListResponse
+			var page2 v1.VirtualMachineListResponse
 			Expect(json.Unmarshal(w.Body.Bytes(), &page2)).To(Succeed())
 			Expect(page2.Page).To(Equal(2))
 			Expect(page2.Vms).To(HaveLen(3))
@@ -817,7 +817,7 @@ var _ = Describe("VMs Handlers Integration", func() {
 
 			Expect(w.Code).To(Equal(http.StatusOK))
 
-			var response v1.VMListResponse
+			var response v1.VirtualMachineListResponse
 			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
 			Expect(response.Total).To(Equal(4))
 			for _, vm := range response.Vms {
@@ -833,7 +833,7 @@ var _ = Describe("VMs Handlers Integration", func() {
 
 			Expect(w.Code).To(Equal(http.StatusOK))
 
-			var response v1.VMListResponse
+			var response v1.VirtualMachineListResponse
 			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
 			Expect(response.Total).To(Equal(7)) // 4 production + 3 staging
 			for _, vm := range response.Vms {
@@ -849,7 +849,7 @@ var _ = Describe("VMs Handlers Integration", func() {
 
 			Expect(w.Code).To(Equal(http.StatusOK))
 
-			var response v1.VMListResponse
+			var response v1.VirtualMachineListResponse
 			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
 			Expect(response.Total).To(Equal(2)) // vm-004 and vm-009
 			for _, vm := range response.Vms {
@@ -865,7 +865,7 @@ var _ = Describe("VMs Handlers Integration", func() {
 
 			Expect(w.Code).To(Equal(http.StatusOK))
 
-			var response v1.VMListResponse
+			var response v1.VirtualMachineListResponse
 			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
 			Expect(response.Total).To(Equal(2)) // vm-003 (2 issues) and vm-007 (3 issues)
 			for _, vm := range response.Vms {
@@ -881,7 +881,7 @@ var _ = Describe("VMs Handlers Integration", func() {
 
 			Expect(w.Code).To(Equal(http.StatusOK))
 
-			var response v1.VMListResponse
+			var response v1.VirtualMachineListResponse
 			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
 			for _, vm := range response.Vms {
 				Expect(vm.DiskSize).To(BeNumerically(">=", 100))
@@ -897,7 +897,7 @@ var _ = Describe("VMs Handlers Integration", func() {
 
 			Expect(w.Code).To(Equal(http.StatusOK))
 
-			var response v1.VMListResponse
+			var response v1.VirtualMachineListResponse
 			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
 			Expect(response.Total).To(Equal(4)) // db-server-1, db-server-2, app-server-1, app-server-2
 			for _, vm := range response.Vms {
@@ -914,7 +914,7 @@ var _ = Describe("VMs Handlers Integration", func() {
 
 			Expect(w.Code).To(Equal(http.StatusOK))
 
-			var response v1.VMListResponse
+			var response v1.VirtualMachineListResponse
 			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
 			Expect(response.Vms).To(HaveLen(10))
 			Expect(response.Vms[0].Name).To(Equal("app-server-1"))
@@ -929,7 +929,7 @@ var _ = Describe("VMs Handlers Integration", func() {
 
 			Expect(w.Code).To(Equal(http.StatusOK))
 
-			var response v1.VMListResponse
+			var response v1.VirtualMachineListResponse
 			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
 			Expect(response.Vms).To(HaveLen(10))
 			Expect(response.Vms[0].Memory).To(Equal(int64(16384)))
@@ -943,7 +943,7 @@ var _ = Describe("VMs Handlers Integration", func() {
 
 			Expect(w.Code).To(Equal(http.StatusOK))
 
-			var response v1.VMListResponse
+			var response v1.VirtualMachineListResponse
 			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
 			Expect(response.Vms[0].IssueCount).To(Equal(3)) // vm-007 has 3 issues
 		})
@@ -956,7 +956,7 @@ var _ = Describe("VMs Handlers Integration", func() {
 
 			Expect(w.Code).To(Equal(http.StatusOK))
 
-			var response v1.VMListResponse
+			var response v1.VirtualMachineListResponse
 			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
 			Expect(response.Total).To(Equal(4))
 			Expect(response.Vms).To(HaveLen(2))
@@ -974,7 +974,7 @@ var _ = Describe("VMs Handlers Integration", func() {
 
 			Expect(w.Code).To(Equal(http.StatusOK))
 
-			var response v1.VMListResponse
+			var response v1.VirtualMachineListResponse
 			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
 			Expect(response.Total).To(Equal(3)) // web-server-1, web-server-2, db-server-1
 			for _, vm := range response.Vms {
@@ -991,11 +991,11 @@ var _ = Describe("VMs Handlers Integration", func() {
 
 			Expect(w.Code).To(Equal(http.StatusOK))
 
-			var response v1.VMListResponse
+			var response v1.VirtualMachineListResponse
 			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
 
 			// Find vm-003 which has 2 disks of 500 MiB each
-			var vm003 *v1.VM
+			var vm003 *v1.VirtualMachine
 			for i := range response.Vms {
 				if response.Vms[i].Id == "vm-003" {
 					vm003 = &response.Vms[i]
@@ -1014,7 +1014,7 @@ var _ = Describe("VMs Handlers Integration", func() {
 
 			Expect(w.Code).To(Equal(http.StatusOK))
 
-			var response v1.VMListResponse
+			var response v1.VirtualMachineListResponse
 			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
 
 			// Find VMs and check their issue counts
@@ -1039,7 +1039,7 @@ var _ = Describe("VMs Handlers Integration", func() {
 
 			Expect(w.Code).To(Equal(http.StatusOK))
 
-			var response v1.VMDetails
+			var response v1.VirtualMachineDetail
 			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
 			Expect(response.Id).To(Equal("vm-003"))
 			Expect(response.Name).To(Equal("db-server-1"))
@@ -1071,7 +1071,7 @@ var _ = Describe("VMs Handlers Integration", func() {
 
 			Expect(w.Code).To(Equal(http.StatusOK))
 
-			var response v1.VMDetails
+			var response v1.VirtualMachineDetail
 			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
 			Expect(response.Disks).To(HaveLen(2))
 			Expect(*response.Disks[0].Capacity).To(Equal(int64(500 * 1024 * 1024)))
@@ -1085,7 +1085,7 @@ var _ = Describe("VMs Handlers Integration", func() {
 
 			Expect(w.Code).To(Equal(http.StatusOK))
 
-			var response v1.VMDetails
+			var response v1.VirtualMachineDetail
 			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
 			Expect(response.Nics).To(HaveLen(2))
 		})
@@ -1098,7 +1098,7 @@ var _ = Describe("VMs Handlers Integration", func() {
 
 			Expect(w.Code).To(Equal(http.StatusOK))
 
-			var response v1.VMDetails
+			var response v1.VirtualMachineDetail
 			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
 			Expect(response.Issues).NotTo(BeNil())
 			Expect(*response.Issues).To(HaveLen(3))

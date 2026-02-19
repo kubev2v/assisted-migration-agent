@@ -119,12 +119,12 @@ func (h *Handler) GetVMs(c *gin.Context, params v1.GetVMsParams) {
 	}
 
 	// Map to API response
-	apiVMs := make([]v1.VM, 0, len(vms))
+	apiVMs := make([]v1.VirtualMachine, 0, len(vms))
 	for _, vm := range vms {
-		apiVMs = append(apiVMs, v1.NewVMFromSummary(vm))
+		apiVMs = append(apiVMs, v1.NewVirtualMachineFromSummary(vm))
 	}
 
-	c.JSON(http.StatusOK, v1.VMListResponse{
+	c.JSON(http.StatusOK, v1.VirtualMachineListResponse{
 		Page:      page,
 		PageCount: pageCount,
 		Total:     total,
@@ -146,7 +146,7 @@ func (h *Handler) GetVM(c *gin.Context, id string) {
 		return
 	}
 
-	c.JSON(http.StatusOK, v1.NewVMDetailsFromModel(*vm))
+	c.JSON(http.StatusOK, v1.NewVirtualMachineDetailFromModel(*vm))
 }
 
 // GetVMInspectionStatus returns the inspection status for a specific VM

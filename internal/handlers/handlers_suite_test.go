@@ -67,7 +67,7 @@ func (m *MockConsoleService) SetMode(ctx context.Context, mode models.AgentMode)
 
 // MockVMService is a mock implementation of VMService.
 type MockVMService struct {
-	ListResult     []models.VMSummary
+	ListResult     []models.VirtualMachineSummary
 	ListTotal      int
 	ListError      error
 	GetResult      *models.VM
@@ -75,7 +75,7 @@ type MockVMService struct {
 	LastListParams services.VMListParams
 }
 
-func (m *MockVMService) List(ctx context.Context, params services.VMListParams) ([]models.VMSummary, int, error) {
+func (m *MockVMService) List(ctx context.Context, params services.VMListParams) ([]models.VirtualMachineSummary, int, error) {
 	m.LastListParams = params
 	return m.ListResult, m.ListTotal, m.ListError
 }

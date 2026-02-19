@@ -1,11 +1,12 @@
 package models
 
-// VMSummary represents a lightweight VM record for list views.
-type VMSummary struct {
+// VirtualMachineSummary represents a lightweight VM record for list views.
+type VirtualMachineSummary struct {
 	ID           string
 	Name         string
 	PowerState   string
 	Cluster      string
+	Datacenter   string
 	Memory       int32 // MB
 	DiskSize     int64 // MB (stored as MiB in DB, treated as MB)
 	IssueCount   int
