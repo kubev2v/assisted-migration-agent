@@ -32,7 +32,7 @@ type Console struct {
 	version             string
 	state               *consoleState
 	mu                  sync.Mutex // protects mode changes to prevent double run()
-	scheduler           *scheduler.Scheduler
+	scheduler           *scheduler.Scheduler[any]
 	client              *console.Client
 	close               chan any
 	collector           Collector
@@ -41,7 +41,7 @@ type Console struct {
 	legacyStatusEnabled bool
 }
 
-func NewConsoleService(cfg config.Agent, s *scheduler.Scheduler, client *console.Client, collector Collector, st *store.Store) (*Console, error) {
+func NewConsoleService(cfg config.Agent, s *scheduler.Scheduler[any], client *console.Client, collector Collector, st *store.Store) (*Console, error) {
 	targetStatus, err := models.ParseConsoleStatusType(cfg.Mode)
 	if err != nil {
 		targetStatus = models.ConsoleStatusDisconnected
@@ -72,7 +72,7 @@ func NewConsoleService(cfg config.Agent, s *scheduler.Scheduler, client *console
 	return c, nil
 }
 
-func newConsoleService(cfg config.Agent, s *scheduler.Scheduler, client *console.Client, collector Collector, store *store.Store, defaultStatus models.ConsoleStatus) *Console {
+func newConsoleService(cfg config.Agent, s *scheduler.Scheduler[any], client *console.Client, collector Collector, store *store.Store, defaultStatus models.ConsoleStatus) *Console {
 	return &Console{
 		updateInterval: cfg.UpdateInterval,
 		agentID:        uuid.MustParse(cfg.ID),

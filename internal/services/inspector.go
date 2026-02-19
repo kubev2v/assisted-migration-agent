@@ -21,7 +21,7 @@ import (
 )
 
 type InspectorService struct {
-	scheduler *scheduler.Scheduler
+	scheduler *scheduler.Scheduler[any]
 	store     *store.Store
 	builder   models.InspectorWorkBuilder
 
@@ -37,7 +37,7 @@ type InspectorService struct {
 }
 
 // NewInspectorService creates a new InspectorService with the default vmware builder.
-func NewInspectorService(s *scheduler.Scheduler, store *store.Store) *InspectorService {
+func NewInspectorService(s *scheduler.Scheduler[any], store *store.Store) *InspectorService {
 	return &InspectorService{
 		scheduler: s,
 		status:    models.InspectorStatus{State: models.InspectorStateReady},

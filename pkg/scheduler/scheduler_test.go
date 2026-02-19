@@ -12,7 +12,7 @@ import (
 )
 
 var _ = Describe("Scheduler", func() {
-	var s *scheduler.Scheduler
+	var s *scheduler.Scheduler[any]
 
 	AfterEach(func() {
 		if s != nil {
@@ -26,7 +26,7 @@ var _ = Describe("Scheduler", func() {
 		// Then it should return a future that eventually receives the result
 		It("should add work and return a future", func() {
 			// Arrange
-			s = scheduler.NewScheduler(1)
+			s = scheduler.NewScheduler[any](1)
 			work := func(ctx context.Context) (any, error) {
 				return "done", nil
 			}
@@ -48,7 +48,7 @@ var _ = Describe("Scheduler", func() {
 		// Then all work items should be executed
 		It("should execute multiple work items", func() {
 			// Arrange
-			s = scheduler.NewScheduler(2)
+			s = scheduler.NewScheduler[any](2)
 			results := make(chan int, 3)
 
 			// Act
@@ -74,7 +74,7 @@ var _ = Describe("Scheduler", func() {
 		// Then the work should be cancelled via context
 		It("should cancel work via future.Stop()", func() {
 			// Arrange
-			s = scheduler.NewScheduler(1)
+			s = scheduler.NewScheduler[any](1)
 			cancelled := make(chan bool, 1)
 			work := func(ctx context.Context) (any, error) {
 				select {
@@ -100,7 +100,7 @@ var _ = Describe("Scheduler", func() {
 		// Then all running work should be cancelled
 		It("should cancel work when scheduler is closed", func() {
 			// Arrange
-			s = scheduler.NewScheduler(1)
+			s = scheduler.NewScheduler[any](1)
 			cancelled := make(chan bool, 1)
 			work := func(ctx context.Context) (any, error) {
 				select {
@@ -130,7 +130,7 @@ var _ = Describe("Scheduler", func() {
 		It("should not leak goroutines after Close under load", func() {
 			// Arrange
 			base := runtime.NumGoroutine()
-			s = scheduler.NewScheduler(4)
+			s = scheduler.NewScheduler[any](4)
 			work := func(ctx context.Context) (any, error) {
 				<-ctx.Done()
 				return nil, ctx.Err()
@@ -157,7 +157,7 @@ var _ = Describe("Scheduler", func() {
 		// Then it should return a future with canceled error
 		It("should return canceled when AddWork is called after Close", func() {
 			// Arrange
-			s = scheduler.NewScheduler(1)
+			s = scheduler.NewScheduler[any](1)
 			s.Close()
 
 			// Act
@@ -176,7 +176,7 @@ var _ = Describe("Scheduler", func() {
 		// Then it should wait for in-flight work to finish
 		It("should wait for in-flight work to finish on Close", func() {
 			// Arrange
-			s = scheduler.NewScheduler(1)
+			s = scheduler.NewScheduler[any](1)
 			started := make(chan struct{})
 			unblock := make(chan struct{})
 			work := func(ctx context.Context) (any, error) {
@@ -208,7 +208,7 @@ var _ = Describe("Scheduler", func() {
 		// Then the future should receive an error and the scheduler should continue working
 		It("should recover from panics and return an error", func() {
 			// Arrange
-			s = scheduler.NewScheduler(1)
+			s = scheduler.NewScheduler[any](1)
 			panicWork := func(ctx context.Context) (any, error) {
 				panic("something went wrong")
 			}
@@ -228,7 +228,7 @@ var _ = Describe("Scheduler", func() {
 		// Then it should be able to process subsequent work
 		It("should continue processing after a panic", func() {
 			// Arrange
-			s = scheduler.NewScheduler(1)
+			s = scheduler.NewScheduler[any](1)
 			panicWork := func(ctx context.Context) (any, error) {
 				panic("oops")
 			}
@@ -259,7 +259,7 @@ var _ = Describe("Scheduler", func() {
 		// Then they should execute in FIFO order
 		It("should execute work in FIFO order with single worker", func() {
 			// Arrange
-			s = scheduler.NewScheduler(1)
+			s = scheduler.NewScheduler[any](1)
 
 			// Block the worker so we can queue up work
 			blocker := make(chan struct{})
@@ -302,7 +302,7 @@ var _ = Describe("Scheduler", func() {
 		// Then the work should receive a non-nil context
 		It("should provide a valid context to work functions", func() {
 			// Arrange
-			s = scheduler.NewScheduler(1)
+			s = scheduler.NewScheduler[any](1)
 			var receivedCtx context.Context
 			done := make(chan struct{})
 

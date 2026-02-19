@@ -21,80 +21,84 @@ func (wq *queue[T]) Push(t T) {
 	*wq = append(*wq, t)
 }
 
-type workRequest struct {
-	fn  Work[any]
-	c   chan Result[any]
+type workRequest[T any] struct {
+	fn  Work[T]
+	c   chan Result[T]
 	ctx context.Context
 }
 
-type worker struct {
+type worker[T any] struct {
 	done chan any
 	wg   *sync.WaitGroup
 }
 
-func (w worker) Work(r workRequest) {
+func (w worker[T]) Work(r workRequest[T]) {
 	defer func() {
 		if rec := recover(); rec != nil {
-			r.c <- Result[any]{Err: fmt.Errorf("worker panicked: %v", rec)}
+			r.c <- Result[T]{Err: fmt.Errorf("worker panicked: %v", rec)}
 		}
 		w.done <- struct{}{}
 		w.wg.Done()
 	}()
 
 	v, err := r.fn(r.ctx)
-	r.c <- Result[any]{Data: v, Err: err}
+	r.c <- Result[T]{Data: v, Err: err}
 }
 
-func newWorker(done chan any, wg *sync.WaitGroup) worker {
-	return worker{done: done, wg: wg}
+func newWorker[T any](done chan any, wg *sync.WaitGroup) worker[T] {
+	return worker[T]{done: done, wg: wg}
 }
 
-type Scheduler struct {
-	workers    *queue[worker]
-	workQueue  *queue[workRequest]
+type Scheduler[T any] struct {
+	workers    *queue[worker[T]]
+	workQueue  *queue[workRequest[T]]
 	close      chan any
 	done       chan any
-	work       chan workRequest
+	work       chan workRequest[T]
 	mainCtx    context.Context
 	mainCancel context.CancelFunc
 	wg         sync.WaitGroup
 	once       sync.Once
 }
 
-func NewScheduler(nbWorkers int) *Scheduler {
+func NewDefaultScheduler(nbWorkers int) *Scheduler[any] {
+	return NewScheduler[any](nbWorkers)
+}
+
+func NewScheduler[T any](nbWorkers int) *Scheduler[T] {
 	done := make(chan any, nbWorkers)
 	ctx, cancel := context.WithCancel(context.Background())
-	s := &Scheduler{
-		workers:    &queue[worker]{},
-		workQueue:  &queue[workRequest]{},
+	s := &Scheduler[T]{
+		workers:    &queue[worker[T]]{},
+		workQueue:  &queue[workRequest[T]]{},
 		close:      make(chan any),
 		done:       done,
-		work:       make(chan workRequest),
+		work:       make(chan workRequest[T]),
 		mainCtx:    ctx,
 		mainCancel: cancel,
 	}
 	for range nbWorkers {
-		s.workers.Push(newWorker(done, &s.wg))
+		s.workers.Push(newWorker[T](done, &s.wg))
 	}
 	go s.run()
 	return s
 }
 
-func (s *Scheduler) AddWork(w Work[any]) *Future[Result[any]] {
-	c := make(chan Result[any], 1)
+func (s *Scheduler[T]) AddWork(w Work[T]) *Future[Result[T]] {
+	c := make(chan Result[T], 1)
 	ctx, cancel := context.WithCancel(s.mainCtx)
 
 	select {
 	case <-s.mainCtx.Done():
 		// we're closing here so send a result with an error
-		c <- Result[any]{Err: context.Canceled}
-	case s.work <- workRequest{w, c, ctx}:
+		c <- Result[T]{Err: context.Canceled}
+	case s.work <- workRequest[T]{w, c, ctx}:
 	}
 
 	return NewFuture(c, cancel)
 }
 
-func (s *Scheduler) Close() {
+func (s *Scheduler[T]) Close() {
 	s.once.Do(func() {
 		s.mainCancel()
 		s.close <- struct{}{}
@@ -102,7 +106,7 @@ func (s *Scheduler) Close() {
 	})
 }
 
-func (s *Scheduler) run() {
+func (s *Scheduler[T]) run() {
 	defer close(s.done)
 	for {
 		select {
@@ -110,7 +114,7 @@ func (s *Scheduler) run() {
 			s.workQueue.Push(w)
 			s.dispatch()
 		case <-s.done:
-			s.workers.Push(newWorker(s.done, &s.wg))
+			s.workers.Push(newWorker[T](s.done, &s.wg))
 			s.dispatch()
 		case <-s.close:
 			s.wg.Wait()
@@ -121,7 +125,7 @@ func (s *Scheduler) run() {
 
 // dispatch drains the workQueue as much as possible
 // based on available workers
-func (s *Scheduler) dispatch() {
+func (s *Scheduler[T]) dispatch() {
 	for s.workers.Len() > 0 && s.workQueue.Len() > 0 {
 		r := s.workQueue.Pop()
 		worker := s.workers.Pop()

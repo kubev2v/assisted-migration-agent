@@ -95,7 +95,7 @@ var _ = Describe("InspectorService", func() {
 		ctx   context.Context
 		db    *sql.DB
 		st    *store.Store
-		sched *scheduler.Scheduler
+		sched *scheduler.Scheduler[any]
 		srv   *services.InspectorService
 	)
 
@@ -124,7 +124,7 @@ var _ = Describe("InspectorService", func() {
 		insertVM("vm-3", "test-vm-3")
 
 		st = store.NewStore(db, test.NewMockValidator())
-		sched = scheduler.NewScheduler(1)
+		sched = scheduler.NewScheduler[any](1)
 		srv = services.NewInspectorService(sched, st)
 	})
 

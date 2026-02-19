@@ -87,7 +87,7 @@ var _ = Describe("CollectorService", func() {
 		ctx   context.Context
 		db    *sql.DB
 		st    *store.Store
-		sched *scheduler.Scheduler
+		sched *scheduler.Scheduler[any]
 		srv   *services.CollectorService
 	)
 
@@ -102,7 +102,7 @@ var _ = Describe("CollectorService", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		st = store.NewStore(db, test.NewMockValidator())
-		sched = scheduler.NewScheduler(1)
+		sched = scheduler.NewScheduler[any](1)
 		srv = services.NewCollectorService(sched, st, &mockWorkBuilder{store: st})
 	})
 

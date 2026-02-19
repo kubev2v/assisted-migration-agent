@@ -78,7 +78,7 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 			zap.S().Info("database initialized successfully")
 
 			// init scheduler
-			sched := scheduler.NewScheduler(cfg.Agent.NumWorkers)
+			sched := scheduler.NewDefaultScheduler(cfg.Agent.NumWorkers)
 
 			// read jwt token for agent
 			jwt := ""

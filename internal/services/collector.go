@@ -13,7 +13,7 @@ import (
 )
 
 type CollectorService struct {
-	scheduler *scheduler.Scheduler
+	scheduler *scheduler.Scheduler[any]
 	builder   models.WorkBuilder
 
 	state models.CollectorStatus
@@ -23,7 +23,7 @@ type CollectorService struct {
 	cancel context.CancelFunc
 }
 
-func NewCollectorService(s *scheduler.Scheduler, store *store.Store, builder models.WorkBuilder) *CollectorService {
+func NewCollectorService(s *scheduler.Scheduler[any], store *store.Store, builder models.WorkBuilder) *CollectorService {
 	srv := &CollectorService{
 		scheduler: s,
 		builder:   builder,

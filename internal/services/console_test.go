@@ -54,7 +54,7 @@ func (m *MockCollector) SetError(err error) {
 
 var _ = Describe("Console Service", func() {
 	var (
-		sched     *scheduler.Scheduler
+		sched     *scheduler.Scheduler[any]
 		collector *MockCollector
 		agentID   string
 		sourceID  string
@@ -67,7 +67,7 @@ var _ = Describe("Console Service", func() {
 		agentID = uuid.New().String()
 		sourceID = uuid.New().String()
 
-		sched = scheduler.NewScheduler(1)
+		sched = scheduler.NewScheduler[any](1)
 		collector = NewMockCollector(models.CollectorStateReady)
 
 		var err error
