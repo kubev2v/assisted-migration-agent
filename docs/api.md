@@ -103,6 +103,7 @@ curl "http://localhost:8000/api/v1/vms?page=2&pageSize=10"
       "name": "web-server-1",
       "vCenterState": "poweredOn",
       "cluster": "production",
+      "datacenter": "DC1",
       "diskSize": 104857600,
       "memory": 4096,
       "issueCount": 0,
@@ -127,6 +128,7 @@ curl "http://localhost:8000/api/v1/vms?page=2&pageSize=10"
 | `name` | string | VM name |
 | `vCenterState` | string | Power state (`poweredOn`, `poweredOff`, `suspended`) |
 | `cluster` | string | Cluster name |
+| `datacenter` | string | Datacenter name |
 | `diskSize` | integer | Total disk size in bytes |
 | `memory` | integer | Memory size in MB |
 | `issueCount` | integer | Number of migration issues |

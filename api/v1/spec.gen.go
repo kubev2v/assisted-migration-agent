@@ -55,10 +55,10 @@ type ServerInterface interface {
 	// Get details about a vm
 	// (GET /vms/{id})
 	GetVM(c *gin.Context, id string)
-	// Remove VM from inspection queue
+	// Remove VirtualMachine from inspection queue
 	// (DELETE /vms/{id}/inspector)
 	RemoveVMFromInspection(c *gin.Context, id string)
-	// Get inspection status for a specific VM
+	// Get inspection status for a specific VirtualMachine
 	// (GET /vms/{id}/inspector)
 	GetVMInspectionStatus(c *gin.Context, id string)
 }

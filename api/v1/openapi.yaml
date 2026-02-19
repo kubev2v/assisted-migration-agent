@@ -194,7 +194,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/VMListResponse'
+                $ref: '#/components/schemas/VirtualMachineListResponse'
         '400':
           description: Invalid request parameters
         '500':
@@ -208,45 +208,45 @@ paths:
         - name: id
           in: path
           required: true
-          description: VM id
+          description: VirtualMachine id
           schema:
             type: string
       responses:
         '200':
-          description: VM details
+          description: VirtualMachine details
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/VMDetails'
+                $ref: '#/components/schemas/VirtualMachineDetail'
         '404':
-          description: VM not found
+          description: VirtualMachine not found
         '500':
           description: Internal server error
 
   /vms/{id}/inspector:
     get:
-      summary: Get inspection status for a specific VM
+      summary: Get inspection status for a specific VirtualMachine
       operationId: getVMInspectionStatus
       parameters:
         - name: id
           in: path
           required: true
-          description: VM ID
+          description: VirtualMachine ID
           schema:
             type: string
       responses:
         '200':
-          description: VM inspection status
+          description: VirtualMachine inspection status
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/VmInspectionStatus'
         '404':
-          description: VM not found
+          description: VirtualMachine not found
         '500':
           description: Internal server error
     delete:
-      summary: Remove VM from inspection queue
+      summary: Remove VirtualMachine from inspection queue
       operationId: removeVMFromInspection
       parameters:
         - name: id
@@ -501,13 +501,14 @@ components:
           type: object
           description: Inspection results
 
-    VM:
+    VirtualMachine:
       type: object
       required:
         - name
         - id
         - vCenterState
         - cluster
+        - datacenter
         - diskSize
         - memory
         - issueCount
@@ -515,16 +516,19 @@ components:
       properties:
         name:
           type: string
-          description: VM name
+          description: VirtualMachine name
         id:
           type: string
-          description: VM ID
+          description: VirtualMachine ID in vCenter
         vCenterState:
           type: string
           description: vCenter state (e.g., poweredOn, poweredOff, suspended)
         cluster:
           type: string
           description: Cluster name
+        datacenter:
+          type: string
+          description: Datacenter name
         diskSize:
           type: integer
           format: int64
@@ -535,17 +539,17 @@ components:
           description: Memory size in MB
         issueCount:
           type: integer
-          description: Number of issues found for this VM
+          description: Number of issues found for this VirtualMachine
         migratable:
           type: boolean
-          description: True if the vm is migratable for MTV. False otherwise 
+          description: True if the vm is migratable for MTV. False otherwise
         template:
           type: boolean
           description: True if the vm is a template. False otherwise
         inspection:
           $ref: '#/components/schemas/VmInspectionStatus'
 
-    VMDetails:
+    VirtualMachineDetail:
       type: object
       required:
         - id
@@ -560,38 +564,38 @@ components:
       properties:
         id:
           type: string
-          description: Unique identifier for the VM in vCenter
+          description: Unique identifier for the VirtualMachine in vCenter
         name:
           type: string
-          description: Display name of the VM
+          description: Display name of the VirtualMachine
         uuid:
           type: string
           description: Universally unique identifier assigned by vCenter
         firmware:
           type: string
-          description: Firmware type used by the VM (bios or efi)
+          description: Firmware type used by the VirtualMachine (bios or efi)
         powerState:
           type: string
-          description: Current power state of the VM (poweredOn, poweredOff, or suspended)
+          description: Current power state of the VirtualMachine (poweredOn, poweredOff, or suspended)
         connectionState:
           type: string
-          description: State of the connection between vCenter and the VM's host (connected, disconnected, orphaned, or inaccessible)
+          description: State of the connection between vCenter and the VirtualMachine's host (connected, disconnected, orphaned, or inaccessible)
         host:
           type: string
-          description: Reference to the ESXi host where the VM is running
+          description: Reference to the ESXi host where the VirtualMachine is running
         datacenter:
           type: string
-          description: Name of the datacenter containing the VM
+          description: Name of the datacenter containing the VirtualMachine
         cluster:
           type: string
-          description: Name of the cluster containing the VM
+          description: Name of the cluster containing the VirtualMachine
         folder:
           type: string
-          description: Reference to the inventory folder containing the VM
+          description: Reference to the inventory folder containing the VirtualMachine
         cpuCount:
           type: integer
           format: int32
-          description: Total number of virtual CPUs allocated to the VM
+          description: Total number of virtual CPUs allocated to the VirtualMachine
         coresPerSocket:
           type: integer
           format: int32
@@ -601,11 +605,11 @@ components:
           items:
             type: integer
             format: int32
-          description: List of physical CPU IDs the VM is pinned to for scheduling
+          description: List of physical CPU IDs the VirtualMachine is pinned to for scheduling
         memoryMB:
           type: integer
           format: int32
-          description: Amount of memory allocated to the VM in megabytes
+          description: Amount of memory allocated to the VirtualMachine in megabytes
         guestName:
           type: string
           description: Full name of the guest operating system as reported by VMware Tools
@@ -621,19 +625,19 @@ components:
         storageUsed:
           type: integer
           format: int64
-          description: Total storage space consumed by the VM in bytes
+          description: Total storage space consumed by the VirtualMachine in bytes
         template:
           type: boolean
-          description: Whether the VM is a template rather than a regular VM
+          description: Whether the VirtualMachine is a template rather than a regular VirtualMachine
         migratable:
           type: boolean
-          description: Whether the VM can be migrated (true if no critical issues)
+          description: Whether the VirtualMachine can be migrated (true if no critical issues)
         faultToleranceEnabled:
           type: boolean
-          description: Whether VMware Fault Tolerance is enabled, which maintains a live shadow VM for instant failover
+          description: Whether VMware Fault Tolerance is enabled, which maintains a live shadow VirtualMachine for instant failover
         nestedHVEnabled:
           type: boolean
-          description: Whether nested virtualization is enabled, allowing hypervisors to run inside the VM
+          description: Whether nested virtualization is enabled, allowing hypervisors to run inside the VirtualMachine
         toolsStatus:
           type: string
           description: Installation status of VMware Tools (toolsNotInstalled, toolsNotRunning, toolsOld, toolsOk)
@@ -644,17 +648,17 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/VMDisk'
-          description: List of virtual disks attached to the VM
+          description: List of virtual disks attached to the VirtualMachine
         nics:
           type: array
           items:
             $ref: '#/components/schemas/VMNIC'
-          description: List of virtual network interface cards attached to the VM
+          description: List of virtual network interface cards attached to the VirtualMachine
         devices:
           type: array
           items:
             $ref: '#/components/schemas/VMDevice'
-          description: List of other virtual devices attached to the VM
+          description: List of other virtual devices attached to the VirtualMachine
         guestNetworks:
           type: array
           items:
@@ -664,10 +668,10 @@ components:
           type: array
           items:
             type: string
-          description: List of issue identifiers affecting this VM
+          description: List of issue identifiers affecting this VirtualMachine
         inspection:
           $ref: '#/components/schemas/VmInspectionStatus'
-          description: Current inspection status for this VM
+          description: Current inspection status for this VirtualMachine
 
     VMDisk:
       type: object
@@ -675,7 +679,7 @@ components:
         key:
           type: integer
           format: int32
-          description: Unique key identifying this disk within the VM
+          description: Unique key identifying this disk within the VirtualMachine
         file:
           type: string
           description: Path to the VMDK file in the datastore
@@ -707,7 +711,7 @@ components:
           description: Reference to the network this NIC is connected to
         index:
           type: integer
-          description: Index of the NIC within the VM
+          description: Index of the NIC within the VirtualMachine
 
     VMDevice:
       type: object
@@ -736,7 +740,7 @@ components:
           type: string
           description: Network name as reported by the guest OS
 
-    VMListResponse:
+    VirtualMachineListResponse:
       type: object
       required:
         - vms
@@ -747,7 +751,7 @@ components:
         vms:
           type: array
           items:
-            $ref: '#/components/schemas/VM'
+            $ref: '#/components/schemas/VirtualMachine'
         total:
           type: integer
           description: Total number of VMs matching the filter
@@ -793,7 +797,7 @@ components:
       type: array
       items:
         type: string
-      description: Array of VM id
+      description: Array of VirtualMachine id
 
     VcenterCredentials:
       required:

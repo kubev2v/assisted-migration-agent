@@ -18,12 +18,13 @@ func (a *AgentStatus) FromModel(m models.AgentStatus) {
 	a.Mode = AgentStatusMode(m.Console.Target)
 }
 
-// NewVMFromSummary converts a models.VMSummary to an API VM.
-func NewVMFromSummary(vm models.VMSummary) VM {
-	return VM{
+// NewVirtualMachineFromSummary converts a models.VirtualMachineSummary to an API VirtualMachine.
+func NewVirtualMachineFromSummary(vm models.VirtualMachineSummary) VirtualMachine {
+	return VirtualMachine{
 		Id:           vm.ID,
 		Name:         vm.Name,
 		Cluster:      vm.Cluster,
+		Datacenter:   vm.Datacenter,
 		DiskSize:     vm.DiskSize,
 		Memory:       int64(vm.Memory),
 		VCenterState: vm.PowerState,
@@ -73,8 +74,8 @@ func NewCollectorStatusWithError(status models.CollectorStatus, err error) Colle
 	return c
 }
 
-func NewVMDetailsFromModel(vm models.VM) VMDetails {
-	details := VMDetails{
+func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
+	details := VirtualMachineDetail{
 		Id:              vm.ID,
 		Name:            vm.Name,
 		PowerState:      vm.PowerState,

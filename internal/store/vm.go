@@ -22,12 +22,13 @@ func NewVMStore(db QueryInterceptor, parser *duckdb_parser.Parser) *VMStore {
 }
 
 // List returns VM summaries with filters, sorting, and pagination.
-func (s *VMStore) List(ctx context.Context, opts ...ListOption) ([]models.VMSummary, error) {
+func (s *VMStore) List(ctx context.Context, opts ...ListOption) ([]models.VirtualMachineSummary, error) {
 	builder := sq.Select(
 		`v."VM ID" AS id`,
 		`v."VM" AS name`,
 		`v."Powerstate" AS power_state`,
 		`COALESCE(v."Cluster", '') AS cluster`,
+		`COALESCE(v."Datacenter", '') AS datacenter`,
 		`v."Memory" AS memory`,
 		`COALESCE(d.total_disk, 0) AS disk_size`,
 		`COALESCE(c.issue_count, 0) AS issue_count`,
@@ -56,15 +57,16 @@ func (s *VMStore) List(ctx context.Context, opts ...ListOption) ([]models.VMSumm
 	}
 	defer rows.Close()
 
-	var vms []models.VMSummary
+	var vms []models.VirtualMachineSummary
 	for rows.Next() {
-		var vm models.VMSummary
+		var vm models.VirtualMachineSummary
 		var sqlErr string
 		err := rows.Scan(
 			&vm.ID,
 			&vm.Name,
 			&vm.PowerState,
 			&vm.Cluster,
+			&vm.Datacenter,
 			&vm.Memory,
 			&vm.DiskSize,
 			&vm.IssueCount,
