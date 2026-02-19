@@ -411,21 +411,8 @@ components:
           description: Git commit SHA used to build the agent
 
     CollectorStartRequest:
-      type: object
-      required:
-        - url
-        - username
-        - password
-      properties:
-        url:
-          type: string
-          format: uri
-          description: vCenter URL
-        username:
-          type: string
-        password:
-          type: string
-          format: password
+      allOf:
+        - $ref: '#/components/schemas/VcenterCredentials'
 
     CollectorStatus:
       type: object
