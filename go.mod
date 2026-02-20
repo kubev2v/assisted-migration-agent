@@ -4,7 +4,6 @@ go 1.24.10
 
 require (
 	github.com/Masterminds/squirrel v1.5.4
-	github.com/cenkalti/backoff/v5 v5.0.2
 	github.com/containers/podman/v5 v5.7.1
 	github.com/creasty/defaults v1.8.0
 	github.com/duckdb/duckdb-go/v2 v2.5.4

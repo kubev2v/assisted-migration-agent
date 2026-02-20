@@ -10,7 +10,6 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/cenkalti/backoff/v5"
 	"github.com/google/uuid"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
@@ -20,6 +19,8 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/pkg/errors"
 	"github.com/kubev2v/assisted-migration-agent/pkg/scheduler"
 )
+
+const maxBackoffInterval = 60 * time.Second
 
 type Collector interface {
 	GetStatus() models.CollectorStatus
@@ -139,49 +140,30 @@ func (c *Console) Status() models.ConsoleStatus {
 // run is the main loop that sends status and inventory updates to the console.
 //
 // On each iteration:
-//  1. Dispatch status and inventory updates (combined in single call) and block until complete.
-//  2. Handle errors (fatal errors stop the loop, transient errors trigger backoff).
-//  3. Wait for next tick or close signal.
+//  1. Wait for the current interval or close signal.
+//  2. Dispatch status and inventory updates and block until complete.
+//  3. Handle errors: fatal errors (4xx) stop the loop, transient errors double the interval.
+//  4. On success, reset the interval to updateInterval.
 //
-// Fatal errors (stop the loop, no retry):
-//   - ConsoleClientError (4xx): Client errors from console cannot be recovered.
-//
-// Transient errors are logged and stored in status.Error, but the loop continues.
-// If inventory hasn't changed, the error state is preserved (not cleared or set).
-//
-// Backoff:
-// When the server is unreachable (transient errors), exponential backoff is used to avoid
-// hammering the server. On error, requests are skipped until the backoff interval expires.
-// The interval grows exponentially from updateInterval up to 60 seconds max. On success,
-// the backoff resets to allow immediate requests on the next tick.
+// The interval itself acts as the backoff mechanism. On transient errors it doubles
+// (up to maxBackoffInterval). On success it resets. This avoids a separate ticker
+// that wakes up only to skip work during backoff periods.
 func (c *Console) run() {
 	c.state.SetCurrent(models.ConsoleStatusConnected)
-	tick := time.NewTicker(c.updateInterval)
 	c.close = make(chan any, 1)
 	defer func() {
-		tick.Stop()
 		c.state.SetCurrent(models.ConsoleStatusDisconnected)
 		zap.S().Named("console_service").Info("service stopped sending requests to console.rh.com")
 		c.close = nil
 	}()
 
-	// use exponential backoff if server is unreachable.
-	nextAllowedTime := time.Time{}
-	b := backoff.NewExponentialBackOff()
-	b.InitialInterval = c.updateInterval
-	b.MaxInterval = 60 * time.Second // Don't wait longer than 60s
+	interval := c.updateInterval
 
 	for {
 		select {
-		case <-tick.C:
+		case <-time.After(interval):
 		case <-c.close:
 			return
-		}
-
-		now := time.Now()
-
-		if !now.After(nextAllowedTime) {
-			continue
 		}
 
 		future := c.dispatch()
@@ -190,29 +172,20 @@ func (c *Console) run() {
 		case result := <-future.C():
 			if result.Err != nil {
 				c.state.SetError(result.Err)
-				// If the error from console.rh.com is 4xx stop the service
-				// 4xx errors cannot be recovered and it is useless to keep sending requests
 				if errors.IsConsoleClientError(result.Err) {
 					zap.S().Named("console_service").Errorw("failed to send request to console. console service stopped", "error", result.Err.Error())
 					c.state.SetFatalStopped()
 					return
 				}
 				zap.S().Named("console_service").Errorw("failed to dispatch to console", "error", result.Err)
+				interval = min(interval*2, maxBackoffInterval)
 			} else {
 				c.state.ClearError()
+				interval = c.updateInterval
 			}
 		case <-c.close:
 			future.Stop()
 			return
-		}
-
-		// if there's an error activate backoff, otherwise reset it
-		if c.state.GetError() != nil {
-			nextAllowedTime = now.Add(b.NextBackOff())
-			zap.S().Debugw("set backoff", "next-allowed-time", nextAllowedTime)
-		} else {
-			b.Reset()
-			nextAllowedTime = time.Time{}
 		}
 	}
 }
