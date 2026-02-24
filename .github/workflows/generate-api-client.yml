@@ -1,0 +1,41 @@
+---
+name: Generate API Client
+
+on:  # yamllint disable-line rule:truthy
+  push:
+    branches: [main, 'release-*']
+    paths:
+      - 'api/v1/openapi.yaml'
+  tags:
+    - '*'
+
+# Required for npm Trusted Publishing (OIDC)
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  version:
+    name: Determine version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        uses: kubev2v/migration-planner/.github/actions/determine-version@main
+
+  generate-client:
+    name: Generate and publish API client
+    needs: version
+    uses: kubev2v/migration-planner-client-generator/.github/workflows/generate-and-publish.yml@main
+    with:
+      openapi-spec-url: "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/api/v1/openapi.yaml"
+      package-name: "@openshift-migration-advisor/agent-sdk"
+      package-version: ${{ needs.version.outputs.version }}
+    secrets: inherit
