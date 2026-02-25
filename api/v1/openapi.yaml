@@ -89,13 +89,24 @@ paths:
     get:
       summary: Get collected inventory
       operationId: getInventory
+      parameters:
+        - name: withAgentId
+          in: query
+          required: false
+          description: If true, include the agentId in the response (Compatible with manual inventory upload).
+          schema:
+            type: boolean
+            default: false
       responses:
         '200':
           description: Collected inventory
           content:
             application/json:
               schema:
-                $ref: 'https://raw.githubusercontent.com/kubev2v/migration-planner/main/api/v1alpha1/openapi.yaml#/components/schemas/Inventory'
+                oneOf:
+                  - $ref: 'https://raw.githubusercontent.com/kubev2v/migration-planner/main/api/v1alpha1/openapi.yaml#/components/schemas/Inventory'
+                  - $ref: 'https://raw.githubusercontent.com/kubev2v/migration-planner/main/api/v1alpha1/openapi.yaml#/components/schemas/UpdateInventory'
+
         '404':
           description: Inventory not available
         '500':

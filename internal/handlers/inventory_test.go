@@ -3,8 +3,14 @@ package handlers_test
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+
+	v1 "github.com/kubev2v/assisted-migration-agent/api/v1"
+
+	"github.com/google/uuid"
+	"github.com/kubev2v/migration-planner/api/v1alpha1"
 
 	"github.com/gin-gonic/gin"
 	. "github.com/onsi/ginkgo/v2"
@@ -26,18 +32,27 @@ var _ = Describe("Inventory Handlers", func() {
 	BeforeEach(func() {
 		gin.SetMode(gin.TestMode)
 		mockInventory = &MockInventoryService{}
-		handler = handlers.New(config.Configuration{}, nil, nil, mockInventory, nil, nil)
+		handler = handlers.New(config.Configuration{
+			Agent: config.Agent{
+				ID: uuid.Nil.String(),
+			},
+		}, nil, nil, mockInventory, nil, nil)
 		router = gin.New()
-		router.GET("/inventory", handler.GetInventory)
+		wrapper := v1.ServerInterfaceWrapper{
+			Handler:      handler,
+			ErrorHandler: func(c *gin.Context, err error, statusCode int) { c.JSON(statusCode, gin.H{"msg": err.Error()}) },
+		}
+		router.GET("/inventory", wrapper.GetInventory)
 	})
 
 	Context("GetInventory", func() {
 		// Given inventory data exists in the store
 		// When we request the inventory
 		// Then it should return the inventory data as JSON
-		It("should return inventory data", func() {
+		It("Schema1: should return inventory data", func() {
+			vcenterID := "502d878c-af91-4a6f-93e9-61c4a1986172"
 			// Arrange
-			inventoryData := []byte(`{"vms":[{"id":"vm-1","name":"Test VM"}]}`)
+			inventoryData := []byte(fmt.Sprintf(`{"clusters": {}, "vcenter": {}, "vcenter_id": "%s"}`, vcenterID))
 			mockInventory.InventoryResult = &models.Inventory{Data: inventoryData}
 
 			req := httptest.NewRequest(http.MethodGet, "/inventory", nil)
@@ -48,8 +63,38 @@ var _ = Describe("Inventory Handlers", func() {
 
 			// Assert
 			Expect(w.Code).To(Equal(http.StatusOK))
-			Expect(w.Header().Get("Content-Type")).To(Equal("application/json"))
-			Expect(w.Body.Bytes()).To(Equal(inventoryData))
+			Expect(w.Header().Get("Content-Type")).To(Equal("application/json; charset=utf-8"))
+
+			var result v1alpha1.Inventory
+			resBody := w.Body.Bytes()
+			err := json.Unmarshal(resBody, &result)
+			Expect(err).To(BeNil())
+
+			Expect(result.VcenterId).To(Equal(vcenterID))
+		})
+
+		It("Schema2: should return inventory with agent id", func() {
+			vcenterID := "502d878c-af91-4a6f-93e9-61c4a1986172"
+			// Arrange
+			inventoryData := []byte(fmt.Sprintf(`{"clusters": {}, "vcenter": {}, "vcenter_id": "%s"}`, vcenterID))
+			mockInventory.InventoryResult = &models.Inventory{Data: inventoryData}
+
+			req := httptest.NewRequest(http.MethodGet, "/inventory?withAgentId=true", nil)
+			w := httptest.NewRecorder()
+
+			// Act
+			router.ServeHTTP(w, req)
+
+			// Assert
+			Expect(w.Code).To(Equal(http.StatusOK))
+			Expect(w.Header().Get("Content-Type")).To(Equal("application/json; charset=utf-8"))
+
+			var result v1alpha1.UpdateInventory
+			resBody := w.Body.Bytes()
+			err := json.Unmarshal(resBody, &result)
+			Expect(err).To(BeNil())
+
+			Expect(result.Inventory.VcenterId).To(Equal(vcenterID))
 		})
 
 		// Given no inventory has been collected yet

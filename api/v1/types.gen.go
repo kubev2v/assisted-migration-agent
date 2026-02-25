@@ -349,6 +349,12 @@ type VmInspectionStatus struct {
 // VmInspectionStatusState Current inspection state
 type VmInspectionStatusState string
 
+// GetInventoryParams defines parameters for GetInventory.
+type GetInventoryParams struct {
+	// WithAgentId If true, include the agentId in the response (Compatible with manual inventory upload).
+	WithAgentId *bool `form:"withAgentId,omitempty" json:"withAgentId,omitempty"`
+}
+
 // GetVMsParams defines parameters for GetVMs.
 type GetVMsParams struct {
 	// MinIssues Filter VMs with at least this many issues

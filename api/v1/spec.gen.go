@@ -30,7 +30,7 @@ type ServerInterface interface {
 	StartCollector(c *gin.Context)
 	// Get collected inventory
 	// (GET /inventory)
-	GetInventory(c *gin.Context)
+	GetInventory(c *gin.Context, params GetInventoryParams)
 	// Upload VDDK tarball
 	// (POST /vddk)
 	PostVddk(c *gin.Context)
@@ -140,6 +140,19 @@ func (siw *ServerInterfaceWrapper) StartCollector(c *gin.Context) {
 // GetInventory operation middleware
 func (siw *ServerInterfaceWrapper) GetInventory(c *gin.Context) {
 
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetInventoryParams
+
+	// ------------- Optional query parameter "withAgentId" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "withAgentId", c.Request.URL.Query(), &params.WithAgentId)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter withAgentId: %w", err), http.StatusBadRequest)
+		return
+	}
+
 	for _, middleware := range siw.HandlerMiddlewares {
 		middleware(c)
 		if c.IsAborted() {
@@ -147,7 +160,7 @@ func (siw *ServerInterfaceWrapper) GetInventory(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.GetInventory(c)
+	siw.Handler.GetInventory(c, params)
 }
 
 // PostVddk operation middleware
