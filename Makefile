@@ -51,7 +51,7 @@ help:
 # Build the application
 build:
 	@echo "Building $(BINARY_NAME)..."
-	go build -ldflags="-X main.gitCommit=${GIT_COMMIT}" -o $(BINARY_PATH) $(MAIN_PATH)
+	go build -ldflags="-X main.gitCommit=${GIT_COMMIT} -X main.version=${VERSION}" -o $(BINARY_PATH) $(MAIN_PATH)
 	@echo "Build complete: $(BINARY_PATH)"
 
 build.e2e:

@@ -17,7 +17,8 @@ RUN go mod download
 USER 0
 COPY . .
 ARG GIT_COMMIT=unknown
-RUN make build GIT_COMMIT=${GIT_COMMIT} BINARY_PATH=/tmp/agent
+ARG VERSION=v0.0.0
+RUN make build GIT_COMMIT=${GIT_COMMIT} VERSION=${VERSION} BINARY_PATH=/tmp/agent
 
 
 # =============================================================================
@@ -44,9 +45,6 @@ RUN mkdir -p /app/policies /app/forklift && \
 # Stage 4: Final runtime image
 # =============================================================================
 FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/ubi-minimal
-
-ARG VERSION=v0.0.0
-ENV AGENT_VERSION=${VERSION}
 
 RUN microdnf install -y ca-certificates tzdata && \
     microdnf clean all
