@@ -174,14 +174,10 @@ func (s *PlannerSvc) RemoveSources() error {
 }
 
 // UpdateSource updates the inventory of a specific source
-func (s *PlannerSvc) UpdateSource(sourceID, agentID uuid.UUID, inventory *v1alpha1.Inventory) error {
-	zap.S().Infof("[PlannerService] Update source: %s with agent: %s", sourceID, agentID)
-	update := v1alpha1.UpdateInventoryJSONRequestBody{
-		AgentId:   agentID,
-		Inventory: *inventory,
-	}
+func (s *PlannerSvc) UpdateSource(sourceID uuid.UUID, inventory *v1alpha1.UpdateInventory) error {
+	zap.S().Infof("[PlannerService] Update source: %s with agent: %s", sourceID, inventory.AgentId)
 
-	reqBody, err := json.Marshal(update)
+	reqBody, err := json.Marshal(inventory)
 	if err != nil {
 		return err
 	}
