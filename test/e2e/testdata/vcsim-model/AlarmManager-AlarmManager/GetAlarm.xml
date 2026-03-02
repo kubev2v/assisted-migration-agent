@@ -1,0 +1,5 @@
+<GetAlarmResponse>
+  <returnval type="Alarm">alarm-384</returnval>
+  <returnval type="Alarm">alarm-11</returnval>
+  <returnval type="Alarm">alarm-12</returnval>
+</GetAlarmResponse>

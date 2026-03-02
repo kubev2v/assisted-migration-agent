@@ -60,14 +60,13 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 			})
 
 			ginkgo.AfterEach(func() {
-				if cfg.KeepContainers {
-					ginkgo.GinkgoWriter.Println("Keeping agent container running (--keep-containers flag set)")
-					obs.Close()
+				obs.Close()
+				if ginkgo.CurrentSpecReport().Failed() {
+					ginkgo.GinkgoWriter.Println("Keeping containers running (test failed)")
 					return
 				}
 				ginkgo.GinkgoWriter.Println("Stopping agent...")
 				_ = infraManager.RemoveAgent()
-				obs.Close()
 			})
 
 			// Given an agent configured to start in disconnected mode
@@ -140,14 +139,13 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 			})
 
 			ginkgo.AfterEach(func() {
-				if cfg.KeepContainers {
-					ginkgo.GinkgoWriter.Println("Keeping agent container running (--keep-containers flag set)")
-					obs.Close()
+				obs.Close()
+				if ginkgo.CurrentSpecReport().Failed() {
+					ginkgo.GinkgoWriter.Println("Keeping containers running (test failed)")
 					return
 				}
 				ginkgo.GinkgoWriter.Println("Stopping agent...")
 				_ = infraManager.RemoveAgent()
-				obs.Close()
 			})
 
 			// Given an agent running in connected mode making requests to console
@@ -304,9 +302,9 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 			})
 
 			ginkgo.AfterEach(func() {
-				if cfg.KeepContainers {
-					ginkgo.GinkgoWriter.Println("Keeping agent and vcsim containers running (--keep-containers flag set)")
-					obs.Close()
+				obs.Close()
+				if ginkgo.CurrentSpecReport().Failed() {
+					ginkgo.GinkgoWriter.Println("Keeping containers running (test failed)")
 					return
 				}
 				ginkgo.GinkgoWriter.Println("Stopping agent...")
@@ -624,8 +622,8 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 			})
 
 			ginkgo.AfterEach(func() {
-				if cfg.KeepContainers {
-					ginkgo.GinkgoWriter.Println("Keeping agent container running (--keep-containers flag set)")
+				if ginkgo.CurrentSpecReport().Failed() {
+					ginkgo.GinkgoWriter.Println("Keeping containers running (test failed)")
 					return
 				}
 				ginkgo.GinkgoWriter.Println("Stopping agent...")
@@ -686,8 +684,8 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 			})
 
 			ginkgo.AfterEach(func() {
-				if cfg.KeepContainers {
-					ginkgo.GinkgoWriter.Println("Keeping agent container running (--keep-containers flag set)")
+				if ginkgo.CurrentSpecReport().Failed() {
+					ginkgo.GinkgoWriter.Println("Keeping containers running (test failed)")
 					return
 				}
 				ginkgo.GinkgoWriter.Println("Stopping agent...")
@@ -818,8 +816,8 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 			})
 
 			ginkgo.AfterEach(func() {
-				if cfg.KeepContainers {
-					ginkgo.GinkgoWriter.Println("Keeping agent and vcsim containers running (--keep-containers flag set)")
+				if ginkgo.CurrentSpecReport().Failed() {
+					ginkgo.GinkgoWriter.Println("Keeping containers running (test failed)")
 					return
 				}
 				ginkgo.GinkgoWriter.Println("Stopping agent...")

@@ -1,0 +1,7 @@
+<ObjectContent>
+  <obj type="LicenseManager">LicenseManager</obj>
+  <propSet>
+    <name>licenseAssignmentManager</name>
+    <val type="LicenseAssignmentManager" xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ManagedObjectReference">LicenseAssignmentManager</val>
+  </propSet>
+</ObjectContent>

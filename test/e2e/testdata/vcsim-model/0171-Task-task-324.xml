@@ -1,0 +1,32 @@
+<ObjectContent>
+  <obj type="Task">task-324</obj>
+  <propSet>
+    <name>value</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfCustomFieldValue"></val>
+  </propSet>
+  <propSet>
+    <name>availableField</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfCustomFieldDef"></val>
+  </propSet>
+  <propSet>
+    <name>info</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="TaskInfo">
+      <key>task-324</key>
+      <task type="Task">task-324</task>
+      <name>PowerOn</name>
+      <descriptionId>VirtualMachine.powerOn</descriptionId>
+      <entity type="VirtualMachine">vm-124</entity>
+      <entityName>vm-124</entityName>
+      <state>success</state>
+      <cancelled>false</cancelled>
+      <cancelable>false</cancelable>
+      <reason _XMLSchema-instance:type="TaskReasonUser">
+        <userName>vcsim</userName>
+      </reason>
+      <queueTime>2026-02-28T12:00:24.000000000Z</queueTime>
+      <startTime>2026-02-28T12:00:24.000000000Z</startTime>
+      <completeTime>2026-02-28T12:00:24.000000000Z</completeTime>
+      <eventChainId>0</eventChainId>
+    </val>
+  </propSet>
+</ObjectContent>

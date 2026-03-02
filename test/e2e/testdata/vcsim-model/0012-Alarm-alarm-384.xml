@@ -1,0 +1,49 @@
+<ObjectContent>
+  <obj type="Alarm">alarm-384</obj>
+  <propSet>
+    <name>value</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfCustomFieldValue"></val>
+  </propSet>
+  <propSet>
+    <name>availableField</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfCustomFieldDef"></val>
+  </propSet>
+  <propSet>
+    <name>info</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="AlarmInfo">
+      <name>vcsim VM Alarm</name>
+      <description>vcsim alarm for Virtual Machines</description>
+      <enabled>true</enabled>
+      <expression _XMLSchema-instance:type="OrAlarmExpression">
+        <expression _XMLSchema-instance:type="EventAlarmExpression">
+          <eventType>EventEx</eventType>
+          <eventTypeId>vcsim.vm.success</eventTypeId>
+          <objectType>VirtualMachine</objectType>
+          <status>green</status>
+        </expression>
+        <expression _XMLSchema-instance:type="EventAlarmExpression">
+          <eventType>EventEx</eventType>
+          <eventTypeId>vcsim.vm.failure</eventTypeId>
+          <objectType>VirtualMachine</objectType>
+          <status>yellow</status>
+        </expression>
+        <expression _XMLSchema-instance:type="EventAlarmExpression">
+          <eventType>EventEx</eventType>
+          <eventTypeId>vcsim.vm.fatal</eventTypeId>
+          <objectType>VirtualMachine</objectType>
+          <status>red</status>
+        </expression>
+      </expression>
+      <setting>
+        <toleranceRange>0</toleranceRange>
+        <reportingFrequency>300</reportingFrequency>
+      </setting>
+      <key></key>
+      <alarm type="Alarm">alarm-384</alarm>
+      <entity type="Folder">group-d1</entity>
+      <lastModifiedTime>2026-02-28T10:53:38.860467907Z</lastModifiedTime>
+      <lastModifiedUser>VSPHERE.LOCAL\Administrator</lastModifiedUser>
+      <creationEventId>0</creationEventId>
+    </val>
+  </propSet>
+</ObjectContent>

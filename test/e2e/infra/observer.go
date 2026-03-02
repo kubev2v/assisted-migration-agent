@@ -2,13 +2,15 @@ package infra
 
 import (
 	"context"
+	"sync"
 )
 
 type Observer struct {
-	requests []Request
-	input    chan Request
-	out      chan chan Request
-	cancel   context.CancelFunc
+	requests  []Request
+	input     chan Request
+	out       chan chan Request
+	cancel    context.CancelFunc
+	closeOnce sync.Once
 }
 
 func NewObserver(input chan Request) *Observer {
@@ -36,10 +38,12 @@ func (o *Observer) Requests() []Request {
 }
 
 func (o *Observer) Close() {
-	if o.out != nil {
-		close(o.out)
-	}
-	o.cancel()
+	o.closeOnce.Do(func() {
+		if o.out != nil {
+			close(o.out)
+		}
+		o.cancel()
+	})
 }
 
 func (o *Observer) observe(ctx context.Context) {

@@ -70,4 +70,5 @@ jobs:
             -agent-image=${{ env.AGENT_IMAGE }} \
             -podman-socket=${{ env.PODMAN_SOCKET }} \
             -iso-path=${{ github.workspace }}/iso \
+            -vcsim-model-path=${{ github.workspace }}/test/e2e/testdata/vcsim-model \
             --ginkgo.v

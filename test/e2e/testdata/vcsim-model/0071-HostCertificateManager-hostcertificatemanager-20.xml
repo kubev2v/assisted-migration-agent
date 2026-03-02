@@ -1,0 +1,13 @@
+<ObjectContent>
+  <obj type="HostCertificateManager">hostcertificatemanager-20</obj>
+  <propSet>
+    <name>certificateInfo</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="HostCertificateManagerCertificateInfo">
+      <issuer>CN=,O=Acme Co</issuer>
+      <notBefore>1970-01-01T00:00:00Z</notBefore>
+      <notAfter>2084-01-29T16:00:00Z</notAfter>
+      <subject>CN=,O=Acme Co</subject>
+      <status>unknown</status>
+    </val>
+  </propSet>
+</ObjectContent>

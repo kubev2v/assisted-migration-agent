@@ -1,0 +1,33 @@
+<ObjectContent>
+  <obj type="Task">task-7</obj>
+  <propSet>
+    <name>value</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfCustomFieldValue"></val>
+  </propSet>
+  <propSet>
+    <name>availableField</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfCustomFieldDef"></val>
+  </propSet>
+  <propSet>
+    <name>info</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="TaskInfo">
+      <key>task-7</key>
+      <task type="Task">task-7</task>
+      <name>CreateDVS</name>
+      <descriptionId>Folder.createDVS</descriptionId>
+      <entity type="Folder">group-5</entity>
+      <entityName>group-5</entityName>
+      <state>success</state>
+      <cancelled>false</cancelled>
+      <cancelable>false</cancelable>
+      <result type="DistributedVirtualSwitch" _XMLSchema-instance:type="ManagedObjectReference">dvs-8</result>
+      <reason _XMLSchema-instance:type="TaskReasonUser">
+        <userName>vcsim</userName>
+      </reason>
+      <queueTime>2026-02-28T10:53:38.861906114Z</queueTime>
+      <startTime>2026-02-28T10:53:38.861952079Z</startTime>
+      <completeTime>2026-02-28T10:53:38.863257991Z</completeTime>
+      <eventChainId>0</eventChainId>
+    </val>
+  </propSet>
+</ObjectContent>

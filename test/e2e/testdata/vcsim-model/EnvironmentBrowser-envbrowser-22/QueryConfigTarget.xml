@@ -1,0 +1,63 @@
+<QueryConfigTargetResponse>
+  <returnval>
+    <numCpus>2</numCpus>
+    <numCpuCores>2</numCpuCores>
+    <numNumaNodes>1</numNumaNodes>
+    <smcPresent>false</smcPresent>
+    <datastore>
+      <name>LocalDS_0</name>
+      <datastore>
+        <datastore type="Datastore">datastore-39</datastore>
+        <name>LocalDS_0</name>
+        <url>/tmp/govcsim-DC0-LocalDS_0-3318109946</url>
+        <capacity>10995116277760</capacity>
+        <freeSpace>10952166604800</freeSpace>
+        <accessible>true</accessible>
+        <type>OTHER</type>
+        <maintenanceMode>normal</maintenanceMode>
+      </datastore>
+      <capability>
+        <directoryHierarchySupported>true</directoryHierarchySupported>
+        <rawDiskMappingsSupported>false</rawDiskMappingsSupported>
+        <perFileThinProvisioningSupported>true</perFileThinProvisioningSupported>
+        <storageIORMSupported>true</storageIORMSupported>
+        <nativeSnapshotSupported>false</nativeSnapshotSupported>
+        <topLevelDirectoryCreateSupported>true</topLevelDirectoryCreateSupported>
+        <seSparseSupported>true</seSparseSupported>
+      </capability>
+      <maxFileSize>0</maxFileSize>
+      <mode>readWrite</mode>
+      <vStorageSupport>vStorageUnsupported</vStorageSupport>
+    </datastore>
+    <network>
+      <name>VM Network</name>
+      <network xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="NetworkSummary">
+        <network type="Network">network-6</network>
+        <name>VM Network</name>
+        <accessible>true</accessible>
+        <ipPoolName></ipPoolName>
+      </network>
+    </network>
+    <distributedVirtualPortgroup>
+      <switchName>DVS0</switchName>
+      <switchUuid>fea97929-4b2d-5972-b146-930c6d0b4014</switchUuid>
+      <portgroupName>DVS0-DVUplinks-8</portgroupName>
+      <portgroupKey>dvportgroup-10</portgroupKey>
+      <portgroupType>earlyBinding</portgroupType>
+      <uplinkPortgroup>false</uplinkPortgroup>
+      <portgroup type="DistributedVirtualPortgroup">dvportgroup-10</portgroup>
+      <networkReservationSupported>false</networkReservationSupported>
+    </distributedVirtualPortgroup>
+    <distributedVirtualPortgroup>
+      <switchName>DVS0</switchName>
+      <switchUuid>fea97929-4b2d-5972-b146-930c6d0b4014</switchUuid>
+      <portgroupName>DC0_DVPG0</portgroupName>
+      <portgroupKey>dvportgroup-12</portgroupKey>
+      <portgroupType>earlyBinding</portgroupType>
+      <uplinkPortgroup>false</uplinkPortgroup>
+      <portgroup type="DistributedVirtualPortgroup">dvportgroup-12</portgroup>
+      <networkReservationSupported>false</networkReservationSupported>
+    </distributedVirtualPortgroup>
+    <maxMemMBOptimalPerf>0</maxMemMBOptimalPerf>
+  </returnval>
+</QueryConfigTargetResponse>

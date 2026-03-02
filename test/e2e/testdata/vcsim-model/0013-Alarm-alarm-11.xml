@@ -1,0 +1,54 @@
+<ObjectContent>
+  <obj type="Alarm">alarm-11</obj>
+  <propSet>
+    <name>value</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfCustomFieldValue"></val>
+  </propSet>
+  <propSet>
+    <name>availableField</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfCustomFieldDef"></val>
+  </propSet>
+  <propSet>
+    <name>info</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="AlarmInfo">
+      <name>Host error</name>
+      <systemName>alarm.HostErrorAlarm</systemName>
+      <description>Default alarm to monitor host error and warning events</description>
+      <enabled>true</enabled>
+      <expression _XMLSchema-instance:type="OrAlarmExpression">
+        <expression _XMLSchema-instance:type="EventAlarmExpression">
+          <eventType>GeneralHostErrorEvent</eventType>
+          <objectType>HostSystem</objectType>
+        </expression>
+        <expression _XMLSchema-instance:type="EventAlarmExpression">
+          <eventType>GeneralHostWarningEvent</eventType>
+          <objectType>HostSystem</objectType>
+        </expression>
+      </expression>
+      <action _XMLSchema-instance:type="GroupAlarmAction">
+        <action _XMLSchema-instance:type="AlarmTriggeringAction">
+          <action _XMLSchema-instance:type="SendSNMPAction"></action>
+          <transitionSpecs>
+            <startState>yellow</startState>
+            <finalState>red</finalState>
+            <repeats>true</repeats>
+          </transitionSpecs>
+          <green2yellow>false</green2yellow>
+          <yellow2red>false</yellow2red>
+          <red2yellow>false</red2yellow>
+          <yellow2green>false</yellow2green>
+        </action>
+      </action>
+      <setting>
+        <toleranceRange>0</toleranceRange>
+        <reportingFrequency>300</reportingFrequency>
+      </setting>
+      <key></key>
+      <alarm type="Alarm">alarm-11</alarm>
+      <entity type="Folder">group-d1</entity>
+      <lastModifiedTime>2026-02-28T10:53:38.860470071Z</lastModifiedTime>
+      <lastModifiedUser></lastModifiedUser>
+      <creationEventId>0</creationEventId>
+    </val>
+  </propSet>
+</ObjectContent>

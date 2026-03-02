@@ -6,9 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strconv"
 
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"go.uber.org/zap"
+
+	v1 "github.com/kubev2v/assisted-migration-agent/api/v1"
 )
 
 // --- Agent API request/response types ---
@@ -43,9 +47,10 @@ type AgentSvc struct {
 }
 
 type AgentReq struct {
-	req         *http.Request
-	queryParams map[string]string
-	Headers     map[string]string
+	req              *http.Request
+	queryParams      map[string]string
+	queryParamSlices map[string][]string
+	Headers          map[string]string
 }
 
 // DefaultAgentSvc creates an AgentSvc client with a default HTTP client that skips TLS verification
@@ -69,9 +74,10 @@ func NewAgentSvc(agentApiBaseUrl string, customHttpClient *http.Client) *AgentSv
 
 func NewAgentRequest(req *http.Request) *AgentReq {
 	return &AgentReq{
-		req:         req,
-		queryParams: make(map[string]string),
-		Headers:     make(map[string]string),
+		req:              req,
+		queryParams:      make(map[string]string),
+		queryParamSlices: make(map[string][]string),
+		Headers:          make(map[string]string),
 	}
 }
 
@@ -231,11 +237,116 @@ func (a *AgentSvc) Inventory() (*v1alpha1.UpdateInventory, error) {
 	return &inventory, nil
 }
 
+// VMListParams holds parameters for listing VMs with filters
+type VMListParams struct {
+	MinIssues     *int
+	Clusters      []string
+	Status        []string
+	DiskSizeMin   *int64
+	DiskSizeMax   *int64
+	MemorySizeMin *int64
+	MemorySizeMax *int64
+	Sort          []string
+	Page          *int
+	PageSize      *int
+}
+
+// ListVMs retrieves a list of VMs with optional filters
+func (a *AgentSvc) ListVMs(params *VMListParams) (*v1.VirtualMachineListResponse, error) {
+	req, err := http.NewRequest(http.MethodGet, a.baseURL+"/api/v1/vms", nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	agentReq := NewAgentRequest(req)
+	if params != nil {
+		if params.MinIssues != nil {
+			agentReq.withQueryParam("minIssues", strconv.Itoa(*params.MinIssues))
+		}
+		if params.DiskSizeMin != nil {
+			agentReq.withQueryParam("diskSizeMin", strconv.FormatInt(*params.DiskSizeMin, 10))
+		}
+		if params.DiskSizeMax != nil {
+			agentReq.withQueryParam("diskSizeMax", strconv.FormatInt(*params.DiskSizeMax, 10))
+		}
+		if params.MemorySizeMin != nil {
+			agentReq.withQueryParam("memorySizeMin", strconv.FormatInt(*params.MemorySizeMin, 10))
+		}
+		if params.MemorySizeMax != nil {
+			agentReq.withQueryParam("memorySizeMax", strconv.FormatInt(*params.MemorySizeMax, 10))
+		}
+		if params.Page != nil {
+			agentReq.withQueryParam("page", strconv.Itoa(*params.Page))
+		}
+		if params.PageSize != nil {
+			agentReq.withQueryParam("pageSize", strconv.Itoa(*params.PageSize))
+		}
+		agentReq.withQueryParamSlice("clusters", params.Clusters).
+			withQueryParamSlice("status", params.Status).
+			withQueryParamSlice("sort", params.Sort)
+	}
+
+	resp, err := a.request(agentReq)
+	if err != nil {
+		return nil, fmt.Errorf("sending request: %w", err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var result v1.VirtualMachineListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+
+	return &result, nil
+}
+
+// GetVM retrieves details for a specific VM by ID
+func (a *AgentSvc) GetVM(id string) (*v1.VirtualMachineDetail, error) {
+	req, err := http.NewRequest(http.MethodGet, a.baseURL+"/api/v1/vms/"+url.PathEscape(id), nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	resp, err := a.request(NewAgentRequest(req))
+	if err != nil {
+		return nil, fmt.Errorf("sending request: %w", err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("VM not found: %s", id)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var vm v1.VirtualMachineDetail
+	if err := json.NewDecoder(resp.Body).Decode(&vm); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+
+	return &vm, nil
+}
+
 func (a *AgentSvc) request(r *AgentReq) (*http.Response, error) {
-	if len(r.queryParams) > 0 {
+	if len(r.queryParams) > 0 || len(r.queryParamSlices) > 0 {
 		q := r.req.URL.Query()
 		for key, value := range r.queryParams {
-			q.Add(key, value)
+			q.Set(key, value)
+		}
+		for key, values := range r.queryParamSlices {
+			for _, value := range values {
+				q.Add(key, value)
+			}
 		}
 		r.req.URL.RawQuery = q.Encode()
 	}
@@ -251,6 +362,13 @@ func (a *AgentSvc) request(r *AgentReq) (*http.Response, error) {
 
 func (r *AgentReq) withQueryParam(key, value string) *AgentReq {
 	r.queryParams[key] = value
+	return r
+}
+
+func (r *AgentReq) withQueryParamSlice(key string, values []string) *AgentReq {
+	if len(values) > 0 {
+		r.queryParamSlices[key] = values
+	}
 	return r
 }
 

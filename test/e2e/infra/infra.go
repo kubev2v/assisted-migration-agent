@@ -32,4 +32,5 @@ type AgentConfig struct {
 const (
 	VcsimUsername = "core"
 	VcsimPassword = "123456"
+	VcsimURL      = "https://localhost:8989/sdk"
 )

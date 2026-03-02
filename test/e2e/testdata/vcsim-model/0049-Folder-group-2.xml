@@ -1,0 +1,261 @@
+<ObjectContent>
+  <obj type="Folder">group-2</obj>
+  <propSet>
+    <name>value</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfCustomFieldValue"></val>
+  </propSet>
+  <propSet>
+    <name>availableField</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfCustomFieldDef"></val>
+  </propSet>
+  <propSet>
+    <name>parent</name>
+    <val type="Datacenter" xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ManagedObjectReference">datacenter-1</val>
+  </propSet>
+  <propSet>
+    <name>customValue</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfCustomFieldValue"></val>
+  </propSet>
+  <propSet>
+    <name>overallStatus</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ManagedEntityStatus">green</val>
+  </propSet>
+  <propSet>
+    <name>configStatus</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ManagedEntityStatus">green</val>
+  </propSet>
+  <propSet>
+    <name>configIssue</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfEvent"></val>
+  </propSet>
+  <propSet>
+    <name>effectiveRole</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfInt">
+      <int>-1</int>
+    </val>
+  </propSet>
+  <propSet>
+    <name>permission</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfPermission"></val>
+  </propSet>
+  <propSet>
+    <name>name</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="xsd:string">vm</val>
+  </propSet>
+  <propSet>
+    <name>disabledMethod</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfString"></val>
+  </propSet>
+  <propSet>
+    <name>recentTask</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfManagedObjectReference">
+      <ManagedObjectReference type="Task">task-200</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-201</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-202</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-203</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-204</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-205</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-206</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-207</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-208</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-209</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-210</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-211</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-212</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-213</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-214</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-215</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-216</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-217</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-218</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-219</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-220</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-221</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-222</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-223</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-224</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-225</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-226</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-227</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-228</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-229</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-230</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-231</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-232</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-233</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-234</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-235</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-236</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-237</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-238</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-239</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-240</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-241</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-242</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-243</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-244</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-245</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-246</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-247</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-248</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-249</ManagedObjectReference>
+    </val>
+  </propSet>
+  <propSet>
+    <name>declaredAlarmState</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfAlarmState"></val>
+  </propSet>
+  <propSet>
+    <name>triggeredAlarmState</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfAlarmState"></val>
+  </propSet>
+  <propSet>
+    <name>tag</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfTag"></val>
+  </propSet>
+  <propSet>
+    <name>childType</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfString">
+      <string>VirtualMachine</string>
+      <string>VirtualApp</string>
+      <string>Folder</string>
+    </val>
+  </propSet>
+  <propSet>
+    <name>childEntity</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfManagedObjectReference">
+      <ManagedObjectReference type="Folder">group-60</ManagedObjectReference>
+      <ManagedObjectReference type="Folder">group-61</ManagedObjectReference>
+      <ManagedObjectReference type="Folder">group-62</ManagedObjectReference>
+    </val>
+  </propSet>
+  <propSet>
+    <name>value</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfCustomFieldValue"></val>
+  </propSet>
+  <propSet>
+    <name>availableField</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfCustomFieldDef"></val>
+  </propSet>
+  <propSet>
+    <name>parent</name>
+    <val type="Datacenter" xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ManagedObjectReference">datacenter-1</val>
+  </propSet>
+  <propSet>
+    <name>customValue</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfCustomFieldValue"></val>
+  </propSet>
+  <propSet>
+    <name>overallStatus</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ManagedEntityStatus">green</val>
+  </propSet>
+  <propSet>
+    <name>configStatus</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ManagedEntityStatus">green</val>
+  </propSet>
+  <propSet>
+    <name>configIssue</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfEvent"></val>
+  </propSet>
+  <propSet>
+    <name>effectiveRole</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfInt">
+      <int>-1</int>
+    </val>
+  </propSet>
+  <propSet>
+    <name>permission</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfPermission"></val>
+  </propSet>
+  <propSet>
+    <name>name</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="xsd:string">vm</val>
+  </propSet>
+  <propSet>
+    <name>disabledMethod</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfString"></val>
+  </propSet>
+  <propSet>
+    <name>recentTask</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfManagedObjectReference">
+      <ManagedObjectReference type="Task">task-200</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-201</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-202</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-203</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-204</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-205</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-206</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-207</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-208</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-209</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-210</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-211</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-212</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-213</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-214</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-215</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-216</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-217</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-218</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-219</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-220</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-221</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-222</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-223</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-224</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-225</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-226</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-227</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-228</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-229</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-230</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-231</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-232</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-233</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-234</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-235</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-236</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-237</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-238</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-239</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-240</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-241</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-242</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-243</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-244</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-245</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-246</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-247</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-248</ManagedObjectReference>
+      <ManagedObjectReference type="Task">task-249</ManagedObjectReference>
+    </val>
+  </propSet>
+  <propSet>
+    <name>declaredAlarmState</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfAlarmState"></val>
+  </propSet>
+  <propSet>
+    <name>triggeredAlarmState</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfAlarmState"></val>
+  </propSet>
+  <propSet>
+    <name>tag</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfTag"></val>
+  </propSet>
+  <propSet>
+    <name>childType</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfString">
+      <string>VirtualMachine</string>
+      <string>VirtualApp</string>
+      <string>Folder</string>
+    </val>
+  </propSet>
+  <propSet>
+    <name>childEntity</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfManagedObjectReference">
+      <ManagedObjectReference type="Folder">group-60</ManagedObjectReference>
+      <ManagedObjectReference type="Folder">group-61</ManagedObjectReference>
+      <ManagedObjectReference type="Folder">group-62</ManagedObjectReference>
+    </val>
+  </propSet>
+</ObjectContent>

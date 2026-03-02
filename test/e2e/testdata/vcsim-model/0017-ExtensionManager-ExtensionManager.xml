@@ -1,0 +1,22 @@
+<ObjectContent>
+  <obj type="ExtensionManager">ExtensionManager</obj>
+  <propSet>
+    <name>extensionList</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfExtension">
+      <Extension>
+        <description _XMLSchema-instance:type="Description">
+          <label>vcsim</label>
+          <summary>Go vCenter simulator</summary>
+        </description>
+        <key>com.vmware.govmomi.simulator</key>
+        <company>VMware, Inc.</company>
+        <version>0.37.0</version>
+        <taskList>
+          <taskID>com.vmware.govmomi.simulator.test</taskID>
+        </taskList>
+        <lastHeartbeatTime>2026-02-28T10:53:38.860880394Z</lastHeartbeatTime>
+        <shownInSolutionManager>false</shownInSolutionManager>
+      </Extension>
+    </val>
+  </propSet>
+</ObjectContent>

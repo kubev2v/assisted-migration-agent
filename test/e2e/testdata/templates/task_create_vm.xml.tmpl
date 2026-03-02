@@ -1,0 +1,33 @@
+<ObjectContent>
+  <obj type="Task">task-{{.TaskID}}</obj>
+  <propSet>
+    <name>value</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfCustomFieldValue"></val>
+  </propSet>
+  <propSet>
+    <name>availableField</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfCustomFieldDef"></val>
+  </propSet>
+  <propSet>
+    <name>info</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="TaskInfo">
+      <key>task-{{.TaskID}}</key>
+      <task type="Task">task-{{.TaskID}}</task>
+      <name>CreateVm</name>
+      <descriptionId>Folder.createVm</descriptionId>
+      <entity type="Folder">group-2</entity>
+      <entityName>group-2</entityName>
+      <state>success</state>
+      <cancelled>false</cancelled>
+      <cancelable>false</cancelable>
+      <result type="VirtualMachine" _XMLSchema-instance:type="ManagedObjectReference">vm-{{.VMID}}</result>
+      <reason _XMLSchema-instance:type="TaskReasonUser">
+        <userName>vcsim</userName>
+      </reason>
+      <queueTime>{{.Timestamp}}</queueTime>
+      <startTime>{{.Timestamp}}</startTime>
+      <completeTime>{{.Timestamp}}</completeTime>
+      <eventChainId>0</eventChainId>
+    </val>
+  </propSet>
+</ObjectContent>

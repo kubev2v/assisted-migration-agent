@@ -1,6 +1,8 @@
 package infra
 
-import "fmt"
+import (
+	"fmt"
+)
 
 const (
 	dbContainerName      = "test-planner-db"
@@ -22,24 +24,26 @@ const (
 
 // ContainerInfraManager implements InfraManager using Podman containers.
 type ContainerInfraManager struct {
-	runner       *PodmanRunner
-	backendImage string
-	agentImage   string
-	isoPath      string
-	oidc         *OIDCServer
+	runner         *PodmanRunner
+	backendImage   string
+	agentImage     string
+	isoPath        string
+	vcsimModelPath string
+	oidc           *OIDCServer
 }
 
 // NewContainerInfraManager creates a new ContainerInfraManager.
-func NewContainerInfraManager(podmanSocket, backendImage, agentImage, isoPath string) (*ContainerInfraManager, error) {
+func NewContainerInfraManager(podmanSocket, backendImage, agentImage, isoPath, vcsimModelPath string) (*ContainerInfraManager, error) {
 	runner, err := NewPodmanRunner(podmanSocket)
 	if err != nil {
 		return nil, err
 	}
 	return &ContainerInfraManager{
-		runner:       runner,
-		backendImage: backendImage,
-		agentImage:   agentImage,
-		isoPath:      isoPath,
+		runner:         runner,
+		backendImage:   backendImage,
+		agentImage:     agentImage,
+		isoPath:        isoPath,
+		vcsimModelPath: vcsimModelPath,
 	}, nil
 }
 
@@ -123,20 +127,34 @@ func (c *ContainerInfraManager) StopBackend() error {
 }
 
 func (c *ContainerInfraManager) StartVcsim() error {
-	_, err := c.runner.StartContainer(
-		NewContainerConfig(vcsimContainerName, vcsimImage).
-			WithPort(vcsimPort, vcsimPort).
+	cfg := NewContainerConfig(vcsimContainerName, vcsimImage).
+		WithPort(vcsimPort, vcsimPort)
+
+	if c.vcsimModelPath != "" {
+		// Use -load flag to load pre-generated model from XML files
+		cfg = cfg.
+			WithBindMount(c.vcsimModelPath, "/model").
 			WithCmd(
 				"-l", ":8989",
 				"-username", VcsimUsername,
 				"-password", VcsimPassword,
-				"-dc", "1",
-				"-cluster", "1",
-				"-ds", "1",
-				"-host", "1",
-				"-vm", "3",
-			),
-	)
+				"-load", "/model",
+			)
+	} else {
+		// Fallback to generating infrastructure with flags
+		cfg = cfg.WithCmd(
+			"-l", ":8989",
+			"-username", VcsimUsername,
+			"-password", VcsimPassword,
+			"-dc", "1",
+			"-cluster", "1",
+			"-ds", "1",
+			"-host", "1",
+			"-vm", "0",
+		)
+	}
+
+	_, err := c.runner.StartContainer(cfg)
 	return err
 }
 

@@ -1,0 +1,39 @@
+<ObjectContent>
+  <obj type="HostVirtualNicManager">hostvirtualnicmanager-16</obj>
+  <propSet>
+    <name>value</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfCustomFieldValue"></val>
+  </propSet>
+  <propSet>
+    <name>availableField</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfCustomFieldDef"></val>
+  </propSet>
+  <propSet>
+    <name>info</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="HostVirtualNicManagerInfo">
+      <netConfig>
+        <nicType>management</nicType>
+        <multiSelectAllowed>true</multiSelectAllowed>
+        <candidateVnic>
+          <device>vmk0</device>
+          <key>management.key-vim.host.VirtualNic-vmk0</key>
+          <portgroup>Management Network</portgroup>
+          <spec>
+            <ip>
+              <dhcp>true</dhcp>
+              <ipAddress>127.0.0.1</ipAddress>
+              <subnetMask>255.0.0.0</subnetMask>
+            </ip>
+            <mac>00:0c:29:81:d8:a0</mac>
+            <portgroup>Management Network</portgroup>
+            <mtu>1500</mtu>
+            <tsoEnabled>true</tsoEnabled>
+            <netStackInstanceKey>defaultTcpipStack</netStackInstanceKey>
+            <systemOwned>false</systemOwned>
+          </spec>
+        </candidateVnic>
+        <selectedVnic>management.key-vim.host.VirtualNic-vmk0</selectedVnic>
+      </netConfig>
+    </val>
+  </propSet>
+</ObjectContent>
