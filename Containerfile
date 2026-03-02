@@ -16,9 +16,9 @@ RUN go mod download
 
 USER 0
 COPY . .
-ARG GIT_COMMIT=unknown
-ARG VERSION=v0.0.0
-RUN make build GIT_COMMIT=${GIT_COMMIT} VERSION=${VERSION} BINARY_PATH=/tmp/agent
+ARG PLANNER_AGENT_GIT_COMMIT=unknown
+ARG PLANNER_AGENT_VERSION=v0.0.0
+RUN make build PLANNER_AGENT_GIT_COMMIT=${PLANNER_AGENT_GIT_COMMIT} PLANNER_AGENT_VERSION=${PLANNER_AGENT_VERSION} BINARY_PATH=/tmp/agent
 
 
 # =============================================================================

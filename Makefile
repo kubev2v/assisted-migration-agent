@@ -1,8 +1,8 @@
 .PHONY: generate generate.proto build build.e2e e2e e2e.container e2e.vm e2e.container.clean run container.run container.stop help tidy tidy-check clean lint format check-format check-generate validate-all image setup-opa-policies clean-opa-policies test test.fuzz
 
 PODMAN ?= podman
-GIT_COMMIT=$(shell git rev-list -1 HEAD --abbrev-commit)
-VERSION=$(shell cat VERSION)
+PLANNER_AGENT_GIT_COMMIT ?= $(shell git rev-list -1 HEAD --abbrev-commit)
+PLANNER_AGENT_VERSION ?= "DEV"
 
 # OPA Policies
 OPA_POLICIES_FOLDER ?= $(CURDIR)/policies
@@ -52,7 +52,7 @@ help:
 # Build the application
 build:
 	@echo "Building $(BINARY_NAME)..."
-	go build -ldflags="-X main.gitCommit=${GIT_COMMIT} -X main.version=${VERSION}" -o $(BINARY_PATH) $(MAIN_PATH)
+	go build -ldflags="-X main.gitCommit=${PLANNER_AGENT_GIT_COMMIT} -X main.version=${PLANNER_AGENT_VERSION}" -o $(BINARY_PATH) $(MAIN_PATH)
 	@echo "Build complete: $(BINARY_PATH)"
 
 build.e2e:
@@ -88,7 +88,7 @@ e2e.container.clean:
 # Build container image
 image:
 	@echo "📦 Building container image $(IMAGE_NAME):$(IMAGE_TAG)..."
-	$(PODMAN) build --build-arg GIT_COMMIT=$(GIT_COMMIT) --build-arg VERSION=$(VERSION) --build-arg AGENT_UI_IMAGE_TAG=$(AGENT_UI_IMAGE_TAG) -t $(IMAGE_NAME):$(IMAGE_TAG) -f Containerfile .
+	$(PODMAN) build --build-arg GIT_COMMIT=$(PLANNER_AGENT_GIT_COMMIT) --build-arg VERSION=$(PLANNER_AGENT_VERSION) --build-arg AGENT_UI_IMAGE_TAG=$(AGENT_UI_IMAGE_TAG) -t $(IMAGE_NAME):$(IMAGE_TAG) -f Containerfile .
 	@echo "✅ Image built: $(IMAGE_NAME):$(IMAGE_TAG)"
 
 # Run container image locally
