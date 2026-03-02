@@ -122,6 +122,7 @@ run.image: image
 		--server-mode prod \
 		--server-statics-folder /app/static \
 		--data-folder /var/lib/agent \
+		--opa-policies-folder /app/policies \
 		--console-url http://host.containers.internal:7443
 	@echo "✅ Container started. View logs with: podman logs -f $(CONTAINER_NAME)"
 

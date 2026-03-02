@@ -20,15 +20,24 @@ func (a *AgentStatus) FromModel(m models.AgentStatus) {
 
 // NewVirtualMachineFromSummary converts a models.VirtualMachineSummary to an API VirtualMachine.
 func NewVirtualMachineFromSummary(vm models.VirtualMachineSummary) VirtualMachine {
+	var issues []VmIssue
+	for _, issue := range vm.Issues {
+		issues = append(issues, VmIssue{
+			Id:       issue.Id,
+			Category: issue.Category,
+			Message:  issue.Assessment,
+		})
+	}
+
 	return VirtualMachine{
 		Id:           vm.ID,
 		Name:         vm.Name,
 		Cluster:      vm.Cluster,
 		Datacenter:   vm.Datacenter,
 		DiskSize:     vm.DiskSize,
+		Issues:       issues,
 		Memory:       int64(vm.Memory),
 		VCenterState: vm.PowerState,
-		IssueCount:   vm.IssueCount,
 		Migratable:   &vm.IsMigratable,
 		Template:     &vm.IsTemplate,
 		Inspection:   NewInspectionStatus(vm.Status),

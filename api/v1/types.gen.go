@@ -209,7 +209,11 @@ type VirtualMachine struct {
 	Inspection VmInspectionStatus `json:"inspection"`
 
 	// IssueCount Number of issues found for this VirtualMachine
+	// Deprecated:
 	IssueCount int `json:"issueCount"`
+
+	// Issues Issues found for this VirtualMachine
+	Issues []VmIssue `json:"issues"`
 
 	// Memory Memory size in MB
 	Memory int64 `json:"memory"`
@@ -348,6 +352,14 @@ type VmInspectionStatus struct {
 
 // VmInspectionStatusState Current inspection state
 type VmInspectionStatusState string
+
+// VmIssue defines model for VmIssue.
+type VmIssue struct {
+	// Category VM issue severity
+	Category string `json:"Category"`
+	Id       string `json:"id"`
+	Message  string `json:"message"`
+}
 
 // GetInventoryParams defines parameters for GetInventory.
 type GetInventoryParams struct {

@@ -1,5 +1,9 @@
 package models
 
+import (
+	"github.com/kubev2v/migration-planner/pkg/duckdb_parser/models"
+)
+
 // VirtualMachineSummary represents a lightweight VM record for list views.
 type VirtualMachineSummary struct {
 	ID           string
@@ -9,6 +13,7 @@ type VirtualMachineSummary struct {
 	Datacenter   string
 	Memory       int32 // MB
 	DiskSize     int64 // MB (stored as MiB in DB, treated as MB)
+	Issues       models.Concerns
 	IssueCount   int
 	IsMigratable bool
 	IsTemplate   bool

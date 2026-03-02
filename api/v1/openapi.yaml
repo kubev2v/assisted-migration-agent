@@ -499,6 +499,21 @@ components:
           type: object
           description: Inspection results
 
+    VmIssue:
+      type: object
+      required:
+        - id
+        - Category
+        - message
+      properties:
+        id:
+          type: string
+        Category:
+          type: string
+          description: VM issue severity
+        message:
+          type: string
+
     VirtualMachine:
       type: object
       required:
@@ -509,6 +524,7 @@ components:
         - datacenter
         - diskSize
         - memory
+        - issues
         - issueCount
         - inspection
       properties:
@@ -538,6 +554,12 @@ components:
         issueCount:
           type: integer
           description: Number of issues found for this VirtualMachine
+          deprecated: true
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/VmIssue'
+          description: Issues found for this VirtualMachine
         migratable:
           type: boolean
           description: True if the vm is migratable for MTV. False otherwise

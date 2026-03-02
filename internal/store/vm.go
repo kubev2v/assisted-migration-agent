@@ -15,6 +15,9 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/pkg/filter"
 )
 
+// concernDelim is used to join/split concern fields in aggregated SQL (must not appear in data).
+const concernDelim = "\x1e"
+
 type VMStore struct {
 	db     QueryInterceptor
 	parser *duckdb_parser.Parser
@@ -34,16 +37,27 @@ func (s *VMStore) List(ctx context.Context, opts ...ListOption) ([]models.Virtua
 		`COALESCE(v."Datacenter", '') AS datacenter`,
 		`v."Memory" AS memory`,
 		`COALESCE(d.total_disk, 0) AS disk_size`,
-		`COALESCE(c.issue_count, 0) AS issue_count`,
 		`COALESCE(i.status, 'not_found') AS status`,
 		`v."Template" as template`,
 		`COALESCE(crit.critical_count, 0) = 0 AS migratable`,
 		`COALESCE(i.error, '') AS error`,
+		`COALESCE(concerns_agg.concern_ids, '') AS concern_ids`,
+		`COALESCE(concerns_agg.concern_labels, '') AS concern_labels`,
+		`COALESCE(concerns_agg.concern_categories, '') AS concern_categories`,
+		`COALESCE(concerns_agg.concern_assessments, '') AS concern_assessments`,
 	).From("vinfo v").
-		LeftJoin(`(SELECT "VM_ID", COUNT(*) AS issue_count FROM concerns GROUP BY "VM_ID") c ON v."VM ID" = c."VM_ID"`).
 		LeftJoin(`(SELECT "VM_ID", COUNT(*) AS critical_count FROM concerns WHERE "Category" = 'Critical' GROUP BY "VM_ID") crit ON v."VM ID" = crit."VM_ID"`).
 		LeftJoin(`(SELECT "VM ID", SUM("Capacity MiB") AS total_disk FROM vdisk GROUP BY "VM ID") d ON v."VM ID" = d."VM ID"`).
-		LeftJoin(`vm_inspection_status i ON v."VM ID" = i."VM ID"`)
+		LeftJoin(`vm_inspection_status i ON v."VM ID" = i."VM ID"`).
+		LeftJoin(`(
+			SELECT "VM_ID",
+				string_agg("Concern_ID", chr(30) ORDER BY "Concern_ID") AS concern_ids,
+				string_agg("Label", chr(30) ORDER BY "Concern_ID") AS concern_labels,
+				string_agg("Category", chr(30) ORDER BY "Concern_ID") AS concern_categories,
+				string_agg("Assessment", chr(30) ORDER BY "Concern_ID") AS concern_assessments
+			FROM concerns
+			GROUP BY "VM_ID"
+		) concerns_agg ON v."VM ID" = concerns_agg."VM_ID"`)
 
 	for _, opt := range opts {
 		builder = opt(builder)
@@ -65,7 +79,7 @@ func (s *VMStore) List(ctx context.Context, opts ...ListOption) ([]models.Virtua
 	var vms []models.VirtualMachineSummary
 	for rows.Next() {
 		var vm models.VirtualMachineSummary
-		var sqlErr string
+		var sqlErr, concernIDs, concernLabels, concernCategories, concernAssessments string
 		err := rows.Scan(
 			&vm.ID,
 			&vm.Name,
@@ -74,20 +88,60 @@ func (s *VMStore) List(ctx context.Context, opts ...ListOption) ([]models.Virtua
 			&vm.Datacenter,
 			&vm.Memory,
 			&vm.DiskSize,
-			&vm.IssueCount,
 			&vm.Status.State,
 			&vm.IsTemplate,
 			&vm.IsMigratable,
 			&sqlErr,
+			&concernIDs,
+			&concernLabels,
+			&concernCategories,
+			&concernAssessments,
 		)
 		if err != nil {
 			return nil, err
 		}
 		vm.Status.Error = errors.New(sqlErr)
+		vm.Issues = parseConcernsFromAgg(concernIDs, concernLabels, concernCategories, concernAssessments)
 		vms = append(vms, vm)
 	}
-
 	return vms, rows.Err()
+}
+
+// parseConcernsFromAgg zips four delimiter-separated strings (char 30) into []parsermodels.Concern.
+func parseConcernsFromAgg(ids, labels, categories, assessments string) parsermodels.Concerns {
+	if ids == "" {
+		return nil
+	}
+	idsList := strings.Split(ids, concernDelim)
+	labelsList := strings.Split(labels, concernDelim)
+	catsList := strings.Split(categories, concernDelim)
+	assessList := strings.Split(assessments, concernDelim)
+	n := len(idsList)
+	if n == 0 {
+		return nil
+	}
+	out := make(parsermodels.Concerns, 0, n)
+	for i := 0; i < n; i++ {
+		label := ""
+		if i < len(labelsList) {
+			label = labelsList[i]
+		}
+		cat := ""
+		if i < len(catsList) {
+			cat = catsList[i]
+		}
+		assess := ""
+		if i < len(assessList) {
+			assess = assessList[i]
+		}
+		out = append(out, parsermodels.Concern{
+			Id:         idsList[i],
+			Label:      label,
+			Category:   cat,
+			Assessment: assess,
+		})
+	}
+	return out
 }
 
 // Count returns the total number of VMs matching the filters.

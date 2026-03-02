@@ -7,6 +7,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	duckdbModels "github.com/kubev2v/migration-planner/pkg/duckdb_parser/models"
+
 	v1 "github.com/kubev2v/assisted-migration-agent/api/v1"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 )
@@ -87,7 +89,14 @@ var _ = Describe("NewVirtualMachineFromSummary", func() {
 			Datacenter: "DC1",
 			Memory:     4096,
 			DiskSize:   102400,
-			IssueCount: 3,
+			Issues: duckdbModels.Concerns{
+				duckdbModels.Concern{
+					Id:         "concern1",
+					Assessment: "msg1",
+					Label:      "label1",
+					Category:   "category1",
+				},
+			},
 		}
 
 		vm := v1.NewVirtualMachineFromSummary(summary)
@@ -97,9 +106,12 @@ var _ = Describe("NewVirtualMachineFromSummary", func() {
 		Expect(vm.VCenterState).To(Equal("poweredOn"))
 		Expect(vm.Cluster).To(Equal("cluster-1"))
 		Expect(vm.Datacenter).To(Equal("DC1"))
+		Expect(vm.Issues).To(HaveLen(1))
+		Expect(vm.Issues[0].Category).To(Equal("category1"))
+		Expect(vm.Issues[0].Message).To(Equal("msg1"))
+		Expect(vm.Issues[0].Id).To(Equal("concern1"))
 		Expect(vm.Memory).To(Equal(int64(4096)))
 		Expect(vm.DiskSize).To(Equal(int64(102400)))
-		Expect(vm.IssueCount).To(Equal(3))
 		Expect(vm.Inspection.State).To(Equal(v1.VmInspectionStatusStateNotFound))
 	})
 
