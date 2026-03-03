@@ -43,10 +43,11 @@ type NIC struct {
 }
 
 type Concern struct {
-	VMID      string
-	ConcernID string
-	Label     string
-	Category  string
+	VMID       string
+	ConcernID  string
+	Label      string
+	Category   string
+	Assessment string
 }
 
 var VMs = []VM{
@@ -85,12 +86,12 @@ var NICs = []NIC{
 }
 
 var Concerns = []Concern{
-	{"vm-003", "concern-001", "High memory usage", "Warning"},
-	{"vm-003", "concern-002", "Outdated VMware Tools", "Warning"},
-	{"vm-004", "concern-003", "No backup configured", "Warning"},
-	{"vm-007", "concern-004", "Suspended state", "Warning"},
-	{"vm-007", "concern-005", "RDM disk detected", "Critical"},
-	{"vm-007", "concern-006", "Storage warning", "Warning"},
+	{"vm-003", "concern-001", "High memory usage", "Warning", "The VM is using 95% of allocated memory. Consider increasing memory allocation or optimizing workload."},
+	{"vm-003", "concern-002", "Outdated VMware Tools", "Warning", "VMware Tools version is outdated. Update to the latest version for better performance and compatibility."},
+	{"vm-004", "concern-003", "No backup configured", "Warning", "No backup policy is configured for this VM. Configure regular backups to prevent data loss."},
+	{"vm-007", "concern-004", "Suspended state", "Warning", "VM is in suspended state. Resume or power off the VM before migration."},
+	{"vm-007", "concern-005", "RDM disk detected", "Critical", "Raw Device Mapping (RDM) disk is attached. RDM disks require special handling during migration and may not be supported."},
+	{"vm-007", "concern-006", "Storage warning", "Information", "VM storage usage is at 75%. Monitor storage capacity and consider expansion if needed."},
 }
 
 // InsertVMs inserts all test VM data into the database.
@@ -141,11 +142,11 @@ func InsertVMs(ctx context.Context, db *sql.DB) error {
 		}
 	}
 
-	for _, c := range Concerns {
+	for _, concern := range Concerns {
 		_, err := db.ExecContext(ctx, `
 			INSERT INTO concerns ("VM_ID", "Concern_ID", "Label", "Category", "Assessment")
-			VALUES (?, ?, ?, ?, 'Needs attention')
-		`, c.VMID, c.ConcernID, c.Label, c.Category)
+			VALUES (?, ?, ?, ?, ?)
+		`, concern.VMID, concern.ConcernID, concern.Label, concern.Category, concern.Assessment)
 		if err != nil {
 			return err
 		}

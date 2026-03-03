@@ -160,7 +160,20 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 	}
 
 	if len(vm.Issues) > 0 {
-		details.Issues = &vm.Issues
+		issues := make([]VMIssue, 0, len(vm.Issues))
+		for _, issue := range vm.Issues {
+			description := issue.Description
+			if description == "" {
+				description = issue.Label
+			}
+			vmIssue := VMIssue{
+				Label:       issue.Label,
+				Category:    VMIssueCategory(issue.Category),
+				Description: description,
+			}
+			issues = append(issues, vmIssue)
+		}
+		details.Issues = &issues
 	}
 
 	return details

@@ -53,11 +53,18 @@ type VM struct {
 	Devices       []Device
 	GuestNetworks []GuestNetwork
 
-	Issues []string
+	Issues []Issue
 
 	InspectionState   string
 	InspectionError   string
 	InspectionResults []byte
+}
+
+type Issue struct {
+	ID          string
+	Label       string
+	Description string
+	Category    string
 }
 
 type Disk struct {

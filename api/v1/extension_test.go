@@ -577,14 +577,21 @@ var _ = Describe("NewVirtualMachineDetailFromModel", func() {
 				Name:            "Issues VM",
 				PowerState:      "poweredOn",
 				ConnectionState: "connected",
-				Issues:          []string{"ISSUE_001", "ISSUE_002", "ISSUE_003"},
+				Issues: []models.Issue{
+					{ID: "ISSUE_001", Label: "Issue 1", Description: "Description 1", Category: "Warning"},
+					{ID: "ISSUE_002", Label: "Issue 2", Description: "Description 2", Category: "Critical"},
+					{ID: "ISSUE_003", Label: "Issue 3", Description: "", Category: "Information"},
+				},
 			}
 
 			details := v1.NewVirtualMachineDetailFromModel(vm)
 
 			Expect(details.Issues).NotTo(BeNil())
 			Expect(*details.Issues).To(HaveLen(3))
-			Expect(*details.Issues).To(ContainElements("ISSUE_001", "ISSUE_002", "ISSUE_003"))
+			Expect((*details.Issues)[0].Label).To(Equal("Issue 1"))
+			Expect((*details.Issues)[0].Description).To(Equal("Description 1"))
+			Expect((*details.Issues)[0].Category).To(Equal(v1.VMIssueCategoryWarning))
+			Expect((*details.Issues)[2].Description).To(Equal("Issue 3")) // Empty description should use label
 		})
 
 		// Given a VM with no issues
@@ -596,7 +603,7 @@ var _ = Describe("NewVirtualMachineDetailFromModel", func() {
 				Name:            "No Issues VM",
 				PowerState:      "poweredOn",
 				ConnectionState: "connected",
-				Issues:          []string{},
+				Issues:          []models.Issue{},
 			}
 
 			details := v1.NewVirtualMachineDetailFromModel(vm)

@@ -491,6 +491,13 @@ components:
             - canceled
             - error
             - not_found
+          x-enum-varnames:
+            - VmInspectionStatusStatePending
+            - VmInspectionStatusStateRunning
+            - VmInspectionStatusStateCompleted
+            - VmInspectionStatusStateCanceled
+            - VmInspectionStatusStateError
+            - VmInspectionStatusStateNotFound
           description: Current inspection state
         error:
           type: string
@@ -665,8 +672,8 @@ components:
         issues:
           type: array
           items:
-            type: string
-          description: List of issue identifiers affecting this VirtualMachine
+            $ref: '#/components/schemas/VMIssue'
+          description: List of issues affecting this VirtualMachine
         inspection:
           $ref: '#/components/schemas/VmInspectionStatus'
           description: Current inspection status for this VirtualMachine
@@ -737,6 +744,30 @@ components:
         network:
           type: string
           description: Network name as reported by the guest OS
+
+    VMIssue:
+      type: object
+      required:
+        - label
+        - category
+        - description
+      properties:
+        label:
+          type: string
+          description: Short label describing the issue
+        description:
+          type: string
+          description: Detailed description of the issue with additional context and recommendations
+        category:
+          type: string
+          enum:
+            - Critical
+            - Warning
+            - Information
+            - Advisory
+            - Error
+            - Other
+          description: Severity category of the issue. Unknown categories are mapped to 'Other'.
 
     VirtualMachineListResponse:
       type: object

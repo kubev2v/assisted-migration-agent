@@ -9,11 +9,37 @@ import (
 	sq "github.com/Masterminds/squirrel"
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
 	parsermodels "github.com/kubev2v/migration-planner/pkg/duckdb_parser/models"
+	"go.uber.org/zap"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 	"github.com/kubev2v/assisted-migration-agent/pkg/filter"
 )
+
+// Valid issue categories (lowercase for case-insensitive comparison)
+var validCategories = map[string]string{
+	"critical":    "Critical",
+	"warning":     "Warning",
+	"information": "Information",
+	"advisory":    "Advisory",
+	"error":       "Error",
+}
+
+// normalizeCategory validates and normalizes an issue category (case-insensitive).
+// If the category is not in the list of valid categories, it logs a warning
+// and returns "Other".
+func normalizeCategory(category, issueID string) string {
+	normalized, ok := validCategories[strings.ToLower(category)]
+	if ok {
+		return normalized
+	}
+	zap.S().Named("vm_store").Warnw(
+		"Unknown issue category encountered, mapping to 'Other'",
+		"category", category,
+		"issueID", issueID,
+	)
+	return "Other"
+}
 
 type VMStore struct {
 	db     QueryInterceptor
@@ -129,11 +155,17 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 }
 
 func vmFromParser(pvm parsermodels.VM) models.VM {
-	issues := make([]string, 0, len(pvm.Concerns))
+	issues := make([]models.Issue, 0, len(pvm.Concerns))
 	criticalCount := 0
 	for _, c := range pvm.Concerns {
-		issues = append(issues, c.Label)
-		if c.Category == "Critical" {
+		normalizedCategory := normalizeCategory(c.Category, c.Id)
+		issues = append(issues, models.Issue{
+			ID:          c.Id,
+			Label:       c.Label,
+			Description: c.Assessment,
+			Category:    normalizedCategory,
+		})
+		if normalizedCategory == "Critical" {
 			criticalCount++
 		}
 	}

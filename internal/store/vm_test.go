@@ -377,7 +377,7 @@ var _ = Describe("VMStore", func() {
 				insertConcern("vm-3", "concern-critical", "RDM disk detected", "Critical")
 			})
 
-			// Given VMs with different concern categories
+			// Given VMs with different issue categories
 			// When we list VMs
 			// Then VMs with critical concerns should have IsMigratable=false
 			It("should set IsMigratable=false for VMs with critical concerns", func() {
@@ -573,8 +573,8 @@ var _ = Describe("VMStore", func() {
 			Expect(vm.DiskSize).To(Equal(int64(500 + 500)))
 			Expect(vm.NICs).To(HaveLen(2))
 			Expect(vm.Issues).To(HaveLen(2))
-			Expect(vm.Issues).To(ContainElement("High memory usage"))
-			Expect(vm.Issues).To(ContainElement("Outdated VMware Tools"))
+			Expect(vm.Issues[0].Label).To(Equal("High memory usage"))
+			Expect(vm.Issues[1].Label).To(Equal("Outdated VMware Tools"))
 		})
 
 		// Given a VM with only warning concerns
@@ -623,6 +623,61 @@ var _ = Describe("VMStore", func() {
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vm.IsTemplate).To(BeTrue(), "vm-010 should be marked as template")
+		})
+
+		// Given a VM with an unknown category
+		// When we get it by ID
+		// Then the category should be normalized to "Other"
+		It("should normalize unknown categories to 'Other'", func() {
+			// Arrange - Insert a concern with an unknown category
+			_, err := db.ExecContext(ctx, `
+				INSERT INTO concerns ("VM_ID", "Concern_ID", "Label", "Category", "Assessment")
+				VALUES ('vm-001', 'test.unknown', 'Unknown Category Test', 'UnknownCategory', 'This is a test')
+			`)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act
+			vm, err := s.VM().Get(ctx, "vm-001")
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vm.Issues).To(HaveLen(1))
+			Expect(vm.Issues[0].Category).To(Equal("Other"), "Unknown category should be normalized to 'Other'")
+			Expect(vm.Issues[0].Label).To(Equal("Unknown Category Test"))
+		})
+
+		// Given a VM with case-variant category names
+		// When we get it by ID
+		// Then categories should be normalized to proper case
+		It("should normalize category case variants", func() {
+			// Arrange - Insert concerns with different case variants
+			_, err := db.ExecContext(ctx, `
+				INSERT INTO concerns ("VM_ID", "Concern_ID", "Label", "Category", "Assessment")
+				VALUES
+					('vm-002', 'test.lowercase', 'Lowercase Test', 'critical', 'Test'),
+					('vm-002', 'test.uppercase', 'Uppercase Test', 'WARNING', 'Test'),
+					('vm-002', 'test.mixedcase', 'Mixed Test', 'InFoRmAtIoN', 'Test')
+			`)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act
+			vm, err := s.VM().Get(ctx, "vm-002")
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vm.Issues).To(HaveLen(3))
+
+			// Find each issue and check its normalized category
+			for _, issue := range vm.Issues {
+				switch issue.ID {
+				case "test.lowercase":
+					Expect(issue.Category).To(Equal("Critical"))
+				case "test.uppercase":
+					Expect(issue.Category).To(Equal("Warning"))
+				case "test.mixedcase":
+					Expect(issue.Category).To(Equal("Information"))
+				}
+			}
 		})
 	})
 })

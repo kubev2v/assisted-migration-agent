@@ -43,6 +43,16 @@ const (
 	InspectorStatusStateRunning    InspectorStatusState = "running"
 )
 
+// Defines values for VMIssueCategory.
+const (
+	VMIssueCategoryAdvisory    VMIssueCategory = "Advisory"
+	VMIssueCategoryCritical    VMIssueCategory = "Critical"
+	VMIssueCategoryError       VMIssueCategory = "Error"
+	VMIssueCategoryInformation VMIssueCategory = "Information"
+	VMIssueCategoryOther       VMIssueCategory = "Other"
+	VMIssueCategoryWarning     VMIssueCategory = "Warning"
+)
+
 // Defines values for VmInspectionStatusState.
 const (
 	VmInspectionStatusStateCanceled  VmInspectionStatusState = "canceled"
@@ -162,6 +172,21 @@ type VMDisk struct {
 
 // VMIdArray Array of VirtualMachine id
 type VMIdArray = []string
+
+// VMIssue defines model for VMIssue.
+type VMIssue struct {
+	// Category Severity category of the issue. Unknown categories are mapped to 'Other'.
+	Category VMIssueCategory `json:"category"`
+
+	// Description Detailed description of the issue with additional context and recommendations
+	Description string `json:"description"`
+
+	// Label Short label describing the issue
+	Label string `json:"label"`
+}
+
+// VMIssueCategory Severity category of the issue. Unknown categories are mapped to 'Other'.
+type VMIssueCategory string
 
 // VMNIC defines model for VMNIC.
 type VMNIC struct {
@@ -284,8 +309,8 @@ type VirtualMachineDetail struct {
 	// IpAddress Primary IP address of the guest OS as reported by VMware Tools
 	IpAddress *string `json:"ipAddress,omitempty"`
 
-	// Issues List of issue identifiers affecting this VirtualMachine
-	Issues *[]string `json:"issues,omitempty"`
+	// Issues List of issues affecting this VirtualMachine
+	Issues *[]VMIssue `json:"issues,omitempty"`
 
 	// MemoryMB Amount of memory allocated to the VirtualMachine in megabytes
 	MemoryMB int32 `json:"memoryMB"`

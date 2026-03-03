@@ -1090,7 +1090,7 @@ var _ = Describe("VMs Handlers Integration", func() {
 			Expect(response.Nics).To(HaveLen(2))
 		})
 
-		It("should return VM with issues", func() {
+		It("should return VM with issues including descriptions and categories", func() {
 			req := httptest.NewRequest(http.MethodGet, "/vms/vm-007", nil)
 			w := httptest.NewRecorder()
 
@@ -1102,6 +1102,104 @@ var _ = Describe("VMs Handlers Integration", func() {
 			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
 			Expect(response.Issues).NotTo(BeNil())
 			Expect(*response.Issues).To(HaveLen(3))
+
+			// Validate the structure of issues
+			issues := *response.Issues
+
+			// Find the Critical issue (RDM disk)
+			var criticalIssue *v1.VMIssue
+			var warnIssue *v1.VMIssue
+			var infoIssue *v1.VMIssue
+
+			for i := range issues {
+				switch issues[i].Label {
+				case "RDM disk detected":
+					criticalIssue = &issues[i]
+				case "Suspended state":
+					warnIssue = &issues[i]
+				case "Storage warning":
+					infoIssue = &issues[i]
+				}
+			}
+
+			// Validate Critical issue
+			Expect(criticalIssue).NotTo(BeNil())
+			Expect(criticalIssue.Label).To(Equal("RDM disk detected"))
+			Expect(criticalIssue.Category).To(Equal(v1.VMIssueCategoryCritical))
+			Expect(criticalIssue.Description).To(ContainSubstring("Raw Device Mapping"))
+
+			// Validate Warning issue
+			Expect(warnIssue).NotTo(BeNil())
+			Expect(warnIssue.Label).To(Equal("Suspended state"))
+			Expect(warnIssue.Category).To(Equal(v1.VMIssueCategoryWarning))
+			Expect(warnIssue.Description).To(ContainSubstring("suspended state"))
+
+			// Validate Information issue
+			Expect(infoIssue).NotTo(BeNil())
+			Expect(infoIssue.Label).To(Equal("Storage warning"))
+			Expect(infoIssue.Category).To(Equal(v1.VMIssueCategoryInformation))
+			Expect(infoIssue.Description).To(ContainSubstring("storage usage"))
+		})
+
+		It("should normalize unknown category to Other", func() {
+			// Insert an issue with an unknown category
+			_, err := db.ExecContext(ctx, `
+				INSERT INTO concerns ("VM_ID", "Concern_ID", "Label", "Category", "Assessment")
+				VALUES ('vm-001', 'test.unknown-cat', 'Test Unknown Category', 'UnknownCategory', 'This category should be normalized to Other')
+			`)
+			Expect(err).NotTo(HaveOccurred())
+
+			req := httptest.NewRequest(http.MethodGet, "/vms/vm-001", nil)
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusOK))
+
+			var response v1.VirtualMachineDetail
+			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
+			Expect(response.Issues).NotTo(BeNil())
+			Expect(*response.Issues).To(HaveLen(1))
+
+			issue := (*response.Issues)[0]
+			Expect(issue.Category).To(Equal(v1.VMIssueCategoryOther))
+			Expect(issue.Label).To(Equal("Test Unknown Category"))
+		})
+
+		It("should normalize category case variants", func() {
+			// Insert issues with various case formats
+			_, err := db.ExecContext(ctx, `
+				INSERT INTO concerns ("VM_ID", "Concern_ID", "Label", "Category", "Assessment")
+				VALUES
+					('vm-002', 'test.lowercase', 'Lowercase Test', 'critical', 'Test critical'),
+					('vm-002', 'test.uppercase', 'Uppercase Test', 'WARNING', 'Test warning'),
+					('vm-002', 'test.mixedcase', 'Mixed Test', 'InFoRmAtIoN', 'Test info')
+			`)
+			Expect(err).NotTo(HaveOccurred())
+
+			req := httptest.NewRequest(http.MethodGet, "/vms/vm-002", nil)
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusOK))
+
+			var response v1.VirtualMachineDetail
+			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
+			Expect(response.Issues).NotTo(BeNil())
+			Expect(*response.Issues).To(HaveLen(3))
+
+			issues := *response.Issues
+			for _, issue := range issues {
+				switch issue.Label {
+				case "Lowercase Test":
+					Expect(issue.Category).To(Equal(v1.VMIssueCategoryCritical))
+				case "Uppercase Test":
+					Expect(issue.Category).To(Equal(v1.VMIssueCategoryWarning))
+				case "Mixed Test":
+					Expect(issue.Category).To(Equal(v1.VMIssueCategoryInformation))
+				}
+			}
 		})
 	})
 })
