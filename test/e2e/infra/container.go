@@ -1,6 +1,7 @@
 package infra
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -130,29 +131,18 @@ func (c *ContainerInfraManager) StartVcsim() error {
 	cfg := NewContainerConfig(vcsimContainerName, vcsimImage).
 		WithPort(vcsimPort, vcsimPort)
 
-	if c.vcsimModelPath != "" {
-		// Use -load flag to load pre-generated model from XML files
-		cfg = cfg.
-			WithBindMount(c.vcsimModelPath, "/model").
-			WithCmd(
-				"-l", ":8989",
-				"-username", VcsimUsername,
-				"-password", VcsimPassword,
-				"-load", "/model",
-			)
-	} else {
-		// Fallback to generating infrastructure with flags
-		cfg = cfg.WithCmd(
+	if c.vcsimModelPath == "" {
+		return errors.New("vcsim model path is empty")
+	}
+	// Use -load flag to load pre-generated model from XML files
+	cfg = cfg.
+		WithBindMount(c.vcsimModelPath, "/model").
+		WithCmd(
 			"-l", ":8989",
 			"-username", VcsimUsername,
 			"-password", VcsimPassword,
-			"-dc", "1",
-			"-cluster", "1",
-			"-ds", "1",
-			"-host", "1",
-			"-vm", "0",
+			"-load", "/model",
 		)
-	}
 
 	_, err := c.runner.StartContainer(cfg)
 	return err

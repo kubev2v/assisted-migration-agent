@@ -36,6 +36,26 @@ func IsResourceNotFoundError(err error) bool {
 	return errors.As(err, &e)
 }
 
+// DuplicateResourceError indicates a resource already exists with the same unique identifier.
+type DuplicateResourceError struct {
+	Kind  string
+	Field string
+	Value string
+}
+
+func NewDuplicateResourceError(kind, field, value string) *DuplicateResourceError {
+	return &DuplicateResourceError{Kind: kind, Field: field, Value: value}
+}
+
+func (e *DuplicateResourceError) Error() string {
+	return fmt.Sprintf("%s with %s '%s' already exists", e.Kind, e.Field, e.Value)
+}
+
+func IsDuplicateResourceError(err error) bool {
+	var e *DuplicateResourceError
+	return errors.As(err, &e)
+}
+
 // CollectionInProgressError indicates a collection is already running.
 type CollectionInProgressError struct{}
 

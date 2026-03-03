@@ -22,7 +22,7 @@
 //	                              ▼
 //	┌─────────────────────────────────────────────────────────────────┐
 //	│                      Services Layer                             │
-//	│  Console │ Collector │ Inventory │ VM                           │
+//	│  Console │ Collector │ Inventory │ VM │ Group                  │
 //	└─────────────────────────────────────────────────────────────────┘
 //
 // # Handler Structure
@@ -30,10 +30,12 @@
 // All handlers are methods on a single Handler struct that holds service dependencies:
 //
 //	type Handler struct {
-//	    consoleSrv   *services.Console
-//	    collectorSrv *services.CollectorService
-//	    inventorySrv *services.InventoryService
-//	    vmSrv        *services.VMService
+//	    consoleSrv   ConsoleService
+//	    collectorSrv CollectorService
+//	    inventorySrv InventoryService
+//	    vmSrv        VMService
+//	    inspectorSrv InspectorService
+//	    groupSrv     GroupService
 //	}
 //
 // The Handler implements the ServerInterface generated from the OpenAPI spec,
@@ -81,6 +83,18 @@
 //	│ POST   │ /vms/inspector   │ Start inspection (not implemented)    │
 //	│ PATCH  │ /vms/inspector   │ Add VMs to inspection (not impl.)     │
 //	│ DELETE │ /vms/inspector   │ Remove VMs from inspection (not impl.)│
+//	└────────┴──────────────────┴───────────────────────────────────────┘
+//
+// Group Endpoints (group.go):
+//
+//	┌────────┬──────────────────┬───────────────────────────────────────┐
+//	│ Method │ Endpoint         │ Description                           │
+//	├────────┼──────────────────┼───────────────────────────────────────┤
+//	│ GET    │ /vms/groups      │ List all groups                       │
+//	│ POST   │ /vms/groups      │ Create a new group                    │
+//	│ GET    │ /vms/groups/{id} │ Get group with filtered VMs           │
+//	│ PATCH  │ /vms/groups/{id} │ Partially update a group              │
+//	│ DELETE │ /vms/groups/{id} │ Delete a group (idempotent)           │
 //	└────────┴──────────────────┴───────────────────────────────────────┘
 //
 // VDDK Endpoints (vddk.go):
@@ -211,6 +225,79 @@
 // Errors:
 //   - 404 Not Found: VM not found
 //
+// # Group Handler
+//
+// GET /vms/groups - Lists all groups.
+//
+// Response:
+//
+//	{
+//	    "groups": [
+//	        {
+//	            "id": "1",
+//	            "name": "Production VMs",
+//	            "description": "All production workloads",
+//	            "filter": "cluster = 'prod'",
+//	            "createdAt": "2025-01-01T00:00:00Z",
+//	            "updatedAt": "2025-01-01T00:00:00Z"
+//	        }
+//	    ]
+//	}
+//
+// POST /vms/groups - Creates a new group.
+//
+// Request:
+//
+//	{
+//	    "name": "Production VMs",
+//	    "filter": "cluster = 'prod'",
+//	    "description": "optional description"
+//	}
+//
+// Validation:
+//   - name: required, 1-100 characters
+//   - filter: required, must be a valid filter DSL expression
+//
+// Response: 201 Created with the created Group.
+//
+// GET /vms/groups/{id} - Returns group details with paginated, filtered VMs.
+//
+// Query Parameters: sort, page, pageSize (same as GET /vms).
+//
+// Response:
+//
+//	{
+//	    "group": { ... },
+//	    "vms": [ ... ],
+//	    "total": 50,
+//	    "page": 1,
+//	    "pageCount": 3
+//	}
+//
+// Errors:
+//   - 404 Not Found: Group not found
+//
+// PATCH /vms/groups/{id} - Partially updates an existing group.
+//
+// Request (all fields optional, at least one required):
+//
+//	{
+//	    "name": "New Name",
+//	    "filter": "memory >= 16GB",
+//	    "description": "updated description"
+//	}
+//
+// Validation:
+//   - At least one field must be provided
+//   - name: 1-100 characters if provided
+//   - filter: must be a valid filter DSL expression if provided
+//
+// Errors:
+//   - 404 Not Found: Group not found
+//
+// DELETE /vms/groups/{id} - Deletes a group. Idempotent (returns 204 even if
+// the group does not exist).
+//
 // # VDDK Handler
 //
 // POST /vddk - Uploads a VDDK tarball to the agent's data directory.
@@ -260,6 +347,7 @@
 //   - v1.NewVirtualMachineFromSummary(models.VirtualMachineSummary) → v1.VirtualMachine
 //   - v1.NewVirtualMachineDetailFromModel(models.VM) → v1.VirtualMachineDetail
 //   - v1.AgentStatus.FromModel(models.AgentStatus)
+//   - v1.NewGroupFromModel(models.Group) → v1.Group
 //
 // # Framework
 //

@@ -40,6 +40,21 @@ type ServerInterface interface {
 	// Get list of VMs with filtering and pagination
 	// (GET /vms)
 	GetVMs(c *gin.Context, params GetVMsParams)
+	// List all groups
+	// (GET /vms/groups)
+	ListGroups(c *gin.Context)
+	// Create a new group
+	// (POST /vms/groups)
+	CreateGroup(c *gin.Context)
+	// Delete group
+	// (DELETE /vms/groups/{id})
+	DeleteGroup(c *gin.Context, id string)
+	// Get group by ID with its VMs
+	// (GET /vms/groups/{id})
+	GetGroup(c *gin.Context, id string, params GetGroupParams)
+	// Update group
+	// (PATCH /vms/groups/{id})
+	UpdateGroup(c *gin.Context, id string)
 	// Stop inspector entirely
 	// (DELETE /vms/inspector)
 	StopInspection(c *gin.Context)
@@ -150,6 +165,14 @@ func (siw *ServerInterfaceWrapper) GetInventory(c *gin.Context) {
 	err = runtime.BindQueryParameter("form", true, false, "withAgentId", c.Request.URL.Query(), &params.WithAgentId)
 	if err != nil {
 		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter withAgentId: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "group_id" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "group_id", c.Request.URL.Query(), &params.GroupId)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter group_id: %w", err), http.StatusBadRequest)
 		return
 	}
 
@@ -285,6 +308,131 @@ func (siw *ServerInterfaceWrapper) GetVMs(c *gin.Context) {
 	}
 
 	siw.Handler.GetVMs(c, params)
+}
+
+// ListGroups operation middleware
+func (siw *ServerInterfaceWrapper) ListGroups(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ListGroups(c)
+}
+
+// CreateGroup operation middleware
+func (siw *ServerInterfaceWrapper) CreateGroup(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.CreateGroup(c)
+}
+
+// DeleteGroup operation middleware
+func (siw *ServerInterfaceWrapper) DeleteGroup(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.DeleteGroup(c, id)
+}
+
+// GetGroup operation middleware
+func (siw *ServerInterfaceWrapper) GetGroup(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetGroupParams
+
+	// ------------- Optional query parameter "sort" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "sort", c.Request.URL.Query(), &params.Sort)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter sort: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "page", c.Request.URL.Query(), &params.Page)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter page: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "pageSize" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "pageSize", c.Request.URL.Query(), &params.PageSize)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter pageSize: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetGroup(c, id, params)
+}
+
+// UpdateGroup operation middleware
+func (siw *ServerInterfaceWrapper) UpdateGroup(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.UpdateGroup(c, id)
 }
 
 // StopInspection operation middleware
@@ -447,6 +595,11 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.POST(options.BaseURL+"/vddk", wrapper.PostVddk)
 	router.GET(options.BaseURL+"/version", wrapper.GetVersion)
 	router.GET(options.BaseURL+"/vms", wrapper.GetVMs)
+	router.GET(options.BaseURL+"/vms/groups", wrapper.ListGroups)
+	router.POST(options.BaseURL+"/vms/groups", wrapper.CreateGroup)
+	router.DELETE(options.BaseURL+"/vms/groups/:id", wrapper.DeleteGroup)
+	router.GET(options.BaseURL+"/vms/groups/:id", wrapper.GetGroup)
+	router.PATCH(options.BaseURL+"/vms/groups/:id", wrapper.UpdateGroup)
 	router.DELETE(options.BaseURL+"/vms/inspector", wrapper.StopInspection)
 	router.GET(options.BaseURL+"/vms/inspector", wrapper.GetInspectorStatus)
 	router.PATCH(options.BaseURL+"/vms/inspector", wrapper.AddVMsToInspection)

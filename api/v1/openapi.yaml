@@ -97,6 +97,12 @@ paths:
           schema:
             type: boolean
             default: false
+        - name: group_id
+          in: query
+          required: false
+          description: Filter inventory to VMs matching this group's filter expression
+          schema:
+            type: string
       responses:
         '200':
           description: Collected inventory
@@ -364,6 +370,132 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VersionInfo'
+
+  /vms/groups:
+    get:
+      summary: List all groups
+      operationId: listGroups
+      responses:
+        '200':
+          description: List of groups
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupListResponse'
+        '500':
+          description: Internal server error
+    post:
+      summary: Create a new group
+      operationId: createGroup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGroupRequest'
+      responses:
+        '201':
+          description: Group created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+        '400':
+          description: Invalid request (e.g., invalid filter syntax)
+        '500':
+          description: Internal server error
+
+  /vms/groups/{id}:
+    get:
+      summary: Get group by ID with its VMs
+      operationId: getGroup
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Group ID
+          schema:
+            type: string
+        - name: sort
+          in: query
+          description: Sort fields with direction (e.g., "name:asc" or "cluster:desc,name:asc"). Valid fields are name, vCenterState, cluster, diskSize, memory, issues.
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+          example: ["cluster:asc", "name:desc"]
+        - name: page
+          in: query
+          description: Page number for pagination
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: pageSize
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Group details with VMs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupResponse'
+        '404':
+          description: Group not found
+        '500':
+          description: Internal server error
+    patch:
+      summary: Update group
+      operationId: updateGroup
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Group ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateGroupRequest'
+      responses:
+        '200':
+          description: Group updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+        '400':
+          description: Invalid request (e.g., invalid filter syntax)
+        '404':
+          description: Group not found
+        '500':
+          description: Internal server error
+    delete:
+      summary: Delete group
+      operationId: deleteGroup
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Group ID
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Group deleted
+        '404':
+          description: Group not found
+        '500':
+          description: Internal server error
 
   /vddk:
     post:
@@ -843,3 +975,96 @@ components:
         password:
           type: string
           format: password
+
+    Group:
+      type: object
+      required:
+        - id
+        - name
+        - filter
+      properties:
+        id:
+          type: string
+          description: Unique group identifier (UUID)
+        name:
+          type: string
+          description: Group display name
+        description:
+          type: string
+          description: Optional group description
+        filter:
+          type: string
+          description: Filter expression (pkg/filter DSL)
+          example: "memory >= 8GB and cluster = 'prod'"
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the group was created
+        updatedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the group was last updated
+
+    GroupListResponse:
+      type: object
+      required:
+        - groups
+      properties:
+        groups:
+          type: array
+          items:
+            $ref: '#/components/schemas/Group'
+
+    GroupResponse:
+      type: object
+      required:
+        - group
+        - vms
+        - total
+        - page
+        - pageCount
+      properties:
+        group:
+          $ref: '#/components/schemas/Group'
+        vms:
+          type: array
+          items:
+            $ref: '#/components/schemas/VirtualMachine'
+        total:
+          type: integer
+          description: Total number of VMs matching the group's filter
+        page:
+          type: integer
+          description: Current page number
+        pageCount:
+          type: integer
+          description: Total number of pages
+
+    CreateGroupRequest:
+      type: object
+      required:
+        - name
+        - filter
+      properties:
+        name:
+          type: string
+          description: Group display name
+        description:
+          type: string
+          description: Optional group description
+        filter:
+          type: string
+          description: Filter expression (will be validated)
+
+    UpdateGroupRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Group display name
+        description:
+          type: string
+          description: Optional group description
+        filter:
+          type: string
+          description: Filter expression (will be validated)

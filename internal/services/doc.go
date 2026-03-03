@@ -195,6 +195,36 @@
 //	}
 //	vms, total, err := vmService.List(ctx, params)
 //
+// # GroupService
+//
+// GroupService manages CRUD operations for groups. A group is a named filter
+// expression that dynamically matches VMs from the collected inventory.
+//
+// Groups are persisted in the store and their filter expressions are evaluated
+// at query time against the VM table, so results always reflect the current
+// inventory state.
+//
+// Operations:
+//   - List: returns all groups
+//   - Get: returns a single group by ID
+//   - ListVirtualMachines: evaluates the group's filter against the VM table
+//     with sorting and pagination support
+//   - Create: creates a new group (filter validated at handler level)
+//   - Update: updates an existing group by ID
+//   - Delete: deletes a group by ID
+//
+// Usage:
+//
+//	groupService := services.NewGroupService(store)
+//	groups, err := groupService.List(ctx)
+//
+//	params := services.GroupGetParams{
+//	    Sort:   []services.SortField{{Field: "name", Desc: false}},
+//	    Limit:  20,
+//	    Offset: 0,
+//	}
+//	vms, total, err := groupService.ListVirtualMachines(ctx, groupID, params)
+//
 // # Thread Safety
 //
 // CollectorService and Console:
@@ -202,7 +232,7 @@
 //   - Goroutine lifecycle managed via channels and context cancellation
 //   - Single work-in-progress at a time
 //
-// InventoryService and VMService:
+// InventoryService, VMService, and GroupService:
 //   - Stateless (only hold store reference)
 //   - Thread-safe through underlying store implementation
 package services
