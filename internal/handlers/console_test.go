@@ -33,7 +33,7 @@ var _ = Describe("Console Handlers", func() {
 				Target:  models.ConsoleStatusDisconnected,
 			},
 		}
-		handler = handlers.New(config.Configuration{}, mockConsole, nil, nil, nil, nil)
+		handler = handlers.NewHandler(config.Configuration{}).WithConsoleService(mockConsole)
 		router = gin.New()
 		router.GET("/agent", handler.GetAgentStatus)
 		router.POST("/agent", handler.SetAgentMode)

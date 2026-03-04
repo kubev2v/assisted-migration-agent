@@ -35,7 +35,7 @@ var _ = Describe("VMs Handlers", func() {
 		gin.SetMode(gin.TestMode)
 		mockVM = &MockVMService{}
 		mockInspector = &MockInspectorService{}
-		handler = handlers.New(config.Configuration{}, nil, nil, nil, mockVM, mockInspector)
+		handler = handlers.NewHandler(config.Configuration{}).WithVMService(mockVM).WithInspectorService(mockInspector)
 		router = gin.New()
 		router.GET("/vms", func(c *gin.Context) {
 			var params v1.GetVMsParams
@@ -739,7 +739,7 @@ var _ = Describe("VMs Handlers Integration", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		vmSrv = services.NewVMService(st)
-		handler = handlers.New(config.Configuration{}, nil, nil, nil, vmSrv, nil)
+		handler = handlers.NewHandler(config.Configuration{}).WithVMService(vmSrv)
 		router = gin.New()
 		router.GET("/vms", func(c *gin.Context) {
 			var params v1.GetVMsParams

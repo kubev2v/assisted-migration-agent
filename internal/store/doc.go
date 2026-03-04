@@ -9,15 +9,15 @@
 //	┌─────────────────────────────────────────────────────────────────┐
 //	│                         Store (facade)                          │
 //	├─────────────────────────────────────────────────────────────────┤
-//	│       ConfigurationStore       │        InventoryStore          │
-//	│              ▼                 │             ▼                  │
-//	│        configuration           │         inventory              │
-//	│           (local)              │           (local)              │
-//	├────────────────────────────────┴────────────────────────────────┤
-//	│                          VMStore                                │
-//	│                             ▼                                   │
-//	│    vinfo, vdisk, concerns (from duckdb_parser)                  │
-//	└─────────────────────────────────────────────────────────────────┘
+//	│  ConfigurationStore  │  InventoryStore  │   GroupStore        │
+//	│         ▼            │        ▼          │       ▼             │
+//	│   configuration      │    inventory      │    groups           │
+//	│      (local)         │     (local)       │    (local)          │
+//	├──────────────────────┴──────────────────┴─────────────────────┤
+//	│                          VMStore                               │
+//	│                             ▼                                  │
+//	│    vinfo, vdisk, concerns (from duckdb_parser)                 │
+//	└────────────────────────────────────────────────────────────────┘
 //
 // # Data Sources
 //
@@ -28,6 +28,7 @@
 //	├────────────────────┼─────────────────────────────────────────────┤
 //	│  configuration     │  Agent runtime config (agent_mode)          │
 //	│  inventory         │  Raw inventory JSON blob with timestamps    │
+//	│  groups            │  Named filter expressions for VM grouping   │
 //	│  schema_migrations │  Migration version tracking                 │
 //	└────────────────────┴─────────────────────────────────────────────┘
 //
@@ -93,88 +94,136 @@
 //   - Get(ctx) → *models.Inventory
 //   - Save(ctx, data []byte) → error (uses UPSERT, updates updated_at)
 //
+// # GroupStore
+//
+// Stores named filter expressions (groups) that dynamically match VMs.
+// Each group has a filter DSL expression that is evaluated at query time
+// against the VM table.
+//
+// Schema:
+//
+//	groups (
+//	    id          INTEGER PRIMARY KEY DEFAULT nextval('id_sequence'),
+//	    created_at  TIMESTAMP DEFAULT now(),
+//	    updated_at  TIMESTAMP DEFAULT now(),
+//	    name        VARCHAR NOT NULL,
+//	    filter      VARCHAR NOT NULL,
+//	    description VARCHAR
+//	)
+//
+// Methods:
+//   - List(ctx) → []models.Group (ordered by ID ascending)
+//   - Get(ctx, id) → *models.Group (returns ResourceNotFoundError if missing)
+//   - Create(ctx, group) → *models.Group (with generated ID and timestamps)
+//   - Update(ctx, id, group) → *models.Group (returns ResourceNotFoundError if missing)
+//   - Delete(ctx, id) → error (returns ResourceNotFoundError if missing)
+//
 // # VMStore
 //
 // Provides read access to VM inventory data. Uses a hybrid approach:
-//   - List/Count: Direct SQL queries against duckdb_parser tables (vinfo, vdisk, concerns)
+//   - List/Count: Two-step query with flat filter subquery + aggregated output
 //   - Get: Uses parser.VMs() for full VM details with all relationships
 //
-// List Query Structure:
+// Query Architecture:
 //
-//	SELECT v."VM ID", v."VM", v."Powerstate", v."Cluster", v."Memory",
-//	       COALESCE(d.total_disk, 0), COALESCE(c.issue_count, 0)
+// The query is split into two steps so that the filter DSL can reference any
+// raw column from any table, while the output remains one row per VM:
+//
+//  1. Filter step — flat JOIN of all 8 tables, apply WHERE, extract DISTINCT VM IDs
+//  2. Output step — aggregated query (subquery JOINs) restricted to matched IDs
+//
+// Filter Subquery (flat JOIN, all columns available):
+//
+//	SELECT DISTINCT v."VM ID"
 //	FROM vinfo v
-//	LEFT JOIN (SELECT "VM ID", SUM("Capacity MiB") FROM vdisk GROUP BY "VM ID") d
-//	LEFT JOIN (SELECT "VM_ID", COUNT(*) FROM concerns GROUP BY "VM_ID") c
+//	LEFT JOIN vdisk dk           ON v."VM ID" = dk."VM ID"
+//	LEFT JOIN concerns c         ON v."VM ID" = c."VM_ID"
+//	LEFT JOIN vm_inspection_status i ON v."VM ID" = i."VM ID"
+//	LEFT JOIN vcpu cpu           ON v."VM ID" = cpu."VM ID"
+//	LEFT JOIN vmemory mem        ON v."VM ID" = mem."VM ID"
+//	LEFT JOIN vnetwork net       ON v."VM ID" = net."VM ID"
+//	LEFT JOIN vdatastore ds      ON ds."Name" = regexp_extract(...)
+//	WHERE <filter conditions>
 //
-// List Options:
+// Output Query (aggregated, one row per VM):
 //
-// VMStore.List uses the functional options pattern. Each ListOption is a function
-// that modifies the SQL query builder. Options can be combined for complex queries:
+//	SELECT v."VM ID" AS id, v."VM" AS name, ...
+//	       COALESCE(d.total_disk, 0) AS disk_size,
+//	       COALESCE(c.issue_count, 0) AS issue_count
+//	FROM vinfo v
+//	LEFT JOIN (...disk subquery...) d  ON v."VM ID" = d."VM ID"
+//	LEFT JOIN (...concern subquery...) c ON v."VM ID" = c."VM_ID"
+//	WHERE v."VM ID" IN (filter subquery)
+//	ORDER BY / LIMIT / OFFSET
+//
+// API:
+//
+// Filter functions return sq.Sqlizer (WHERE clauses for the flat subquery).
+// Query options remain as ListOption (sort/pagination for the output query).
+// List takes both:
 //
 //	vms, err := store.VM().List(ctx,
-//	    store.ByClusters("prod-cluster"),
-//	    store.ByStatus("poweredOn"),
-//	    store.ByIssues(1),
+//	    []sq.Sqlizer{
+//	        store.ByClusters("prod-cluster"),
+//	        store.ByStatus("poweredOn"),
+//	    },
 //	    store.WithSort([]store.SortParam{{Field: "name", Desc: false}}),
 //	    store.WithLimit(50),
-//	    store.WithOffset(0),
 //	)
 //
-// Filtering Options:
+// Count takes only filters:
+//
+//	total, err := store.VM().Count(ctx, store.ByStatus("poweredOn"))
+//
+// Filtering Functions (return sq.Sqlizer):
 //
 //   - ByClusters(clusters ...string)
 //     Filters VMs by cluster name. Multiple clusters use OR logic.
-//     SQL: WHERE v."Cluster" IN (...)
 //
 //   - ByStatus(statuses ...string)
-//     Filters VMs by power state. Multiple statuses use OR logic.
-//     Values: "poweredOn", "poweredOff", "suspended"
-//     SQL: WHERE v."Powerstate" IN (...)
+//     Filters VMs by power state (OR logic).
 //
 //   - ByIssues(minIssues int)
-//     Filters VMs with at least N migration concerns/issues.
-//     SQL: WHERE COALESCE(c.issue_count, 0) >= minIssues
+//     Filters VMs with at least N migration concerns via subquery.
 //
 //   - ByDiskSizeRange(min, max int64)
-//     Filters VMs by total disk capacity in MB. Range is [min, max).
-//     SQL: WHERE total_disk >= min AND total_disk < max
+//     Filters VMs by total disk capacity in MiB [min, max) via subquery.
 //
 //   - ByMemorySizeRange(min, max int64)
-//     Filters VMs by memory in MB. Range is [min, max).
-//     SQL: WHERE v."Memory" >= min AND v."Memory" < max
+//     Filters VMs by memory in MiB [min, max].
 //
-// Pagination Options:
+//   - ByFilter(expr string)
+//     Parses a filter DSL expression (see pkg/filter) into a sq.Sqlizer.
+//     The DSL can reference any column from all 8 joined tables using
+//     dot-notation prefixes: disk.*, concern.*, cpu.*, mem.*, net.*, datastore.*,
+//     inspection.*, plus all flat vinfo columns.
+//
+// Pagination Options (ListOption):
 //
 //   - WithLimit(limit uint64)
-//     Limits the number of results returned.
-//     SQL: LIMIT limit
-//
 //   - WithOffset(offset uint64)
-//     Skips the first N results (for pagination).
-//     SQL: OFFSET offset
 //
-// Sorting Options:
+// Sorting Options (ListOption):
 //
 //   - WithSort(sorts []SortParam)
-//     Applies multi-field sorting. Each SortParam has Field and Desc (direction).
-//     Always appends VM ID as tie-breaker for stable sorting.
+//     Applies multi-field sorting using output aliases.
+//     Always appends "id" as tie-breaker for stable sorting.
 //
 //   - WithDefaultSort()
-//     Sorts by VM ID ascending. Applied when no explicit sort is provided.
+//     Sorts by id ascending.
 //
-// Sort Field Mapping:
+// Sort Field Mapping (API field -> output alias):
 //
-//	┌──────────────┬─────────────────────────────┐
-//	│  API Field   │  Database Column            │
-//	├──────────────┼─────────────────────────────┤
-//	│  name        │  v."VM"                     │
-//	│  vCenterState│  v."Powerstate"             │
-//	│  cluster     │  v."Cluster"                │
-//	│  diskSize    │  COALESCE(d.total_disk, 0)  │
-//	│  memory      │  v."Memory"                 │
-//	│  issues      │  issue_count                │
-//	└──────────────┴─────────────────────────────┘
+//	┌──────────────┬──────────────┐
+//	│  API Field   │  Alias       │
+//	├──────────────┼──────────────┤
+//	│  name        │  name        │
+//	│  vCenterState│  power_state │
+//	│  cluster     │  cluster     │
+//	│  diskSize    │  disk_size   │
+//	│  memory      │  memory      │
+//	│  issues      │  issue_count │
+//	└──────────────┴──────────────┘
 //
 // # QueryInterceptor
 //

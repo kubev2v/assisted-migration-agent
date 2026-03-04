@@ -85,6 +85,45 @@ var NICs = []NIC{
 	{"vm-007", "Staging", "00:50:56:01:07:01"},
 }
 
+type Memory struct {
+	VMID      string
+	HotAdd    bool
+	Ballooned int32
+}
+
+type Datastore struct {
+	Name        string
+	Hosts       string
+	Address     string
+	ObjectID    string
+	FreeMiB     int64
+	MHA         bool
+	CapacityMiB int64
+	Type        string
+}
+
+type Inspection struct {
+	VMID   string
+	Status string
+	Error  string
+}
+
+var Memories = []Memory{
+	{"vm-003", true, 512},
+	{"vm-005", true, 0},
+	{"vm-008", false, 256},
+}
+
+var Datastores = []Datastore{
+	{"datastore1", "esxi-01.local", "10.0.0.1", "datastore-001", 524288, false, 1048576, "VMFS"},
+}
+
+var Inspections = []Inspection{
+	{"vm-001", "completed", ""},
+	{"vm-003", "completed", ""},
+	{"vm-007", "failed", "timeout connecting to VM"},
+}
+
 var Concerns = []Concern{
 	{"vm-003", "concern-001", "High memory usage", "Warning", "The VM is using 95% of allocated memory. Consider increasing memory allocation or optimizing workload."},
 	{"vm-003", "concern-002", "Outdated VMware Tools", "Warning", "VMware Tools version is outdated. Update to the latest version for better performance and compatibility."},
@@ -152,5 +191,47 @@ func InsertVMs(ctx context.Context, db *sql.DB) error {
 		}
 	}
 
+	return nil
+}
+
+// InsertVMMemory inserts vmemory fixture data.
+func InsertVMMemory(ctx context.Context, db *sql.DB) error {
+	for _, m := range Memories {
+		_, err := db.ExecContext(ctx, `
+			INSERT INTO vmemory ("VM ID", "Hot Add", "Ballooned")
+			VALUES (?, ?, ?)
+		`, m.VMID, m.HotAdd, m.Ballooned)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// InsertVMDatastores inserts vdatastore fixture data.
+func InsertVMDatastores(ctx context.Context, db *sql.DB) error {
+	for _, ds := range Datastores {
+		_, err := db.ExecContext(ctx, `
+			INSERT INTO vdatastore ("Name", "Hosts", "Address", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type")
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		`, ds.Name, ds.Hosts, ds.Address, ds.ObjectID, ds.FreeMiB, ds.MHA, ds.CapacityMiB, ds.Type)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// InsertVMInspections inserts vm_inspection_status fixture data.
+func InsertVMInspections(ctx context.Context, db *sql.DB) error {
+	for _, ins := range Inspections {
+		_, err := db.ExecContext(ctx, `
+			INSERT INTO vm_inspection_status ("VM ID", status, error)
+			VALUES (?, ?, ?)
+		`, ins.VMID, ins.Status, ins.Error)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }

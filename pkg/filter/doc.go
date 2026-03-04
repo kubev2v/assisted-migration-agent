@@ -134,29 +134,59 @@
 //	// query: SELECT * FROM vms WHERE v."Powerstate" IN (?,?)
 //	// args: ["poweredOn", "suspended"]
 //
-// # Creating a ListOption
+// # Default Field Mapping
 //
-// Common pattern for integrating with store queries:
+// ParseWithDefaultMap uses a built-in MapFunc that maps identifiers to SQL
+// column references in the flat filter subquery (see internal/store VMStore).
+// Flat names reference vinfo columns; dotted names reference joined tables:
 //
-//	func ByFilter(filterStr string, mapper filter.MapFunc) store.ListOption {
-//	    return func(b sq.SelectBuilder) sq.SelectBuilder {
-//	        if filterStr == "" {
-//	            return b
-//	        }
-//	        sqlizer, err := filter.Parse([]byte(filterStr), mapper)
-//	        if err != nil {
-//	            // Log error and return unmodified builder
-//	            return b
-//	        }
-//	        return b.Where(sqlizer)
-//	    }
-//	}
+// vinfo (v) — flat names:
 //
-//	// Usage:
-//	vms, err := store.VM().List(ctx,
-//	    ByFilter("memory > 8GB and cluster = 'prod'", vmMapper),
-//	    store.WithLimit(50),
-//	)
+//	id, name, folder_id, folder, host, smbios_uuid, vm_uuid, firmware,
+//	powerstate (alias: status), connection_state, ft_state, cpus, memory,
+//	os_config, os_tools, dns_name, ip_address, storage_used, template,
+//	cbt, enable_uuid, datacenter, cluster, hw_version, total_disk_capacity,
+//	provisioned, resource_pool
+//
+// vdisk (dk) — disk.* prefix:
+//
+//	disk.key, disk.path, disk.capacity, disk.sharing, disk.raw,
+//	disk.shared_bus, disk.mode, disk.thin, disk.controller, disk.label
+//
+// concerns (c) — concern.* prefix:
+//
+//	concern.label, concern.category, concern.assessment
+//
+// vm_inspection_status (i) — inspection.* prefix:
+//
+//	inspection.status, inspection.error
+//
+// vcpu (cpu) — cpu.* prefix:
+//
+//	cpu.hot_add, cpu.hot_remove, cpu.sockets, cpu.cores_per_socket
+//
+// vmemory (mem) — mem.* prefix:
+//
+//	mem.hot_add, mem.ballooned
+//
+// vnetwork (net) — net.* prefix:
+//
+//	net.network, net.mac, net.nic_label, net.adapter, net.switch,
+//	net.connected, net.starts_connected, net.type, net.ipv4, net.ipv6,
+//	net.cluster
+//
+// vdatastore (ds) — datastore.* prefix:
+//
+//	datastore.name, datastore.hosts, datastore.address, datastore.object_id,
+//	datastore.free, datastore.mha, datastore.capacity, datastore.type
+//
+// # Usage with store
+//
+// ByFilter parses a DSL expression and returns a sq.Sqlizer for the flat
+// filter subquery:
+//
+//	filters := []sq.Sqlizer{store.ByFilter("memory > 8GB and disk.capacity >= 100GB")}
+//	vms, err := store.VM().List(ctx, filters, store.WithLimit(50))
 //
 // # Filter Examples
 //
@@ -165,42 +195,32 @@
 //	name = 'web-server-01'
 //	status != 'poweredOff'
 //	memory >= 16GB
-//	disk < 500GB
+//	template = false
+//
+// Cross-table filtering with dot notation:
+//
+//	disk.capacity >= 100GB
+//	concern.category = 'Critical'
+//	cpu.cores_per_socket >= 4
+//	net.type = 'VmxNet3'
+//	datastore.type = 'NFS'
 //
 // Regex matching:
 //
-//	name ~ /^prod-/              // starts with "prod-"
-//	name ~ /-(dev|test)-/        // contains "-dev-" or "-test-"
-//	name !~ /backup/             // excludes "backup"
+//	name ~ /^prod-/
+//	disk.path ~ /datastore1/
+//	concern.label ~ /RDM/
 //
-// Boolean filters:
+// IN/NOT IN:
 //
-//	active = true
-//	template = false
-//
-// IN/NOT IN filters (membership test):
-//
-//	status in ['poweredOn', 'suspended']
-//	cluster in ['prod', 'staging', 'dev']
-//	status not in ['deleted', 'archived']
-//	name not in ['test-vm', 'backup-vm']
+//	cluster in ['prod', 'staging']
+//	concern.category not in ['Information']
 //
 // Combined filters:
 //
-//	memory >= 8GB and disk >= 100GB
-//	status = 'poweredOn' or status = 'suspended'
-//	name ~ /^prod-/ and memory >= 16GB and active = true
-//
-// Complex expressions with grouping:
-//
-//	(cluster = 'prod' or cluster = 'staging') and memory >= 8GB
-//	active = true and (memory >= 16GB or disk >= 500GB)
-//	(name ~ /^web-/ or name ~ /^api-/) and status = 'poweredOn' and memory >= 4GB
-//
-// IN with other conditions:
-//
-//	status in ['poweredOn', 'suspended'] and memory >= 8GB
-//	cluster in ['prod', 'staging'] and name ~ /^web-/
+//	memory >= 8GB and disk.capacity >= 100GB
+//	(cluster = 'prod' or cluster = 'staging') and concern.category != 'Critical'
+//	cpu.sockets >= 2 and mem.hot_add = true and net.connected = true
 //
 // # Error Handling
 //
@@ -209,40 +229,8 @@
 //	_, err := filter.Parse([]byte("name ="), mapper)
 //	// err: parse error at 6: expected value instead of eol
 //
-//	_, err := filter.Parse([]byte("name ~ /unclosed"), mapper)
-//	// err: parse error at 7: unclosed regex
+// The MapFunc returns errors for unknown fields:
 //
-// The MapFunc can return errors for unknown fields:
-//
-//	mapper := func(name string) (string, error) {
-//	    if name == "unknown" {
-//	        return "", fmt.Errorf("unknown field: %s", name)
-//	    }
-//	    return `"` + name + `"`, nil
-//	}
-//
-// // {{- /*
-// -// Flattened VM Query — joins all tables without aggregation so every column
-// -// is directly available in the WHERE clause for filtering.
-// -//
-// -// A VM with N disks and M NICs produces N×M rows (cartesian product).
-// -// Use SELECT DISTINCT i."VM ID" when you only need matching VM IDs.
-// -//
-// -// Template Parameters:
-// -//   - Filter: raw SQL WHERE expression from the filter parser (optional)
-// -//   - Limit:  max results, 0 = unlimited (optional)
-// -//   - Offset: skip first N results (optional)
-// -// */ -}}
-// -// SELECT DISTINCT i."VM ID" AS id
-// -// FROM vinfo i
-// -// LEFT JOIN vcpu c ON i."VM ID" = c."VM ID"
-// -// LEFT JOIN vmemory m ON i."VM ID" = m."VM ID"
-// -// LEFT JOIN vdisk dk ON i."VM ID" = dk."VM ID"
-// -// LEFT JOIN vdatastore ds ON ds."Name" = regexp_extract(COALESCE(dk."Path", dk."Disk Path"), '\[([^\]]+)\]', 1)
-// -// LEFT JOIN vnetwork n ON i."VM ID" = n."VM ID"
-// -// LEFT JOIN concerns con ON i."VM ID" = con."VM_ID"
-// -// WHERE 1=1
-// -// {{- if .Filter }} AND {{ .Filter }}{{ end }}
-// -// {{- if and .Limit (gt .Limit 0) }} LIMIT {{ .Limit }}{{ end }}
-// -// {{- if and .Offset (gt .Offset 0) }} OFFSET {{ .Offset }}{{ end }};
+//	_, err := filter.ParseWithDefaultMap([]byte("unknown_field = 'x'"))
+//	// err: unknown filter field: unknown_field
 package filter

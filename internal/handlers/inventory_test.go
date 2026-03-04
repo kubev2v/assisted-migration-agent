@@ -32,11 +32,11 @@ var _ = Describe("Inventory Handlers", func() {
 	BeforeEach(func() {
 		gin.SetMode(gin.TestMode)
 		mockInventory = &MockInventoryService{}
-		handler = handlers.New(config.Configuration{
+		handler = handlers.NewHandler(config.Configuration{
 			Agent: config.Agent{
 				ID: uuid.Nil.String(),
 			},
-		}, nil, nil, mockInventory, nil, nil)
+		}).WithInventoryService(mockInventory)
 		router = gin.New()
 		wrapper := v1.ServerInterfaceWrapper{
 			Handler:      handler,

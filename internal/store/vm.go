@@ -50,26 +50,23 @@ func NewVMStore(db QueryInterceptor, parser *duckdb_parser.Parser) *VMStore {
 	return &VMStore{db: db, parser: parser}
 }
 
+// FilterOption is a SQL WHERE condition for filtering VMs in the flat filter subquery.
+type FilterOption = sq.Sqlizer
+
 // List returns VM summaries with filters, sorting, and pagination.
-func (s *VMStore) List(ctx context.Context, opts ...ListOption) ([]models.VirtualMachineSummary, error) {
-	builder := sq.Select(
-		`v."VM ID" AS id`,
-		`v."VM" AS name`,
-		`v."Powerstate" AS power_state`,
-		`COALESCE(v."Cluster", '') AS cluster`,
-		`COALESCE(v."Datacenter", '') AS datacenter`,
-		`v."Memory" AS memory`,
-		`COALESCE(d.total_disk, 0) AS disk_size`,
-		`COALESCE(c.issue_count, 0) AS issue_count`,
-		`COALESCE(i.status, 'not_found') AS status`,
-		`v."Template" as template`,
-		`COALESCE(crit.critical_count, 0) = 0 AS migratable`,
-		`COALESCE(i.error, '') AS error`,
-	).From("vinfo v").
-		LeftJoin(`(SELECT "VM_ID", COUNT(*) AS issue_count FROM concerns GROUP BY "VM_ID") c ON v."VM ID" = c."VM_ID"`).
-		LeftJoin(`(SELECT "VM_ID", COUNT(*) AS critical_count FROM concerns WHERE "Category" = 'Critical' GROUP BY "VM_ID") crit ON v."VM ID" = crit."VM_ID"`).
-		LeftJoin(`(SELECT "VM ID", SUM("Capacity MiB") AS total_disk FROM vdisk GROUP BY "VM ID") d ON v."VM ID" = d."VM ID"`).
-		LeftJoin(`vm_inspection_status i ON v."VM ID" = i."VM ID"`)
+// Filters are applied via a flat subquery that joins all tables, allowing
+// WHERE clauses to reference any column. The output query aggregates results into one row per VM.
+func (s *VMStore) List(ctx context.Context, filters []sq.Sqlizer, opts ...ListOption) ([]models.VirtualMachineSummary, error) {
+	builder := vmOutputQuery()
+
+	if len(filters) > 0 {
+		subquery := vmFilterSubquery(filters)
+		subSQL, subArgs, err := subquery.ToSql()
+		if err != nil {
+			return nil, err
+		}
+		builder = builder.Where(sq.Expr(fmt.Sprintf(`v."VM ID" IN (%s)`, subSQL), subArgs...))
+	}
 
 	for _, opt := range opts {
 		builder = opt(builder)
@@ -117,15 +114,16 @@ func (s *VMStore) List(ctx context.Context, opts ...ListOption) ([]models.Virtua
 }
 
 // Count returns the total number of VMs matching the filters.
-func (s *VMStore) Count(ctx context.Context, opts ...ListOption) (int, error) {
-	builder := sq.Select("COUNT(*)").
-		From("vinfo v").
-		LeftJoin(`(SELECT "VM_ID", COUNT(*) AS issue_count FROM concerns GROUP BY "VM_ID") c ON v."VM ID" = c."VM_ID"`).
-		LeftJoin(`(SELECT "VM ID", SUM("Capacity MiB") AS total_disk FROM vdisk GROUP BY "VM ID") d ON v."VM ID" = d."VM ID"`)
+func (s *VMStore) Count(ctx context.Context, filters ...sq.Sqlizer) (int, error) {
+	builder := sq.Select("COUNT(*)").From("vinfo v")
 
-	// Apply only WHERE filters, skip ORDER BY/LIMIT/OFFSET
-	for _, opt := range opts {
-		builder = opt(builder)
+	if len(filters) > 0 {
+		subquery := vmFilterSubquery(filters)
+		subSQL, subArgs, err := subquery.ToSql()
+		if err != nil {
+			return 0, err
+		}
+		builder = builder.Where(sq.Expr(fmt.Sprintf(`v."VM ID" IN (%s)`, subSQL), subArgs...))
 	}
 
 	query, args, err := builder.ToSql()
@@ -221,7 +219,7 @@ func vmFromParser(pvm parsermodels.VM) models.VM {
 	}
 }
 
-// ListOption modifies a SELECT query for filtering/sorting/pagination.
+// ListOption modifies a SELECT query for sorting/pagination.
 type ListOption func(sq.SelectBuilder) sq.SelectBuilder
 
 // SortParam represents a single sort parameter with field name and direction.
@@ -230,85 +228,99 @@ type SortParam struct {
 	Desc  bool
 }
 
-// ByClusters filters by cluster names (OR logic).
-func ByClusters(clusters ...string) ListOption {
-	return func(b sq.SelectBuilder) sq.SelectBuilder {
-		if len(clusters) == 0 {
-			return b
-		}
-		expr := fmt.Sprintf("cluster in [%s]", strings.Join(quoteFilterStrings(clusters), ", "))
-		if sqlizer, _ := filter.ParseWithDefaultMap([]byte(expr)); sqlizer != nil {
-			return b.Where(sqlizer)
-		}
-		return b
+// vmOutputQuery builds the aggregated output query that produces one row per VM.
+func vmOutputQuery() sq.SelectBuilder {
+	return sq.Select(
+		`v."VM ID" AS id`,
+		`v."VM" AS name`,
+		`v."Powerstate" AS power_state`,
+		`COALESCE(v."Cluster", '') AS cluster`,
+		`COALESCE(v."Datacenter", '') AS datacenter`,
+		`v."Memory" AS memory`,
+		`COALESCE(d.total_disk, 0) AS disk_size`,
+		`COALESCE(c.issue_count, 0) AS issue_count`,
+		`COALESCE(i.status, 'not_found') AS status`,
+		`v."Template" as template`,
+		`COALESCE(crit.critical_count, 0) = 0 AS migratable`,
+		`COALESCE(i.error, '') AS error`,
+	).From("vinfo v").
+		LeftJoin(`(SELECT "VM_ID", COUNT(*) AS issue_count FROM concerns GROUP BY "VM_ID") c ON v."VM ID" = c."VM_ID"`).
+		LeftJoin(`(SELECT "VM_ID", COUNT(*) AS critical_count FROM concerns WHERE "Category" = 'Critical' GROUP BY "VM_ID") crit ON v."VM ID" = crit."VM_ID"`).
+		LeftJoin(`(SELECT "VM ID", SUM("Capacity MiB") AS total_disk FROM vdisk GROUP BY "VM ID") d ON v."VM ID" = d."VM ID"`).
+		LeftJoin(`vm_inspection_status i ON v."VM ID" = i."VM ID"`)
+}
+
+// vmFilterSubquery builds a flat JOIN of all tables so WHERE clauses can
+// reference any raw column. Returns DISTINCT VM IDs matching the filters.
+func vmFilterSubquery(filters []sq.Sqlizer) sq.SelectBuilder {
+	b := sq.Select(`DISTINCT v."VM ID"`).
+		From("vinfo v").
+		LeftJoin(`vdisk dk ON v."VM ID" = dk."VM ID"`).
+		LeftJoin(`concerns c ON v."VM ID" = c."VM_ID"`).
+		LeftJoin(`vm_inspection_status i ON v."VM ID" = i."VM ID"`).
+		LeftJoin(`vcpu cpu ON v."VM ID" = cpu."VM ID"`).
+		LeftJoin(`vmemory mem ON v."VM ID" = mem."VM ID"`).
+		LeftJoin(`vnetwork net ON v."VM ID" = net."VM ID"`).
+		LeftJoin(`vdatastore ds ON ds."Name" = regexp_extract(COALESCE(dk."Path", dk."Disk Path"), '\[([^\]]+)\]', 1)`)
+
+	for _, f := range filters {
+		b = b.Where(f)
 	}
+
+	return b
+}
+
+// ByClusters filters by cluster names (OR logic).
+func ByClusters(clusters ...string) sq.Sqlizer {
+	if len(clusters) == 0 {
+		return nil
+	}
+	return sq.Eq{`v."Cluster"`: clusters}
 }
 
 // ByStatus filters by power state (OR logic).
-func ByStatus(statuses ...string) ListOption {
-	return func(b sq.SelectBuilder) sq.SelectBuilder {
-		if len(statuses) == 0 {
-			return b
-		}
-		expr := fmt.Sprintf("status in [%s]", strings.Join(quoteFilterStrings(statuses), ", "))
-		if sqlizer, _ := filter.ParseWithDefaultMap([]byte(expr)); sqlizer != nil {
-			return b.Where(sqlizer)
-		}
-		return b
+func ByStatus(statuses ...string) sq.Sqlizer {
+	if len(statuses) == 0 {
+		return nil
 	}
+	return sq.Eq{`v."Powerstate"`: statuses}
 }
 
-// ByIssues filters VMs with issue_count >= minIssues.
-func ByIssues(minIssues int) ListOption {
-	return func(b sq.SelectBuilder) sq.SelectBuilder {
-		if minIssues <= 0 {
-			return b
-		}
-		expr := fmt.Sprintf("issues >= %d", minIssues)
-		if sqlizer, _ := filter.ParseWithDefaultMap([]byte(expr)); sqlizer != nil { // error is ignored
-			return b.Where(sqlizer)
-		}
-		return b
+// ByIssues filters VMs with at least minIssues concerns.
+func ByIssues(minIssues int) sq.Sqlizer {
+	if minIssues <= 0 {
+		return nil
 	}
+	return sq.Expr(
+		`v."VM ID" IN (SELECT "VM_ID" FROM concerns GROUP BY "VM_ID" HAVING COUNT(*) >= ?)`,
+		minIssues,
+	)
 }
 
-// ByDiskSizeRange filters by disk size in MB [min, max).
-func ByDiskSizeRange(min, max int64) ListOption {
-	return func(b sq.SelectBuilder) sq.SelectBuilder {
-		expr := fmt.Sprintf("disk >= %d and disk < %d", min, max)
-		if sqlizer, _ := filter.ParseWithDefaultMap([]byte(expr)); sqlizer != nil {
-			return b.Where(sqlizer)
-		}
-		return b
-	}
+// ByDiskSizeRange filters by total disk size in MiB [min, max).
+func ByDiskSizeRange(min, max int64) sq.Sqlizer {
+	return sq.Expr(
+		`v."VM ID" IN (SELECT "VM ID" FROM vdisk GROUP BY "VM ID" HAVING SUM("Capacity MiB") >= ? AND SUM("Capacity MiB") < ?)`,
+		min, max,
+	)
 }
 
-// ByMemorySizeRange filters by memory in MB [min, max).
-func ByMemorySizeRange(min, max int64) ListOption {
-	return func(b sq.SelectBuilder) sq.SelectBuilder {
-		expr := fmt.Sprintf("memory >= %d and memory <= %d", min, max)
-		if sqlizer, _ := filter.ParseWithDefaultMap([]byte(expr)); sqlizer != nil {
-			return b.Where(sqlizer)
-		}
-		return b
+// ByMemorySizeRange filters by memory in MiB [min, max].
+func ByMemorySizeRange(min, max int64) sq.Sqlizer {
+	return sq.And{
+		sq.GtOrEq{`v."Memory"`: min},
+		sq.LtOrEq{`v."Memory"`: max},
 	}
 }
 
 // ByFilter applies a raw filter DSL expression.
-// The expression should be pre-validated by the handler.
-// If the expression is empty or fails to parse, the builder is returned unchanged.
-func ByFilter(expr string) ListOption {
-	return func(b sq.SelectBuilder) sq.SelectBuilder {
-		if expr == "" {
-			return b
-		}
-		// TODO: error should be checked here ?
-		// The best solution is to check in handler
-		if sqlizer, _ := filter.ParseWithDefaultMap([]byte(expr)); sqlizer != nil {
-			return b.Where(sqlizer)
-		}
-		return b
+// Returns nil if the expression is empty or fails to parse.
+func ByFilter(expr string) sq.Sqlizer {
+	if expr == "" {
+		return nil
 	}
+	sqlizer, _ := filter.ParseWithDefaultMap([]byte(expr))
+	return sqlizer
 }
 
 // WithLimit sets the LIMIT clause.
@@ -328,19 +340,20 @@ func WithOffset(offset uint64) ListOption {
 // WithDefaultSort applies default sorting by VM ID.
 func WithDefaultSort() ListOption {
 	return func(b sq.SelectBuilder) sq.SelectBuilder {
-		return b.OrderBy(`v."VM ID"`)
+		return b.OrderBy("id")
 	}
 }
 
-// WithSort applies multi-field sorting.
+// WithSort applies multi-field sorting using output aliases from the
+// aggregated query.
 func WithSort(sorts []SortParam) ListOption {
 	apiFieldToDBColumn := map[string]string{
-		"name":         `v."VM"`,
-		"vCenterState": `v."Powerstate"`,
-		"cluster":      `v."Cluster"`,
-		"diskSize":     `COALESCE(d.total_disk, 0)`,
-		"memory":       `v."Memory"`,
-		"issues":       `issue_count`,
+		"name":         "name",
+		"vCenterState": "power_state",
+		"cluster":      "cluster",
+		"diskSize":     "disk_size",
+		"memory":       "memory",
+		"issues":       "issue_count",
 	}
 
 	return func(b sq.SelectBuilder) sq.SelectBuilder {
@@ -356,19 +369,9 @@ func WithSort(sorts []SortParam) ListOption {
 				orderClauses = append(orderClauses, col+" ASC")
 			}
 		}
-		// Always add VM ID as tie-breaker for stable sorting
-		orderClauses = append(orderClauses, `v."VM ID"`)
+		orderClauses = append(orderClauses, "id")
 		return b.OrderBy(orderClauses...)
 	}
-}
-
-// quoteFilterStrings quotes strings for use in filter DSL expressions.
-func quoteFilterStrings(values []string) []string {
-	quoted := make([]string, len(values))
-	for i, v := range values {
-		quoted[i] = fmt.Sprintf("'%s'", strings.ReplaceAll(v, "'", "\\'"))
-	}
-	return quoted
 }
 
 // GetFolders returns a list of distinct folders from the vinfo table.

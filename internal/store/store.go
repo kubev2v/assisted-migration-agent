@@ -16,6 +16,7 @@ type Store struct {
 	inventory     *InventoryStore
 	vm            *VMStore
 	inspection    *InspectionStore
+	group         *GroupStore
 }
 
 func NewStore(db *sql.DB, validator duckdb_parser.Validator) *Store {
@@ -28,6 +29,7 @@ func NewStore(db *sql.DB, validator duckdb_parser.Validator) *Store {
 		inventory:     NewInventoryStore(qi),
 		vm:            NewVMStore(qi, parser),
 		inspection:    NewInspectionStore(qi),
+		group:         NewGroupStore(qi),
 	}
 }
 
@@ -61,6 +63,10 @@ func (s *Store) VM() *VMStore {
 
 func (s *Store) Inspection() *InspectionStore {
 	return s.inspection
+}
+
+func (s *Store) Group() *GroupStore {
+	return s.group
 }
 
 // Checkpoint forces a WAL flush to the main database file.

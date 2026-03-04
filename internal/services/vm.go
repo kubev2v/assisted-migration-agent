@@ -3,6 +3,8 @@ package services
 import (
 	"context"
 
+	sq "github.com/Masterminds/squirrel"
+
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 )
@@ -38,19 +40,18 @@ func (s *VMService) Get(ctx context.Context, id string) (*models.VM, error) {
 }
 
 func (s *VMService) List(ctx context.Context, params VMListParams) ([]models.VirtualMachineSummary, int, error) {
-	opts := s.buildListOptions(params)
+	filters, opts := s.buildListOptions(params)
 
 	if len(params.Sort) == 0 {
 		opts = append(opts, store.WithDefaultSort())
 	}
 
-	vms, err := s.store.VM().List(ctx, opts...)
+	vms, err := s.store.VM().List(ctx, filters, opts...)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	// Get total count without pagination
-	countOpts := s.buildListOptions(VMListParams{
+	countFilters, _ := s.buildListOptions(VMListParams{
 		Clusters:      params.Clusters,
 		Statuses:      params.Statuses,
 		MinIssues:     params.MinIssues,
@@ -59,7 +60,7 @@ func (s *VMService) List(ctx context.Context, params VMListParams) ([]models.Vir
 		MemorySizeMin: params.MemorySizeMin,
 		MemorySizeMax: params.MemorySizeMax,
 	})
-	total, err := s.store.VM().Count(ctx, countOpts...)
+	total, err := s.store.VM().Count(ctx, countFilters...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -67,43 +68,42 @@ func (s *VMService) List(ctx context.Context, params VMListParams) ([]models.Vir
 	return vms, total, nil
 }
 
-func (s *VMService) buildListOptions(params VMListParams) []store.ListOption {
+func (s *VMService) buildListOptions(params VMListParams) ([]sq.Sqlizer, []store.ListOption) {
+	var filters []sq.Sqlizer
 	var opts []store.ListOption
 
 	if len(params.Clusters) > 0 {
-		opts = append(opts, store.ByClusters(params.Clusters...))
+		filters = append(filters, store.ByClusters(params.Clusters...))
 	}
 	if len(params.Statuses) > 0 {
-		opts = append(opts, store.ByStatus(params.Statuses...))
+		filters = append(filters, store.ByStatus(params.Statuses...))
 	}
 	if params.MinIssues > 0 {
-		opts = append(opts, store.ByIssues(params.MinIssues))
+		filters = append(filters, store.ByIssues(params.MinIssues))
 	}
 
-	// Handle disk size filter (values in MB)
 	if params.DiskSizeMin != nil || params.DiskSizeMax != nil {
 		min := int64(0)
-		max := int64(1 << 62) // effectively no upper limit
+		max := int64(1 << 62)
 		if params.DiskSizeMin != nil {
 			min = *params.DiskSizeMin
 		}
 		if params.DiskSizeMax != nil {
 			max = *params.DiskSizeMax
 		}
-		opts = append(opts, store.ByDiskSizeRange(min, max))
+		filters = append(filters, store.ByDiskSizeRange(min, max))
 	}
 
-	// Handle memory size filter (values in MB)
 	if params.MemorySizeMin != nil || params.MemorySizeMax != nil {
 		min := int64(0)
-		max := int64(1 << 62) // effectively no upper limit
+		max := int64(1 << 62)
 		if params.MemorySizeMin != nil {
 			min = *params.MemorySizeMin
 		}
 		if params.MemorySizeMax != nil {
 			max = *params.MemorySizeMax
 		}
-		opts = append(opts, store.ByMemorySizeRange(min, max))
+		filters = append(filters, store.ByMemorySizeRange(min, max))
 	}
 
 	if len(params.Sort) > 0 {
@@ -121,5 +121,5 @@ func (s *VMService) buildListOptions(params VMListParams) []store.ListOption {
 		opts = append(opts, store.WithOffset(params.Offset))
 	}
 
-	return opts
+	return filters, opts
 }

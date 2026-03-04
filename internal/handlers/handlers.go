@@ -42,6 +42,16 @@ type InspectorService interface {
 	Stop(ctx context.Context) error
 }
 
+// GroupService defines the interface for group operations.
+type GroupService interface {
+	List(ctx context.Context) ([]models.Group, error)
+	ListVirtualMachines(ctx context.Context, id int, params services.GroupGetParams) ([]models.VirtualMachineSummary, int, error)
+	Get(ctx context.Context, id int) (*models.Group, error)
+	Create(ctx context.Context, group models.Group) (*models.Group, error)
+	Update(ctx context.Context, id int, group models.Group) (*models.Group, error)
+	Delete(ctx context.Context, id int) error
+}
+
 type Handler struct {
 	cfg          config.Configuration
 	consoleSrv   ConsoleService
@@ -49,22 +59,39 @@ type Handler struct {
 	inventorySrv InventoryService
 	inspectorSrv InspectorService
 	vmSrv        VMService
+	groupSrv     GroupService
 }
 
-func New(
-	cfg config.Configuration,
-	consoleSrv ConsoleService,
-	collectorSrv CollectorService,
-	inventorySrv InventoryService,
-	vmSrv VMService,
-	inspectorSrv InspectorService,
-) *Handler {
-	return &Handler{
-		cfg:          cfg,
-		consoleSrv:   consoleSrv,
-		collectorSrv: collectorSrv,
-		inventorySrv: inventorySrv,
-		vmSrv:        vmSrv,
-		inspectorSrv: inspectorSrv,
-	}
+func NewHandler(cfg config.Configuration) *Handler {
+	return &Handler{cfg: cfg}
+}
+
+func (h *Handler) WithConsoleService(srv ConsoleService) *Handler {
+	h.consoleSrv = srv
+	return h
+}
+
+func (h *Handler) WithCollectorService(srv CollectorService) *Handler {
+	h.collectorSrv = srv
+	return h
+}
+
+func (h *Handler) WithInventoryService(srv InventoryService) *Handler {
+	h.inventorySrv = srv
+	return h
+}
+
+func (h *Handler) WithVMService(srv VMService) *Handler {
+	h.vmSrv = srv
+	return h
+}
+
+func (h *Handler) WithInspectorService(srv InspectorService) *Handler {
+	h.inspectorSrv = srv
+	return h
+}
+
+func (h *Handler) WithGroupService(srv GroupService) *Handler {
+	h.groupSrv = srv
+	return h
 }

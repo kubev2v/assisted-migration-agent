@@ -130,3 +130,53 @@ func (m *MockInspectorService) Stop(ctx context.Context) error {
 	m.StopCallCount++
 	return m.StopError
 }
+
+// MockGroupService is a mock implementation of GroupService.
+type MockGroupService struct {
+	ListResult        []models.Group
+	ListError         error
+	GetResult         *models.Group
+	GetError          error
+	ListVMsResult     []models.VirtualMachineSummary
+	ListVMsTotal      int
+	ListVMsError      error
+	CreateResult      *models.Group
+	CreateError       error
+	UpdateResult      *models.Group
+	UpdateError       error
+	DeleteError       error
+	LastListVMsParams services.GroupGetParams
+	LastCreateGroup   models.Group
+	LastUpdateGroup   models.Group
+	LastUpdateID      int
+	LastDeleteID      int
+}
+
+func (m *MockGroupService) List(ctx context.Context) ([]models.Group, error) {
+	return m.ListResult, m.ListError
+}
+
+func (m *MockGroupService) Get(ctx context.Context, id int) (*models.Group, error) {
+	return m.GetResult, m.GetError
+}
+
+func (m *MockGroupService) ListVirtualMachines(ctx context.Context, id int, params services.GroupGetParams) ([]models.VirtualMachineSummary, int, error) {
+	m.LastListVMsParams = params
+	return m.ListVMsResult, m.ListVMsTotal, m.ListVMsError
+}
+
+func (m *MockGroupService) Create(ctx context.Context, group models.Group) (*models.Group, error) {
+	m.LastCreateGroup = group
+	return m.CreateResult, m.CreateError
+}
+
+func (m *MockGroupService) Update(ctx context.Context, id int, group models.Group) (*models.Group, error) {
+	m.LastUpdateID = id
+	m.LastUpdateGroup = group
+	return m.UpdateResult, m.UpdateError
+}
+
+func (m *MockGroupService) Delete(ctx context.Context, id int) error {
+	m.LastDeleteID = id
+	return m.DeleteError
+}

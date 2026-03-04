@@ -50,10 +50,7 @@ func (h *Handler) GetVMs(c *gin.Context, params v1.GetVMsParams) {
 	}
 	pageSize := defaultPageSize
 	if params.PageSize != nil && *params.PageSize > 0 {
-		pageSize = *params.PageSize
-		if pageSize > maxPageSize {
-			pageSize = maxPageSize
-		}
+		pageSize = min(*params.PageSize, maxPageSize)
 	}
 
 	// Build service params

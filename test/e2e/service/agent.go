@@ -337,6 +337,203 @@ func (a *AgentSvc) GetVM(id string) (*v1.VirtualMachineDetail, error) {
 	return &vm, nil
 }
 
+// GroupGetParams holds parameters for getting a group's VMs.
+type GroupGetParams struct {
+	Sort     []string
+	Page     *int
+	PageSize *int
+}
+
+// CreateGroup creates a new group with the given name, filter, and description.
+func (a *AgentSvc) CreateGroup(name, filter, description string) (*v1.Group, error) {
+	body := v1.CreateGroupRequest{
+		Name:   name,
+		Filter: filter,
+	}
+	if description != "" {
+		body.Description = &description
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling request: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, a.baseURL+"/api/v1/vms/groups", bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	resp, err := a.request(NewAgentRequest(req).withHeader("Content-Type", "application/json"))
+	if err != nil {
+		return nil, fmt.Errorf("sending request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var group v1.Group
+	if err := json.NewDecoder(resp.Body).Decode(&group); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+	return &group, nil
+}
+
+// CreateGroupRaw sends a raw POST to /vms/groups and returns the status code.
+func (a *AgentSvc) CreateGroupRaw(body []byte) (int, error) {
+	req, err := http.NewRequest(http.MethodPost, a.baseURL+"/api/v1/vms/groups", bytes.NewReader(body))
+	if err != nil {
+		return 0, fmt.Errorf("creating request: %w", err)
+	}
+
+	resp, err := a.request(NewAgentRequest(req).withHeader("Content-Type", "application/json"))
+	if err != nil {
+		return 0, fmt.Errorf("sending request: %w", err)
+	}
+	_ = resp.Body.Close()
+	return resp.StatusCode, nil
+}
+
+// ListGroups lists all groups.
+func (a *AgentSvc) ListGroups() (*v1.GroupListResponse, error) {
+	req, err := http.NewRequest(http.MethodGet, a.baseURL+"/api/v1/vms/groups", nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	resp, err := a.request(NewAgentRequest(req))
+	if err != nil {
+		return nil, fmt.Errorf("sending request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var result v1.GroupListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+	return &result, nil
+}
+
+// GetGroup retrieves a group by ID with its filtered VMs.
+func (a *AgentSvc) GetGroup(id string, params *GroupGetParams) (*v1.GroupResponse, error) {
+	req, err := http.NewRequest(http.MethodGet, a.baseURL+"/api/v1/vms/groups/"+url.PathEscape(id), nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	agentReq := NewAgentRequest(req)
+	if params != nil {
+		if params.Page != nil {
+			agentReq.withQueryParam("page", strconv.Itoa(*params.Page))
+		}
+		if params.PageSize != nil {
+			agentReq.withQueryParam("pageSize", strconv.Itoa(*params.PageSize))
+		}
+		agentReq.withQueryParamSlice("sort", params.Sort)
+	}
+
+	resp, err := a.request(agentReq)
+	if err != nil {
+		return nil, fmt.Errorf("sending request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("group not found: %s", id)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var result v1.GroupResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+	return &result, nil
+}
+
+// GetGroupStatus sends a GET to /vms/groups/{id} and returns only the status code.
+func (a *AgentSvc) GetGroupStatus(id string) (int, error) {
+	req, err := http.NewRequest(http.MethodGet, a.baseURL+"/api/v1/vms/groups/"+url.PathEscape(id), nil)
+	if err != nil {
+		return 0, fmt.Errorf("creating request: %w", err)
+	}
+
+	resp, err := a.request(NewAgentRequest(req))
+	if err != nil {
+		return 0, fmt.Errorf("sending request: %w", err)
+	}
+	_ = resp.Body.Close()
+	return resp.StatusCode, nil
+}
+
+// UpdateGroup partially updates a group via PATCH.
+func (a *AgentSvc) UpdateGroup(id string, body v1.UpdateGroupRequest) (*v1.Group, error) {
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling request: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, a.baseURL+"/api/v1/vms/groups/"+url.PathEscape(id), bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	resp, err := a.request(NewAgentRequest(req).withHeader("Content-Type", "application/json"))
+	if err != nil {
+		return nil, fmt.Errorf("sending request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("group not found: %s", id)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var group v1.Group
+	if err := json.NewDecoder(resp.Body).Decode(&group); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+	return &group, nil
+}
+
+// UpdateGroupRaw sends a raw PATCH to /vms/groups/{id} and returns the status code.
+func (a *AgentSvc) UpdateGroupRaw(id string, body []byte) (int, error) {
+	req, err := http.NewRequest(http.MethodPatch, a.baseURL+"/api/v1/vms/groups/"+url.PathEscape(id), bytes.NewReader(body))
+	if err != nil {
+		return 0, fmt.Errorf("creating request: %w", err)
+	}
+
+	resp, err := a.request(NewAgentRequest(req).withHeader("Content-Type", "application/json"))
+	if err != nil {
+		return 0, fmt.Errorf("sending request: %w", err)
+	}
+	_ = resp.Body.Close()
+	return resp.StatusCode, nil
+}
+
+// DeleteGroup deletes a group by ID.
+func (a *AgentSvc) DeleteGroup(id string) (int, error) {
+	req, err := http.NewRequest(http.MethodDelete, a.baseURL+"/api/v1/vms/groups/"+url.PathEscape(id), nil)
+	if err != nil {
+		return 0, fmt.Errorf("creating request: %w", err)
+	}
+
+	resp, err := a.request(NewAgentRequest(req))
+	if err != nil {
+		return 0, fmt.Errorf("sending request: %w", err)
+	}
+	_ = resp.Body.Close()
+	return resp.StatusCode, nil
+}
+
 func (a *AgentSvc) request(r *AgentReq) (*http.Response, error) {
 	if len(r.queryParams) > 0 || len(r.queryParamSlices) > 0 {
 		q := r.req.URL.Query()
