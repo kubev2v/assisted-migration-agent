@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/kubev2v/assisted-migration-agent/pkg/filter"
+
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
@@ -57,6 +59,15 @@ func (h *Handler) GetVMs(c *gin.Context, params v1.GetVMsParams) {
 	svcParams := services.VMListParams{
 		Limit:  uint64(pageSize),
 		Offset: uint64((page - 1) * pageSize),
+	}
+
+	if params.ByExpression != nil {
+		// validate expression
+		if _, err := filter.ParseWithDefaultMap([]byte(*params.ByExpression)); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("expression filter is invalid: %v", err)})
+			return
+		}
+		svcParams.Expression = *params.ByExpression
 	}
 
 	if params.Clusters != nil {

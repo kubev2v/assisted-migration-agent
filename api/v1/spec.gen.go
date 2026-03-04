@@ -276,6 +276,14 @@ func (siw *ServerInterfaceWrapper) GetVMs(c *gin.Context) {
 		return
 	}
 
+	// ------------- Optional query parameter "byExpression" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "byExpression", c.Request.URL.Query(), &params.ByExpression)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter byExpression: %w", err), http.StatusBadRequest)
+		return
+	}
+
 	// ------------- Optional query parameter "sort" -------------
 
 	err = runtime.BindQueryParameter("form", true, false, "sort", c.Request.URL.Query(), &params.Sort)

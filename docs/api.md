@@ -43,6 +43,7 @@ Returns a paginated list of VMs with filtering and sorting capabilities.
 | `diskSizeMax` | integer | Maximum disk size in MB |
 | `memorySizeMin` | integer | Minimum memory size in MB |
 | `memorySizeMax` | integer | Maximum memory size in MB |
+| `byExpression` | string | Filter by expression (DSL). See [Filter by Expression](filter-by-expression.md) for grammar and all supported fields. |
 | `sort` | array | Sort fields with direction (e.g., `name:asc`, `cluster:desc`) |
 | `page` | integer | Page number (default: 1) |
 | `pageSize` | integer | Items per page |

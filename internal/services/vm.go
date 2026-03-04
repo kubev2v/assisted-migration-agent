@@ -25,6 +25,7 @@ type SortField struct {
 type VMListParams struct {
 	Clusters      []string
 	Statuses      []string
+	Expression    string
 	MinIssues     int
 	DiskSizeMin   *int64
 	DiskSizeMax   *int64
@@ -54,6 +55,7 @@ func (s *VMService) List(ctx context.Context, params VMListParams) ([]models.Vir
 	countFilters, _ := s.buildListOptions(VMListParams{
 		Clusters:      params.Clusters,
 		Statuses:      params.Statuses,
+		Expression:    params.Expression,
 		MinIssues:     params.MinIssues,
 		DiskSizeMin:   params.DiskSizeMin,
 		DiskSizeMax:   params.DiskSizeMax,
@@ -77,6 +79,9 @@ func (s *VMService) buildListOptions(params VMListParams) ([]sq.Sqlizer, []store
 	}
 	if len(params.Statuses) > 0 {
 		filters = append(filters, store.ByStatus(params.Statuses...))
+	}
+	if params.Expression != "" {
+		filters = append(filters, store.ByFilter(params.Expression))
 	}
 	if params.MinIssues > 0 {
 		filters = append(filters, store.ByIssues(params.MinIssues))
