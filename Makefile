@@ -70,7 +70,7 @@ e2e: build.e2e
 	@echo "🧪 Running e2e tests (infra-mode=$(E2E_INFRA_MODE))..."
 	./bin/e2e -infra-mode=$(E2E_INFRA_MODE) -agent-image=$(E2E_AGENT_IMAGE) -backend-image=$(E2E_BACKEND_IMAGE) --ginkgo.v -iso-path=$(E2E_ISO_PATH) -vcsim-model-path=$(E2E_VCSIM_MODEL_PATH)
 
-e2e.container: build.e2e
+e2e.container: build.e2e e2e.container.clean
 	touch $(E2E_ISO_PATH)/rhcos-live-iso.x86_64.iso # In container mode, generating iso is not test for now
 	@echo "🧪 Running e2e tests (container mode)..."
 	./bin/e2e -infra-mode=container -agent-image=$(E2E_AGENT_IMAGE) -backend-image=$(E2E_BACKEND_IMAGE) --ginkgo.v -iso-path=$(E2E_ISO_PATH) -vcsim-model-path=$(E2E_VCSIM_MODEL_PATH)

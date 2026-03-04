@@ -158,10 +158,49 @@ func (b *WorkBuilder) parsing() models.WorkUnit {
 
 				zap.S().Named("inventory").Info("Successfully created inventory with clusters")
 
+				// Create groups for each folder
+				if err := b.createFolderGroups(ctx); err != nil {
+					zap.S().Named("collector_service").Warnw("failed to create folder groups", "error", err)
+				}
+
 				return nil, nil
 			}
 		},
 	}
+}
+
+// createFolderGroups creates a group for each folder and one for VMs without a folder.
+func (b *WorkBuilder) createFolderGroups(ctx context.Context) error {
+	folders, err := b.store.VM().GetFolders(ctx)
+	if err != nil {
+		return fmt.Errorf("getting folders: %w", err)
+	}
+
+	// Create group for each folder
+	for _, folder := range folders {
+		group := models.Group{
+			Name:        folder.Name,
+			Description: fmt.Sprintf("VMs in folder: %s", folder.Name),
+			Filter:      fmt.Sprintf("folder = '%s'", folder.Name),
+		}
+		if _, err := b.store.Group().Create(ctx, group); err != nil {
+			zap.S().Named("collector_service").Warnw("failed to create folder group",
+				"folder", folder.Name, "error", err)
+		}
+	}
+
+	// Create "No Folder" group for VMs without a folder
+	noFolderGroup := models.Group{
+		Name:        "No Folder",
+		Description: "VMs not organized in any folder",
+		Filter:      "folder = ''",
+	}
+	if _, err := b.store.Group().Create(ctx, noFolderGroup); err != nil {
+		zap.S().Named("collector_service").Warnw("failed to create no-folder group", "error", err)
+	}
+
+	zap.S().Named("collector_service").Infow("folder groups created", "count", len(folders)+1)
+	return nil
 }
 
 func (b *WorkBuilder) collected() models.WorkUnit {

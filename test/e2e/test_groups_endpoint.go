@@ -585,4 +585,258 @@ var _ = Describe("Group endpoint e2e tests", Ordered, func() {
 			}
 		})
 	})
+
+})
+
+var _ = Describe("Auto-created folder groups e2e tests", Ordered, func() {
+	// vcsim model has 3 folders by MoRef ID:
+	// - group-60 (databases): 17 VMs (index 0-16)
+	// - group-61 (workload): 17 VMs (index 17-33)
+	// - group-62 (sap): 16 VMs (index 34-49)
+	// The Folder column in vinfo stores the folder ID, not the name.
+
+	var (
+		agentSvc *service.AgentSvc
+	)
+
+	BeforeAll(func() {
+		GinkgoWriter.Println("Starting postgres...")
+		err := infraManager.StartPostgres()
+		Expect(err).ToNot(HaveOccurred(), "failed to start postgres")
+		time.Sleep(2 * time.Second)
+
+		GinkgoWriter.Println("Starting vcsim...")
+		err = infraManager.StartVcsim()
+		Expect(err).ToNot(HaveOccurred(), "failed to start vcsim")
+
+		client := &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			},
+		}
+		Eventually(func() error {
+			resp, err := client.Get(infra.VcsimURL)
+			if err != nil {
+				return err
+			}
+			_ = resp.Body.Close()
+			return nil
+		}, 30*time.Second, 1*time.Second).Should(BeNil(), "vcsim did not become ready")
+
+		agentSvc = service.DefaultAgentSvc(cfg.AgentAPIUrl)
+
+		agentID := uuid.NewString()
+		GinkgoWriter.Printf("Starting agent %s in disconnected mode...\n", agentID)
+		_, err = infraManager.StartAgent(infra.AgentConfig{
+			AgentID:        agentID,
+			SourceID:       uuid.NewString(),
+			Mode:           "disconnected",
+			ConsoleURL:     cfg.AgentProxyUrl,
+			UpdateInterval: "1s",
+		})
+		Expect(err).ToNot(HaveOccurred(), "failed to start agent")
+
+		Eventually(func() error {
+			_, err := agentSvc.Status()
+			return err
+		}, 30*time.Second, 1*time.Second).Should(BeNil(), "agent did not become ready")
+
+		GinkgoWriter.Println("Starting collector...")
+		_, err = agentSvc.StartCollector(infra.VcsimURL, infra.VcsimUsername, infra.VcsimPassword)
+		Expect(err).ToNot(HaveOccurred(), "failed to start collector")
+
+		Eventually(func() string {
+			status, err := agentSvc.GetCollectorStatus()
+			if err != nil {
+				return "error"
+			}
+			GinkgoWriter.Printf("Collector status: %s\n", status.Status)
+			return status.Status
+		}, 120*time.Second, 2*time.Second).Should(Equal("collected"), "collector did not reach collected state")
+
+		GinkgoWriter.Println("Auto-created folder groups test setup complete")
+	})
+
+	AfterAll(func() {
+		GinkgoWriter.Println("Cleaning up auto-created folder groups tests...")
+		_ = infraManager.RemoveAgent()
+		_ = infraManager.StopVcsim()
+		_ = infraManager.StopPostgres()
+	})
+
+	// Given an agent that has collected inventory from vcsim with 3 folders
+	// When listing all groups
+	// Then groups for each folder plus "No Folder" should exist
+	It("should have auto-created groups for each folder after collection", func() {
+		// Act
+		list, err := agentSvc.ListGroups()
+		Expect(err).ToNot(HaveOccurred())
+
+		// Assert
+		GinkgoWriter.Printf("******** %+v\n", list)
+		groupNames := make([]string, len(list.Groups))
+		for i, g := range list.Groups {
+			groupNames[i] = g.Name
+		}
+		GinkgoWriter.Printf("Auto-created groups: %v\n", groupNames)
+
+		Expect(groupNames).To(ContainElement("group-60"))
+		Expect(groupNames).To(ContainElement("group-61"))
+		Expect(groupNames).To(ContainElement("group-62"))
+		Expect(groupNames).To(ContainElement("No Folder"))
+	})
+
+	// Given auto-created folder groups exist
+	// When inspecting the filter field of each group
+	// Then each group should have the correct folder filter syntax
+	It("should have correct filter for folder groups", func() {
+		// Act
+		list, err := agentSvc.ListGroups()
+		Expect(err).ToNot(HaveOccurred())
+
+		// Assert
+		for _, g := range list.Groups {
+			switch g.Name {
+			case "group-60":
+				Expect(g.Filter).To(Equal("folder = 'group-60'"))
+			case "group-61":
+				Expect(g.Filter).To(Equal("folder = 'group-61'"))
+			case "group-62":
+				Expect(g.Filter).To(Equal("folder = 'group-62'"))
+			case "No Folder":
+				Expect(g.Filter).To(Equal("folder = ''"))
+			}
+		}
+	})
+
+	// Given the group-60 folder contains 17 VMs (index 0-16)
+	// When getting the group-60 folder group
+	// Then it should return exactly 17 VMs
+	It("should return correct VMs for group-60 folder group", func() {
+		// Arrange
+		list, err := agentSvc.ListGroups()
+		Expect(err).ToNot(HaveOccurred())
+
+		var folderGroupID string
+		for _, g := range list.Groups {
+			if g.Name == "group-60" {
+				folderGroupID = g.Id
+				break
+			}
+		}
+		Expect(folderGroupID).ToNot(BeEmpty(), "group-60 group should exist")
+
+		// Act
+		pageSize := 100
+		resp, err := agentSvc.GetGroup(folderGroupID, &service.GroupGetParams{PageSize: &pageSize})
+		Expect(err).ToNot(HaveOccurred())
+
+		// Assert
+		GinkgoWriter.Printf("group-60 folder group: total=%d\n", resp.Total)
+		Expect(resp.Total).To(Equal(17))
+	})
+
+	// Given the group-61 folder contains 17 VMs (index 17-33)
+	// When getting the group-61 folder group
+	// Then it should return exactly 17 VMs
+	It("should return correct VMs for group-61 folder group", func() {
+		// Arrange
+		list, err := agentSvc.ListGroups()
+		Expect(err).ToNot(HaveOccurred())
+
+		var folderGroupID string
+		for _, g := range list.Groups {
+			if g.Name == "group-61" {
+				folderGroupID = g.Id
+				break
+			}
+		}
+		Expect(folderGroupID).ToNot(BeEmpty(), "group-61 group should exist")
+
+		// Act
+		pageSize := 100
+		resp, err := agentSvc.GetGroup(folderGroupID, &service.GroupGetParams{PageSize: &pageSize})
+		Expect(err).ToNot(HaveOccurred())
+
+		// Assert
+		GinkgoWriter.Printf("group-61 folder group: total=%d\n", resp.Total)
+		Expect(resp.Total).To(Equal(17))
+	})
+
+	// Given the group-62 folder contains 16 VMs (index 34-49)
+	// When getting the group-62 folder group
+	// Then it should return exactly 16 VMs
+	It("should return correct VMs for group-62 folder group", func() {
+		// Arrange
+		list, err := agentSvc.ListGroups()
+		Expect(err).ToNot(HaveOccurred())
+
+		var folderGroupID string
+		for _, g := range list.Groups {
+			if g.Name == "group-62" {
+				folderGroupID = g.Id
+				break
+			}
+		}
+		Expect(folderGroupID).ToNot(BeEmpty(), "group-62 group should exist")
+
+		// Act
+		pageSize := 100
+		resp, err := agentSvc.GetGroup(folderGroupID, &service.GroupGetParams{PageSize: &pageSize})
+		Expect(err).ToNot(HaveOccurred())
+
+		// Assert
+		GinkgoWriter.Printf("group-62 folder group: total=%d\n", resp.Total)
+		Expect(resp.Total).To(Equal(16))
+	})
+
+	// Given all VMs in vcsim model are organized in folders
+	// When getting the "No Folder" group
+	// Then it should return 0 VMs
+	It("should return 0 VMs for No Folder group in vcsim model", func() {
+		// Arrange
+		list, err := agentSvc.ListGroups()
+		Expect(err).ToNot(HaveOccurred())
+
+		var noFolderGroupID string
+		for _, g := range list.Groups {
+			if g.Name == "No Folder" {
+				noFolderGroupID = g.Id
+				break
+			}
+		}
+		Expect(noFolderGroupID).ToNot(BeEmpty(), "No Folder group should exist")
+
+		// Act
+		resp, err := agentSvc.GetGroup(noFolderGroupID, nil)
+		Expect(err).ToNot(HaveOccurred())
+
+		// Assert
+		GinkgoWriter.Printf("No Folder group: total=%d\n", resp.Total)
+		Expect(resp.Total).To(Equal(0))
+	})
+
+	// Given 50 VMs distributed across 3 folders (group-60: 17, group-61: 17, group-62: 16)
+	// When summing VMs across all folder groups
+	// Then the total should equal 50
+	It("should have all 50 VMs distributed across folder groups", func() {
+		// Arrange
+		list, err := agentSvc.ListGroups()
+		Expect(err).ToNot(HaveOccurred())
+		pageSize := 100
+
+		// Act
+		totalInFolders := 0
+		for _, g := range list.Groups {
+			if g.Name == "group-60" || g.Name == "group-61" || g.Name == "group-62" {
+				resp, err := agentSvc.GetGroup(g.Id, &service.GroupGetParams{PageSize: &pageSize})
+				Expect(err).ToNot(HaveOccurred())
+				totalInFolders += resp.Total
+				GinkgoWriter.Printf("Folder %s: %d VMs\n", g.Name, resp.Total)
+			}
+		}
+
+		// Assert
+		Expect(totalInFolders).To(Equal(50), "all 50 VMs should be in folder groups")
+	})
 })
