@@ -133,19 +133,6 @@ func (q *quantityExpression) String() string {
 	return fmt.Sprintf("%.2f%s", q.Value, q.Unit)
 }
 
-// listExpression is a list of string values like ['a', 'b', 'c'].
-type listExpression struct {
-	Values []string
-}
-
-func (l *listExpression) String() string {
-	quoted := make([]string, len(l.Values))
-	for i, v := range l.Values {
-		quoted[i] = strconv.Quote(v)
-	}
-	return "[" + strings.Join(quoted, ", ") + "]"
-}
-
 // inExpression is an expression like "field IN ['a', 'b']" or "field NOT IN ['a', 'b']".
 type inExpression struct {
 	Left    Expression

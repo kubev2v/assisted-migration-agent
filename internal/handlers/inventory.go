@@ -25,7 +25,7 @@ func (h *Handler) GetInventory(c *gin.Context, params v1.GetInventoryParams) {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return
 		}
-		zap.S().Named("collector_handler").Errorw("failed to get inventory", "error", err)
+		zap.S().Named("inventory_handler").Errorw("failed to get inventory", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

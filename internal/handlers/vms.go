@@ -176,18 +176,12 @@ func (h *Handler) GetInspectorStatus(c *gin.Context) {
 func (h *Handler) StartInspection(c *gin.Context) {
 	var req v1.InspectorStartRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
-		return
-	}
-
-	// Todo: validate using the openapi spec. do the same for the collector
-	if req.VcenterCredentials.Url == "" || req.VcenterCredentials.Username == "" || req.VcenterCredentials.Password == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "url, username, and password are required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": validationErrorMessage(err)})
 		return
 	}
 
 	if len(req.VmIds) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "no vms provided"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "vmIds is required"})
 		return
 	}
 

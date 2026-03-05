@@ -2,6 +2,7 @@ package v1
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 )
@@ -239,12 +240,20 @@ func NewInspectionStatus(status models.InspectionStatus) VmInspectionStatus {
 // NewGroupFromModel converts a models.Group to an API Group.
 func NewGroupFromModel(g models.Group) Group {
 	id := fmt.Sprintf("%d", g.ID)
+	createdAt := g.CreatedAt
+	if createdAt.IsZero() {
+		createdAt = time.Now()
+	}
+	updatedAt := g.UpdatedAt
+	if updatedAt.IsZero() {
+		updatedAt = time.Now()
+	}
 	group := Group{
 		Id:        id,
 		Name:      g.Name,
 		Filter:    g.Filter,
-		CreatedAt: &g.CreatedAt,
-		UpdatedAt: &g.UpdatedAt,
+		CreatedAt: &createdAt,
+		UpdatedAt: &updatedAt,
 	}
 	if g.Description != "" {
 		group.Description = &g.Description

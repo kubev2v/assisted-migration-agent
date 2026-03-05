@@ -34,7 +34,9 @@ func (h *Handler) ListGroups(c *gin.Context, params v1.ListGroupsParams) {
 	}
 
 	if params.ByName != nil {
-		svcParams.ByName = *params.ByName
+		escaped := strings.ReplaceAll(*params.ByName, `\`, `\\`)
+		escaped = strings.ReplaceAll(escaped, `'`, `\'`)
+		svcParams.ByName = escaped
 	}
 
 	groups, total, err := h.groupSrv.List(c.Request.Context(), svcParams)
@@ -66,27 +68,16 @@ func (h *Handler) ListGroups(c *gin.Context, params v1.ListGroupsParams) {
 func (h *Handler) CreateGroup(c *gin.Context) {
 	var req v1.CreateGroupRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": validationErrorMessage(err)})
 		return
 	}
 
 	req.Name = strings.TrimSpace(req.Name)
-	if req.Name == "" || len(req.Name) > 100 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "name must be between 1 and 100 characters"})
+	if req.Name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "name must not be blank"})
 		return
 	}
 
-	if req.Filter == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "filter is required"})
-		return
-	}
-
-	if req.Description != nil && len(*req.Description) > maxDescriptionLength {
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("description must not exceed %d characters", maxDescriptionLength)})
-		return
-	}
-
-	// validate filter
 	if _, err := filter.ParseWithDefaultMap([]byte(req.Filter)); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("filter is invalid: %v", err)})
 		return
@@ -122,19 +113,16 @@ func (h *Handler) GetGroup(c *gin.Context, id string, params v1.GetGroupParams) 
 		return
 	}
 
-	// Get the group first to include in response
 	group, err := h.groupSrv.Get(c.Request.Context(), groupID)
 	if err != nil {
 		if srvErrors.IsResourceNotFoundError(err) {
-			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("group %d not found", groupID)})
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return
 		}
-
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Parse pagination
 	page := 1
 	if params.Page != nil && *params.Page > 0 {
 		page = *params.Page
@@ -150,7 +138,6 @@ func (h *Handler) GetGroup(c *gin.Context, id string, params v1.GetGroupParams) 
 		Offset: uint64((page - 1) * pageSize),
 	}
 
-	// Parse and validate sort params
 	if params.Sort != nil {
 		for _, s := range *params.Sort {
 			parts := strings.SplitN(s, ":", 2)
@@ -177,13 +164,11 @@ func (h *Handler) GetGroup(c *gin.Context, id string, params v1.GetGroupParams) 
 		return
 	}
 
-	// Calculate page count
 	pageCount := (total + pageSize - 1) / pageSize
 	if pageCount == 0 {
 		pageCount = 1
 	}
 
-	// Map to API response
 	apiVMs := make([]v1.VirtualMachine, 0, len(vms))
 	for _, vm := range vms {
 		apiVMs = append(apiVMs, v1.NewVirtualMachineFromSummary(vm))
@@ -209,38 +194,24 @@ func (h *Handler) UpdateGroup(c *gin.Context, id string) {
 
 	var req v1.UpdateGroupRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
-		return
-	}
-
-	if req.Name == nil && req.Filter == nil && req.Description == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "at least one field must be provided"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": validationErrorMessage(err)})
 		return
 	}
 
 	if req.Name != nil {
 		trimmed := strings.TrimSpace(*req.Name)
 		req.Name = &trimmed
-		if *req.Name == "" || len(*req.Name) > 100 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "name must be between 1 and 100 characters"})
+		if *req.Name == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "name must not be blank"})
 			return
 		}
 	}
 
 	if req.Filter != nil {
-		if *req.Filter == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "filter cannot be empty"})
-			return
-		}
 		if _, err := filter.ParseWithDefaultMap([]byte(*req.Filter)); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("filter is invalid: %v", err)})
 			return
 		}
-	}
-
-	if req.Description != nil && len(*req.Description) > maxDescriptionLength {
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("description must not exceed %d characters", maxDescriptionLength)})
-		return
 	}
 
 	existing, err := h.groupSrv.Get(c.Request.Context(), groupID)

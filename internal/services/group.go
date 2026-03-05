@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	sq "github.com/Masterminds/squirrel"
 
@@ -35,9 +34,7 @@ type GroupListParams struct {
 func (s *GroupService) List(ctx context.Context, params GroupListParams) ([]models.Group, int, error) {
 	var filters []sq.Sqlizer
 	if params.ByName != "" {
-		escaped := strings.ReplaceAll(params.ByName, `\`, `\\`)
-		escaped = strings.ReplaceAll(escaped, `'`, `\'`)
-		expr := fmt.Sprintf("name = '%s'", escaped)
+		expr := fmt.Sprintf("name = '%s'", params.ByName)
 		f, err := filter.ParseWithGroupMap([]byte(expr))
 		if err != nil {
 			return nil, 0, fmt.Errorf("invalid name filter: %w", err)

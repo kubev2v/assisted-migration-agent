@@ -4,9 +4,12 @@ import (
 	"context"
 	"testing"
 
+	"github.com/gin-gonic/gin/binding"
+	"github.com/go-playground/validator/v10"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/kubev2v/assisted-migration-agent/internal/handlers"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/services"
 )
@@ -15,6 +18,12 @@ func TestHandlers(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Handlers Suite")
 }
+
+var _ = BeforeSuite(func() {
+	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
+		handlers.RegisterValidators(v)
+	}
+})
 
 // MockCollectorService is a mock implementation of CollectorService.
 type MockCollectorService struct {

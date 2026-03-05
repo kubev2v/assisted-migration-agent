@@ -201,26 +201,4 @@ var _ = Describe("Parser", func() {
 		}
 	})
 
-	Context("listExpression.String()", func() {
-		It("should format empty list", func() {
-			l := &listExpression{Values: []string{}}
-			Expect(l.String()).To(Equal("[]"))
-		})
-
-		It("should format single value list", func() {
-			l := &listExpression{Values: []string{"active"}}
-			Expect(l.String()).To(Equal(`["active"]`))
-		})
-
-		It("should format multiple value list", func() {
-			l := &listExpression{Values: []string{"a", "b", "c"}}
-			Expect(l.String()).To(Equal(`["a", "b", "c"]`))
-		})
-
-		It("should escape special characters", func() {
-			l := &listExpression{Values: []string{"it's", "a \"test\""}}
-			Expect(l.String()).To(Equal(`["it's", "a \"test\""]`))
-		})
-	})
-
 })

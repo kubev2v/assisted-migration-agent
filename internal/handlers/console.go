@@ -25,7 +25,7 @@ func (h *Handler) GetAgentStatus(c *gin.Context) {
 func (h *Handler) SetAgentMode(c *gin.Context) {
 	var req v1.AgentModeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": validationErrorMessage(err)})
 		return
 	}
 
@@ -35,9 +35,6 @@ func (h *Handler) SetAgentMode(c *gin.Context) {
 		mode = models.AgentModeConnected
 	case v1.AgentModeRequestModeDisconnected:
 		mode = models.AgentModeDisconnected
-	default:
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid mode: must be 'connected' or 'disconnected'"})
-		return
 	}
 
 	if err := h.consoleSrv.SetMode(c.Request.Context(), mode); err != nil {

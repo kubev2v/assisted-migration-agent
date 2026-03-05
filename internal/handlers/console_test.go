@@ -157,7 +157,7 @@ var _ = Describe("Console Handlers", func() {
 			var response map[string]any
 			err := json.Unmarshal(w.Body.Bytes(), &response)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(response["error"]).To(ContainSubstring("invalid mode"))
+			Expect(response["error"]).To(ContainSubstring("Mode must be one of"))
 		})
 
 		// Given a valid request to set mode to connected

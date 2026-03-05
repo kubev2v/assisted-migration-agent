@@ -9,7 +9,6 @@ const (
 	or
 	not
 	in
-	notIn
 	equal
 	gte
 	greater
@@ -52,7 +51,6 @@ var tokenNames = map[Token]string{
 	boolean:        "boolean",
 	not:            "not",
 	in:             "in",
-	notIn:          "notIn",
 	comma:          ",",
 	lSquareBracket: "[",
 	rSquareBracket: "]",
@@ -66,7 +64,6 @@ var tokenSql = map[Token]string{
 	and:      "AND",
 	or:       "OR",
 	in:       "IN",
-	notIn:    "NOT IN",
 	equal:    "=",
 	gte:      ">=",
 	greater:  ">",

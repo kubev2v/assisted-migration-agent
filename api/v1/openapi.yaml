@@ -474,7 +474,7 @@ paths:
       requestBody:
         required: true
         content:
-          multiple/form-data:
+          multipart/form-data:
             schema:
               type: object
               required:
@@ -486,7 +486,7 @@ paths:
                   description: VDDK tarball
       responses:
         '200':
-          description: Upload successfull
+          description: Upload successful
           content:
             application/json:
               schema:
@@ -579,6 +579,8 @@ components:
           enum:
             - connected
             - disconnected
+          x-oapi-codegen-extra-tags:
+            binding: "required,oneof=connected disconnected"
 
     VmInspectionStatus:
       type: object
@@ -922,8 +924,12 @@ components:
       properties:
         VcenterCredentials:
           $ref: '#/components/schemas/VcenterCredentials'
+          x-oapi-codegen-extra-tags:
+            binding: "required"
         vmIds:
           $ref: '#/components/schemas/VMIdArray'
+          x-oapi-codegen-extra-tags:
+            binding: "required,min=1"
 
     VMIdArray:
       type: array
@@ -941,11 +947,19 @@ components:
           type: string
           format: uri
           description: vCenter URL
+          x-oapi-codegen-extra-tags:
+            binding: "required,url"
         username:
           type: string
+          minLength: 1
+          x-oapi-codegen-extra-tags:
+            binding: "required,min=1"
         password:
           type: string
           format: password
+          minLength: 1
+          x-oapi-codegen-extra-tags:
+            binding: "required,min=1"
 
     Group:
       type: object
@@ -1031,23 +1045,43 @@ components:
       properties:
         name:
           type: string
+          minLength: 1
+          maxLength: 100
           description: Group display name
+          x-oapi-codegen-extra-tags:
+            binding: "required,min=1,max=100"
         description:
           type: string
+          maxLength: 500
           description: Optional group description
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty,max=500"
         filter:
           type: string
+          minLength: 1
           description: Filter expression (will be validated)
+          x-oapi-codegen-extra-tags:
+            binding: "required,min=1"
 
     UpdateGroupRequest:
       type: object
       properties:
         name:
           type: string
+          minLength: 1
+          maxLength: 100
           description: Group display name
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty,min=1,max=100"
         description:
           type: string
+          maxLength: 500
           description: Optional group description
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty,max=500"
         filter:
           type: string
+          minLength: 1
           description: Filter expression (will be validated)
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty,min=1"

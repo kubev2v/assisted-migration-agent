@@ -535,6 +535,51 @@ func (a *AgentSvc) DeleteGroup(id string) (int, error) {
 	return resp.StatusCode, nil
 }
 
+// SetAgentModeRaw sends a raw POST to /agent and returns the status code.
+func (a *AgentSvc) SetAgentModeRaw(body []byte) (int, error) {
+	req, err := http.NewRequest(http.MethodPost, a.baseURL+"/api/v1/agent", bytes.NewReader(body))
+	if err != nil {
+		return 0, fmt.Errorf("creating request: %w", err)
+	}
+
+	resp, err := a.request(NewAgentRequest(req).withHeader("Content-Type", "application/json"))
+	if err != nil {
+		return 0, fmt.Errorf("sending request: %w", err)
+	}
+	_ = resp.Body.Close()
+	return resp.StatusCode, nil
+}
+
+// StartCollectorRaw sends a raw POST to /collector and returns the status code.
+func (a *AgentSvc) StartCollectorRaw(body []byte) (int, error) {
+	req, err := http.NewRequest(http.MethodPost, a.baseURL+"/api/v1/collector", bytes.NewReader(body))
+	if err != nil {
+		return 0, fmt.Errorf("creating request: %w", err)
+	}
+
+	resp, err := a.request(NewAgentRequest(req).withHeader("Content-Type", "application/json"))
+	if err != nil {
+		return 0, fmt.Errorf("sending request: %w", err)
+	}
+	_ = resp.Body.Close()
+	return resp.StatusCode, nil
+}
+
+// StartInspectionRaw sends a raw POST to /vms/inspector and returns the status code.
+func (a *AgentSvc) StartInspectionRaw(body []byte) (int, error) {
+	req, err := http.NewRequest(http.MethodPost, a.baseURL+"/api/v1/vms/inspector", bytes.NewReader(body))
+	if err != nil {
+		return 0, fmt.Errorf("creating request: %w", err)
+	}
+
+	resp, err := a.request(NewAgentRequest(req).withHeader("Content-Type", "application/json"))
+	if err != nil {
+		return 0, fmt.Errorf("sending request: %w", err)
+	}
+	_ = resp.Body.Close()
+	return resp.StatusCode, nil
+}
+
 func (a *AgentSvc) request(r *AgentReq) (*http.Response, error) {
 	if len(r.queryParams) > 0 || len(r.queryParamSlices) > 0 {
 		q := r.req.URL.Query()

@@ -5,6 +5,8 @@ package v1
 
 import (
 	"time"
+
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // Defines values for AgentModeRequestMode.
@@ -69,7 +71,7 @@ const (
 
 // AgentModeRequest defines model for AgentModeRequest.
 type AgentModeRequest struct {
-	Mode AgentModeRequestMode `json:"mode"`
+	Mode AgentModeRequestMode `binding:"required,oneof=connected disconnected" json:"mode"`
 }
 
 // AgentModeRequestMode defines model for AgentModeRequest.Mode.
@@ -109,13 +111,13 @@ type CollectorStatusStatus string
 // CreateGroupRequest defines model for CreateGroupRequest.
 type CreateGroupRequest struct {
 	// Description Optional group description
-	Description *string `json:"description,omitempty"`
+	Description *string `binding:"omitempty,max=500" json:"description,omitempty"`
 
 	// Filter Filter expression (will be validated)
-	Filter string `json:"filter"`
+	Filter string `binding:"required,min=1" json:"filter"`
 
 	// Name Group display name
-	Name string `json:"name"`
+	Name string `binding:"required,min=1,max=100" json:"name"`
 }
 
 // Group defines model for Group.
@@ -209,13 +211,13 @@ type InspectorStatusState string
 // UpdateGroupRequest defines model for UpdateGroupRequest.
 type UpdateGroupRequest struct {
 	// Description Optional group description
-	Description *string `json:"description,omitempty"`
+	Description *string `binding:"omitempty,max=500" json:"description,omitempty"`
 
 	// Filter Filter expression (will be validated)
-	Filter *string `json:"filter,omitempty"`
+	Filter *string `binding:"omitempty,min=1" json:"filter,omitempty"`
 
 	// Name Group display name
-	Name *string `json:"name,omitempty"`
+	Name *string `binding:"omitempty,min=1,max=100" json:"name,omitempty"`
 }
 
 // VMDevice defines model for VMDevice.
@@ -280,11 +282,11 @@ type VMNIC struct {
 
 // VcenterCredentials defines model for VcenterCredentials.
 type VcenterCredentials struct {
-	Password string `json:"password"`
+	Password string `binding:"required,min=1" json:"password"`
 
 	// Url vCenter URL
-	Url      string `json:"url"`
-	Username string `json:"username"`
+	Url      string `binding:"required,url" json:"url"`
+	Username string `binding:"required,min=1" json:"username"`
 }
 
 // VersionInfo defines model for VersionInfo.
@@ -461,6 +463,12 @@ type GetInventoryParams struct {
 	GroupId *string `form:"group_id,omitempty" json:"group_id,omitempty"`
 }
 
+// PostVddkMultipartBody defines parameters for PostVddk.
+type PostVddkMultipartBody struct {
+	// File VDDK tarball
+	File openapi_types.File `json:"file"`
+}
+
 // GetVMsParams defines parameters for GetVMs.
 type GetVMsParams struct {
 	// ByExpression Filter by expression (matches VMs with the provided expression)
@@ -505,6 +513,9 @@ type SetAgentModeJSONRequestBody = AgentModeRequest
 
 // StartCollectorJSONRequestBody defines body for StartCollector for application/json ContentType.
 type StartCollectorJSONRequestBody = CollectorStartRequest
+
+// PostVddkMultipartRequestBody defines body for PostVddk for multipart/form-data ContentType.
+type PostVddkMultipartRequestBody PostVddkMultipartBody
 
 // CreateGroupJSONRequestBody defines body for CreateGroup for application/json ContentType.
 type CreateGroupJSONRequestBody = CreateGroupRequest

@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"net/url"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -24,20 +23,7 @@ func (h *Handler) GetCollectorStatus(c *gin.Context) {
 func (h *Handler) StartCollector(c *gin.Context) {
 	var req v1.CollectorStartRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
-		return
-	}
-
-	// Validate required fields
-	if req.Url == "" || req.Username == "" || req.Password == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "url, username, and password are required"})
-		return
-	}
-
-	// Validate URL format
-	parsedURL, err := url.Parse(req.Url)
-	if err != nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid url format"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": validationErrorMessage(err)})
 		return
 	}
 
@@ -47,7 +33,6 @@ func (h *Handler) StartCollector(c *gin.Context) {
 		Password: req.Password,
 	}
 
-	// Start collection (saves creds, verifies, starts async job)
 	if err := h.collectorSrv.Start(c.Request.Context(), creds); err != nil {
 		if srvErrors.IsCollectionInProgressError(err) {
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
@@ -58,7 +43,6 @@ func (h *Handler) StartCollector(c *gin.Context) {
 		return
 	}
 
-	// Return current state after starting
 	status := h.collectorSrv.GetStatus()
 	c.JSON(http.StatusAccepted, v1.NewCollectorStatus(status))
 }

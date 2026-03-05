@@ -146,7 +146,7 @@ var _ = Describe("Collector Handlers", func() {
 			var response map[string]any
 			err := json.Unmarshal(w.Body.Bytes(), &response)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(response["error"]).To(ContainSubstring("url, username, and password are required"))
+			Expect(response["error"]).To(ContainSubstring("Url"))
 		})
 
 		// Given a request missing the username field
@@ -214,7 +214,7 @@ var _ = Describe("Collector Handlers", func() {
 			var response map[string]any
 			err := json.Unmarshal(w.Body.Bytes(), &response)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(response["error"]).To(ContainSubstring("invalid url format"))
+			Expect(response["error"]).To(ContainSubstring("Url must be a valid URL"))
 		})
 
 		// Given a request with valid credentials

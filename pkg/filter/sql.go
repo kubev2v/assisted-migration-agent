@@ -193,12 +193,22 @@ func toSql(expr Expression, mf MapFunc) (sq.Sqlizer, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		right, err := toSql(e.Right, mf)
 		if err != nil {
 			return nil, err
 		}
-		leftSQL, leftArgs, _ := left.ToSql()
-		rightSQL, rightArgs, _ := right.ToSql()
+
+		leftSQL, leftArgs, err := left.ToSql()
+		if err != nil {
+			return nil, err
+		}
+
+		rightSQL, rightArgs, err := right.ToSql()
+		if err != nil {
+			return nil, err
+		}
+
 		args := append(leftArgs, rightArgs...)
 		switch e.Op {
 		case like:
@@ -241,7 +251,7 @@ func toSql(expr Expression, mf MapFunc) (sq.Sqlizer, error) {
 		default:
 			valueInMb = e.Value
 		}
-		return sq.Expr(fmt.Sprintf("%.2f", valueInMb)), nil
+		return sq.Expr("?", valueInMb), nil
 	case *inExpression:
 		col, err := mf(strings.ToLower(e.Left.(*varExpression).Name))
 		if err != nil {

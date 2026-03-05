@@ -23,9 +23,15 @@ func toSqlString(expr Expression, mf MapFunc) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// Interpolate args into SQL for test comparison
 	for _, arg := range args {
-		sql = strings.Replace(sql, "?", fmt.Sprintf("'%v'", arg), 1)
+		var replacement string
+		switch v := arg.(type) {
+		case float64:
+			replacement = fmt.Sprintf("%.2f", v)
+		default:
+			replacement = fmt.Sprintf("'%v'", arg)
+		}
+		sql = strings.Replace(sql, "?", replacement, 1)
 	}
 	return sql, nil
 }
@@ -652,8 +658,8 @@ var _ = Describe("SQL Generation", func() {
 			Expect(err).ToNot(HaveOccurred())
 			sql, args, err := sqlizer.ToSql()
 			Expect(err).ToNot(HaveOccurred())
-			Expect(sql).To(Equal(`("status" IN (?,?) AND ("memory" > 8192.00))`))
-			Expect(args).To(Equal([]interface{}{"active", "pending"}))
+			Expect(sql).To(Equal(`("status" IN (?,?) AND ("memory" > ?))`))
+			Expect(args).To(Equal([]interface{}{"active", "pending", float64(8192)}))
 		})
 
 		It("should generate SQL for IN with OR", func() {
@@ -709,8 +715,8 @@ var _ = Describe("SQL Generation", func() {
 			Expect(err).ToNot(HaveOccurred())
 			sql, args, err := sqlizer.ToSql()
 			Expect(err).ToNot(HaveOccurred())
-			Expect(sql).To(Equal(`("status" NOT IN (?) AND ("memory" > 4096.00))`))
-			Expect(args).To(Equal([]interface{}{"deleted"}))
+			Expect(sql).To(Equal(`("status" NOT IN (?) AND ("memory" > ?))`))
+			Expect(args).To(Equal([]interface{}{"deleted", float64(4096)}))
 		})
 
 		It("should handle empty NOT IN list", func() {

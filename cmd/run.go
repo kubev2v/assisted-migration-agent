@@ -16,6 +16,8 @@ import (
 	"github.com/ecordell/optgen/helpers"
 	"github.com/fatih/color"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
+	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/spf13/cobra"
@@ -113,6 +115,11 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 			inventorySrv := services.NewInventoryService(store)
 			vmSrv := services.NewVMService(store)
 			groupSrv := services.NewGroupService(store)
+
+			// register custom validators
+			if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
+				handlers.RegisterValidators(v)
+			}
 
 			// init handlers
 			h := handlers.NewHandler(*cfg).

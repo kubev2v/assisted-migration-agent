@@ -93,7 +93,9 @@ func (s *VMStore) List(ctx context.Context, filters []sq.Sqlizer, opts ...ListOp
 		if err != nil {
 			return nil, err
 		}
-		vm.Status.Error = errors.New(sqlErr)
+		if sqlErr != "" {
+			vm.Status.Error = errors.New(sqlErr)
+		}
 		vms = append(vms, vm)
 	}
 
@@ -236,6 +238,7 @@ type SortParam struct {
 
 // ByFilter applies a raw filter DSL expression.
 // Returns nil if the expression is empty or fails to parse.
+// Callers must validate the expression before calling this (e.g. in the handler layer).
 func ByFilter(expr string) sq.Sqlizer {
 	if expr == "" {
 		return nil
