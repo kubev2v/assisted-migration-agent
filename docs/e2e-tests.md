@@ -177,7 +177,9 @@ Specs cycle deterministically based on VM index:
 
 **API filter semantics:**
 
-Range filters use `[min, max)` -- inclusive minimum, exclusive maximum.
+All VM filtering uses the `byExpression` query parameter with a DSL expression.
+Size fields (memory, disk) require units (e.g., `8GB`, `500GB`). Without units, values are treated as MB.
+Count fields (`cpus`, `issues_count`) don't require units.
 Default page size is 20, max page size is 100.
 
 ## Test catalog
@@ -226,40 +228,58 @@ lifecycle via `BeforeAll`/`AfterAll`. All 50 VMs are collected once before any t
 | should get VM details by ID | Fetches first VM by ID, asserts non-empty name, memory > 0, cpuCount > 0 |
 | should return error for non-existent VM | GETs a non-existent VM ID, asserts "not found" error |
 
-#### Memory filters
+#### Memory filters (byExpression)
 
-| Test | Filter | Expected |
-|------|--------|----------|
-| should filter by memory minimum | memorySizeMin=32768 | 24 VMs (32+64+128 GB tiers: 8+8+8) |
-| should filter by memory maximum | memorySizeMax=16384 | 18 VMs (4+8 GB tiers: 9+9) |
-| should filter by exact memory tier | memorySizeMin=8192, memorySizeMax=8193 | 9 VMs (exactly 8 GB) |
-| should filter by memory range spanning multiple tiers | memorySizeMin=16384, memorySizeMax=65537 | 24 VMs (16+32+64 GB: 8+8+8) |
+| Test | Expression | Expected |
+|------|------------|----------|
+| should filter by memory minimum | `memory >= 32GB` | 24 VMs (32+64+128 GB tiers: 8+8+8) |
+| should filter by memory maximum | `memory <= 16GB` | 26 VMs (4+8+16 GB tiers: 9+9+8) |
+| should filter by exact memory tier | `memory = 8GB` | 9 VMs (exactly 8 GB) |
+| should filter by memory range spanning multiple tiers | `memory >= 16GB and memory <= 64GB` | 24 VMs (16+32+64 GB: 8+8+8) |
 
-#### Disk filters
+#### Disk filters (byExpression)
 
-| Test | Filter | Expected |
-|------|--------|----------|
-| should filter by disk minimum | diskSizeMin=512000 | >= 10 VMs with total disk >= 500 GB |
-| should filter by disk maximum | diskSizeMax=204800 | >= 5 VMs with total disk < 200 GB |
-| should filter by disk range | diskSizeMin=204800, diskSizeMax=512001 | >= 5 VMs in [200, 500) GB range |
+| Test | Expression | Expected |
+|------|------------|----------|
+| should filter by total disk minimum | `total_disk_capacity >= 500GB` | >= 10 VMs with total disk >= 500 GB |
+| should filter by total disk maximum | `total_disk_capacity < 200GB` | >= 5 VMs with total disk < 200 GB |
+| should filter by total disk range | `total_disk_capacity >= 200GB and total_disk_capacity < 500GB` | >= 5 VMs in range |
 
-#### Cluster and status filters
+#### Individual disk capacity filters (byExpression)
 
-| Test | Filter | Expected |
-|------|--------|----------|
-| should filter by cluster | clusters=\<cluster name from first VM\> | 25 VMs (even/odd host split across 2 clusters) |
-| should filter by status poweredOn | status=poweredOn | 50 VMs (all poweredOn) |
-| should return empty for non-matching status | status=poweredOff | 0 VMs |
+| Test | Expression | Expected |
+|------|------------|----------|
+| should filter by individual disk minimum | `disk.capacity >= 100GB` | VMs with at least one disk >= 100GB |
+| should filter by individual disk maximum | `disk.capacity < 150GB` | VMs with at least one disk < 150GB |
+| should filter by individual disk range | `disk.capacity >= 100GB and disk.capacity <= 200GB` | VMs with disk in range |
+| should combine individual disk with memory | `disk.capacity >= 100GB and memory >= 16GB` | VMs matching both |
 
-#### Combined filters
+#### Issues count filters (byExpression)
 
-| Test | Filters | Expected |
-|------|---------|----------|
-| should combine memory min and disk min | memorySizeMin=32768, diskSizeMin=307200 | >= 5 VMs satisfying both |
-| should combine memory range and disk range | memorySizeMin=8192, memorySizeMax=32769, diskSizeMin=204800, diskSizeMax=614401 | >= 1 VM in intersection |
-| should combine memory filter with disk sort | memorySizeMin=8192, sort=diskSize:desc | 41 VMs, disk descending order |
-| should combine memory filter, disk filter, sort, and pagination | memorySizeMin=8192, diskSizeMin=204800, sort=memory:desc, page=1, pageSize=5 | 5 VMs, correct totals, memory desc |
-| should apply all filter dimensions together | memorySizeMin=16384, diskSizeMin=102400, status=poweredOn, clusters=\<name\> | >= 10 VMs matching all four |
+| Test | Expression | Expected |
+|------|------------|----------|
+| should filter by minimum issues count | `issues_count >= 1` | VMs with at least 1 issue |
+| should filter by issues count greater than threshold | `issues_count > 2` | VMs with more than 2 issues |
+| should filter by exact issues count | `issues_count = 0` | VMs with no issues |
+| should combine issues count with memory filter | `issues_count >= 1 and memory >= 8GB` | VMs matching both |
+
+#### Cluster and status filters (byExpression)
+
+| Test | Expression | Expected |
+|------|------------|----------|
+| should filter by cluster | `cluster = '<cluster name>'` | 25 VMs (even/odd host split across 2 clusters) |
+| should filter by status poweredOn | `powerstate = 'poweredOn'` | 50 VMs (all poweredOn) |
+| should return empty for non-matching status | `powerstate = 'poweredOff'` | 0 VMs |
+
+#### Combined filters (byExpression)
+
+| Test | Expression | Expected |
+|------|------------|----------|
+| should combine memory min and total disk min | `memory >= 32GB and total_disk_capacity >= 300GB` | >= 5 VMs satisfying both |
+| should combine memory range and total disk range | `memory >= 8GB and memory <= 32GB and total_disk_capacity >= 200GB and total_disk_capacity <= 600GB` | >= 1 VM in intersection |
+| should combine memory filter with disk sort | `memory >= 8GB` + sort=diskSize:desc | 41 VMs, disk descending order |
+| should combine filter, sort, and pagination | `memory >= 8GB and total_disk_capacity >= 200GB` + sort, page, pageSize | 5 VMs, correct totals, memory desc |
+| should apply all filter dimensions together | `memory >= 16GB and total_disk_capacity >= 100GB and powerstate = 'poweredOn' and cluster = '<name>'` | >= 10 VMs matching all |
 
 #### Sorting
 
@@ -279,12 +299,10 @@ lifecycle via `BeforeAll`/`AfterAll`. All 50 VMs are collected once before any t
 | should return different VMs on different pages | page 1 vs page 2, pageSize=3 | No overlapping VM IDs |
 | should return correct remainder on last page | page=17, pageSize=3 | 2 VMs (50 - 16*3) |
 | should use default page size when not specified | no params | 20 VMs, total=50, pageCount=3 |
-| should paginate filtered results correctly | memorySizeMin=131072, memorySizeMax=131073, page=1, pageSize=3 | total=8, pageCount=3, 3 VMs returned |
+| should paginate filtered results correctly | `memory = 128GB`, page=1, pageSize=3 | total=8, pageCount=3, 3 VMs returned |
 
 #### Edge cases
 
 | Test | Scenario | Assertion |
 |------|----------|-----------|
-| should return empty result for unreachable filter | memorySizeMin=204800 (200 GB, above max) | total=0, empty list |
-| should reject memory min greater than max | memorySizeMin=65536, memorySizeMax=4096 | HTTP 400 error |
-| should reject disk min greater than max | diskSizeMin=512000, diskSizeMax=102400 | HTTP 400 error |
+| should return empty result for unreachable filter | `memory >= 200GB` (above max 128GB) | total=0, empty list |

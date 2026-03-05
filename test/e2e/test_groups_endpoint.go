@@ -673,7 +673,6 @@ var _ = Describe("Auto-created folder groups e2e tests", Ordered, func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		// Assert
-		GinkgoWriter.Printf("******** %+v\n", list)
 		groupNames := make([]string, len(list.Groups))
 		for i, g := range list.Groups {
 			groupNames[i] = g.Name

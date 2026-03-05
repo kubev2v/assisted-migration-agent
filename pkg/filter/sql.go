@@ -64,7 +64,7 @@ var defaultMapFn MapFunc = func(name string) (string, error) {
 	case "hw_version":
 		return `v."HW version"`, nil
 	case "total_disk_capacity":
-		return `v."Total disk capacity MiB"`, nil
+		return `d.total_disk`, nil
 	case "provisioned":
 		return `v."Provisioned MiB"`, nil
 	case "resource_pool":
@@ -80,7 +80,7 @@ var defaultMapFn MapFunc = func(name string) (string, error) {
 	case "disk.path":
 		return `dk."Disk Path"`, nil
 	case "disk.capacity":
-		return `d.total_disk`, nil
+		return `dk."Capacity MiB"`, nil
 	case "disk.sharing":
 		return `dk."Sharing mode"`, nil
 	case "disk.raw":

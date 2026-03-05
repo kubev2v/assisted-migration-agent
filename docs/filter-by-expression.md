@@ -64,6 +64,137 @@ cluster in ['prod', 'staging']
 
 ---
 
+## Units for size fields
+
+Size/capacity fields support unit suffixes. The expression parser normalizes all quantities to MB for comparison.
+
+**Supported unit suffixes:** `Kb`, `Mb`, `GB`, `TB` (case-insensitive)
+
+**Default behavior:** If no unit is specified, the value is treated as **MB** (megabytes).
+
+| Size fields | Unit behavior |
+|-------------|---------------|
+| `memory`, `total_disk_capacity`, `disk.capacity`, `storage_used`, `provisioned`, `datastore.free`, `datastore.capacity`, `mem.ballooned` | Use units for clarity (e.g., `8GB`, `500GB`). Without units, value is in MB. |
+
+| Count fields (no units needed) |
+|--------------------------------|
+| `cpus`, `issues_count`, `cpu.sockets`, `cpu.cores_per_socket`, `disk.key` |
+
+**Examples:**
+```text
+memory >= 8GB        # 8 gigabytes (recommended)
+memory >= 8192       # 8192 MB = 8 GB (works, but less readable)
+total_disk_capacity >= 500GB   # 500 gigabytes
+total_disk_capacity >= 512000  # 512000 MB ≈ 500 GB
+cpus >= 4            # 4 CPUs (no unit needed)
+issues_count >= 1    # 1 issue (no unit needed)
+```
+
+---
+
+## Common use cases
+
+### Filter by disk capacity
+
+There are two disk capacity filters:
+
+- **`total_disk_capacity`** — Total disk capacity across all disks on the VM
+- **`disk.capacity`** — Individual disk capacity (matches VMs with at least one disk meeting the criteria)
+
+```bash
+# VMs with total disk capacity >= 500GB
+curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=total_disk_capacity >= 500GB"
+
+# VMs with total disk capacity between 200GB and 500GB
+curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=total_disk_capacity >= 200GB and total_disk_capacity < 500GB"
+
+# VMs with at least one individual disk >= 100GB
+curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=disk.capacity >= 100GB"
+
+# VMs with at least one thin-provisioned disk
+curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=disk.thin = true"
+```
+
+### Filter by issues/concerns
+
+```bash
+# VMs with at least one issue (no unit needed - it's a count)
+curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=issues_count >= 1"
+
+# VMs with no issues (clean)
+curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=issues_count = 0"
+
+# VMs with more than 2 issues
+curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=issues_count > 2"
+
+# VMs with critical concerns
+curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=concern.category = 'Critical'"
+```
+
+### Filter by CPU and memory
+
+```bash
+# VMs with 4 or more CPUs (no unit needed - it's a count)
+curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=cpus >= 4"
+
+# VMs with memory between 8GB and 32GB (units required)
+curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=memory >= 8GB and memory <= 32GB"
+
+# VMs with CPU hot-add enabled
+curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=cpu.hot_add = true"
+
+# VMs with memory hot-add enabled
+curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=mem.hot_add = true"
+```
+
+### Filter by network
+
+```bash
+# VMs on a specific network
+curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=net.network = 'VM Network'"
+
+# VMs with E1000 adapter
+curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=net.adapter = 'E1000'"
+
+# VMs with a specific IPv4 subnet
+curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=net.ipv4 ~ /^192\\.168\\.1\\./"
+```
+
+### Filter by datastore
+
+```bash
+# VMs on a specific datastore
+curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=datastore.name = 'datastore1'"
+
+# VMs on datastores with at least 100GB free (units required)
+curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=datastore.free >= 100GB"
+
+# VMs on NFS datastores
+curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=datastore.type = 'NFS'"
+```
+
+### Combined filters with sorting and pagination
+
+```bash
+# Large VMs (memory >= 32GB, total disk >= 500GB) sorted by memory descending
+curl -G "http://localhost:8000/api/v1/vms" \
+  --data-urlencode "byExpression=memory >= 32GB and total_disk_capacity >= 500GB" \
+  --data-urlencode "sort=memory:desc"
+
+# Production VMs with issues, paginated
+curl -G "http://localhost:8000/api/v1/vms" \
+  --data-urlencode "byExpression=cluster = 'production' and issues_count >= 1" \
+  --data-urlencode "sort=issues_count:desc" \
+  --data-urlencode "page=1" \
+  --data-urlencode "pageSize=20"
+
+# Non-template VMs in specific datacenter with EFI firmware
+curl -G "http://localhost:8000/api/v1/vms" \
+  --data-urlencode "byExpression=template = false and datacenter = 'DC1' and firmware = 'efi'"
+```
+
+---
+
 ## Filter fields (default mapping)
 
 The following table lists every identifier supported by the default map function used for `byExpression`. Unknown identifiers cause a parse/validation error.
@@ -99,7 +230,7 @@ Identifiers are **case-insensitive**. Dotted names refer to joined tables (e.g. 
 | `datacenter`     | string  | Datacenter                          |
 | `cluster`        | string  | Cluster                             |
 | `hw_version`     | string  | Hardware version                    |
-| `total_disk_capacity` | integer | Total disk capacity (MiB)     |
+| `total_disk_capacity` | integer | Total disk capacity (MiB, aggregated) |
 | `provisioned`    | integer | Provisioned (MiB)                   |
 | `resource_pool`  | string  | Resource pool                       |
 | `issues_count`   | integer | Number of concerns/issues for the VM |
@@ -110,7 +241,7 @@ Identifiers are **case-insensitive**. Dotted names refer to joined tables (e.g. 
 |-------------------|---------|-----------------------------|
 | `disk.key`        | integer | Disk key                    |
 | `disk.path`       | string  | Disk path                   |
-| `disk.capacity`   | integer | Total disk capacity (MiB, aggregated sum of all disks) |
+| `disk.capacity`   | integer | Individual disk capacity (MiB) |
 | `disk.sharing`    | string  | Sharing mode                |
 | `disk.raw`        | boolean | Raw                         |
 | `disk.shared_bus` | string  | Shared bus                  |
