@@ -103,7 +103,10 @@ func (c *Console) SetMode(ctx context.Context, mode models.AgentMode) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	prevMode, _ := c.GetMode(ctx)
+	prevMode, err := c.GetMode(ctx)
+	if err != nil {
+		return err
+	}
 
 	if prevMode == mode {
 		return nil
@@ -113,8 +116,7 @@ func (c *Console) SetMode(ctx context.Context, mode models.AgentMode) error {
 		return errors.NewModeConflictError("console reporting stopped after receiving 401/410 from the server")
 	}
 
-	err := c.store.Configuration().Save(ctx, &models.Configuration{AgentMode: mode})
-	if err != nil {
+	if err := c.store.Configuration().Save(ctx, &models.Configuration{AgentMode: mode}); err != nil {
 		return err
 	}
 

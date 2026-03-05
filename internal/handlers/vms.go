@@ -8,7 +8,6 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/pkg/filter"
 
 	"github.com/gin-gonic/gin"
-	"go.uber.org/zap"
 
 	v1 "github.com/kubev2v/assisted-migration-agent/api/v1"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
@@ -82,7 +81,6 @@ func (h *Handler) GetVMs(c *gin.Context, params v1.GetVMsParams) {
 
 	vms, total, err := h.vmSrv.List(c.Request.Context(), svcParams)
 	if err != nil {
-		zap.S().Named("vm_handler").Errorw("failed to list VMs", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to list VMs: %v", err)})
 		return
 	}
@@ -116,7 +114,6 @@ func (h *Handler) GetVM(c *gin.Context, id string) {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return
 		}
-		zap.S().Named("vm_handler").Errorw("failed to get VM", "id", id, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
