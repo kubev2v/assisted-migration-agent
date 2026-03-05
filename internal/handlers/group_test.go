@@ -31,7 +31,9 @@ var _ = Describe("Group Handlers", func() {
 		mockGroup = &MockGroupService{}
 		handler = handlers.NewHandler(config.Configuration{}).WithGroupService(mockGroup)
 		router = gin.New()
-		router.GET("/vms/groups", handler.ListGroups)
+		router.GET("/vms/groups", func(c *gin.Context) {
+			handler.ListGroups(c, v1.ListGroupsParams{})
+		})
 		router.POST("/vms/groups", handler.CreateGroup)
 		router.GET("/vms/groups/:id", func(c *gin.Context) {
 			handler.GetGroup(c, c.Param("id"), v1.GetGroupParams{})
@@ -47,6 +49,7 @@ var _ = Describe("Group Handlers", func() {
 	Context("ListGroups", func() {
 		It("should return empty list when no groups exist", func() {
 			mockGroup.ListResult = []models.Group{}
+			mockGroup.ListTotal = 0
 
 			req := httptest.NewRequest(http.MethodGet, "/vms/groups", nil)
 			w := httptest.NewRecorder()
@@ -57,6 +60,9 @@ var _ = Describe("Group Handlers", func() {
 			var resp v1.GroupListResponse
 			Expect(json.Unmarshal(w.Body.Bytes(), &resp)).To(Succeed())
 			Expect(resp.Groups).To(BeEmpty())
+			Expect(resp.Total).To(Equal(0))
+			Expect(resp.Page).To(Equal(1))
+			Expect(resp.PageCount).To(Equal(1))
 		})
 
 		It("should return all groups", func() {
@@ -65,6 +71,7 @@ var _ = Describe("Group Handlers", func() {
 				{ID: 1, Name: "group1", Filter: "memory >= 8GB", CreatedAt: now, UpdatedAt: now},
 				{ID: 2, Name: "group2", Filter: "cluster = 'prod'", CreatedAt: now, UpdatedAt: now},
 			}
+			mockGroup.ListTotal = 2
 
 			req := httptest.NewRequest(http.MethodGet, "/vms/groups", nil)
 			w := httptest.NewRecorder()
@@ -77,6 +84,8 @@ var _ = Describe("Group Handlers", func() {
 			Expect(resp.Groups).To(HaveLen(2))
 			Expect(resp.Groups[0].Name).To(Equal("group1"))
 			Expect(resp.Groups[1].Name).To(Equal("group2"))
+			Expect(resp.Total).To(Equal(2))
+			Expect(resp.Page).To(Equal(1))
 		})
 
 		It("should return 500 on service error", func() {

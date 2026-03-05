@@ -205,7 +205,11 @@
 // inventory state.
 //
 // Operations:
-//   - List: returns all groups
+//   - List: returns groups with optional name filtering and pagination.
+//     Accepts GroupListParams with ByName, Limit, Offset. The ByName field
+//     is converted to a filter DSL expression (name = '<value>') and parsed
+//     through filter.ParseWithGroupMap to produce a sq.Sqlizer for the store.
+//     Returns ([]models.Group, total int, error).
 //   - Get: returns a single group by ID
 //   - ListVirtualMachines: evaluates the group's filter against the VM table
 //     with sorting and pagination support
@@ -216,14 +220,20 @@
 // Usage:
 //
 //	groupService := services.NewGroupService(store)
-//	groups, err := groupService.List(ctx)
 //
-//	params := services.GroupGetParams{
+//	params := services.GroupListParams{
+//	    ByName: "production",
+//	    Limit:  20,
+//	    Offset: 0,
+//	}
+//	groups, total, err := groupService.List(ctx, params)
+//
+//	getParams := services.GroupGetParams{
 //	    Sort:   []services.SortField{{Field: "name", Desc: false}},
 //	    Limit:  20,
 //	    Offset: 0,
 //	}
-//	vms, total, err := groupService.ListVirtualMachines(ctx, groupID, params)
+//	vms, total, err := groupService.ListVirtualMachines(ctx, groupID, getParams)
 //
 // # Thread Safety
 //

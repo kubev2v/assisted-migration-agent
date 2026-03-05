@@ -134,6 +134,7 @@ func (m *MockInspectorService) Stop(ctx context.Context) error {
 // MockGroupService is a mock implementation of GroupService.
 type MockGroupService struct {
 	ListResult        []models.Group
+	ListTotal         int
 	ListError         error
 	GetResult         *models.Group
 	GetError          error
@@ -145,6 +146,7 @@ type MockGroupService struct {
 	UpdateResult      *models.Group
 	UpdateError       error
 	DeleteError       error
+	LastListParams    services.GroupListParams
 	LastListVMsParams services.GroupGetParams
 	LastCreateGroup   models.Group
 	LastUpdateGroup   models.Group
@@ -152,8 +154,9 @@ type MockGroupService struct {
 	LastDeleteID      int
 }
 
-func (m *MockGroupService) List(ctx context.Context) ([]models.Group, error) {
-	return m.ListResult, m.ListError
+func (m *MockGroupService) List(ctx context.Context, params services.GroupListParams) ([]models.Group, int, error) {
+	m.LastListParams = params
+	return m.ListResult, m.ListTotal, m.ListError
 }
 
 func (m *MockGroupService) Get(ctx context.Context, id int) (*models.Group, error) {

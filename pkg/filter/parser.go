@@ -32,6 +32,10 @@ func ParseWithDefaultMap(src []byte) (sq.Sqlizer, error) {
 	return Parse(src, defaultMapFn)
 }
 
+func ParseWithGroupMap(src []byte) (sq.Sqlizer, error) {
+	return Parse(src, groupMapFn)
+}
+
 // Parse parses a filter expression and returns a Sqlizer that can be used with SelectBuilder.Where().
 func Parse(src []byte, mf MapFunc) (sq.Sqlizer, error) {
 	expr, err := parse(src)

@@ -46,9 +46,21 @@ func NewGroupStore(db QueryInterceptor) *GroupStore {
 	return &GroupStore{db: db}
 }
 
-// List returns all groups.
-func (s *GroupStore) List(ctx context.Context) ([]models.Group, error) {
-	query, args, err := selectStm.OrderBy(groupColID + " ASC").ToSql()
+// List returns groups with optional filters and pagination.
+func (s *GroupStore) List(ctx context.Context, filters []sq.Sqlizer, limit, offset uint64) ([]models.Group, error) {
+	builder := selectStm.OrderBy(groupColID + " ASC")
+
+	for _, f := range filters {
+		builder = builder.Where(f)
+	}
+	if limit > 0 {
+		builder = builder.Limit(limit)
+	}
+	if offset > 0 {
+		builder = builder.Offset(offset)
+	}
+
+	query, args, err := builder.ToSql()
 	if err != nil {
 		return nil, fmt.Errorf("building list query: %w", err)
 	}
@@ -73,6 +85,27 @@ func (s *GroupStore) List(ctx context.Context) ([]models.Group, error) {
 	}
 
 	return groups, nil
+}
+
+// Count returns the total number of groups matching the filters.
+func (s *GroupStore) Count(ctx context.Context, filters ...sq.Sqlizer) (int, error) {
+	builder := sq.Select("COUNT(*)").From(groupTable)
+
+	for _, f := range filters {
+		builder = builder.Where(f)
+	}
+
+	query, args, err := builder.ToSql()
+	if err != nil {
+		return 0, fmt.Errorf("building count query: %w", err)
+	}
+
+	var count int
+	err = s.db.QueryRowContext(ctx, query, args...).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("executing count query: %w", err)
+	}
+	return count, nil
 }
 
 // Get returns a group by ID.

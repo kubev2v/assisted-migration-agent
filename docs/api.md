@@ -137,6 +137,253 @@ curl "http://localhost:8000/api/v1/vms?page=2&pageSize=10"
 | `template` | boolean | `true` if VM is a template |
 | `inspection` | object | Inspection status |
 
+## Groups Endpoint
+
+Groups are named filter expressions that dynamically match VMs. A group's filter is evaluated at query time, so results always reflect the current inventory.
+
+### GET /api/v1/vms/groups
+
+Returns a paginated list of groups with optional name filtering.
+
+#### Query Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `byName` | string | Filter groups by exact name match |
+| `page` | integer | Page number (default: 1) |
+| `pageSize` | integer | Items per page (default: 20, max: 100) |
+
+#### Examples
+
+List all groups:
+
+```bash
+curl http://localhost:8000/api/v1/vms/groups
+```
+
+Filter by name:
+
+```bash
+curl "http://localhost:8000/api/v1/vms/groups?byName=production"
+```
+
+Paginate:
+
+```bash
+curl "http://localhost:8000/api/v1/vms/groups?page=2&pageSize=10"
+```
+
+#### Response
+
+```json
+{
+  "groups": [
+    {
+      "id": "1",
+      "name": "Production VMs",
+      "description": "All production workloads",
+      "filter": "cluster = 'prod'",
+      "createdAt": "2025-01-01T00:00:00Z",
+      "updatedAt": "2025-01-01T00:00:00Z"
+    }
+  ],
+  "total": 5,
+  "page": 1,
+  "pageCount": 1
+}
+```
+
+#### Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `groups` | array | List of group objects |
+| `total` | integer | Total number of groups matching the filter |
+| `page` | integer | Current page number |
+| `pageCount` | integer | Total number of pages |
+
+#### Group Object
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Group identifier |
+| `name` | string | Group name (unique, 1-100 characters) |
+| `description` | string | Optional description (max 500 characters) |
+| `filter` | string | Filter DSL expression evaluated against VMs |
+| `createdAt` | string | ISO 8601 creation timestamp |
+| `updatedAt` | string | ISO 8601 last update timestamp |
+
+### POST /api/v1/vms/groups
+
+Creates a new group.
+
+#### Request Body
+
+```json
+{
+  "name": "Production VMs",
+  "filter": "cluster = 'prod' and memory >= 8GB",
+  "description": "All production workloads"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | yes | Group name, 1-100 characters (trimmed of whitespace) |
+| `filter` | string | yes | Valid filter DSL expression (see [Filter by Expression](filter-by-expression.md)) |
+| `description` | string | no | Optional description, max 500 characters |
+
+#### Examples
+
+```bash
+curl -X POST http://localhost:8000/api/v1/vms/groups \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Large VMs", "filter": "memory >= 32GB and total_disk_capacity >= 500GB"}'
+```
+
+#### Response
+
+**201 Created** — returns the created group object.
+
+#### Errors
+
+| Status | Condition |
+|--------|-----------|
+| 400 | Missing or empty name/filter, name > 100 chars, description > 500 chars, invalid filter expression, duplicate name |
+
+### GET /api/v1/vms/groups/{id}
+
+Returns a group and its matching VMs with pagination and sorting.
+
+#### Query Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `sort` | array | Sort fields with direction (e.g., `name:asc`, `memory:desc`) |
+| `page` | integer | Page number (default: 1) |
+| `pageSize` | integer | Items per page (default: 20, max: 100) |
+
+**Valid sort fields:** `name`, `vCenterState`, `cluster`, `diskSize`, `memory`, `issues`
+
+#### Examples
+
+```bash
+curl http://localhost:8000/api/v1/vms/groups/1
+```
+
+With sorting and pagination:
+
+```bash
+curl "http://localhost:8000/api/v1/vms/groups/1?sort=memory:desc&page=1&pageSize=10"
+```
+
+#### Response
+
+```json
+{
+  "group": {
+    "id": "1",
+    "name": "Production VMs",
+    "description": "All production workloads",
+    "filter": "cluster = 'prod'",
+    "createdAt": "2025-01-01T00:00:00Z",
+    "updatedAt": "2025-01-01T00:00:00Z"
+  },
+  "vms": [
+    {
+      "id": "vm-001",
+      "name": "web-server-1",
+      "vCenterState": "poweredOn",
+      "cluster": "production",
+      "datacenter": "DC1",
+      "diskSize": 104857600,
+      "memory": 4096,
+      "issueCount": 0,
+      "migratable": true,
+      "template": false
+    }
+  ],
+  "total": 42,
+  "page": 1,
+  "pageCount": 3
+}
+```
+
+#### Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `group` | object | The group object (see [Group Object](#group-object) above) |
+| `vms` | array | VMs matching the group's filter (same schema as GET /vms) |
+| `total` | integer | Total VMs matching the filter |
+| `page` | integer | Current page number |
+| `pageCount` | integer | Total number of pages |
+
+#### Errors
+
+| Status | Condition |
+|--------|-----------|
+| 404 | Group not found |
+
+### PATCH /api/v1/vms/groups/{id}
+
+Partially updates an existing group. At least one field must be provided.
+
+#### Request Body
+
+All fields are optional; only provided fields are updated.
+
+```json
+{
+  "name": "Updated Name",
+  "filter": "memory >= 16GB",
+  "description": "updated description"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | no | New name, 1-100 characters (trimmed of whitespace) |
+| `filter` | string | no | New filter DSL expression |
+| `description` | string | no | New description, max 500 characters |
+
+#### Examples
+
+Update only the filter:
+
+```bash
+curl -X PATCH http://localhost:8000/api/v1/vms/groups/1 \
+  -H "Content-Type: application/json" \
+  -d '{"filter": "memory >= 32GB"}'
+```
+
+#### Response
+
+**200 OK** — returns the updated group object.
+
+#### Errors
+
+| Status | Condition |
+|--------|-----------|
+| 400 | No fields provided, name > 100 chars, description > 500 chars, invalid filter expression, duplicate name |
+| 404 | Group not found |
+
+### DELETE /api/v1/vms/groups/{id}
+
+Deletes a group. Idempotent — returns 204 even if the group does not exist.
+
+#### Examples
+
+```bash
+curl -X DELETE http://localhost:8000/api/v1/vms/groups/1
+```
+
+#### Response
+
+**204 No Content**
+
+---
+
 ### GET /api/v1/vms/{id}
 
 Returns detailed information about a specific VM including disks, NICs, and issues.

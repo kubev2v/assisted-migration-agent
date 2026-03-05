@@ -3,7 +3,9 @@ package store_test
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
+	sq "github.com/Masterminds/squirrel"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -11,6 +13,7 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
+	"github.com/kubev2v/assisted-migration-agent/pkg/filter"
 	"github.com/kubev2v/assisted-migration-agent/test"
 )
 
@@ -42,14 +45,13 @@ var _ = Describe("GroupStore", func() {
 
 	Context("List", func() {
 		It("should return empty list when no groups exist", func() {
-			groups, err := s.Group().List(ctx)
+			groups, err := s.Group().List(ctx, nil, 0, 0)
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(groups).To(BeEmpty())
 		})
 
 		It("should return all groups", func() {
-			// Arrange
 			g1 := models.Group{Name: "group1", Filter: "memory >= 8GB"}
 			g2 := models.Group{Name: "group2", Filter: "cluster = 'prod'"}
 			_, err := s.Group().Create(ctx, g1)
@@ -57,14 +59,82 @@ var _ = Describe("GroupStore", func() {
 			_, err = s.Group().Create(ctx, g2)
 			Expect(err).NotTo(HaveOccurred())
 
-			// Act
-			groups, err := s.Group().List(ctx)
+			groups, err := s.Group().List(ctx, nil, 0, 0)
 
-			// Assert
 			Expect(err).NotTo(HaveOccurred())
 			Expect(groups).To(HaveLen(2))
 			Expect(groups[0].Name).To(Equal("group1"))
 			Expect(groups[1].Name).To(Equal("group2"))
+		})
+
+		It("should filter by name", func() {
+			_, err := s.Group().Create(ctx, models.Group{Name: "prod-cluster", Filter: "cluster = 'prod'"})
+			Expect(err).NotTo(HaveOccurred())
+			_, err = s.Group().Create(ctx, models.Group{Name: "staging-cluster", Filter: "cluster = 'staging'"})
+			Expect(err).NotTo(HaveOccurred())
+
+			f, err := filter.ParseWithGroupMap([]byte("name = 'prod-cluster'"))
+			Expect(err).NotTo(HaveOccurred())
+
+			groups, err := s.Group().List(ctx, []sq.Sqlizer{f}, 0, 0)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(groups).To(HaveLen(1))
+			Expect(groups[0].Name).To(Equal("prod-cluster"))
+		})
+
+		It("should paginate results", func() {
+			for i := 0; i < 5; i++ {
+				_, err := s.Group().Create(ctx, models.Group{
+					Name: fmt.Sprintf("group-%d", i), Filter: "memory > 0",
+				})
+				Expect(err).NotTo(HaveOccurred())
+			}
+
+			groups, err := s.Group().List(ctx, nil, 2, 0)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(groups).To(HaveLen(2))
+
+			groups, err = s.Group().List(ctx, nil, 2, 2)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(groups).To(HaveLen(2))
+
+			groups, err = s.Group().List(ctx, nil, 2, 4)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(groups).To(HaveLen(1))
+		})
+	})
+
+	Context("Count", func() {
+		It("should return 0 when no groups exist", func() {
+			count, err := s.Group().Count(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(count).To(Equal(0))
+		})
+
+		It("should count all groups", func() {
+			_, err := s.Group().Create(ctx, models.Group{Name: "g1", Filter: "memory > 0"})
+			Expect(err).NotTo(HaveOccurred())
+			_, err = s.Group().Create(ctx, models.Group{Name: "g2", Filter: "memory > 0"})
+			Expect(err).NotTo(HaveOccurred())
+
+			count, err := s.Group().Count(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(count).To(Equal(2))
+		})
+
+		It("should count with name filter", func() {
+			_, err := s.Group().Create(ctx, models.Group{Name: "prod-vms", Filter: "memory > 0"})
+			Expect(err).NotTo(HaveOccurred())
+			_, err = s.Group().Create(ctx, models.Group{Name: "staging-vms", Filter: "memory > 0"})
+			Expect(err).NotTo(HaveOccurred())
+
+			f, err := filter.ParseWithGroupMap([]byte("name = 'prod-vms'"))
+			Expect(err).NotTo(HaveOccurred())
+
+			count, err := s.Group().Count(ctx, f)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(count).To(Equal(1))
 		})
 	})
 
@@ -284,7 +354,7 @@ var _ = Describe("GroupStore", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Assert
-			groups, err := s.Group().List(ctx)
+			groups, err := s.Group().List(ctx, nil, 0, 0)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(groups).To(HaveLen(1))
 			Expect(groups[0].ID).To(Equal(created2.ID))

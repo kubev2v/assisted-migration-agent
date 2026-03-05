@@ -26,8 +26,9 @@ var validSortFields = map[string]bool{
 }
 
 const (
-	defaultPageSize = 20
-	maxPageSize     = 100
+	defaultPageSize      = 20
+	maxPageSize          = 100
+	maxDescriptionLength = 500
 )
 
 // GetVMs returns the list of VMs with filtering and pagination

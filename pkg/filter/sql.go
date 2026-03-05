@@ -173,6 +173,19 @@ var defaultMapFn MapFunc = func(name string) (string, error) {
 	}
 }
 
+var groupMapFn MapFunc = func(name string) (string, error) {
+	switch strings.ToLower(name) {
+	case "name":
+		return "name", nil
+	case "description":
+		return "description", nil
+	case "filter":
+		return "filter", nil
+	default:
+		return "", fmt.Errorf("unknown group filter field: %s", name)
+	}
+}
+
 func toSql(expr Expression, mf MapFunc) (sq.Sqlizer, error) {
 	switch e := expr.(type) {
 	case *binaryExpression:

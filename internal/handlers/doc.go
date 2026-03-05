@@ -90,7 +90,7 @@
 //	┌────────┬──────────────────┬───────────────────────────────────────┐
 //	│ Method │ Endpoint         │ Description                           │
 //	├────────┼──────────────────┼───────────────────────────────────────┤
-//	│ GET    │ /vms/groups      │ List all groups                       │
+//	│ GET    │ /vms/groups      │ List groups (filter, paginate)        │
 //	│ POST   │ /vms/groups      │ Create a new group                    │
 //	│ GET    │ /vms/groups/{id} │ Get group with filtered VMs           │
 //	│ PATCH  │ /vms/groups/{id} │ Partially update a group              │
@@ -227,7 +227,21 @@
 //
 // # Group Handler
 //
-// GET /vms/groups - Lists all groups.
+// GET /vms/groups - Lists groups with optional name filtering and pagination.
+//
+// Query Parameters:
+//
+//	┌────────────────┬──────────┬─────────────────────────────────────────┐
+//	│ Parameter      │ Type     │ Description                             │
+//	├────────────────┼──────────┼─────────────────────────────────────────┤
+//	│ byName         │ string   │ Filter groups by exact name match       │
+//	│ page           │ int      │ Page number (default: 1)                │
+//	│ pageSize       │ int      │ Items per page (default: 20, max: 100)  │
+//	└────────────────┴──────────┴─────────────────────────────────────────┘
+//
+// The byName filter uses the group-specific MapFunc (pkg/filter) to build
+// a filter expression: name = '<value>'. This applies the same DSL engine
+// used for VM filtering, mapped to group table columns.
 //
 // Response:
 //
@@ -241,7 +255,10 @@
 //	            "createdAt": "2025-01-01T00:00:00Z",
 //	            "updatedAt": "2025-01-01T00:00:00Z"
 //	        }
-//	    ]
+//	    ],
+//	    "total": 5,
+//	    "page": 1,
+//	    "pageCount": 1
 //	}
 //
 // POST /vms/groups - Creates a new group.
@@ -255,8 +272,9 @@
 //	}
 //
 // Validation:
-//   - name: required, 1-100 characters
+//   - name: required, 1-100 characters (trimmed of leading/trailing whitespace)
 //   - filter: required, must be a valid filter DSL expression
+//   - description: optional, max 500 characters
 //
 // Response: 201 Created with the created Group.
 //
@@ -289,8 +307,9 @@
 //
 // Validation:
 //   - At least one field must be provided
-//   - name: 1-100 characters if provided
+//   - name: 1-100 characters if provided (trimmed of leading/trailing whitespace)
 //   - filter: must be a valid filter DSL expression if provided
+//   - description: max 500 characters if provided
 //
 // Errors:
 //   - 404 Not Found: Group not found

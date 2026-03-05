@@ -155,6 +155,9 @@ var _ = Describe("Group endpoint e2e tests", Ordered, func() {
 			list, err := agentSvc.ListGroups()
 			Expect(err).ToNot(HaveOccurred())
 			Expect(len(list.Groups)).To(BeNumerically(">=", 2))
+			Expect(list.Total).To(BeNumerically(">=", 2))
+			Expect(list.Page).To(Equal(1))
+			Expect(list.PageCount).To(BeNumerically(">=", 1))
 
 			names := make([]string, len(list.Groups))
 			for i, g := range list.Groups {
@@ -162,6 +165,23 @@ var _ = Describe("Group endpoint e2e tests", Ordered, func() {
 			}
 			Expect(names).To(ContainElement("group-a"))
 			Expect(names).To(ContainElement("group-b"))
+		})
+
+		It("should filter groups by name", func() {
+			g1, err := agentSvc.CreateGroup("filter-target", "memory > 0", "")
+			Expect(err).ToNot(HaveOccurred())
+			defer func() { _, _ = agentSvc.DeleteGroup(g1.Id) }()
+
+			g2, err := agentSvc.CreateGroup("other-group", "memory > 0", "")
+			Expect(err).ToNot(HaveOccurred())
+			defer func() { _, _ = agentSvc.DeleteGroup(g2.Id) }()
+
+			byName := "filter-target"
+			list, err := agentSvc.ListGroups(&service.GroupListParams{ByName: &byName})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(list.Total).To(Equal(1))
+			Expect(list.Groups).To(HaveLen(1))
+			Expect(list.Groups[0].Name).To(Equal("filter-target"))
 		})
 
 		It("should get a group by ID with its VMs", func() {
