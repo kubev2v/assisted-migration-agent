@@ -6,8 +6,8 @@ on:  # yamllint disable-line rule:truthy
     branches: [main, 'release-*']
     paths:
       - 'api/v1/openapi.yaml'
-  tags:
-    - '*'
+    tags:
+      - '*'
 
 # Required for npm Trusted Publishing (OIDC)
 permissions:
@@ -28,12 +28,12 @@ jobs:
 
       - name: Determine version
         id: version
-        uses: kubev2v/migration-planner/.github/actions/determine-version@main
+        uses: kubev2v/migration-planner-workflows/.github/actions/determine-version@main
 
   generate-client:
     name: Generate and publish API client
     needs: version
-    uses: kubev2v/migration-planner-client-generator/.github/workflows/generate-and-publish.yml@main
+    uses: kubev2v/migration-planner-workflows/.github/workflows/generate-and-publish.yml@main
     with:
       openapi-spec-url: "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/api/v1/openapi.yaml"
       package-name: "@openshift-migration-advisor/agent-sdk"
