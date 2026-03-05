@@ -465,8 +465,6 @@ paths:
       responses:
         '204':
           description: Group deleted
-        '404':
-          description: Group not found
         '500':
           description: Internal server error
 
