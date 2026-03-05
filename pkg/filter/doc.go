@@ -39,9 +39,11 @@
 // # Value Types
 //
 // Strings: Single or double quoted. Empty strings are allowed.
+// Use backslash to escape the enclosing quote character: \' inside '…', \" inside "…".
 //
 //	name = 'production'
 //	name = "test-vm"
+//	name = 'it\'s a test'
 //	description = ''
 //
 // Booleans: Case-insensitive true/false.
@@ -179,6 +181,20 @@
 //
 //	datastore.name, datastore.hosts, datastore.address, datastore.object_id,
 //	datastore.free, datastore.mha, datastore.capacity, datastore.type
+//
+// # Group Field Mapping
+//
+// ParseWithGroupMap uses a group-specific MapFunc that maps identifiers to
+// columns in the groups table:
+//
+//	name        → "name"
+//	description → "description"
+//	filter      → "filter"
+//
+// Usage:
+//
+//	sqlizer, err := filter.ParseWithGroupMap([]byte("name = 'production'"))
+//	groups, err := store.Group().List(ctx, []sq.Sqlizer{sqlizer}, 20, 0)
 //
 // # Usage with store
 //

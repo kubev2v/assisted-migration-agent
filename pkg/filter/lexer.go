@@ -141,6 +141,12 @@ func (l *lexer) Scan() (int, Token, string) {
 			if l.ch == 0 {
 				return pos, illegal, "unclosed string"
 			}
+			if l.ch == '\\' && l.offset < len(l.src) && l.src[l.offset] == ch {
+				l.next()
+				chars = append(chars, l.ch)
+				l.next()
+				continue
+			}
 			chars = append(chars, l.ch)
 			l.next()
 		}

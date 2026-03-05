@@ -88,6 +88,12 @@ var _ = Describe("Lexer", func() {
 			{input: "'test<value'", output: "stringLit eol"},
 			{input: `"with spaces and symbols !@#$%"`, output: "stringLit eol"},
 
+			// Escaped quotes inside strings
+			{input: `'it\'s'`, output: "stringLit eol"},
+			{input: `"say \"hello\""`, output: "stringLit eol"},
+			{input: `'no escape needed "here"'`, output: "stringLit eol"},
+			{input: `"no escape needed 'here'"`, output: "stringLit eol"},
+
 			// ===== REGEX LITERALS =====
 			{input: "/pattern/", output: "regexLit eol"},
 			{input: "/hello world/", output: "regexLit eol"},
@@ -286,5 +292,28 @@ var _ = Describe("Lexer", func() {
 				Expect(strings.TrimSpace(output)).To(Equal(test.output))
 			})
 		}
+	})
+
+	Context("escaped string values", func() {
+		It("should unescape single quotes", func() {
+			l := newLexer([]byte(`'it\'s'`))
+			_, tok, val := l.Scan()
+			Expect(tok).To(Equal(stringLit))
+			Expect(val).To(Equal("it's"))
+		})
+
+		It("should unescape double quotes", func() {
+			l := newLexer([]byte(`"say \"hello\""`))
+			_, tok, val := l.Scan()
+			Expect(tok).To(Equal(stringLit))
+			Expect(val).To(Equal(`say "hello"`))
+		})
+
+		It("should not unescape mismatched quote type", func() {
+			l := newLexer([]byte(`'contains \"double\"'`))
+			_, tok, val := l.Scan()
+			Expect(tok).To(Equal(stringLit))
+			Expect(val).To(Equal(`contains \"double\"`))
+		})
 	})
 })
