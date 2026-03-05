@@ -174,17 +174,16 @@
 //	┌────────────────┬──────────┬─────────────────────────────────────────┐
 //	│ Parameter      │ Type     │ Description                             │
 //	├────────────────┼──────────┼─────────────────────────────────────────┤
-//	│ clusters       │ []string │ Filter by cluster names (OR logic)      │
-//	│ status         │ []string │ Filter by power state (OR logic)        │
-//	│ minIssues      │ int      │ Filter by minimum issue count           │
-//	│ diskSizeMin    │ int64    │ Minimum disk size in MB                 │
-//	│ diskSizeMax    │ int64    │ Maximum disk size in MB                 │
-//	│ memorySizeMin  │ int64    │ Minimum memory in MB                    │
-//	│ memorySizeMax  │ int64    │ Maximum memory in MB                    │
+//	│ byExpression   │ string   │ Filter DSL expression (see pkg/filter)  │
 //	│ sort           │ []string │ Sort fields (format: "field:direction") │
 //	│ page           │ int      │ Page number (default: 1)                │
 //	│ pageSize       │ int      │ Items per page (default: 20, max: 100)  │
 //	└────────────────┴──────────┴─────────────────────────────────────────┘
+//
+// The byExpression parameter accepts a filter DSL expression that can reference
+// any column across all joined tables (vinfo, vdisk, concerns, vcpu, vmemory,
+// vnetwork, vdatastore, vm_inspection_status). See pkg/filter for the grammar
+// and docs/filter-by-expression.md for field mappings and examples.
 //
 // Valid Sort Fields:
 //   - name, vCenterState, cluster, diskSize, memory, issues
@@ -192,7 +191,7 @@
 // Sort Direction:
 //   - asc (ascending) or desc (descending)
 //
-// Example: /vms?clusters=prod&status=poweredOn&sort=name:asc&page=1&pageSize=50
+// Example: /vms?byExpression=memory+%3E%3D+8GB&sort=name:asc&page=1&pageSize=50
 //
 // Response:
 //
@@ -214,8 +213,7 @@
 //	}
 //
 // Validation Errors (400 Bad Request):
-//   - diskSizeMin > diskSizeMax
-//   - memorySizeMin > memorySizeMax
+//   - Invalid byExpression syntax or unknown field
 //   - Invalid sort format (must be "field:direction")
 //   - Invalid sort field
 //   - Invalid sort direction

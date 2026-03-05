@@ -166,14 +166,12 @@
 // # VMService
 //
 // VMService manages querying and filtering virtual machines from the collected inventory.
-// It supports advanced filtering, multi-field sorting, and pagination.
+// It supports expression-based filtering, multi-field sorting, and pagination.
 //
-// Filtering capabilities:
-//   - By cluster names (multiple clusters supported)
-//   - By VM status (multiple statuses supported)
-//   - By minimum issue count
-//   - By disk size range (min/max in MB)
-//   - By memory size range (min/max in MB)
+// Filtering:
+//   - A single filter DSL expression (byExpression) that can reference any column
+//     across all joined tables (vinfo, vdisk, concerns, vcpu, vmemory, vnetwork,
+//     vdatastore, vm_inspection_status). See pkg/filter for the grammar and field mappings.
 //
 // Sorting:
 //   - Multiple sort fields with direction control (ascending/descending)
@@ -186,12 +184,10 @@
 //	vm, err := vmService.Get(ctx, "vm-123")
 //
 //	params := services.VMListParams{
-//	    Clusters:  []string{"cluster-1", "cluster-2"},
-//	    Statuses:  []string{"poweredOn"},
-//	    MinIssues: 1,
-//	    Sort:      []services.SortField{{Field: "name", Desc: false}},
-//	    Limit:     50,
-//	    Offset:    0,
+//	    Expression: "cluster = 'production' and memory >= 8GB",
+//	    Sort:       []services.SortField{{Field: "name", Desc: false}},
+//	    Limit:      50,
+//	    Offset:     0,
 //	}
 //	vms, total, err := vmService.List(ctx, params)
 //

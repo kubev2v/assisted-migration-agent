@@ -36,17 +36,10 @@ Returns a paginated list of VMs with filtering and sorting capabilities.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `clusters` | array | Filter by cluster names (OR logic) |
-| `status` | array | Filter by power state: `poweredOn`, `poweredOff`, `suspended` (OR logic) |
-| `minIssues` | integer | Filter VMs with at least this many issues |
-| `diskSizeMin` | integer | Minimum disk size in MB |
-| `diskSizeMax` | integer | Maximum disk size in MB |
-| `memorySizeMin` | integer | Minimum memory size in MB |
-| `memorySizeMax` | integer | Maximum memory size in MB |
 | `byExpression` | string | Filter by expression (DSL). See [Filter by Expression](filter-by-expression.md) for grammar and all supported fields. |
 | `sort` | array | Sort fields with direction (e.g., `name:asc`, `cluster:desc`) |
 | `page` | integer | Page number (default: 1) |
-| `pageSize` | integer | Items per page |
+| `pageSize` | integer | Items per page (default: 20, max: 100) |
 
 **Valid sort fields:** `name`, `vCenterState`, `cluster`, `diskSize`, `memory`, `issues`
 
@@ -58,28 +51,10 @@ Get all VMs:
 curl http://localhost:8000/api/v1/vms
 ```
 
-Filter by cluster:
+Filter by expression:
 
 ```bash
-curl "http://localhost:8000/api/v1/vms?clusters=production&clusters=staging"
-```
-
-Filter by power state:
-
-```bash
-curl "http://localhost:8000/api/v1/vms?status=poweredOn"
-```
-
-Filter by disk size range (100GB to 500GB):
-
-```bash
-curl "http://localhost:8000/api/v1/vms?diskSizeMin=102400&diskSizeMax=512000"
-```
-
-Filter VMs with issues:
-
-```bash
-curl "http://localhost:8000/api/v1/vms?minIssues=1"
+curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=cluster = 'production' and memory >= 8GB"
 ```
 
 Sort by cluster ascending, then by name descending:

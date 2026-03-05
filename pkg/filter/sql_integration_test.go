@@ -918,4 +918,236 @@ var _ = Describe("Filter Integration with DuckDB", func() {
 			Expect(names).To(Equal([]string{"vm-test", "vm-worker-01", "vm-worker-02"}))
 		})
 	})
+
+	// ============================================================
+	// SQL INJECTION PREVENTION TESTS
+	// These tests verify that SQL injection attempts are properly
+	// parameterized and treated as data, not executable SQL.
+	// ============================================================
+
+	Context("SQL Injection Prevention - String Values", func() {
+		It("should treat DROP TABLE as literal string value", func() {
+			// This should search for a VM named literally "'; DROP TABLE vms; --"
+			// Not execute the DROP TABLE command
+			names, err := queryVMs("name = '\\'; DROP TABLE vms; --'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(BeEmpty()) // No VM with this name exists
+
+			// Verify table still exists by running another query
+			names, err = queryVMs("name = 'vm-web-01'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(Equal([]string{"vm-web-01"}))
+		})
+
+		It("should treat DELETE FROM as literal string value", func() {
+			names, err := queryVMs("name = '\\'; DELETE FROM vms; --'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(BeEmpty())
+
+			// Verify data still exists
+			names, err = queryVMs("cpus >= 1")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(HaveLen(10))
+		})
+
+		It("should treat UNION SELECT as literal string value", func() {
+			names, err := queryVMs("name = '\\' UNION SELECT * FROM vms --'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(BeEmpty())
+		})
+
+		It("should treat OR 1=1 as literal string value", func() {
+			names, err := queryVMs("name = '\\' OR \\'1\\'=\\'1'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(BeEmpty()) // Should not return all rows
+		})
+
+		It("should handle SQL comment injection in string", func() {
+			names, err := queryVMs("name = 'test--comment'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(BeEmpty())
+		})
+
+		It("should handle block comment injection in string", func() {
+			names, err := queryVMs("name = 'test/*comment*/'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(BeEmpty())
+		})
+
+		It("should handle semicolon injection in string", func() {
+			names, err := queryVMs("name = 'test; SELECT * FROM vms'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(BeEmpty())
+		})
+	})
+
+	Context("SQL Injection Prevention - Quote Escaping", func() {
+		It("should handle escaped single quotes correctly", func() {
+			names, err := queryVMs("name = 'O\\'Brien'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(BeEmpty()) // No VM with this name
+		})
+
+		It("should handle multiple escaped quotes", func() {
+			names, err := queryVMs("name = 'it\\'s a \\'test\\''")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(BeEmpty())
+		})
+
+		It("should handle double quotes inside single quotes", func() {
+			names, err := queryVMs("name = 'say \"hello\"'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(BeEmpty())
+		})
+
+		It("should handle backslash sequences", func() {
+			names, err := queryVMs("name = 'path\\\\to\\\\file'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(BeEmpty())
+		})
+	})
+
+	Context("SQL Injection Prevention - IN Operator", func() {
+		It("should treat injection in IN list as literal values", func() {
+			names, err := queryVMs("name in ['normal', '\\'; DROP TABLE vms; --']")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(BeEmpty())
+
+			// Verify table still exists
+			names, err = queryVMs("name = 'vm-web-01'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(Equal([]string{"vm-web-01"}))
+		})
+
+		It("should handle UNION injection in IN list", func() {
+			names, err := queryVMs("name in ['a', 'b', '\\' UNION SELECT * --']")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(BeEmpty())
+		})
+	})
+
+	Context("SQL Injection Prevention - Regex Patterns", func() {
+		It("should treat injection in regex as literal pattern", func() {
+			names, err := queryVMs("name ~ /'; DROP TABLE vms; --/")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(BeEmpty())
+
+			// Verify table still exists
+			names, err = queryVMs("cpus >= 1")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(HaveLen(10))
+		})
+
+		It("should handle SQL keywords in regex", func() {
+			names, err := queryVMs("name ~ /SELECT.*FROM/")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(BeEmpty())
+		})
+	})
+
+	Context("SQL Injection Prevention - Special Characters", func() {
+		It("should handle null byte in string", func() {
+			// Null bytes cause a parse error (unclosed string), which is safe behavior
+			// The parser rejects input containing null bytes
+			_, err := queryVMs("name = 'test\x00injection'")
+			Expect(err).To(HaveOccurred()) // Parse error is expected and safe
+		})
+
+		It("should handle newline in string", func() {
+			names, err := queryVMs("name = 'line1\nline2'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(BeEmpty())
+		})
+
+		It("should handle tab in string", func() {
+			names, err := queryVMs("name = 'col1\tcol2'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(BeEmpty())
+		})
+
+		It("should handle SQL wildcards as literals", func() {
+			// % and _ should be treated as literal characters in equality
+			names, err := queryVMs("name = '%'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(BeEmpty())
+
+			names, err = queryVMs("name = '_'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(BeEmpty())
+		})
+	})
+
+	Context("SQL Injection Prevention - Unicode", func() {
+		It("should handle Chinese characters", func() {
+			names, err := queryVMs("name = '测试'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(BeEmpty())
+		})
+
+		It("should handle Cyrillic lookalikes", func() {
+			// 'tеst' with Cyrillic 'е' (U+0435) instead of Latin 'e'
+			names, err := queryVMs("name = 'tеst'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(BeEmpty())
+		})
+
+		It("should handle emoji", func() {
+			names, err := queryVMs("name = '🎉test🎉'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(BeEmpty())
+		})
+
+		It("should handle right-to-left override", func() {
+			names, err := queryVMs("name = 'test\u202Eexe.txt'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(BeEmpty())
+		})
+	})
+
+	Context("SQL Injection Prevention - Combined Attacks", func() {
+		It("should handle injection combined with valid filter", func() {
+			names, err := queryVMs("name = 'vm-web-01' and name = '\\'; DROP TABLE vms; --'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(BeEmpty()) // AND makes this impossible
+
+			// Verify table still exists
+			names, err = queryVMs("name = 'vm-web-01'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(Equal([]string{"vm-web-01"}))
+		})
+
+		It("should handle injection in OR clause", func() {
+			names, err := queryVMs("name = 'vm-web-01' or name = '\\'; DROP TABLE vms; --'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(Equal([]string{"vm-web-01"})) // Only valid match
+
+			// Verify table still exists with all data
+			names, err = queryVMs("cpus >= 1")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(HaveLen(10))
+		})
+
+		It("should handle multiple injection attempts in one query", func() {
+			names, err := queryVMs("name = 'DROP' and active = true and name ~ /DELETE/")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(BeEmpty())
+		})
+	})
+
+	Context("SQL Injection Prevention - Verify Data Integrity After All Tests", func() {
+		It("should have all original data intact", func() {
+			// This test verifies that none of the injection attempts modified data
+			names, err := queryVMs("cpus >= 1")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(HaveLen(10))
+
+			// Verify specific VMs still exist
+			expectedVMs := []string{
+				"vm-analytics", "vm-cache-01", "vm-db-01", "vm-db-02",
+				"vm-legacy", "vm-test", "vm-web-01", "vm-web-02",
+				"vm-worker-01", "vm-worker-02",
+			}
+			Expect(names).To(Equal(expectedVMs))
+		})
+	})
 })

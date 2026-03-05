@@ -45,7 +45,7 @@ curl -G "http://localhost:8000/api/v1/vms" \
 
 **Value types:**
 
-- **Strings:** `'...'` or `"..."` (empty allowed)
+- **Strings:** `'...'` or `"..."` (empty allowed). Escape quotes with backslash: `\'` inside single-quoted strings, `\"` inside double-quoted strings.
 - **Booleans:** `true`, `false` (case-insensitive)
 - **Quantities:** `123`, `8GB`, `512MB`, `1TB` (normalized to MB for comparison)
 - **Regex:** `/pattern/` (escape `/` as `\/`)

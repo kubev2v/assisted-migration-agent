@@ -162,14 +162,13 @@
 //
 // API:
 //
-// Filter functions return sq.Sqlizer (WHERE clauses for the flat subquery).
-// Query options remain as ListOption (sort/pagination for the output query).
+// Filters are sq.Sqlizer values (WHERE clauses for the flat subquery).
+// Query options are ListOption functions (sort/pagination for the output query).
 // List takes both:
 //
 //	vms, err := store.VM().List(ctx,
 //	    []sq.Sqlizer{
-//	        store.ByClusters("prod-cluster"),
-//	        store.ByStatus("poweredOn"),
+//	        store.ByFilter("cluster = 'production' and memory >= 8GB"),
 //	    },
 //	    store.WithSort([]store.SortParam{{Field: "name", Desc: false}}),
 //	    store.WithLimit(50),
@@ -177,24 +176,9 @@
 //
 // Count takes only filters:
 //
-//	total, err := store.VM().Count(ctx, store.ByStatus("poweredOn"))
+//	total, err := store.VM().Count(ctx, store.ByFilter("status = 'poweredOn'"))
 //
-// Filtering Functions (return sq.Sqlizer):
-//
-//   - ByClusters(clusters ...string)
-//     Filters VMs by cluster name. Multiple clusters use OR logic.
-//
-//   - ByStatus(statuses ...string)
-//     Filters VMs by power state (OR logic).
-//
-//   - ByIssues(minIssues int)
-//     Filters VMs with at least N migration concerns via subquery.
-//
-//   - ByDiskSizeRange(min, max int64)
-//     Filters VMs by total disk capacity in MiB [min, max) via subquery.
-//
-//   - ByMemorySizeRange(min, max int64)
-//     Filters VMs by memory in MiB [min, max].
+// Filtering:
 //
 //   - ByFilter(expr string)
 //     Parses a filter DSL expression (see pkg/filter) into a sq.Sqlizer.
