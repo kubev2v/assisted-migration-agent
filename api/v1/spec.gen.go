@@ -42,7 +42,7 @@ type ServerInterface interface {
 	GetVMs(c *gin.Context, params GetVMsParams)
 	// List all groups
 	// (GET /vms/groups)
-	ListGroups(c *gin.Context)
+	ListGroups(c *gin.Context, params ListGroupsParams)
 	// Create a new group
 	// (POST /vms/groups)
 	CreateGroup(c *gin.Context)
@@ -265,6 +265,35 @@ func (siw *ServerInterfaceWrapper) GetVMs(c *gin.Context) {
 // ListGroups operation middleware
 func (siw *ServerInterfaceWrapper) ListGroups(c *gin.Context) {
 
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListGroupsParams
+
+	// ------------- Optional query parameter "byName" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "byName", c.Request.URL.Query(), &params.ByName)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter byName: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "page", c.Request.URL.Query(), &params.Page)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter page: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "pageSize" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "pageSize", c.Request.URL.Query(), &params.PageSize)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter pageSize: %w", err), http.StatusBadRequest)
+		return
+	}
+
 	for _, middleware := range siw.HandlerMiddlewares {
 		middleware(c)
 		if c.IsAborted() {
@@ -272,7 +301,7 @@ func (siw *ServerInterfaceWrapper) ListGroups(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.ListGroups(c)
+	siw.Handler.ListGroups(c, params)
 }
 
 // CreateGroup operation middleware

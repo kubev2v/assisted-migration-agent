@@ -142,6 +142,15 @@ type Group struct {
 // GroupListResponse defines model for GroupListResponse.
 type GroupListResponse struct {
 	Groups []Group `json:"groups"`
+
+	// Page Current page number
+	Page int `json:"page"`
+
+	// PageCount Total number of pages
+	PageCount int `json:"pageCount"`
+
+	// Total Total number of groups
+	Total int `json:"total"`
 }
 
 // GroupResponse defines model for GroupResponse.
@@ -464,6 +473,18 @@ type GetVMsParams struct {
 	Page *int `form:"page,omitempty" json:"page,omitempty"`
 
 	// PageSize Number of items per page
+	PageSize *int `form:"pageSize,omitempty" json:"pageSize,omitempty"`
+}
+
+// ListGroupsParams defines parameters for ListGroups.
+type ListGroupsParams struct {
+	// ByName Filter groups by name (case-insensitive substring match)
+	ByName *string `form:"byName,omitempty" json:"byName,omitempty"`
+
+	// Page Page number (1-indexed)
+	Page *int `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize Number of groups per page
 	PageSize *int `form:"pageSize,omitempty" json:"pageSize,omitempty"`
 }
 

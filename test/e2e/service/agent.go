@@ -375,14 +375,35 @@ func (a *AgentSvc) CreateGroupRaw(body []byte) (int, error) {
 	return resp.StatusCode, nil
 }
 
-// ListGroups lists all groups.
-func (a *AgentSvc) ListGroups() (*v1.GroupListResponse, error) {
+// GroupListParams holds optional parameters for listing groups.
+type GroupListParams struct {
+	ByName   *string
+	Page     *int
+	PageSize *int
+}
+
+// ListGroups lists groups with optional filtering and pagination.
+func (a *AgentSvc) ListGroups(params ...*GroupListParams) (*v1.GroupListResponse, error) {
 	req, err := http.NewRequest(http.MethodGet, a.baseURL+"/api/v1/vms/groups", nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
 
-	resp, err := a.request(NewAgentRequest(req))
+	agentReq := NewAgentRequest(req)
+	if len(params) > 0 && params[0] != nil {
+		p := params[0]
+		if p.ByName != nil {
+			agentReq.withQueryParam("byName", *p.ByName)
+		}
+		if p.Page != nil {
+			agentReq.withQueryParam("page", strconv.Itoa(*p.Page))
+		}
+		if p.PageSize != nil {
+			agentReq.withQueryParam("pageSize", strconv.Itoa(*p.PageSize))
+		}
+	}
+
+	resp, err := a.request(agentReq)
 	if err != nil {
 		return nil, fmt.Errorf("sending request: %w", err)
 	}

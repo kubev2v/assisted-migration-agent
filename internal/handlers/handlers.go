@@ -44,7 +44,7 @@ type InspectorService interface {
 
 // GroupService defines the interface for group operations.
 type GroupService interface {
-	List(ctx context.Context) ([]models.Group, error)
+	List(ctx context.Context, params services.GroupListParams) ([]models.Group, int, error)
 	ListVirtualMachines(ctx context.Context, id int, params services.GroupGetParams) ([]models.VirtualMachineSummary, int, error)
 	Get(ctx context.Context, id int) (*models.Group, error)
 	Create(ctx context.Context, group models.Group) (*models.Group, error)

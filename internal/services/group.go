@@ -2,11 +2,14 @@ package services
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	sq "github.com/Masterminds/squirrel"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
+	"github.com/kubev2v/assisted-migration-agent/pkg/filter"
 )
 
 type GroupService struct {
@@ -23,8 +26,36 @@ type GroupGetParams struct {
 	Offset uint64
 }
 
-func (s *GroupService) List(ctx context.Context) ([]models.Group, error) {
-	return s.store.Group().List(ctx)
+type GroupListParams struct {
+	ByName string
+	Limit  uint64
+	Offset uint64
+}
+
+func (s *GroupService) List(ctx context.Context, params GroupListParams) ([]models.Group, int, error) {
+	var filters []sq.Sqlizer
+	if params.ByName != "" {
+		escaped := strings.ReplaceAll(params.ByName, `\`, `\\`)
+		escaped = strings.ReplaceAll(escaped, `'`, `\'`)
+		expr := fmt.Sprintf("name = '%s'", escaped)
+		f, err := filter.ParseWithGroupMap([]byte(expr))
+		if err != nil {
+			return nil, 0, fmt.Errorf("invalid name filter: %w", err)
+		}
+		filters = append(filters, f)
+	}
+
+	total, err := s.store.Group().Count(ctx, filters...)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	groups, err := s.store.Group().List(ctx, filters, params.Limit, params.Offset)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return groups, total, nil
 }
 
 func (s *GroupService) Get(ctx context.Context, id int) (*models.Group, error) {

@@ -15,13 +15,37 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/pkg/filter"
 )
 
-// ListGroups returns all groups
+// ListGroups returns groups with optional name filtering and pagination
 // (GET /vms/groups)
-func (h *Handler) ListGroups(c *gin.Context) {
-	groups, err := h.groupSrv.List(c.Request.Context())
+func (h *Handler) ListGroups(c *gin.Context, params v1.ListGroupsParams) {
+	page := 1
+	if params.Page != nil && *params.Page > 0 {
+		page = *params.Page
+	}
+
+	pageSize := defaultPageSize
+	if params.PageSize != nil && *params.PageSize > 0 {
+		pageSize = min(*params.PageSize, maxPageSize)
+	}
+
+	svcParams := services.GroupListParams{
+		Limit:  uint64(pageSize),
+		Offset: uint64((page - 1) * pageSize),
+	}
+
+	if params.ByName != nil {
+		svcParams.ByName = *params.ByName
+	}
+
+	groups, total, err := h.groupSrv.List(c.Request.Context(), svcParams)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+
+	pageCount := (total + pageSize - 1) / pageSize
+	if pageCount == 0 {
+		pageCount = 1
 	}
 
 	apiGroups := make([]v1.Group, 0, len(groups))
@@ -29,7 +53,12 @@ func (h *Handler) ListGroups(c *gin.Context) {
 		apiGroups = append(apiGroups, v1.NewGroupFromModel(g))
 	}
 
-	c.JSON(http.StatusOK, v1.GroupListResponse{Groups: apiGroups})
+	c.JSON(http.StatusOK, v1.GroupListResponse{
+		Groups:    apiGroups,
+		Total:     total,
+		Page:      page,
+		PageCount: pageCount,
+	})
 }
 
 // CreateGroup creates a new group
@@ -41,6 +70,7 @@ func (h *Handler) CreateGroup(c *gin.Context) {
 		return
 	}
 
+	req.Name = strings.TrimSpace(req.Name)
 	if req.Name == "" || len(req.Name) > 100 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "name must be between 1 and 100 characters"})
 		return
@@ -48,6 +78,11 @@ func (h *Handler) CreateGroup(c *gin.Context) {
 
 	if req.Filter == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "filter is required"})
+		return
+	}
+
+	if req.Description != nil && len(*req.Description) > maxDescriptionLength {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("description must not exceed %d characters", maxDescriptionLength)})
 		return
 	}
 
@@ -183,6 +218,15 @@ func (h *Handler) UpdateGroup(c *gin.Context, id string) {
 		return
 	}
 
+	if req.Name != nil {
+		trimmed := strings.TrimSpace(*req.Name)
+		req.Name = &trimmed
+		if *req.Name == "" || len(*req.Name) > 100 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "name must be between 1 and 100 characters"})
+			return
+		}
+	}
+
 	if req.Filter != nil {
 		if *req.Filter == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "filter cannot be empty"})
@@ -194,8 +238,8 @@ func (h *Handler) UpdateGroup(c *gin.Context, id string) {
 		}
 	}
 
-	if req.Name != nil && (*req.Name == "" || len(*req.Name) > 100) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "name must be between 1 and 100 characters"})
+	if req.Description != nil && len(*req.Description) > maxDescriptionLength {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("description must not exceed %d characters", maxDescriptionLength)})
 		return
 	}
 

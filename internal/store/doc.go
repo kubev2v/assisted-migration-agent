@@ -112,7 +112,11 @@
 //	)
 //
 // Methods:
-//   - List(ctx) → []models.Group (ordered by ID ascending)
+//   - List(ctx, filters []sq.Sqlizer, limit, offset uint64) → ([]models.Group, error)
+//     Returns groups ordered by ID ascending. Applies optional sq.Sqlizer
+//     filters (e.g. from filter.ParseWithGroupMap) and LIMIT/OFFSET pagination.
+//   - Count(ctx, filters ...sq.Sqlizer) → (int, error)
+//     Returns the total number of groups matching the given filters.
 //   - Get(ctx, id) → *models.Group (returns ResourceNotFoundError if missing)
 //   - Create(ctx, group) → *models.Group (with generated ID and timestamps)
 //   - Update(ctx, id, group) → *models.Group (returns ResourceNotFoundError if missing)
