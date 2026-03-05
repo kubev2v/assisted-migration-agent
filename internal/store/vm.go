@@ -8,7 +8,7 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
-	parsermodels "github.com/kubev2v/migration-planner/pkg/duckdb_parser/models"
+	duckdb_models "github.com/kubev2v/migration-planner/pkg/duckdb_parser/models"
 	"go.uber.org/zap"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
@@ -23,22 +23,6 @@ var validCategories = map[string]string{
 	"information": "Information",
 	"advisory":    "Advisory",
 	"error":       "Error",
-}
-
-// normalizeCategory validates and normalizes an issue category (case-insensitive).
-// If the category is not in the list of valid categories, it logs a warning
-// and returns "Other".
-func normalizeCategory(category, issueID string) string {
-	normalized, ok := validCategories[strings.ToLower(category)]
-	if ok {
-		return normalized
-	}
-	zap.S().Named("vm_store").Warnw(
-		"Unknown issue category encountered, mapping to 'Other'",
-		"category", category,
-		"issueID", issueID,
-	)
-	return "Other"
 }
 
 type VMStore struct {
@@ -57,10 +41,13 @@ type FilterOption = sq.Sqlizer
 // Filters are applied via a flat subquery that joins all tables, allowing
 // WHERE clauses to reference any column. The output query aggregates results into one row per VM.
 func (s *VMStore) List(ctx context.Context, filters []sq.Sqlizer, opts ...ListOption) ([]models.VirtualMachineSummary, error) {
-	builder := vmOutputQuery()
+	builder := vmOutputQuery
 
 	if len(filters) > 0 {
-		subquery := vmFilterSubquery(filters)
+		subquery := vmFilterSubquery
+		for _, f := range filters {
+			subquery = subquery.Where(f)
+		}
 		subSQL, subArgs, err := subquery.ToSql()
 		if err != nil {
 			return nil, err
@@ -118,7 +105,10 @@ func (s *VMStore) Count(ctx context.Context, filters ...sq.Sqlizer) (int, error)
 	builder := sq.Select("COUNT(*)").From("vinfo v")
 
 	if len(filters) > 0 {
-		subquery := vmFilterSubquery(filters)
+		subquery := vmFilterSubquery
+		for _, f := range filters {
+			subquery = subquery.Where(f)
+		}
 		subSQL, subArgs, err := subquery.ToSql()
 		if err != nil {
 			return 0, err
@@ -147,12 +137,28 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 		return nil, srvErrors.NewResourceNotFoundError("vm", id)
 	}
 
-	result := vmFromParser(vms[0])
+	result := fromDB(vms[0])
 
 	return &result, nil
 }
 
-func vmFromParser(pvm parsermodels.VM) models.VM {
+// normalizeCategory validates and normalizes an issue category (case-insensitive).
+// If the category is not in the list of valid categories, it logs a warning
+// and returns "Other".
+func normalizeCategory(category, issueID string) string {
+	normalized, ok := validCategories[strings.ToLower(category)]
+	if ok {
+		return normalized
+	}
+	zap.S().Named("vm_store").Warnw(
+		"Unknown issue category encountered, mapping to 'Other'",
+		"category", category,
+		"issueID", issueID,
+	)
+	return "Other"
+}
+
+func fromDB(pvm duckdb_models.VM) models.VM {
 	issues := make([]models.Issue, 0, len(pvm.Concerns))
 	criticalCount := 0
 	for _, c := range pvm.Concerns {
@@ -226,48 +232,6 @@ type ListOption func(sq.SelectBuilder) sq.SelectBuilder
 type SortParam struct {
 	Field string
 	Desc  bool
-}
-
-// vmOutputQuery builds the aggregated output query that produces one row per VM.
-func vmOutputQuery() sq.SelectBuilder {
-	return sq.Select(
-		`v."VM ID" AS id`,
-		`v."VM" AS name`,
-		`v."Powerstate" AS power_state`,
-		`COALESCE(v."Cluster", '') AS cluster`,
-		`COALESCE(v."Datacenter", '') AS datacenter`,
-		`v."Memory" AS memory`,
-		`COALESCE(d.total_disk, 0) AS disk_size`,
-		`COALESCE(c.issue_count, 0) AS issue_count`,
-		`COALESCE(i.status, 'not_found') AS status`,
-		`v."Template" as template`,
-		`COALESCE(crit.critical_count, 0) = 0 AS migratable`,
-		`COALESCE(i.error, '') AS error`,
-	).From("vinfo v").
-		LeftJoin(`(SELECT "VM_ID", COUNT(*) AS issue_count FROM concerns GROUP BY "VM_ID") c ON v."VM ID" = c."VM_ID"`).
-		LeftJoin(`(SELECT "VM_ID", COUNT(*) AS critical_count FROM concerns WHERE "Category" = 'Critical' GROUP BY "VM_ID") crit ON v."VM ID" = crit."VM_ID"`).
-		LeftJoin(`(SELECT "VM ID", SUM("Capacity MiB") AS total_disk FROM vdisk GROUP BY "VM ID") d ON v."VM ID" = d."VM ID"`).
-		LeftJoin(`vm_inspection_status i ON v."VM ID" = i."VM ID"`)
-}
-
-// vmFilterSubquery builds a flat JOIN of all tables so WHERE clauses can
-// reference any raw column. Returns DISTINCT VM IDs matching the filters.
-func vmFilterSubquery(filters []sq.Sqlizer) sq.SelectBuilder {
-	b := sq.Select(`DISTINCT v."VM ID"`).
-		From("vinfo v").
-		LeftJoin(`vdisk dk ON v."VM ID" = dk."VM ID"`).
-		LeftJoin(`concerns c ON v."VM ID" = c."VM_ID"`).
-		LeftJoin(`vm_inspection_status i ON v."VM ID" = i."VM ID"`).
-		LeftJoin(`vcpu cpu ON v."VM ID" = cpu."VM ID"`).
-		LeftJoin(`vmemory mem ON v."VM ID" = mem."VM ID"`).
-		LeftJoin(`vnetwork net ON v."VM ID" = net."VM ID"`).
-		LeftJoin(`vdatastore ds ON ds."Name" = regexp_extract(COALESCE(dk."Path", dk."Disk Path"), '\[([^\]]+)\]', 1)`)
-
-	for _, f := range filters {
-		b = b.Where(f)
-	}
-
-	return b
 }
 
 // ByClusters filters by cluster names (OR logic).

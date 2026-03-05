@@ -70,13 +70,17 @@ var defaultMapFn MapFunc = func(name string) (string, error) {
 	case "resource_pool":
 		return `v."Resource pool"`, nil
 
+	// issues count
+	case "issues_count":
+		return `cc."issues_count"`, nil
+
 	// vdisk (dk) — disk.* prefix
 	case "disk.key":
 		return `dk."Disk Key"`, nil
 	case "disk.path":
 		return `dk."Disk Path"`, nil
 	case "disk.capacity":
-		return `dk."Capacity MiB"`, nil
+		return `d.total_disk`, nil
 	case "disk.sharing":
 		return `dk."Sharing mode"`, nil
 	case "disk.raw":

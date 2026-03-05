@@ -155,46 +155,6 @@ var _ = Describe("VMs Handlers", func() {
 			Expect(mockVM.LastListParams.Limit).To(Equal(uint64(100)))
 		})
 
-		// Given a disk size range where min is greater than max
-		// When we request the VM list
-		// Then it should return 400 Bad Request
-		It("should return 400 for invalid disk size range", func() {
-			// Arrange
-			req := httptest.NewRequest(http.MethodGet, "/vms?diskSizeMin=1000&diskSizeMax=500", nil)
-			w := httptest.NewRecorder()
-
-			// Act
-			router.ServeHTTP(w, req)
-
-			// Assert
-			Expect(w.Code).To(Equal(http.StatusBadRequest))
-
-			var response map[string]any
-			err := json.Unmarshal(w.Body.Bytes(), &response)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(response["error"]).To(ContainSubstring("diskSizeMin cannot be greater than diskSizeMax"))
-		})
-
-		// Given a memory size range where min is greater than max
-		// When we request the VM list
-		// Then it should return 400 Bad Request
-		It("should return 400 for invalid memory size range", func() {
-			// Arrange
-			req := httptest.NewRequest(http.MethodGet, "/vms?memorySizeMin=8000&memorySizeMax=4000", nil)
-			w := httptest.NewRecorder()
-
-			// Act
-			router.ServeHTTP(w, req)
-
-			// Assert
-			Expect(w.Code).To(Equal(http.StatusBadRequest))
-
-			var response map[string]any
-			err := json.Unmarshal(w.Body.Bytes(), &response)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(response["error"]).To(ContainSubstring("memorySizeMin cannot be greater than memorySizeMax"))
-		})
-
 		// Given an invalid sort format
 		// When we request the VM list
 		// Then it should return 400 Bad Request
@@ -809,8 +769,8 @@ var _ = Describe("VMs Handlers Integration", func() {
 			}
 		})
 
-		It("should filter by cluster", func() {
-			req := httptest.NewRequest(http.MethodGet, "/vms?clusters=production", nil)
+		It("should filter by cluster using byExpression", func() {
+			req := httptest.NewRequest(http.MethodGet, "/vms?byExpression=cluster+%3D+%27production%27", nil)
 			w := httptest.NewRecorder()
 
 			router.ServeHTTP(w, req)
@@ -825,8 +785,8 @@ var _ = Describe("VMs Handlers Integration", func() {
 			}
 		})
 
-		It("should filter by multiple clusters", func() {
-			req := httptest.NewRequest(http.MethodGet, "/vms?clusters=production&clusters=staging", nil)
+		It("should filter by multiple clusters using byExpression", func() {
+			req := httptest.NewRequest(http.MethodGet, "/vms?byExpression=cluster+%3D+%27production%27+or+cluster+%3D+%27staging%27", nil)
 			w := httptest.NewRecorder()
 
 			router.ServeHTTP(w, req)
@@ -841,8 +801,8 @@ var _ = Describe("VMs Handlers Integration", func() {
 			}
 		})
 
-		It("should filter by power state", func() {
-			req := httptest.NewRequest(http.MethodGet, "/vms?status=poweredOff", nil)
+		It("should filter by power state using byExpression", func() {
+			req := httptest.NewRequest(http.MethodGet, "/vms?byExpression=powerstate+%3D+%27poweredOff%27", nil)
 			w := httptest.NewRecorder()
 
 			router.ServeHTTP(w, req)
@@ -857,24 +817,8 @@ var _ = Describe("VMs Handlers Integration", func() {
 			}
 		})
 
-		It("should filter by minimum issues", func() {
-			req := httptest.NewRequest(http.MethodGet, "/vms?minIssues=2", nil)
-			w := httptest.NewRecorder()
-
-			router.ServeHTTP(w, req)
-
-			Expect(w.Code).To(Equal(http.StatusOK))
-
-			var response v1.VirtualMachineListResponse
-			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
-			Expect(response.Total).To(Equal(2)) // vm-003 (2 issues) and vm-007 (3 issues)
-			for _, vm := range response.Vms {
-				Expect(vm.IssueCount).To(BeNumerically(">=", 2))
-			}
-		})
-
-		It("should filter by disk size range", func() {
-			req := httptest.NewRequest(http.MethodGet, "/vms?diskSizeMin=100&diskSizeMax=250", nil)
+		It("should filter by disk size range using byExpression", func() {
+			req := httptest.NewRequest(http.MethodGet, "/vms?byExpression=disk.capacity+%3E%3D+100+and+disk.capacity+%3C+250", nil)
 			w := httptest.NewRecorder()
 
 			router.ServeHTTP(w, req)
@@ -889,8 +833,8 @@ var _ = Describe("VMs Handlers Integration", func() {
 			}
 		})
 
-		It("should filter by memory size range", func() {
-			req := httptest.NewRequest(http.MethodGet, "/vms?memorySizeMin=8000&memorySizeMax=20000", nil)
+		It("should filter by memory size range using byExpression", func() {
+			req := httptest.NewRequest(http.MethodGet, "/vms?byExpression=memory+%3E%3D+8000+and+memory+%3C+20000", nil)
 			w := httptest.NewRecorder()
 
 			router.ServeHTTP(w, req)
@@ -948,8 +892,8 @@ var _ = Describe("VMs Handlers Integration", func() {
 			Expect(response.Vms[0].IssueCount).To(Equal(3)) // vm-007 has 3 issues
 		})
 
-		It("should combine cluster filter with pagination", func() {
-			req := httptest.NewRequest(http.MethodGet, "/vms?clusters=production&page=1&pageSize=2", nil)
+		It("should combine byExpression filter with pagination", func() {
+			req := httptest.NewRequest(http.MethodGet, "/vms?byExpression=cluster+%3D+%27production%27&page=1&pageSize=2", nil)
 			w := httptest.NewRecorder()
 
 			router.ServeHTTP(w, req)
@@ -966,8 +910,8 @@ var _ = Describe("VMs Handlers Integration", func() {
 			}
 		})
 
-		It("should combine multiple filters", func() {
-			req := httptest.NewRequest(http.MethodGet, "/vms?clusters=production&status=poweredOn", nil)
+		It("should combine multiple conditions in byExpression", func() {
+			req := httptest.NewRequest(http.MethodGet, "/vms?byExpression=cluster+%3D+%27production%27+and+powerstate+%3D+%27poweredOn%27", nil)
 			w := httptest.NewRecorder()
 
 			router.ServeHTTP(w, req)
