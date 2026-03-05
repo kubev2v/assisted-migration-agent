@@ -124,7 +124,7 @@ var _ = Describe("VMStore", func() {
 			// Then it should return only VMs in that cluster
 			It("should filter by single cluster", func() {
 				// Act
-				vms, err := s.VM().List(ctx, []sq.Sqlizer{store.ByClusters("cluster-a")})
+				vms, err := s.VM().List(ctx, []sq.Sqlizer{store.ByFilter("cluster = 'cluster-a'")})
 
 				// Assert
 				Expect(err).NotTo(HaveOccurred())
@@ -139,7 +139,7 @@ var _ = Describe("VMStore", func() {
 			// Then it should return VMs in any of those clusters (OR)
 			It("should filter by multiple clusters (OR)", func() {
 				// Act
-				vms, err := s.VM().List(ctx, []sq.Sqlizer{store.ByClusters("cluster-a", "cluster-b")})
+				vms, err := s.VM().List(ctx, []sq.Sqlizer{store.ByFilter("cluster in ['cluster-a', 'cluster-b']")})
 
 				// Assert
 				Expect(err).NotTo(HaveOccurred())
@@ -153,7 +153,7 @@ var _ = Describe("VMStore", func() {
 			// Then it should return only VMs with that status
 			It("should filter by single status", func() {
 				// Act
-				vms, err := s.VM().List(ctx, []sq.Sqlizer{store.ByStatus("poweredOn")})
+				vms, err := s.VM().List(ctx, []sq.Sqlizer{store.ByFilter("powerstate = 'poweredOn'")})
 
 				// Assert
 				Expect(err).NotTo(HaveOccurred())
@@ -168,7 +168,7 @@ var _ = Describe("VMStore", func() {
 			// Then it should return VMs with any of those statuses (OR)
 			It("should filter by multiple statuses (OR)", func() {
 				// Act
-				vms, err := s.VM().List(ctx, []sq.Sqlizer{store.ByStatus("poweredOn", "poweredOff")})
+				vms, err := s.VM().List(ctx, []sq.Sqlizer{store.ByFilter("powerstate in ['poweredOn', 'poweredOff']")})
 
 				// Assert
 				Expect(err).NotTo(HaveOccurred())
@@ -182,7 +182,7 @@ var _ = Describe("VMStore", func() {
 			// Then it should return only VMs with at least 2 issues
 			It("should filter VMs with at least N issues", func() {
 				// Act
-				vms, err := s.VM().List(ctx, []sq.Sqlizer{store.ByIssues(2)})
+				vms, err := s.VM().List(ctx, []sq.Sqlizer{store.ByFilter("issues_count >= 2")})
 
 				// Assert
 				Expect(err).NotTo(HaveOccurred())
@@ -196,7 +196,7 @@ var _ = Describe("VMStore", func() {
 			// Then it should return VMs with at least 1 issue
 			It("should filter VMs with at least 1 issue", func() {
 				// Act
-				vms, err := s.VM().List(ctx, []sq.Sqlizer{store.ByIssues(1)})
+				vms, err := s.VM().List(ctx, []sq.Sqlizer{store.ByFilter("issues_count >= 1")})
 
 				// Assert
 				Expect(err).NotTo(HaveOccurred())
@@ -210,7 +210,7 @@ var _ = Describe("VMStore", func() {
 			// Then it should return only VMs within that range
 			It("should filter by disk size range", func() {
 				// Act
-				vms, err := s.VM().List(ctx, []sq.Sqlizer{store.ByDiskSizeRange(100, 200)})
+				vms, err := s.VM().List(ctx, []sq.Sqlizer{store.ByFilter("total_disk_capacity >= 100 and total_disk_capacity < 200")})
 
 				// Assert
 				Expect(err).NotTo(HaveOccurred())
@@ -226,7 +226,7 @@ var _ = Describe("VMStore", func() {
 			// Then it should return empty result
 			It("should return empty when no VMs in range", func() {
 				// Act
-				vms, err := s.VM().List(ctx, []sq.Sqlizer{store.ByDiskSizeRange(1000, 2000)})
+				vms, err := s.VM().List(ctx, []sq.Sqlizer{store.ByFilter("total_disk_capacity >= 1000 and total_disk_capacity < 2000")})
 
 				// Assert
 				Expect(err).NotTo(HaveOccurred())
@@ -240,7 +240,7 @@ var _ = Describe("VMStore", func() {
 			// Then it should return only VMs within that range
 			It("should filter by memory size range", func() {
 				// Act
-				vms, err := s.VM().List(ctx, []sq.Sqlizer{store.ByMemorySizeRange(8000, 20000)})
+				vms, err := s.VM().List(ctx, []sq.Sqlizer{store.ByFilter("memory >= 8000 and memory < 20000")})
 
 				// Assert
 				Expect(err).NotTo(HaveOccurred())
@@ -336,8 +336,7 @@ var _ = Describe("VMStore", func() {
 			It("should combine cluster and status filters (AND)", func() {
 				// Act
 				vms, err := s.VM().List(ctx, []sq.Sqlizer{
-					store.ByClusters("cluster-a"),
-					store.ByStatus("poweredOn"),
+					store.ByFilter("cluster = 'cluster-a' and powerstate = 'poweredOn'"),
 				})
 
 				// Assert
@@ -355,8 +354,7 @@ var _ = Describe("VMStore", func() {
 			It("should combine cluster and memory range filters", func() {
 				// Act
 				vms, err := s.VM().List(ctx, []sq.Sqlizer{
-					store.ByClusters("cluster-a"),
-					store.ByMemorySizeRange(4000, 10000),
+					store.ByFilter("cluster = 'cluster-a' and memory >= 4000 and memory < 10000"),
 				})
 
 				// Assert
@@ -370,7 +368,7 @@ var _ = Describe("VMStore", func() {
 			It("should combine multiple filters with pagination", func() {
 				// Act
 				vms, err := s.VM().List(ctx,
-					[]sq.Sqlizer{store.ByStatus("poweredOn")},
+					[]sq.Sqlizer{store.ByFilter("powerstate = 'poweredOn'")},
 					store.WithLimit(1),
 					store.WithOffset(1),
 				)
@@ -526,7 +524,7 @@ var _ = Describe("VMStore", func() {
 		// Then it should return only the count of matching VMs
 		It("should count VMs with filter", func() {
 			// Act
-			count, err := s.VM().Count(ctx, store.ByStatus("poweredOn"))
+			count, err := s.VM().Count(ctx, store.ByFilter("powerstate = 'poweredOn'"))
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())

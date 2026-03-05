@@ -234,49 +234,6 @@ type SortParam struct {
 	Desc  bool
 }
 
-// ByClusters filters by cluster names (OR logic).
-func ByClusters(clusters ...string) sq.Sqlizer {
-	if len(clusters) == 0 {
-		return nil
-	}
-	return sq.Eq{`v."Cluster"`: clusters}
-}
-
-// ByStatus filters by power state (OR logic).
-func ByStatus(statuses ...string) sq.Sqlizer {
-	if len(statuses) == 0 {
-		return nil
-	}
-	return sq.Eq{`v."Powerstate"`: statuses}
-}
-
-// ByIssues filters VMs with at least minIssues concerns.
-func ByIssues(minIssues int) sq.Sqlizer {
-	if minIssues <= 0 {
-		return nil
-	}
-	return sq.Expr(
-		`v."VM ID" IN (SELECT "VM_ID" FROM concerns GROUP BY "VM_ID" HAVING COUNT(*) >= ?)`,
-		minIssues,
-	)
-}
-
-// ByDiskSizeRange filters by total disk size in MiB [min, max).
-func ByDiskSizeRange(min, max int64) sq.Sqlizer {
-	return sq.Expr(
-		`v."VM ID" IN (SELECT "VM ID" FROM vdisk GROUP BY "VM ID" HAVING SUM("Capacity MiB") >= ? AND SUM("Capacity MiB") < ?)`,
-		min, max,
-	)
-}
-
-// ByMemorySizeRange filters by memory in MiB [min, max].
-func ByMemorySizeRange(min, max int64) sq.Sqlizer {
-	return sq.And{
-		sq.GtOrEq{`v."Memory"`: min},
-		sq.LtOrEq{`v."Memory"`: max},
-	}
-}
-
 // ByFilter applies a raw filter DSL expression.
 // Returns nil if the expression is empty or fails to parse.
 func ByFilter(expr string) sq.Sqlizer {
