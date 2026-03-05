@@ -33,18 +33,6 @@ const (
 // GetVMs returns the list of VMs with filtering and pagination
 // (GET /vms)
 func (h *Handler) GetVMs(c *gin.Context, params v1.GetVMsParams) {
-	// Validate disk size range
-	if params.DiskSizeMin != nil && params.DiskSizeMax != nil && *params.DiskSizeMin > *params.DiskSizeMax {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "diskSizeMin cannot be greater than diskSizeMax"})
-		return
-	}
-
-	// Validate memory size range
-	if params.MemorySizeMin != nil && params.MemorySizeMax != nil && *params.MemorySizeMin > *params.MemorySizeMax {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "memorySizeMin cannot be greater than memorySizeMax"})
-		return
-	}
-
 	// Parse pagination
 	page := 1
 	if params.Page != nil && *params.Page > 0 {
@@ -68,28 +56,6 @@ func (h *Handler) GetVMs(c *gin.Context, params v1.GetVMsParams) {
 			return
 		}
 		svcParams.Expression = *params.ByExpression
-	}
-
-	if params.Clusters != nil {
-		svcParams.Clusters = *params.Clusters
-	}
-	if params.Status != nil {
-		svcParams.Statuses = *params.Status
-	}
-	if params.MinIssues != nil {
-		svcParams.MinIssues = *params.MinIssues
-	}
-	if params.DiskSizeMin != nil {
-		svcParams.DiskSizeMin = params.DiskSizeMin
-	}
-	if params.DiskSizeMax != nil {
-		svcParams.DiskSizeMax = params.DiskSizeMax
-	}
-	if params.MemorySizeMin != nil {
-		svcParams.MemorySizeMin = params.MemorySizeMin
-	}
-	if params.MemorySizeMax != nil {
-		svcParams.MemorySizeMax = params.MemorySizeMax
 	}
 
 	// Parse and validate sort params

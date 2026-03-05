@@ -454,27 +454,6 @@ type GetInventoryParams struct {
 
 // GetVMsParams defines parameters for GetVMs.
 type GetVMsParams struct {
-	// MinIssues Filter VMs with at least this many issues
-	MinIssues *int `form:"minIssues,omitempty" json:"minIssues,omitempty"`
-
-	// Clusters Filter by clusters (OR logic - matches VMs in any of the specified clusters)
-	Clusters *[]string `form:"clusters,omitempty" json:"clusters,omitempty"`
-
-	// DiskSizeMin Minimum disk size in MB
-	DiskSizeMin *int64 `form:"diskSizeMin,omitempty" json:"diskSizeMin,omitempty"`
-
-	// DiskSizeMax Maximum disk size in MB
-	DiskSizeMax *int64 `form:"diskSizeMax,omitempty" json:"diskSizeMax,omitempty"`
-
-	// MemorySizeMin Minimum memory size in MB
-	MemorySizeMin *int64 `form:"memorySizeMin,omitempty" json:"memorySizeMin,omitempty"`
-
-	// MemorySizeMax Maximum memory size in MB
-	MemorySizeMax *int64 `form:"memorySizeMax,omitempty" json:"memorySizeMax,omitempty"`
-
-	// Status Filter by status (OR logic - matches VMs with any of the specified statuses)
-	Status *[]string `form:"status,omitempty" json:"status,omitempty"`
-
 	// ByExpression Filter by expression (matches VMs with the provided expression)
 	ByExpression *string `form:"byExpression,omitempty" json:"byExpression,omitempty"`
 

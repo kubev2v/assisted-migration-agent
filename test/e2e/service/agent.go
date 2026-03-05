@@ -239,16 +239,10 @@ func (a *AgentSvc) Inventory() (*v1alpha1.UpdateInventory, error) {
 
 // VMListParams holds parameters for listing VMs with filters
 type VMListParams struct {
-	MinIssues     *int
-	Clusters      []string
-	Status        []string
-	DiskSizeMin   *int64
-	DiskSizeMax   *int64
-	MemorySizeMin *int64
-	MemorySizeMax *int64
-	Sort          []string
-	Page          *int
-	PageSize      *int
+	ByExpression *string
+	Sort         []string
+	Page         *int
+	PageSize     *int
 }
 
 // ListVMs retrieves a list of VMs with optional filters
@@ -260,20 +254,8 @@ func (a *AgentSvc) ListVMs(params *VMListParams) (*v1.VirtualMachineListResponse
 
 	agentReq := NewAgentRequest(req)
 	if params != nil {
-		if params.MinIssues != nil {
-			agentReq.withQueryParam("minIssues", strconv.Itoa(*params.MinIssues))
-		}
-		if params.DiskSizeMin != nil {
-			agentReq.withQueryParam("diskSizeMin", strconv.FormatInt(*params.DiskSizeMin, 10))
-		}
-		if params.DiskSizeMax != nil {
-			agentReq.withQueryParam("diskSizeMax", strconv.FormatInt(*params.DiskSizeMax, 10))
-		}
-		if params.MemorySizeMin != nil {
-			agentReq.withQueryParam("memorySizeMin", strconv.FormatInt(*params.MemorySizeMin, 10))
-		}
-		if params.MemorySizeMax != nil {
-			agentReq.withQueryParam("memorySizeMax", strconv.FormatInt(*params.MemorySizeMax, 10))
+		if params.ByExpression != nil {
+			agentReq.withQueryParam("byExpression", *params.ByExpression)
 		}
 		if params.Page != nil {
 			agentReq.withQueryParam("page", strconv.Itoa(*params.Page))
@@ -281,9 +263,7 @@ func (a *AgentSvc) ListVMs(params *VMListParams) (*v1.VirtualMachineListResponse
 		if params.PageSize != nil {
 			agentReq.withQueryParam("pageSize", strconv.Itoa(*params.PageSize))
 		}
-		agentReq.withQueryParamSlice("clusters", params.Clusters).
-			withQueryParamSlice("status", params.Status).
-			withQueryParamSlice("sort", params.Sort)
+		agentReq.withQueryParamSlice("sort", params.Sort)
 	}
 
 	resp, err := a.request(agentReq)

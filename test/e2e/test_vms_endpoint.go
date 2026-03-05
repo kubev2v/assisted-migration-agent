@@ -144,21 +144,21 @@ var _ = Describe("VM endpoint e2e tests", Ordered, func() {
 	})
 
 	// -----------------------------------------------------------------
-	// Memory filters
+	// Memory filters (using byExpression)
 	// -----------------------------------------------------------------
 	Context("memory filters", func() {
 		// Given 50 VMs distributed across 6 memory tiers (4/8/16/32/64/128 GB)
 		// When filtering by minimum memory of 32 GB (32768 MB)
 		// Then only VMs with 32/64/128 GB memory should be returned (24 VMs)
-		It("should filter by memory minimum", func() {
+		It("should filter by memory minimum using byExpression", func() {
 			// Arrange
-			minMemory := int64(32768)
+			expr := "memory >= 32768"
 
 			// Act
 			pageSize := 100
 			result, err := agentSvc.ListVMs(&service.VMListParams{
-				MemorySizeMin: &minMemory,
-				PageSize:      &pageSize,
+				ByExpression: &expr,
+				PageSize:     &pageSize,
 			})
 
 			// Assert
@@ -166,49 +166,47 @@ var _ = Describe("VM endpoint e2e tests", Ordered, func() {
 			GinkgoWriter.Printf("VMs with >= 32GB memory: %d\n", result.Total)
 			Expect(result.Total).To(Equal(24), "expected 24 VMs with >= 32GB (8+8+8)")
 			for _, vm := range result.Vms {
-				Expect(vm.Memory).To(BeNumerically(">=", minMemory),
-					fmt.Sprintf("VM %s has memory %d MB, expected >= %d", vm.Name, vm.Memory, minMemory))
+				Expect(vm.Memory).To(BeNumerically(">=", 32768),
+					fmt.Sprintf("VM %s has memory %d MB, expected >= 32768", vm.Name, vm.Memory))
 			}
 		})
 
 		// Given 50 VMs distributed across 6 memory tiers
 		// When filtering by maximum memory of 16384 MB (inclusive upper bound)
 		// Then VMs with 4 GB, 8 GB, and 16 GB memory should be returned (26 VMs)
-		It("should filter by memory maximum", func() {
+		It("should filter by memory maximum using byExpression", func() {
 			// Arrange
-			maxMemory := int64(16384)
+			expr := "memory <= 16384"
 
 			// Act
 			pageSize := 100
 			result, err := agentSvc.ListVMs(&service.VMListParams{
-				MemorySizeMax: &maxMemory,
-				PageSize:      &pageSize,
+				ByExpression: &expr,
+				PageSize:     &pageSize,
 			})
 
 			// Assert
 			Expect(err).ToNot(HaveOccurred())
-			GinkgoWriter.Printf("VMs with memory <= %d MB: %d\n", maxMemory, result.Total)
+			GinkgoWriter.Printf("VMs with memory <= 16384 MB: %d\n", result.Total)
 			Expect(result.Total).To(Equal(26), "expected 26 VMs with <= 16384 MB (9+9+8)")
 			for _, vm := range result.Vms {
-				Expect(vm.Memory).To(BeNumerically("<=", maxMemory),
-					fmt.Sprintf("VM %s has memory %d MB, expected <= %d", vm.Name, vm.Memory, maxMemory))
+				Expect(vm.Memory).To(BeNumerically("<=", 16384),
+					fmt.Sprintf("VM %s has memory %d MB, expected <= 16384", vm.Name, vm.Memory))
 			}
 		})
 
 		// Given 50 VMs distributed across 6 memory tiers
 		// When filtering by memory range [8192, 8192] to select exactly the 8 GB tier
 		// Then only the 9 VMs with exactly 8192 MB should be returned
-		It("should filter by exact memory tier", func() {
+		It("should filter by exact memory tier using byExpression", func() {
 			// Arrange
-			minMemory := int64(8192)
-			maxMemory := int64(8192)
+			expr := "memory = 8192"
 
 			// Act
 			pageSize := 100
 			result, err := agentSvc.ListVMs(&service.VMListParams{
-				MemorySizeMin: &minMemory,
-				MemorySizeMax: &maxMemory,
-				PageSize:      &pageSize,
+				ByExpression: &expr,
+				PageSize:     &pageSize,
 			})
 
 			// Assert
@@ -224,17 +222,15 @@ var _ = Describe("VM endpoint e2e tests", Ordered, func() {
 		// Given 50 VMs distributed across 6 memory tiers
 		// When filtering by memory range [16384, 65536] to capture 16/32/64 GB tiers
 		// Then 24 VMs should be returned (8+8+8)
-		It("should filter by memory range spanning multiple tiers", func() {
+		It("should filter by memory range spanning multiple tiers using byExpression", func() {
 			// Arrange
-			minMemory := int64(16384)
-			maxMemory := int64(65536)
+			expr := "memory >= 16384 and memory <= 65536"
 
 			// Act
 			pageSize := 100
 			result, err := agentSvc.ListVMs(&service.VMListParams{
-				MemorySizeMin: &minMemory,
-				MemorySizeMax: &maxMemory,
-				PageSize:      &pageSize,
+				ByExpression: &expr,
+				PageSize:     &pageSize,
 			})
 
 			// Assert
@@ -242,28 +238,28 @@ var _ = Describe("VM endpoint e2e tests", Ordered, func() {
 			GinkgoWriter.Printf("VMs with 16-64GB memory: %d\n", result.Total)
 			Expect(result.Total).To(Equal(24), "expected 24 VMs with 16/32/64 GB (8+8+8)")
 			for _, vm := range result.Vms {
-				Expect(vm.Memory).To(BeNumerically(">=", minMemory))
-				Expect(vm.Memory).To(BeNumerically("<=", maxMemory))
+				Expect(vm.Memory).To(BeNumerically(">=", 16384))
+				Expect(vm.Memory).To(BeNumerically("<=", 65536))
 			}
 		})
 	})
 
 	// -----------------------------------------------------------------
-	// Disk filters
+	// Disk filters (using byExpression)
 	// -----------------------------------------------------------------
 	Context("disk filters", func() {
 		// Given 50 VMs with varied disk totals (1-3 disks, 100-825+ GB total)
 		// When filtering by minimum disk size of 500 GB (512000 MB)
 		// Then only VMs with large total disk should be returned
-		It("should filter by disk minimum", func() {
+		It("should filter by disk minimum using byExpression", func() {
 			// Arrange
-			minDisk := int64(512000)
+			expr := "disk.capacity >= 512000Mb"
 
 			// Act
 			pageSize := 100
 			result, err := agentSvc.ListVMs(&service.VMListParams{
-				DiskSizeMin: &minDisk,
-				PageSize:    &pageSize,
+				ByExpression: &expr,
+				PageSize:     &pageSize,
 			})
 
 			// Assert
@@ -271,23 +267,23 @@ var _ = Describe("VM endpoint e2e tests", Ordered, func() {
 			GinkgoWriter.Printf("VMs with >= 500GB disk: %d\n", result.Total)
 			Expect(result.Total).To(BeNumerically(">=", 10), "expected at least 10 VMs with >= 500GB total disk")
 			for _, vm := range result.Vms {
-				Expect(vm.DiskSize).To(BeNumerically(">=", minDisk),
-					fmt.Sprintf("VM %s has disk %d MB, expected >= %d", vm.Name, vm.DiskSize, minDisk))
+				Expect(vm.DiskSize).To(BeNumerically(">=", 512000),
+					fmt.Sprintf("VM %s has disk %d MB, expected >= 512000", vm.Name, vm.DiskSize))
 			}
 		})
 
 		// Given 50 VMs with varied disk totals
 		// When filtering by maximum disk size of 200 GB (204800 MB, exclusive)
 		// Then only VMs with small total disk should be returned
-		It("should filter by disk maximum", func() {
+		It("should filter by disk maximum using byExpression", func() {
 			// Arrange
-			maxDisk := int64(204800)
+			expr := "disk.capacity < 204800Mb"
 
 			// Act
 			pageSize := 100
 			result, err := agentSvc.ListVMs(&service.VMListParams{
-				DiskSizeMax: &maxDisk,
-				PageSize:    &pageSize,
+				ByExpression: &expr,
+				PageSize:     &pageSize,
 			})
 
 			// Assert
@@ -295,25 +291,23 @@ var _ = Describe("VM endpoint e2e tests", Ordered, func() {
 			GinkgoWriter.Printf("VMs with disk < 200GB: %d\n", result.Total)
 			Expect(result.Total).To(BeNumerically(">=", 5), "expected at least 5 VMs with < 200GB disk")
 			for _, vm := range result.Vms {
-				Expect(vm.DiskSize).To(BeNumerically("<", maxDisk),
-					fmt.Sprintf("VM %s has disk %d MB, expected < %d", vm.Name, vm.DiskSize, maxDisk))
+				Expect(vm.DiskSize).To(BeNumerically("<", 204800),
+					fmt.Sprintf("VM %s has disk %d MB, expected < 204800", vm.Name, vm.DiskSize))
 			}
 		})
 
 		// Given 50 VMs with varied disk totals
 		// When filtering by disk size range [200 GB, 500 GB)
 		// Then only VMs within that band should be returned
-		It("should filter by disk range", func() {
+		It("should filter by disk range using byExpression", func() {
 			// Arrange
-			minDisk := int64(204800)
-			maxDisk := int64(512001)
+			expr := "disk.capacity >= 204800Mb and disk.capacity < 512001Mb"
 
 			// Act
 			pageSize := 100
 			result, err := agentSvc.ListVMs(&service.VMListParams{
-				DiskSizeMin: &minDisk,
-				DiskSizeMax: &maxDisk,
-				PageSize:    &pageSize,
+				ByExpression: &expr,
+				PageSize:     &pageSize,
 			})
 
 			// Assert
@@ -321,31 +315,131 @@ var _ = Describe("VM endpoint e2e tests", Ordered, func() {
 			GinkgoWriter.Printf("VMs with 200-500GB disk: %d\n", result.Total)
 			Expect(result.Total).To(BeNumerically(">=", 5))
 			for _, vm := range result.Vms {
-				Expect(vm.DiskSize).To(BeNumerically(">=", minDisk))
-				Expect(vm.DiskSize).To(BeNumerically("<", maxDisk))
+				Expect(vm.DiskSize).To(BeNumerically(">=", 204800))
+				Expect(vm.DiskSize).To(BeNumerically("<", 512001))
 			}
 		})
 	})
 
 	// -----------------------------------------------------------------
-	// Cluster and status filters
+	// Issues count filters (using byExpression)
+	// -----------------------------------------------------------------
+	Context("issues count filters", func() {
+		// Given VMs with varying numbers of issues/concerns
+		// When filtering by minimum issues count
+		// Then only VMs with at least that many issues should be returned
+		It("should filter by minimum issues count using byExpression", func() {
+			// Arrange
+			expr := "issues_count >= 1"
+
+			// Act
+			pageSize := 100
+			result, err := agentSvc.ListVMs(&service.VMListParams{
+				ByExpression: &expr,
+				PageSize:     &pageSize,
+			})
+
+			// Assert
+			Expect(err).ToNot(HaveOccurred())
+			GinkgoWriter.Printf("VMs with >= 1 issues: %d\n", result.Total)
+			for _, vm := range result.Vms {
+				Expect(vm.IssueCount).To(BeNumerically(">=", 1),
+					fmt.Sprintf("VM %s has %d issues, expected >= 1", vm.Name, vm.IssueCount))
+			}
+		})
+
+		// Given VMs with varying numbers of issues/concerns
+		// When filtering by issues count greater than a threshold
+		// Then only VMs exceeding that threshold should be returned
+		It("should filter by issues count greater than threshold using byExpression", func() {
+			// Arrange
+			expr := "issues_count > 2"
+
+			// Act
+			pageSize := 100
+			result, err := agentSvc.ListVMs(&service.VMListParams{
+				ByExpression: &expr,
+				PageSize:     &pageSize,
+			})
+
+			// Assert
+			Expect(err).ToNot(HaveOccurred())
+			GinkgoWriter.Printf("VMs with > 2 issues: %d\n", result.Total)
+			for _, vm := range result.Vms {
+				Expect(vm.IssueCount).To(BeNumerically(">", 2),
+					fmt.Sprintf("VM %s has %d issues, expected > 2", vm.Name, vm.IssueCount))
+			}
+		})
+
+		// Given VMs with varying numbers of issues/concerns
+		// When filtering by exact issues count
+		// Then only VMs with exactly that count should be returned
+		It("should filter by exact issues count using byExpression", func() {
+			// Arrange
+			expr := "issues_count = 0"
+
+			// Act
+			pageSize := 100
+			result, err := agentSvc.ListVMs(&service.VMListParams{
+				ByExpression: &expr,
+				PageSize:     &pageSize,
+			})
+
+			// Assert
+			Expect(err).ToNot(HaveOccurred())
+			GinkgoWriter.Printf("VMs with exactly 0 issues: %d\n", result.Total)
+			for _, vm := range result.Vms {
+				Expect(vm.IssueCount).To(Equal(0),
+					fmt.Sprintf("VM %s has %d issues, expected exactly 0", vm.Name, vm.IssueCount))
+			}
+		})
+
+		// Given VMs with varying numbers of issues/concerns
+		// When combining issues count filter with other filters
+		// Then all filters should be applied together
+		It("should combine issues count with memory filter using byExpression", func() {
+			// Arrange
+			expr := "issues_count >= 1 and memory >= 8192"
+
+			// Act
+			pageSize := 100
+			result, err := agentSvc.ListVMs(&service.VMListParams{
+				ByExpression: &expr,
+				PageSize:     &pageSize,
+			})
+
+			// Assert
+			Expect(err).ToNot(HaveOccurred())
+			GinkgoWriter.Printf("VMs with >= 1 issues AND >= 8GB memory: %d\n", result.Total)
+			for _, vm := range result.Vms {
+				Expect(vm.IssueCount).To(BeNumerically(">=", 1),
+					fmt.Sprintf("VM %s has %d issues, expected >= 1", vm.Name, vm.IssueCount))
+				Expect(vm.Memory).To(BeNumerically(">=", 8192),
+					fmt.Sprintf("VM %s has %d MB memory, expected >= 8192", vm.Name, vm.Memory))
+			}
+		})
+	})
+
+	// -----------------------------------------------------------------
+	// Cluster and status filters (using byExpression)
 	// -----------------------------------------------------------------
 	Context("cluster and status filters", func() {
 		// Given 50 VMs split across 2 clusters (25 each: DC0_H0 and DC0_C0)
 		// When filtering by the cluster of the first VM
 		// Then only the 25 VMs in that cluster should be returned
-		It("should filter by cluster", func() {
+		It("should filter by cluster using byExpression", func() {
 			// Arrange
 			all := listAllVMs()
 			Expect(len(all.Vms)).To(BeNumerically(">", 0))
 			clusterName := all.Vms[0].Cluster
 			GinkgoWriter.Printf("Filtering by cluster: %s\n", clusterName)
+			expr := fmt.Sprintf("cluster = '%s'", clusterName)
 
 			// Act
 			pageSize := 100
 			result, err := agentSvc.ListVMs(&service.VMListParams{
-				Clusters: []string{clusterName},
-				PageSize: &pageSize,
+				ByExpression: &expr,
+				PageSize:     &pageSize,
 			})
 
 			// Assert
@@ -359,12 +453,15 @@ var _ = Describe("VM endpoint e2e tests", Ordered, func() {
 		// Given 50 VMs all in poweredOn state
 		// When filtering by status "poweredOn"
 		// Then all 50 VMs should be returned
-		It("should filter by status poweredOn", func() {
+		It("should filter by status poweredOn using byExpression", func() {
+			// Arrange
+			expr := "powerstate = 'poweredOn'"
+
 			// Act
 			pageSize := 100
 			result, err := agentSvc.ListVMs(&service.VMListParams{
-				Status:   []string{"poweredOn"},
-				PageSize: &pageSize,
+				ByExpression: &expr,
+				PageSize:     &pageSize,
 			})
 
 			// Assert
@@ -379,12 +476,15 @@ var _ = Describe("VM endpoint e2e tests", Ordered, func() {
 		// Given 50 VMs all in poweredOn state
 		// When filtering by status "poweredOff"
 		// Then no VMs should be returned
-		It("should return empty for non-matching status", func() {
+		It("should return empty for non-matching status using byExpression", func() {
+			// Arrange
+			expr := "powerstate = 'poweredOff'"
+
 			// Act
 			pageSize := 100
 			result, err := agentSvc.ListVMs(&service.VMListParams{
-				Status:   []string{"poweredOff"},
-				PageSize: &pageSize,
+				ByExpression: &expr,
+				PageSize:     &pageSize,
 			})
 
 			// Assert
@@ -395,23 +495,21 @@ var _ = Describe("VM endpoint e2e tests", Ordered, func() {
 	})
 
 	// -----------------------------------------------------------------
-	// Combined filters
+	// Combined filters (using byExpression)
 	// -----------------------------------------------------------------
 	Context("combined filters", func() {
 		// Given 50 VMs with varied memory and disk
 		// When filtering by both memory min (32 GB) and disk min (300 GB)
 		// Then only VMs satisfying both criteria should be returned
-		It("should combine memory min and disk min", func() {
+		It("should combine memory min and disk min using byExpression", func() {
 			// Arrange
-			minMemory := int64(32768)
-			minDisk := int64(307200)
+			expr := "memory >= 32768 and disk.capacity >= 307200Mb"
 
 			// Act
 			pageSize := 100
 			result, err := agentSvc.ListVMs(&service.VMListParams{
-				MemorySizeMin: &minMemory,
-				DiskSizeMin:   &minDisk,
-				PageSize:      &pageSize,
+				ByExpression: &expr,
+				PageSize:     &pageSize,
 			})
 
 			// Assert
@@ -419,31 +517,25 @@ var _ = Describe("VM endpoint e2e tests", Ordered, func() {
 			GinkgoWriter.Printf("VMs with >= 32GB memory AND >= 300GB disk: %d\n", result.Total)
 			Expect(result.Total).To(BeNumerically(">=", 5))
 			for _, vm := range result.Vms {
-				Expect(vm.Memory).To(BeNumerically(">=", minMemory),
-					fmt.Sprintf("VM %s memory %d < %d", vm.Name, vm.Memory, minMemory))
-				Expect(vm.DiskSize).To(BeNumerically(">=", minDisk),
-					fmt.Sprintf("VM %s disk %d < %d", vm.Name, vm.DiskSize, minDisk))
+				Expect(vm.Memory).To(BeNumerically(">=", 32768),
+					fmt.Sprintf("VM %s memory %d < 32768", vm.Name, vm.Memory))
+				Expect(vm.DiskSize).To(BeNumerically(">=", 307200),
+					fmt.Sprintf("VM %s disk %d < 307200", vm.Name, vm.DiskSize))
 			}
 		})
 
 		// Given 50 VMs with varied memory and disk
 		// When filtering by memory range and disk range simultaneously
 		// Then only VMs in the intersection should be returned
-		It("should combine memory range and disk range", func() {
+		It("should combine memory range and disk range using byExpression", func() {
 			// Arrange
-			minMemory := int64(8192)
-			maxMemory := int64(32768)
-			minDisk := int64(204800)
-			maxDisk := int64(614400)
+			expr := "memory >= 8192 and memory <= 32768 and disk.capacity >= 204800Mb and disk.capacity <= 614400Mb"
 
 			// Act
 			pageSize := 100
 			result, err := agentSvc.ListVMs(&service.VMListParams{
-				MemorySizeMin: &minMemory,
-				MemorySizeMax: &maxMemory,
-				DiskSizeMin:   &minDisk,
-				DiskSizeMax:   &maxDisk,
-				PageSize:      &pageSize,
+				ByExpression: &expr,
+				PageSize:     &pageSize,
 			})
 
 			// Assert
@@ -451,26 +543,26 @@ var _ = Describe("VM endpoint e2e tests", Ordered, func() {
 			GinkgoWriter.Printf("VMs with 8-32GB memory AND 200-600GB disk: %d\n", result.Total)
 			Expect(result.Total).To(BeNumerically(">=", 1), "expected at least 1 VM in the intersection")
 			for _, vm := range result.Vms {
-				Expect(vm.Memory).To(BeNumerically(">=", minMemory))
-				Expect(vm.Memory).To(BeNumerically("<=", maxMemory))
-				Expect(vm.DiskSize).To(BeNumerically(">=", minDisk))
-				Expect(vm.DiskSize).To(BeNumerically("<=", maxDisk))
+				Expect(vm.Memory).To(BeNumerically(">=", 8192))
+				Expect(vm.Memory).To(BeNumerically("<=", 32768))
+				Expect(vm.DiskSize).To(BeNumerically(">=", 204800))
+				Expect(vm.DiskSize).To(BeNumerically("<=", 614400))
 			}
 		})
 
 		// Given 50 VMs with varied memory and disk
 		// When filtering by memory min, sorting by disk descending
 		// Then results should satisfy the filter AND be in descending disk order
-		It("should combine memory filter with disk sort", func() {
+		It("should combine memory filter with disk sort using byExpression", func() {
 			// Arrange
-			minMemory := int64(8192)
+			expr := "memory >= 8192"
 
 			// Act
 			pageSize := 100
 			result, err := agentSvc.ListVMs(&service.VMListParams{
-				MemorySizeMin: &minMemory,
-				Sort:          []string{"diskSize:desc"},
-				PageSize:      &pageSize,
+				ByExpression: &expr,
+				Sort:         []string{"diskSize:desc"},
+				PageSize:     &pageSize,
 			})
 
 			// Assert
@@ -478,7 +570,7 @@ var _ = Describe("VM endpoint e2e tests", Ordered, func() {
 			GinkgoWriter.Printf("Filtered VMs (memory >= 8GB) sorted by disk desc: %d\n", result.Total)
 			Expect(result.Total).To(Equal(41), "expected 41 VMs with >= 8GB memory")
 			for _, vm := range result.Vms {
-				Expect(vm.Memory).To(BeNumerically(">=", minMemory))
+				Expect(vm.Memory).To(BeNumerically(">=", 8192))
 			}
 			for i := 1; i < len(result.Vms); i++ {
 				Expect(result.Vms[i-1].DiskSize).To(BeNumerically(">=", result.Vms[i].DiskSize),
@@ -489,20 +581,18 @@ var _ = Describe("VM endpoint e2e tests", Ordered, func() {
 		// Given 50 VMs with varied memory and disk
 		// When combining memory filter, disk filter, sort, and pagination
 		// Then the page should contain correctly filtered, sorted results with accurate totals
-		It("should combine memory filter, disk filter, sort, and pagination", func() {
+		It("should combine byExpression filter, sort, and pagination", func() {
 			// Arrange
-			minMemory := int64(8192)
-			minDisk := int64(204800)
+			expr := "memory >= 8192 and disk.capacity >= 204800Mb"
 			page := 1
 			pageSize := 5
 
 			// Act
 			result, err := agentSvc.ListVMs(&service.VMListParams{
-				MemorySizeMin: &minMemory,
-				DiskSizeMin:   &minDisk,
-				Sort:          []string{"memory:desc"},
-				Page:          &page,
-				PageSize:      &pageSize,
+				ByExpression: &expr,
+				Sort:         []string{"memory:desc"},
+				Page:         &page,
+				PageSize:     &pageSize,
 			})
 
 			// Assert
@@ -514,8 +604,8 @@ var _ = Describe("VM endpoint e2e tests", Ordered, func() {
 			Expect(result.Total).To(BeNumerically(">=", pageSize), "total should exceed page size")
 			Expect(result.PageCount).To(Equal((result.Total + pageSize - 1) / pageSize))
 			for _, vm := range result.Vms {
-				Expect(vm.Memory).To(BeNumerically(">=", minMemory))
-				Expect(vm.DiskSize).To(BeNumerically(">=", minDisk))
+				Expect(vm.Memory).To(BeNumerically(">=", 8192))
+				Expect(vm.DiskSize).To(BeNumerically(">=", 204800))
 			}
 			for i := 1; i < len(result.Vms); i++ {
 				Expect(result.Vms[i-1].Memory).To(BeNumerically(">=", result.Vms[i].Memory),
@@ -526,21 +616,17 @@ var _ = Describe("VM endpoint e2e tests", Ordered, func() {
 		// Given 50 VMs
 		// When filtering by memory, disk, cluster, and status simultaneously
 		// Then all four filters should be applied as an AND
-		It("should apply all filter dimensions together", func() {
+		It("should apply all filter dimensions together using byExpression", func() {
 			// Arrange
 			all := listAllVMs()
 			clusterName := all.Vms[0].Cluster
-			minMemory := int64(16384)
-			minDisk := int64(102400)
+			expr := fmt.Sprintf("memory >= 16384 and disk.capacity >= 102400Mb and powerstate = 'poweredOn' and cluster = '%s'", clusterName)
 
 			// Act
 			pageSize := 100
 			result, err := agentSvc.ListVMs(&service.VMListParams{
-				MemorySizeMin: &minMemory,
-				DiskSizeMin:   &minDisk,
-				Status:        []string{"poweredOn"},
-				Clusters:      []string{clusterName},
-				PageSize:      &pageSize,
+				ByExpression: &expr,
+				PageSize:     &pageSize,
 			})
 
 			// Assert
@@ -548,8 +634,8 @@ var _ = Describe("VM endpoint e2e tests", Ordered, func() {
 			GinkgoWriter.Printf("All dimensions combined: %d VMs\n", result.Total)
 			Expect(result.Total).To(BeNumerically(">=", 10))
 			for _, vm := range result.Vms {
-				Expect(vm.Memory).To(BeNumerically(">=", minMemory))
-				Expect(vm.DiskSize).To(BeNumerically(">=", minDisk))
+				Expect(vm.Memory).To(BeNumerically(">=", 16384))
+				Expect(vm.DiskSize).To(BeNumerically(">=", 102400))
 				Expect(vm.VCenterState).To(Equal("poweredOn"))
 				Expect(vm.Cluster).To(Equal(clusterName))
 			}
@@ -754,19 +840,17 @@ var _ = Describe("VM endpoint e2e tests", Ordered, func() {
 		// Given 50 VMs with a filter that matches fewer VMs
 		// When paginating the filtered results
 		// Then pagination should reflect the filtered total, not all 50
-		It("should paginate filtered results correctly", func() {
+		It("should paginate filtered results correctly using byExpression", func() {
 			// Arrange
-			minMemory := int64(131072)
-			maxMemory := int64(131072)
+			expr := "memory = 131072"
 			page := 1
 			pageSize := 3
 
 			// Act
 			result, err := agentSvc.ListVMs(&service.VMListParams{
-				MemorySizeMin: &minMemory,
-				MemorySizeMax: &maxMemory,
-				Page:          &page,
-				PageSize:      &pageSize,
+				ByExpression: &expr,
+				Page:         &page,
+				PageSize:     &pageSize,
 			})
 
 			// Assert
@@ -786,57 +870,19 @@ var _ = Describe("VM endpoint e2e tests", Ordered, func() {
 		// Given 50 VMs with maximum memory of 128 GB
 		// When filtering by minimum memory of 200 GB
 		// Then no VMs should be returned
-		It("should return empty result for unreachable filter", func() {
+		It("should return empty result for unreachable filter using byExpression", func() {
 			// Arrange
-			minMemory := int64(204800)
+			expr := "memory >= 204800"
 
 			// Act
 			result, err := agentSvc.ListVMs(&service.VMListParams{
-				MemorySizeMin: &minMemory,
+				ByExpression: &expr,
 			})
 
 			// Assert
 			Expect(err).ToNot(HaveOccurred())
 			Expect(result.Total).To(Equal(0))
 			Expect(result.Vms).To(BeEmpty())
-		})
-
-		// Given the API validates that memorySizeMin <= memorySizeMax
-		// When sending memorySizeMin > memorySizeMax
-		// Then the API should return an error
-		It("should reject memory min greater than max", func() {
-			// Arrange
-			minMemory := int64(65536)
-			maxMemory := int64(4096)
-
-			// Act
-			_, err := agentSvc.ListVMs(&service.VMListParams{
-				MemorySizeMin: &minMemory,
-				MemorySizeMax: &maxMemory,
-			})
-
-			// Assert
-			Expect(err).To(HaveOccurred(), "expected API to reject min > max")
-			Expect(err.Error()).To(ContainSubstring("400"))
-		})
-
-		// Given the API validates that diskSizeMin <= diskSizeMax
-		// When sending diskSizeMin > diskSizeMax
-		// Then the API should return an error
-		It("should reject disk min greater than max", func() {
-			// Arrange
-			minDisk := int64(512000)
-			maxDisk := int64(102400)
-
-			// Act
-			_, err := agentSvc.ListVMs(&service.VMListParams{
-				DiskSizeMin: &minDisk,
-				DiskSizeMax: &maxDisk,
-			})
-
-			// Assert
-			Expect(err).To(HaveOccurred(), "expected API to reject min > max")
-			Expect(err.Error()).To(ContainSubstring("400"))
 		})
 	})
 })

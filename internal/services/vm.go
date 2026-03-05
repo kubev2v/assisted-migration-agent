@@ -23,17 +23,10 @@ type SortField struct {
 }
 
 type VMListParams struct {
-	Clusters      []string
-	Statuses      []string
-	Expression    string
-	MinIssues     int
-	DiskSizeMin   *int64
-	DiskSizeMax   *int64
-	MemorySizeMin *int64
-	MemorySizeMax *int64
-	Sort          []SortField
-	Limit         uint64
-	Offset        uint64
+	Expression string
+	Sort       []SortField
+	Limit      uint64
+	Offset     uint64
 }
 
 func (s *VMService) Get(ctx context.Context, id string) (*models.VM, error) {
@@ -53,14 +46,7 @@ func (s *VMService) List(ctx context.Context, params VMListParams) ([]models.Vir
 	}
 
 	countFilters, _ := s.buildListOptions(VMListParams{
-		Clusters:      params.Clusters,
-		Statuses:      params.Statuses,
-		Expression:    params.Expression,
-		MinIssues:     params.MinIssues,
-		DiskSizeMin:   params.DiskSizeMin,
-		DiskSizeMax:   params.DiskSizeMax,
-		MemorySizeMin: params.MemorySizeMin,
-		MemorySizeMax: params.MemorySizeMax,
+		Expression: params.Expression,
 	})
 	total, err := s.store.VM().Count(ctx, countFilters...)
 	if err != nil {
@@ -74,41 +60,8 @@ func (s *VMService) buildListOptions(params VMListParams) ([]sq.Sqlizer, []store
 	var filters []sq.Sqlizer
 	var opts []store.ListOption
 
-	if len(params.Clusters) > 0 {
-		filters = append(filters, store.ByClusters(params.Clusters...))
-	}
-	if len(params.Statuses) > 0 {
-		filters = append(filters, store.ByStatus(params.Statuses...))
-	}
 	if params.Expression != "" {
 		filters = append(filters, store.ByFilter(params.Expression))
-	}
-	if params.MinIssues > 0 {
-		filters = append(filters, store.ByIssues(params.MinIssues))
-	}
-
-	if params.DiskSizeMin != nil || params.DiskSizeMax != nil {
-		min := int64(0)
-		max := int64(1 << 62)
-		if params.DiskSizeMin != nil {
-			min = *params.DiskSizeMin
-		}
-		if params.DiskSizeMax != nil {
-			max = *params.DiskSizeMax
-		}
-		filters = append(filters, store.ByDiskSizeRange(min, max))
-	}
-
-	if params.MemorySizeMin != nil || params.MemorySizeMax != nil {
-		min := int64(0)
-		max := int64(1 << 62)
-		if params.MemorySizeMin != nil {
-			min = *params.MemorySizeMin
-		}
-		if params.MemorySizeMax != nil {
-			max = *params.MemorySizeMax
-		}
-		filters = append(filters, store.ByMemorySizeRange(min, max))
 	}
 
 	if len(params.Sort) > 0 {

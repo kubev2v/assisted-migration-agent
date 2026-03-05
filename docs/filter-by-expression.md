@@ -32,7 +32,7 @@ curl -G "http://localhost:8000/api/v1/vms" \
 - **Type:** string (single expression)
 - **Encoding:** Use `--data-urlencode` (or percent-encode) so spaces and quotes are safe.
 
-`byExpression` can be combined with other query parameters (`clusters`, `status`, `minIssues`, `diskSizeMin`/`diskSizeMax`, `memorySizeMin`/`memorySizeMax`, `sort`, `page`, `pageSize`). The expression filter is applied together with those filters.
+`byExpression` can be combined with other query parameters (`sort`, `page`, `pageSize`). The expression filter is the only way to filter VMs.
 
 ---
 
@@ -102,6 +102,7 @@ Identifiers are **case-insensitive**. Dotted names refer to joined tables (e.g. 
 | `total_disk_capacity` | integer | Total disk capacity (MiB)     |
 | `provisioned`    | integer | Provisioned (MiB)                   |
 | `resource_pool`  | string  | Resource pool                       |
+| `issues_count`   | integer | Number of concerns/issues for the VM |
 
 ### vdisk (disk.*) — disk attributes
 
@@ -109,7 +110,7 @@ Identifiers are **case-insensitive**. Dotted names refer to joined tables (e.g. 
 |-------------------|---------|-----------------------------|
 | `disk.key`        | integer | Disk key                    |
 | `disk.path`       | string  | Disk path                   |
-| `disk.capacity`   | integer | Capacity (MiB)              |
+| `disk.capacity`   | integer | Total disk capacity (MiB, aggregated sum of all disks) |
 | `disk.sharing`    | string  | Sharing mode                |
 | `disk.raw`        | boolean | Raw                         |
 | `disk.shared_bus` | string  | Shared bus                  |
@@ -203,6 +204,5 @@ Identifiers are **case-insensitive**. Dotted names refer to joined tables (e.g. 
 
 - **Invalid expression syntax:** API returns 400 with an error message; the filter package may return a parse error with position.
 - **Unknown field in expression:** e.g. `unknown_field = 'x'` → error like `unknown filter field: unknown_field`.
-- **Invalid range (other params):** e.g. `memorySizeMin` > `memorySizeMax` → 400 with a clear message.
 
 For more detail on the grammar and the default mapping, see package `pkg/filter` (e.g. `doc.go` and `sql.go`).
