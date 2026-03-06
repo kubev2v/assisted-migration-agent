@@ -73,6 +73,8 @@ var defaultMapFn MapFunc = func(name string) (string, error) {
 	// issues count
 	case "issues_count":
 		return `cc."issues_count"`, nil
+	case "migratable":
+		return `(COALESCE(crit.critical_count, 0) = 0)`, nil
 
 	// vdisk (dk) — disk.* prefix
 	case "disk.key":

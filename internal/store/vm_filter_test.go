@@ -156,6 +156,28 @@ var _ = Describe("VMStore cross-table filters", func() {
 		})
 	})
 
+	Context("migratable filter", func() {
+		It("should filter migratable VMs (no critical concerns)", func() {
+			f := store.ByFilter("migratable = true")
+			vms, err := s.VM().List(ctx, []sq.Sqlizer{f}, store.WithDefaultSort())
+
+			Expect(err).NotTo(HaveOccurred())
+			// vm-007 has critical concerns, so it should NOT be in the result
+			Expect(vmIDs(vms)).NotTo(ContainElement("vm-007"))
+			// All other VMs should be migratable
+			Expect(len(vms)).To(Equal(9))
+		})
+
+		It("should filter non-migratable VMs (has critical concerns)", func() {
+			f := store.ByFilter("migratable = false")
+			vms, err := s.VM().List(ctx, []sq.Sqlizer{f}, store.WithDefaultSort())
+
+			Expect(err).NotTo(HaveOccurred())
+			// Only vm-007 has critical concerns
+			Expect(vmIDs(vms)).To(Equal([]string{"vm-007"}))
+		})
+	})
+
 	Context("vcpu columns (cpu.* prefix)", func() {
 		It("should filter by cores per socket", func() {
 			f := store.ByFilter("cpu.cores_per_socket >= 4")
