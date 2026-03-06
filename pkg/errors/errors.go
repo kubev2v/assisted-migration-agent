@@ -183,3 +183,17 @@ func IsInspectorNotRunningError(err error) bool {
 	var e *InspectorNotRunningError
 	return errors.As(err, &e)
 }
+
+type InspectionCanceledError struct {
+	vmId string
+}
+
+func (i *InspectionCanceledError) Error() string {
+	return fmt.Sprintf("inspection canceled for: %s", i.vmId)
+}
+
+func NewInspectionCanceledError(vmId string) *InspectionCanceledError {
+	return &InspectionCanceledError{
+		vmId: vmId,
+	}
+}
