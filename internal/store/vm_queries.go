@@ -17,11 +17,20 @@ var vmOutputQuery = sq.Select(
 	`v."Template" as template`,
 	`COALESCE(crit.critical_count, 0) = 0 AS migratable`,
 	`COALESCE(i.error, '') AS error`,
+	`COALESCE(t.tags, [])::VARCHAR[] AS tags`,
 ).From("vinfo v").
 	LeftJoin(`(SELECT "VM_ID", COUNT(*) AS issues_count FROM concerns GROUP BY "VM_ID") c ON v."VM ID" = c."VM_ID"`).
 	LeftJoin(`(SELECT "VM_ID", COUNT(*) AS critical_count FROM concerns WHERE "Category" = 'Critical' GROUP BY "VM_ID") crit ON v."VM ID" = crit."VM_ID"`).
 	LeftJoin(`(SELECT "VM ID", SUM("Capacity MiB") AS total_disk FROM vdisk GROUP BY "VM ID") d ON v."VM ID" = d."VM ID"`).
-	LeftJoin(`vm_inspection_status i ON v."VM ID" = i."VM ID"`)
+	LeftJoin(`vm_inspection_status i ON v."VM ID" = i."VM ID"`).
+	LeftJoin(`(
+		SELECT u.vm_id, list_distinct(flatten(list(g.tags))) AS tags
+		FROM group_matches gm
+		JOIN groups g ON gm.group_id = g.id
+		, UNNEST(gm.vm_ids) AS u(vm_id)
+		WHERE len(g.tags) > 0
+		GROUP BY u.vm_id
+	) t ON v."VM ID" = t.vm_id`)
 
 // vmFilterSubquery is the base flat JOIN query for filtering.
 // It joins all tables so WHERE clauses can reference any raw column.

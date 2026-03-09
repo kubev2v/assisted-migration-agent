@@ -3,6 +3,7 @@ package v1_test
 import (
 	"errors"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -101,6 +102,32 @@ var _ = Describe("NewVirtualMachineFromSummary", func() {
 		Expect(vm.DiskSize).To(Equal(int64(102400)))
 		Expect(vm.IssueCount).To(Equal(3))
 		Expect(vm.Inspection.State).To(Equal(v1.VmInspectionStatusStateNotFound))
+	})
+
+	Context("Tags", func() {
+		It("should include tags when present", func() {
+			summary := models.VirtualMachineSummary{
+				ID:   "vm-tagged",
+				Name: "Tagged VM",
+				Tags: []string{"production", "critical"},
+			}
+
+			vm := v1.NewVirtualMachineFromSummary(summary)
+
+			Expect(vm.Tags).NotTo(BeNil())
+			Expect(*vm.Tags).To(Equal([]string{"production", "critical"}))
+		})
+
+		It("should not include tags when empty", func() {
+			summary := models.VirtualMachineSummary{
+				ID:   "vm-no-tags",
+				Name: "No Tags VM",
+			}
+
+			vm := v1.NewVirtualMachineFromSummary(summary)
+
+			Expect(vm.Tags).To(BeNil())
+		})
 	})
 
 	Context("IsMigratable", func() {
@@ -261,6 +288,119 @@ var _ = Describe("NewCollectorStatusWithError", func() {
 			nil,
 		)
 		Expect(status.Error).To(BeNil())
+	})
+})
+
+var _ = Describe("NewGroupFromModel", func() {
+	It("should convert all fields", func() {
+		now := time.Now()
+		g := models.Group{
+			ID:          42,
+			Name:        "prod",
+			Filter:      "cluster = 'prod'",
+			Description: "Production VMs",
+			Tags:        []string{"production", "critical"},
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		}
+
+		result := v1.NewGroupFromModel(g)
+
+		Expect(result.Id).To(Equal("42"))
+		Expect(result.Name).To(Equal("prod"))
+		Expect(result.Filter).To(Equal("cluster = 'prod'"))
+		Expect(result.Description).NotTo(BeNil())
+		Expect(*result.Description).To(Equal("Production VMs"))
+		Expect(result.Tags).NotTo(BeNil())
+		Expect(*result.Tags).To(Equal([]string{"production", "critical"}))
+		Expect(*result.CreatedAt).To(BeTemporally("~", now, time.Second))
+		Expect(*result.UpdatedAt).To(BeTemporally("~", now, time.Second))
+	})
+
+	It("should not include description when empty", func() {
+		g := models.Group{ID: 1, Name: "g", Filter: "name = 'x'", CreatedAt: time.Now(), UpdatedAt: time.Now()}
+
+		result := v1.NewGroupFromModel(g)
+
+		Expect(result.Description).To(BeNil())
+	})
+
+	It("should not include tags when empty", func() {
+		g := models.Group{ID: 1, Name: "g", Filter: "name = 'x'", CreatedAt: time.Now(), UpdatedAt: time.Now()}
+
+		result := v1.NewGroupFromModel(g)
+
+		Expect(result.Tags).To(BeNil())
+	})
+
+	It("should default zero CreatedAt to now", func() {
+		g := models.Group{ID: 1, Name: "g", Filter: "name = 'x'", UpdatedAt: time.Now()}
+
+		result := v1.NewGroupFromModel(g)
+
+		Expect(*result.CreatedAt).To(BeTemporally("~", time.Now(), time.Second))
+	})
+
+	It("should default zero UpdatedAt to now", func() {
+		g := models.Group{ID: 1, Name: "g", Filter: "name = 'x'", CreatedAt: time.Now()}
+
+		result := v1.NewGroupFromModel(g)
+
+		Expect(*result.UpdatedAt).To(BeTemporally("~", time.Now(), time.Second))
+	})
+})
+
+var _ = Describe("NewInspectorStatus", func() {
+	Context("state mapping", func() {
+		It("should map ready state", func() {
+			status := v1.NewInspectorStatus(models.InspectorStatus{State: models.InspectorStateReady})
+			Expect(status.State).To(Equal(v1.InspectorStatusStateReady))
+		})
+
+		It("should map initiating state", func() {
+			status := v1.NewInspectorStatus(models.InspectorStatus{State: models.InspectorStateInitiating})
+			Expect(status.State).To(Equal(v1.InspectorStatusStateInitiating))
+		})
+
+		It("should map running state", func() {
+			status := v1.NewInspectorStatus(models.InspectorStatus{State: models.InspectorStateRunning})
+			Expect(status.State).To(Equal(v1.InspectorStatusStateRunning))
+		})
+
+		It("should map canceling state", func() {
+			status := v1.NewInspectorStatus(models.InspectorStatus{State: models.InspectorStateCanceling})
+			Expect(status.State).To(Equal(v1.InspectorStatusStateCanceling))
+		})
+
+		It("should map canceled state", func() {
+			status := v1.NewInspectorStatus(models.InspectorStatus{State: models.InspectorStateCanceled})
+			Expect(status.State).To(Equal(v1.InspectorStatusStateCanceled))
+		})
+
+		It("should map completed state", func() {
+			status := v1.NewInspectorStatus(models.InspectorStatus{State: models.InspectorStateCompleted})
+			Expect(status.State).To(Equal(v1.InspectorStatusStateCompleted))
+		})
+
+		It("should map error state with message", func() {
+			status := v1.NewInspectorStatus(models.InspectorStatus{
+				State: models.InspectorStateError,
+				Error: errors.New("inspection failed"),
+			})
+			Expect(status.State).To(Equal(v1.InspectorStatusStateError))
+			Expect(status.Error).NotTo(BeNil())
+			Expect(*status.Error).To(Equal("inspection failed"))
+		})
+
+		It("should default unknown state to ready", func() {
+			status := v1.NewInspectorStatus(models.InspectorStatus{State: "bogus"})
+			Expect(status.State).To(Equal(v1.InspectorStatusStateReady))
+		})
+
+		It("should not include error when nil", func() {
+			status := v1.NewInspectorStatus(models.InspectorStatus{State: models.InspectorStateReady})
+			Expect(status.Error).To(BeNil())
+		})
 	})
 })
 

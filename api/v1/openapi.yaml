@@ -658,6 +658,11 @@ components:
           description: True if the vm is a template. False otherwise
         inspection:
           $ref: '#/components/schemas/VmInspectionStatus'
+        tags:
+          type: array
+          items:
+            type: string
+          description: Tags aggregated from matching groups
 
     VirtualMachineDetail:
       type: object
@@ -981,6 +986,12 @@ components:
           type: string
           description: Filter expression (pkg/filter DSL)
           example: "memory >= 8GB and cluster = 'prod'"
+        tags:
+          type: array
+          items:
+            type: string
+          description: Tags associated with this group (applied to matching VMs)
+          example: ["production", "critical"]
         createdAt:
           type: string
           format: date-time
@@ -1062,6 +1073,14 @@ components:
           description: Filter expression (will be validated)
           x-oapi-codegen-extra-tags:
             binding: "required,min=1"
+        tags:
+          type: array
+          items:
+            type: string
+            pattern: "^[a-zA-Z0-9_.]+$"
+          description: Tags to apply to matching VMs (only alphanumeric, underscore, and dot allowed)
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty,dive,tag_format"
 
     UpdateGroupRequest:
       type: object
@@ -1085,3 +1104,11 @@ components:
           description: Filter expression (will be validated)
           x-oapi-codegen-extra-tags:
             binding: "omitempty,min=1"
+        tags:
+          type: array
+          items:
+            type: string
+            pattern: "^[a-zA-Z0-9_.]+$"
+          description: Tags to apply to matching VMs (only alphanumeric, underscore, and dot allowed)
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty,dive,tag_format"

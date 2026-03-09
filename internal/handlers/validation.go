@@ -3,12 +3,16 @@ package handlers
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
 
 	v1 "github.com/kubev2v/assisted-migration-agent/api/v1"
 )
+
+// tagFormatRegex validates that tags contain only alphanumeric characters, underscores, and dots.
+var tagFormatRegex = regexp.MustCompile(`^[a-zA-Z0-9_.]+$`)
 
 // validationErrorMessage translates validator.ValidationErrors into a
 // human-readable message. Falls back to "invalid request body" for
@@ -40,6 +44,8 @@ func formatFieldError(fe validator.FieldError) string {
 		return fmt.Sprintf("%s must be a valid URL", field)
 	case "at_least_one":
 		return "at least one field must be provided"
+	case "tag_format":
+		return fmt.Sprintf("%s must contain only alphanumeric characters, underscores, and dots", field)
 	default:
 		return fmt.Sprintf("%s failed validation: %s", field, fe.Tag())
 	}
@@ -48,12 +54,19 @@ func formatFieldError(fe validator.FieldError) string {
 // RegisterValidators registers all custom struct-level validators with
 // the given validator instance. Called once during application startup.
 func RegisterValidators(v *validator.Validate) {
+	_ = v.RegisterValidation("tag_format", validateTagFormat)
 	v.RegisterStructValidation(validateUpdateGroupAtLeastOneField, v1.UpdateGroupRequest{})
+}
+
+// validateTagFormat checks that a tag contains only alphanumeric characters, underscores, and dots.
+func validateTagFormat(fl validator.FieldLevel) bool {
+	tag := fl.Field().String()
+	return tagFormatRegex.MatchString(tag)
 }
 
 func validateUpdateGroupAtLeastOneField(sl validator.StructLevel) {
 	req := sl.Current().Interface().(v1.UpdateGroupRequest)
-	if req.Name == nil && req.Filter == nil && req.Description == nil {
+	if req.Name == nil && req.Filter == nil && req.Description == nil && req.Tags == nil {
 		sl.ReportError(req, "UpdateGroupRequest", "", "at_least_one", "")
 	}
 }

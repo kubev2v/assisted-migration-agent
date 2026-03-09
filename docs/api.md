@@ -85,6 +85,7 @@ curl "http://localhost:8000/api/v1/vms?page=2&pageSize=10"
       "issueCount": 0,
       "migratable": true,
       "template": false,
+      "tags": ["production", "critical"],
       "inspection": {
         "state": "completed"
       }
@@ -110,11 +111,12 @@ curl "http://localhost:8000/api/v1/vms?page=2&pageSize=10"
 | `issueCount` | integer | Number of migration issues |
 | `migratable` | boolean | `true` if VM has no critical issues |
 | `template` | boolean | `true` if VM is a template |
+| `tags` | array | Distinct tags from all groups whose filter matches this VM |
 | `inspection` | object | Inspection status |
 
 ## Groups Endpoint
 
-Groups are named filter expressions that dynamically match VMs. A group's filter is evaluated at query time, so results always reflect the current inventory.
+Groups are named filter expressions (with optional tags) that dynamically match VMs. When a group is created or updated, its filter is evaluated against the VM inventory and matching VM IDs are stored in a pre-computed `group_matches` table. This avoids re-evaluating filters on every read. Tags assigned to groups are surfaced on matching VMs in the `GET /vms` response.
 
 ### GET /api/v1/vms/groups
 
@@ -158,6 +160,7 @@ curl "http://localhost:8000/api/v1/vms/groups?page=2&pageSize=10"
       "name": "Production VMs",
       "description": "All production workloads",
       "filter": "cluster = 'prod'",
+      "tags": ["production"],
       "createdAt": "2025-01-01T00:00:00Z",
       "updatedAt": "2025-01-01T00:00:00Z"
     }
@@ -185,6 +188,7 @@ curl "http://localhost:8000/api/v1/vms/groups?page=2&pageSize=10"
 | `name` | string | Group name (unique, 1-100 characters) |
 | `description` | string | Optional description (max 500 characters) |
 | `filter` | string | Filter DSL expression evaluated against VMs |
+| `tags` | array | Optional list of tags (each matching `[a-zA-Z0-9_.]+`) |
 | `createdAt` | string | ISO 8601 creation timestamp |
 | `updatedAt` | string | ISO 8601 last update timestamp |
 
@@ -198,7 +202,8 @@ Creates a new group.
 {
   "name": "Production VMs",
   "filter": "cluster = 'prod' and memory >= 8GB",
-  "description": "All production workloads"
+  "description": "All production workloads",
+  "tags": ["production", "critical"]
 }
 ```
 
@@ -207,6 +212,7 @@ Creates a new group.
 | `name` | string | yes | Group name, 1-100 characters (trimmed of whitespace) |
 | `filter` | string | yes | Valid filter DSL expression (see [Filter by Expression](filter-by-expression.md)) |
 | `description` | string | no | Optional description, max 500 characters |
+| `tags` | array | no | List of tags, each matching `[a-zA-Z0-9_.]+` |
 
 #### Examples
 
@@ -224,11 +230,11 @@ curl -X POST http://localhost:8000/api/v1/vms/groups \
 
 | Status | Condition |
 |--------|-----------|
-| 400 | Missing or empty name/filter, name > 100 chars, description > 500 chars, invalid filter expression, duplicate name |
+| 400 | Missing or empty name/filter, name > 100 chars, description > 500 chars, invalid filter expression, invalid tag format, duplicate name |
 
 ### GET /api/v1/vms/groups/{id}
 
-Returns a group and its matching VMs with pagination and sorting.
+Returns a group and its matching VMs with pagination and sorting. VMs are looked up from pre-computed matches (no filter re-evaluation at read time).
 
 #### Query Parameters
 
@@ -261,6 +267,7 @@ curl "http://localhost:8000/api/v1/vms/groups/1?sort=memory:desc&page=1&pageSize
     "name": "Production VMs",
     "description": "All production workloads",
     "filter": "cluster = 'prod'",
+    "tags": ["production"],
     "createdAt": "2025-01-01T00:00:00Z",
     "updatedAt": "2025-01-01T00:00:00Z"
   },
@@ -275,7 +282,8 @@ curl "http://localhost:8000/api/v1/vms/groups/1?sort=memory:desc&page=1&pageSize
       "memory": 4096,
       "issueCount": 0,
       "migratable": true,
-      "template": false
+      "template": false,
+      "tags": ["production"]
     }
   ],
   "total": 42,
@@ -312,7 +320,8 @@ All fields are optional; only provided fields are updated.
 {
   "name": "Updated Name",
   "filter": "memory >= 16GB",
-  "description": "updated description"
+  "description": "updated description",
+  "tags": ["staging"]
 }
 ```
 
@@ -321,6 +330,7 @@ All fields are optional; only provided fields are updated.
 | `name` | string | no | New name, 1-100 characters (trimmed of whitespace) |
 | `filter` | string | no | New filter DSL expression |
 | `description` | string | no | New description, max 500 characters |
+| `tags` | array | no | New tags, each matching `[a-zA-Z0-9_.]+` |
 
 #### Examples
 
@@ -340,12 +350,12 @@ curl -X PATCH http://localhost:8000/api/v1/vms/groups/1 \
 
 | Status | Condition |
 |--------|-----------|
-| 400 | No fields provided, name > 100 chars, description > 500 chars, invalid filter expression, duplicate name |
+| 400 | No fields provided, name > 100 chars, description > 500 chars, invalid filter expression, invalid tag format, duplicate name |
 | 404 | Group not found |
 
 ### DELETE /api/v1/vms/groups/{id}
 
-Deletes a group. Idempotent — returns 204 even if the group does not exist.
+Deletes a group and its pre-computed matches. Idempotent — returns 204 even if the group does not exist.
 
 #### Examples
 

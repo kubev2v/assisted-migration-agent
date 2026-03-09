@@ -16,15 +16,6 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/pkg/filter"
 )
 
-// Valid issue categories (lowercase for case-insensitive comparison)
-var validCategories = map[string]string{
-	"critical":    "Critical",
-	"warning":     "Warning",
-	"information": "Information",
-	"advisory":    "Advisory",
-	"error":       "Error",
-}
-
 type VMStore struct {
 	db     QueryInterceptor
 	parser *duckdb_parser.Parser
@@ -38,11 +29,10 @@ func NewVMStore(db QueryInterceptor, parser *duckdb_parser.Parser) *VMStore {
 type FilterOption = sq.Sqlizer
 
 // List returns VM summaries with filters, sorting, and pagination.
-// Filters are applied via a flat subquery that joins all tables, allowing
-// WHERE clauses to reference any column. The output query aggregates results into one row per VM.
 func (s *VMStore) List(ctx context.Context, filters []sq.Sqlizer, opts ...ListOption) ([]models.VirtualMachineSummary, error) {
 	builder := vmOutputQuery
 
+	// Apply external filters via subquery (filters reference table aliases in vmFilterSubquery)
 	if len(filters) > 0 {
 		subquery := vmFilterSubquery
 		for _, f := range filters {
@@ -55,6 +45,7 @@ func (s *VMStore) List(ctx context.Context, filters []sq.Sqlizer, opts ...ListOp
 		builder = builder.Where(sq.Expr(fmt.Sprintf(`v."VM ID" IN (%s)`, subSQL), subArgs...))
 	}
 
+	// Apply options (sort, limit, offset)
 	for _, opt := range opts {
 		builder = opt(builder)
 	}
@@ -76,6 +67,7 @@ func (s *VMStore) List(ctx context.Context, filters []sq.Sqlizer, opts ...ListOp
 	for rows.Next() {
 		var vm models.VirtualMachineSummary
 		var sqlErr string
+		var tags StringArray
 		err := rows.Scan(
 			&vm.ID,
 			&vm.Name,
@@ -89,6 +81,7 @@ func (s *VMStore) List(ctx context.Context, filters []sq.Sqlizer, opts ...ListOp
 			&vm.IsTemplate,
 			&vm.IsMigratable,
 			&sqlErr,
+			&tags,
 		)
 		if err != nil {
 			return nil, err
@@ -96,6 +89,7 @@ func (s *VMStore) List(ctx context.Context, filters []sq.Sqlizer, opts ...ListOp
 		if sqlErr != "" {
 			vm.Status.Error = errors.New(sqlErr)
 		}
+		vm.Tags = tags
 		vms = append(vms, vm)
 	}
 
@@ -145,9 +139,16 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 }
 
 // normalizeCategory validates and normalizes an issue category (case-insensitive).
-// If the category is not in the list of valid categories, it logs a warning
-// and returns "Other".
 func normalizeCategory(category, issueID string) string {
+	// Valid issue categories (lowercase for case-insensitive comparison)
+	var validCategories = map[string]string{
+		"critical":    "Critical",
+		"warning":     "Warning",
+		"information": "Information",
+		"advisory":    "Advisory",
+		"error":       "Error",
+	}
+
 	normalized, ok := validCategories[strings.ToLower(category)]
 	if ok {
 		return normalized
@@ -238,13 +239,20 @@ type SortParam struct {
 
 // ByFilter applies a raw filter DSL expression.
 // Returns nil if the expression is empty or fails to parse.
-// Callers must validate the expression before calling this (e.g. in the handler layer).
 func ByFilter(expr string) sq.Sqlizer {
 	if expr == "" {
 		return nil
 	}
 	sqlizer, _ := filter.ParseWithDefaultMap([]byte(expr))
 	return sqlizer
+}
+
+// WithVMIDs filters the output query to only include VMs with the given IDs.
+// This bypasses the filter subquery, using pre-computed group match results.
+func WithVMIDs(ids []string) ListOption {
+	return func(b sq.SelectBuilder) sq.SelectBuilder {
+		return b.Where(sq.Eq{`v."VM ID"`: ids})
+	}
 }
 
 // WithLimit sets the LIMIT clause.
@@ -268,8 +276,7 @@ func WithDefaultSort() ListOption {
 	}
 }
 
-// WithSort applies multi-field sorting using output aliases from the
-// aggregated query.
+// WithSort applies multi-field sorting using output aliases.
 func WithSort(sorts []SortParam) ListOption {
 	apiFieldToDBColumn := map[string]string{
 		"name":         "name",

@@ -118,6 +118,9 @@ type CreateGroupRequest struct {
 
 	// Name Group display name
 	Name string `binding:"required,min=1,max=100" json:"name"`
+
+	// Tags Tags to apply to matching VMs (only alphanumeric, underscore, and dot allowed)
+	Tags *[]string `binding:"omitempty,dive,tag_format" json:"tags,omitempty"`
 }
 
 // Group defines model for Group.
@@ -136,6 +139,9 @@ type Group struct {
 
 	// Name Group display name
 	Name string `json:"name"`
+
+	// Tags Tags associated with this group (applied to matching VMs)
+	Tags *[]string `json:"tags,omitempty"`
 
 	// UpdatedAt Timestamp when the group was last updated
 	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
@@ -218,6 +224,9 @@ type UpdateGroupRequest struct {
 
 	// Name Group display name
 	Name *string `binding:"omitempty,min=1,max=100" json:"name,omitempty"`
+
+	// Tags Tags to apply to matching VMs (only alphanumeric, underscore, and dot allowed)
+	Tags *[]string `binding:"omitempty,dive,tag_format" json:"tags,omitempty"`
 }
 
 // VMDevice defines model for VMDevice.
@@ -324,6 +333,9 @@ type VirtualMachine struct {
 
 	// Name VirtualMachine name
 	Name string `json:"name"`
+
+	// Tags Tags aggregated from matching groups
+	Tags *[]string `json:"tags,omitempty"`
 
 	// Template True if the vm is a template. False otherwise
 	Template *bool `json:"template,omitempty"`

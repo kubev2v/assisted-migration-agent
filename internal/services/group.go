@@ -60,17 +60,20 @@ func (s *GroupService) Get(ctx context.Context, id int) (*models.Group, error) {
 }
 
 func (s *GroupService) ListVirtualMachines(ctx context.Context, id int, params GroupGetParams) ([]models.VirtualMachineSummary, int, error) {
-	group, err := s.store.Group().Get(ctx, id)
+	if _, err := s.store.Group().Get(ctx, id); err != nil {
+		return []models.VirtualMachineSummary{}, 0, err
+	}
+
+	vmIDs, err := s.store.Group().GetMatchedIDs(ctx, id)
 	if err != nil {
 		return []models.VirtualMachineSummary{}, 0, err
 	}
 
-	var filters []sq.Sqlizer
-	if f := store.ByFilter(group.Filter); f != nil {
-		filters = append(filters, f)
-	}
+	total := len(vmIDs)
 
 	var opts []store.ListOption
+	opts = append(opts, store.WithVMIDs(vmIDs))
+
 	if len(params.Sort) > 0 {
 		sortParams := make([]store.SortParam, len(params.Sort))
 		for i, sf := range params.Sort {
@@ -81,11 +84,6 @@ func (s *GroupService) ListVirtualMachines(ctx context.Context, id int, params G
 		opts = append(opts, store.WithDefaultSort())
 	}
 
-	total, err := s.store.VM().Count(ctx, filters...)
-	if err != nil {
-		return []models.VirtualMachineSummary{}, 0, err
-	}
-
 	if params.Limit > 0 {
 		opts = append(opts, store.WithLimit(params.Limit))
 	}
@@ -93,7 +91,7 @@ func (s *GroupService) ListVirtualMachines(ctx context.Context, id int, params G
 		opts = append(opts, store.WithOffset(params.Offset))
 	}
 
-	vms, err := s.store.VM().List(ctx, filters, opts...)
+	vms, err := s.store.VM().List(ctx, nil, opts...)
 	if err != nil {
 		return []models.VirtualMachineSummary{}, 0, err
 	}
@@ -102,13 +100,42 @@ func (s *GroupService) ListVirtualMachines(ctx context.Context, id int, params G
 }
 
 func (s *GroupService) Create(ctx context.Context, group models.Group) (*models.Group, error) {
-	return s.store.Group().Create(ctx, group)
+	var created *models.Group
+	err := s.store.WithTx(ctx, func(txCtx context.Context) error {
+		var err error
+		created, err = s.store.Group().Create(txCtx, group)
+		if err != nil {
+			return err
+		}
+		return s.store.Group().RefreshMatches(txCtx, created.ID)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return created, nil
 }
 
 func (s *GroupService) Update(ctx context.Context, id int, group models.Group) (*models.Group, error) {
-	return s.store.Group().Update(ctx, id, group)
+	var updated *models.Group
+	err := s.store.WithTx(ctx, func(txCtx context.Context) error {
+		var err error
+		updated, err = s.store.Group().Update(txCtx, id, group)
+		if err != nil {
+			return err
+		}
+		return s.store.Group().RefreshMatches(txCtx, id)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return updated, nil
 }
 
 func (s *GroupService) Delete(ctx context.Context, id int) error {
-	return s.store.Group().Delete(ctx, id)
+	return s.store.WithTx(ctx, func(txCtx context.Context) error {
+		if err := s.store.Group().Delete(txCtx, id); err != nil {
+			return err
+		}
+		return s.store.Group().DeleteMatches(txCtx, id)
+	})
 }

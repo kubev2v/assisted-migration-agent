@@ -207,10 +207,15 @@
 //	            "vCenterState": "poweredOn",
 //	            "diskSize": 102400,
 //	            "memory": 8192,
-//	            "issueCount": 0
+//	            "issueCount": 0,
+//	            "tags": ["production", "critical"]
 //	        }
 //	    ]
 //	}
+//
+// Tags on each VM are derived from all groups whose filter matches
+// that VM. Tags are pre-computed at group create/update time and
+// stored in the group_matches table.
 //
 // Validation Errors (400 Bad Request):
 //   - Invalid byExpression syntax or unknown field
@@ -250,6 +255,7 @@
 //	            "name": "Production VMs",
 //	            "description": "All production workloads",
 //	            "filter": "cluster = 'prod'",
+//	            "tags": ["production"],
 //	            "createdAt": "2025-01-01T00:00:00Z",
 //	            "updatedAt": "2025-01-01T00:00:00Z"
 //	        }
@@ -266,25 +272,32 @@
 //	{
 //	    "name": "Production VMs",
 //	    "filter": "cluster = 'prod'",
-//	    "description": "optional description"
+//	    "description": "optional description",
+//	    "tags": ["production", "critical"]
 //	}
 //
 // Validation:
 //   - name: required, 1-100 characters (trimmed of leading/trailing whitespace)
 //   - filter: required, must be a valid filter DSL expression
 //   - description: optional, max 500 characters
+//   - tags: optional, each tag must match [a-zA-Z0-9_.]+ (tag_format validator)
 //
-// Response: 201 Created with the created Group.
+// On success the group's filter is evaluated against the VM inventory and matching
+// VM IDs are stored in the group_matches table. Tags from matching groups are
+// then visible on VMs returned by GET /vms.
 //
-// GET /vms/groups/{id} - Returns group details with paginated, filtered VMs.
+// Response: 201 Created with the created Group (includes tags if provided).
 //
+// GET /vms/groups/{id} - Returns group details with paginated VMs.
+//
+// VMs are looked up from pre-computed group_matches (no filter re-evaluation).
 // Query Parameters: sort, page, pageSize (same as GET /vms).
 //
 // Response:
 //
 //	{
-//	    "group": { ... },
-//	    "vms": [ ... ],
+//	    "group": { "id": 1, "name": "...", "tags": ["production"], ... },
+//	    "vms": [ { "id": "vm-1", "tags": ["production"], ... } ],
 //	    "total": 50,
 //	    "page": 1,
 //	    "pageCount": 3
@@ -300,7 +313,8 @@
 //	{
 //	    "name": "New Name",
 //	    "filter": "memory >= 16GB",
-//	    "description": "updated description"
+//	    "description": "updated description",
+//	    "tags": ["staging"]
 //	}
 //
 // Validation:
@@ -308,12 +322,15 @@
 //   - name: 1-100 characters if provided (trimmed of leading/trailing whitespace)
 //   - filter: must be a valid filter DSL expression if provided
 //   - description: max 500 characters if provided
+//   - tags: each tag must match [a-zA-Z0-9_.]+ if provided
+//
+// On success the group's matches are recomputed against the VM inventory.
 //
 // Errors:
 //   - 404 Not Found: Group not found
 //
-// DELETE /vms/groups/{id} - Deletes a group. Idempotent (returns 204 even if
-// the group does not exist).
+// DELETE /vms/groups/{id} - Deletes a group and its pre-computed matches.
+// Idempotent (returns 204 even if the group does not exist).
 //
 // # VDDK Handler
 //
@@ -334,6 +351,19 @@
 //   - 500 Internal Server Error: Failed to create or save file
 //
 // The uploaded file is saved as "vddk.tar.gz" in the agent's data directory.
+//
+// # Request Validation
+//
+// Handlers delegate request validation to validator/v10 via Gin's ShouldBindJSON.
+// Validation rules are declared in the OpenAPI spec (api/v1/openapi.yaml) using
+// x-oapi-codegen-extra-tags, which generate `binding:"..."` struct tags in
+// api/v1/types.gen.go. Custom struct-level validators (registered in cmd/run.go):
+//
+//   - at_least_one: ensures at least one field is set (UpdateGroupRequest)
+//   - tag_format:   validates each tag matches ^[a-zA-Z0-9_.]+$
+//
+// Validation errors are formatted by validationErrorMessage (validation.go) into
+// human-readable messages before being returned as 400 Bad Request.
 //
 // # Error Handling
 //
