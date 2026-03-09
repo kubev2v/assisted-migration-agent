@@ -1,0 +1,33 @@
+name: Notify planner repo
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.MIGRATION_PLANNER_SYNC_APP_ID }}
+          private-key: ${{ secrets.MIGRATION_PLANNER_SYNC_APP_PRIVATE_KEY }}
+          owner: kubev2v
+          repositories: migration-planner
+
+      - name: Send repository_dispatch
+        run: |
+          curl --fail-with-body -sS -X POST \
+            -H "Authorization: Bearer ${{ steps.app-token.outputs.token }}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "Content-Type: application/json" \
+            https://api.github.com/repos/kubev2v/migration-planner/dispatches \
+            -d '{
+              "event_type": "remote_repo_updated",
+              "client_payload": {
+                "sha": "${{ github.sha }}",
+                "repo": "${{ github.repository }}"
+              }
+            }'
