@@ -65,7 +65,8 @@ func NewConsoleService(cfg config.Agent, s *scheduler.Scheduler[any], client *co
 	}
 
 	if defaultStatus.Target == models.ConsoleStatusConnected {
-		go c.run()
+		c.close = make(chan any, 1)
+		go c.run(c.close)
 	}
 
 	zap.S().Named("console_service").Infow("agent mode", "current", defaultStatus.Current, "target", defaultStatus.Target)
@@ -124,11 +125,17 @@ func (c *Console) SetMode(ctx context.Context, mode models.AgentMode) error {
 	case models.AgentModeConnected:
 		c.state.SetTarget(models.ConsoleStatusConnected)
 		zap.S().Debugw("starting run loop for connected mode")
-		go c.run()
+		c.close = make(chan any, 1)
+		go c.run(c.close)
 	case models.AgentModeDisconnected:
 		c.state.SetTarget(models.ConsoleStatusDisconnected)
 		zap.S().Debugw("stopping run loop for disconnected mode")
+		if c.close == nil {
+			return nil
+		}
 		c.close <- struct{}{}
+		<-c.close
+		c.close = nil
 	}
 
 	zap.S().Named("console_service").Infow("agent mode changed", "mode", mode)
@@ -150,13 +157,12 @@ func (c *Console) Status() models.ConsoleStatus {
 // The interval itself acts as the backoff mechanism. On transient errors it doubles
 // (up to maxBackoffInterval). On success it resets. This avoids a separate ticker
 // that wakes up only to skip work during backoff periods.
-func (c *Console) run() {
+func (c *Console) run(closeCh chan any) {
 	c.state.SetCurrent(models.ConsoleStatusConnected)
-	c.close = make(chan any, 1)
 	defer func() {
 		c.state.SetCurrent(models.ConsoleStatusDisconnected)
 		zap.S().Named("console_service").Info("service stopped sending requests to console.rh.com")
-		c.close = nil
+		closeCh <- struct{}{}
 	}()
 
 	interval := c.updateInterval
@@ -164,7 +170,7 @@ func (c *Console) run() {
 	for {
 		select {
 		case <-time.After(interval):
-		case <-c.close:
+		case <-closeCh:
 			return
 		}
 
@@ -185,7 +191,7 @@ func (c *Console) run() {
 				c.state.ClearError()
 				interval = c.updateInterval
 			}
-		case <-c.close:
+		case <-closeCh:
 			future.Stop()
 			return
 		}
@@ -194,11 +200,11 @@ func (c *Console) run() {
 
 func (c *Console) Stop() {
 	c.mu.Lock()
-	closeCh := c.close
-	c.mu.Unlock()
+	defer c.mu.Unlock()
 
-	if closeCh != nil {
-		closeCh <- struct{}{}
+	if c.close != nil {
+		c.close <- struct{}{}
+		<-c.close
 	}
 }
 
