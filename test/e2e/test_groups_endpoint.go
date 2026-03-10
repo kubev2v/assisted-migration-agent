@@ -859,3 +859,219 @@ var _ = Describe("Auto-created folder groups e2e tests", Ordered, func() {
 		Expect(totalInFolders).To(Equal(50), "all 50 VMs should be in folder groups")
 	})
 })
+
+var _ = Describe("Group tags e2e tests", Ordered, func() {
+	var (
+		agentSvc *service.AgentSvc
+		allVMs   []v1.VirtualMachine
+	)
+
+	BeforeAll(func() {
+		GinkgoWriter.Println("Starting postgres...")
+		err := infraManager.StartPostgres()
+		Expect(err).ToNot(HaveOccurred(), "failed to start postgres")
+		time.Sleep(2 * time.Second)
+
+		GinkgoWriter.Println("Starting vcsim...")
+		err = infraManager.StartVcsim()
+		Expect(err).ToNot(HaveOccurred(), "failed to start vcsim")
+
+		client := &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			},
+		}
+		Eventually(func() error {
+			resp, err := client.Get(infra.VcsimURL)
+			if err != nil {
+				return err
+			}
+			_ = resp.Body.Close()
+			return nil
+		}, 30*time.Second, 1*time.Second).Should(BeNil(), "vcsim did not become ready")
+
+		agentSvc = service.DefaultAgentSvc(cfg.AgentAPIUrl)
+
+		agentID := uuid.NewString()
+		GinkgoWriter.Printf("Starting agent %s in disconnected mode...\n", agentID)
+		_, err = infraManager.StartAgent(infra.AgentConfig{
+			AgentID:        agentID,
+			SourceID:       uuid.NewString(),
+			Mode:           "disconnected",
+			ConsoleURL:     cfg.AgentProxyUrl,
+			UpdateInterval: "1s",
+		})
+		Expect(err).ToNot(HaveOccurred(), "failed to start agent")
+
+		Eventually(func() error {
+			_, err := agentSvc.Status()
+			return err
+		}, 30*time.Second, 1*time.Second).Should(BeNil(), "agent did not become ready")
+
+		GinkgoWriter.Println("Starting collector...")
+		_, err = agentSvc.StartCollector(infra.VcsimURL, infra.VcsimUsername, infra.VcsimPassword)
+		Expect(err).ToNot(HaveOccurred(), "failed to start collector")
+
+		Eventually(func() string {
+			status, err := agentSvc.GetCollectorStatus()
+			if err != nil {
+				return "error"
+			}
+			GinkgoWriter.Printf("Collector status: %s\n", status.Status)
+			return status.Status
+		}, 120*time.Second, 2*time.Second).Should(Equal("collected"), "collector did not reach collected state")
+
+		// Get all VMs for reference
+		pageSize := 100
+		result, err := agentSvc.ListVMs(&service.VMListParams{PageSize: &pageSize})
+		Expect(err).ToNot(HaveOccurred(), "failed to list VMs after collection")
+		allVMs = result.Vms
+		Expect(len(allVMs)).To(Equal(50), "vcsim model should produce 50 VMs")
+
+		GinkgoWriter.Println("Group tags test setup complete")
+	})
+
+	AfterAll(func() {
+		GinkgoWriter.Println("Cleaning up group tags tests...")
+		_ = infraManager.RemoveAgent()
+		_ = infraManager.StopVcsim()
+		_ = infraManager.StopPostgres()
+	})
+
+	// Given a group with tags
+	// When creating the group
+	// Then the group should have the tags
+	It("should create a group with tags", func() {
+		// Act
+		tags := []string{"prod", "critical"}
+		group, err := agentSvc.CreateGroupWithTags("tagged-group", "memory > 0", "Group with tags", tags)
+		Expect(err).ToNot(HaveOccurred())
+		defer func() { _, _ = agentSvc.DeleteGroup(group.Id) }()
+
+		// Assert
+		Expect(group.Tags).ToNot(BeNil())
+		Expect(*group.Tags).To(ConsistOf("prod", "critical"))
+	})
+
+	// Given a group with tags matching some VMs
+	// When listing VMs
+	// Then matching VMs should have the group's tags
+	It("should assign tags to matching VMs", func() {
+		// Arrange - create a group matching VMs in cluster
+		firstCluster := allVMs[0].Cluster
+		tags := []string{"cluster_tag"}
+		group, err := agentSvc.CreateGroupWithTags("cluster-tagged",
+			fmt.Sprintf("cluster = '%s'", firstCluster), "", tags)
+		Expect(err).ToNot(HaveOccurred())
+		defer func() { _, _ = agentSvc.DeleteGroup(group.Id) }()
+
+		// Act - list all VMs
+		pageSize := 100
+		result, err := agentSvc.ListVMs(&service.VMListParams{PageSize: &pageSize})
+		Expect(err).ToNot(HaveOccurred())
+
+		// Assert - VMs in the cluster should have the tag
+		for _, vm := range result.Vms {
+			if vm.Cluster == firstCluster {
+				Expect(vm.Tags).ToNot(BeNil(), "VM %s in cluster should have tags", vm.Name)
+				Expect(*vm.Tags).To(ContainElement("cluster_tag"),
+					"VM %s should have cluster_tag", vm.Name)
+			}
+		}
+	})
+
+	// Given multiple groups with different tags matching the same VM
+	// When listing VMs
+	// Then the VM should have tags from all matching groups
+	It("should merge tags from multiple matching groups", func() {
+		// Arrange - create two groups that both match some VMs
+		firstCluster := allVMs[0].Cluster
+
+		group1, err := agentSvc.CreateGroupWithTags("tag-group-1",
+			fmt.Sprintf("cluster = '%s'", firstCluster), "", []string{"tag_a"})
+		Expect(err).ToNot(HaveOccurred())
+		defer func() { _, _ = agentSvc.DeleteGroup(group1.Id) }()
+
+		group2, err := agentSvc.CreateGroupWithTags("tag-group-2",
+			"memory > 0", "", []string{"tag_b"})
+		Expect(err).ToNot(HaveOccurred())
+		defer func() { _, _ = agentSvc.DeleteGroup(group2.Id) }()
+
+		// Act - list VMs
+		pageSize := 100
+		result, err := agentSvc.ListVMs(&service.VMListParams{PageSize: &pageSize})
+		Expect(err).ToNot(HaveOccurred())
+
+		// Assert - VMs in the cluster should have both tags
+		for _, vm := range result.Vms {
+			if vm.Cluster == firstCluster {
+				Expect(vm.Tags).ToNot(BeNil(), "VM %s should have tags", vm.Name)
+				Expect(*vm.Tags).To(ContainElement("tag_a"),
+					"VM %s should have tag_a", vm.Name)
+				Expect(*vm.Tags).To(ContainElement("tag_b"),
+					"VM %s should have tag_b", vm.Name)
+			}
+		}
+	})
+
+	// Given a group with tags
+	// When the group is deleted
+	// Then VMs should no longer have those tags
+	It("should remove tags when group is deleted", func() {
+		// Arrange - create and verify tags are applied
+		tags := []string{"temp_tag"}
+		group, err := agentSvc.CreateGroupWithTags("temp-group", "memory > 0", "", tags)
+		Expect(err).ToNot(HaveOccurred())
+
+		pageSize := 100
+		result, err := agentSvc.ListVMs(&service.VMListParams{PageSize: &pageSize})
+		Expect(err).ToNot(HaveOccurred())
+
+		// Verify tags are present
+		taggedCount := 0
+		for _, vm := range result.Vms {
+			if vm.Tags != nil && len(*vm.Tags) > 0 {
+				taggedCount++
+			}
+		}
+		Expect(taggedCount).To(BeNumerically(">", 0), "some VMs should have tags")
+
+		// Act - delete the group
+		_, err = agentSvc.DeleteGroup(group.Id)
+		Expect(err).ToNot(HaveOccurred())
+
+		// Assert - VMs should not have temp_tag anymore
+		result, err = agentSvc.ListVMs(&service.VMListParams{PageSize: &pageSize})
+		Expect(err).ToNot(HaveOccurred())
+
+		for _, vm := range result.Vms {
+			if vm.Tags != nil {
+				Expect(*vm.Tags).ToNot(ContainElement("temp_tag"),
+					"VM %s should not have temp_tag after group deletion", vm.Name)
+			}
+		}
+	})
+
+	// Given auto-created folder groups
+	// When listing VMs
+	// Then VMs should have tags matching their folder names
+	It("should have folder tags from auto-created groups", func() {
+		// Act - list all VMs
+		pageSize := 100
+		result, err := agentSvc.ListVMs(&service.VMListParams{PageSize: &pageSize})
+		Expect(err).ToNot(HaveOccurred())
+
+		// Assert - VMs should have tags from auto-created folder groups
+		// The auto-created groups should have tags based on folder names
+		taggedVMCount := 0
+		for _, vm := range result.Vms {
+			if vm.Tags != nil && len(*vm.Tags) > 0 {
+				taggedVMCount++
+				GinkgoWriter.Printf("VM %s has tags: %v\n", vm.Name, *vm.Tags)
+			}
+		}
+		GinkgoWriter.Printf("Total VMs with tags: %d\n", taggedVMCount)
+		// All VMs in folders should have tags (50 VMs total, all in folders)
+		Expect(taggedVMCount).To(Equal(50), "all VMs should have folder tags")
+	})
+})

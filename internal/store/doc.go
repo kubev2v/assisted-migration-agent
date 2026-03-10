@@ -29,6 +29,7 @@
 //	│  configuration     │  Agent runtime config (agent_mode)          │
 //	│  inventory         │  Raw inventory JSON blob with timestamps    │
 //	│  groups            │  Named filter expressions for VM grouping   │
+//	│  group_matches     │  Pre-computed group→VM ID matches           │
 //	│  schema_migrations │  Migration version tracking                 │
 //	└────────────────────┴─────────────────────────────────────────────┘
 //
@@ -97,8 +98,9 @@
 // # GroupStore
 //
 // Stores named filter expressions (groups) that dynamically match VMs.
-// Each group has a filter DSL expression that is evaluated at query time
-// against the VM table.
+// Each group has a filter DSL expression and optional tags. Matching VM IDs
+// are pre-computed into the group_matches table at write time so that
+// reads (e.g. listing VMs for a group) avoid re-evaluating the filter DSL.
 //
 // Schema:
 //
@@ -108,10 +110,16 @@
 //	    updated_at  TIMESTAMP DEFAULT now(),
 //	    name        VARCHAR NOT NULL,
 //	    filter      VARCHAR NOT NULL,
-//	    description VARCHAR
+//	    description VARCHAR,
+//	    tags        VARCHAR[]
 //	)
 //
-// Methods:
+//	group_matches (
+//	    group_id INTEGER PRIMARY KEY,
+//	    vm_ids   VARCHAR[]
+//	)
+//
+// CRUD Methods:
 //   - List(ctx, filters []sq.Sqlizer, limit, offset uint64) → ([]models.Group, error)
 //     Returns groups ordered by ID ascending. Applies optional sq.Sqlizer
 //     filters (e.g. from filter.ParseWithGroupMap) and LIMIT/OFFSET pagination.
@@ -121,6 +129,16 @@
 //   - Create(ctx, group) → *models.Group (with generated ID and timestamps)
 //   - Update(ctx, id, group) → *models.Group (returns ResourceNotFoundError if missing)
 //   - Delete(ctx, id) → error (returns ResourceNotFoundError if missing)
+//
+// Match Methods:
+//   - RefreshMatches(ctx, groupIDs ...int)
+//     Re-evaluates group filters and writes matching VM IDs into group_matches.
+//     When groupIDs are provided only those groups are refreshed; otherwise all
+//     groups are refreshed. Runs inside a WithTx transaction for atomicity.
+//   - GetMatchedVMIDs(ctx, groupID int) → ([]string, error)
+//     Returns the pre-computed VM IDs for a single group.
+//   - DeleteMatches(ctx, groupID int) → error
+//     Removes the group_matches row for a group (used on group deletion).
 //
 // # VMStore
 //
@@ -153,12 +171,18 @@
 //
 //	SELECT v."VM ID" AS id, v."VM" AS name, ...
 //	       COALESCE(d.total_disk, 0) AS disk_size,
-//	       COALESCE(c.issue_count, 0) AS issue_count
+//	       COALESCE(c.issue_count, 0) AS issue_count,
+//	       COALESCE(t.tags, [])::VARCHAR[] AS tags
 //	FROM vinfo v
 //	LEFT JOIN (...disk subquery...) d  ON v."VM ID" = d."VM ID"
 //	LEFT JOIN (...concern subquery...) c ON v."VM ID" = c."VM_ID"
+//	LEFT JOIN (...tags subquery...) t ON v."VM ID" = t.vm_id
 //	WHERE v."VM ID" IN (filter subquery)
 //	ORDER BY / LIMIT / OFFSET
+//
+// The tags subquery derives tags for each VM by joining group_matches
+// (UNNEST vm_ids) with groups (tags column) and aggregating the distinct
+// tag values into a single array per VM.
 //
 // API:
 //
@@ -186,10 +210,12 @@
 //     dot-notation prefixes: disk.*, concern.*, cpu.*, mem.*, net.*, datastore.*,
 //     inspection.*, plus all flat vinfo columns.
 //
-// Pagination Options (ListOption):
+// Pagination & Filtering Options (ListOption):
 //
 //   - WithLimit(limit uint64)
 //   - WithOffset(offset uint64)
+//   - WithVMIDs(ids []string) — restricts output to an explicit set of VM IDs
+//     (used by GroupService.ListVirtualMachines to avoid filter re-evaluation)
 //
 // Sorting Options (ListOption):
 //
@@ -219,10 +245,31 @@
 // debug logging for all queries. This enables visibility into SQL execution
 // without modifying individual store implementations.
 //
+// The interceptor is transaction-aware: when the context carries an active
+// *sql.Tx (injected by WithTx), all three methods route queries through
+// the transaction instead of the raw *sql.DB. The interceptor also suppresses
+// FORCE CHECKPOINT inside a transaction to avoid DuckDB errors.
+//
 // Logged operations:
 //   - QueryRowContext
 //   - QueryContext
 //   - ExecContext
+//
+// # Transactions (WithTx)
+//
+// Store.WithTx(ctx, fn) executes fn inside a database transaction.
+// The transaction is passed via context so that sub-stores automatically
+// use it through the QueryInterceptor. On success the transaction is
+// committed; on error (or panic) it is rolled back.
+//
+//	err := store.WithTx(ctx, func(txCtx context.Context) error {
+//	    group, err := store.Group().Create(txCtx, group)
+//	    if err != nil { return err }
+//	    return store.Group().RefreshMatches(txCtx, group.ID)
+//	})
+//
+// WithTx is re-entrant: if the context already carries a transaction, the
+// inner call reuses it (no nested BEGIN).
 //
 // # Design Patterns
 //

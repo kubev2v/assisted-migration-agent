@@ -13,6 +13,7 @@ type VirtualMachineSummary struct {
 	IsMigratable bool
 	IsTemplate   bool
 	Status       InspectionStatus
+	Tags         []string
 }
 
 type VM struct {

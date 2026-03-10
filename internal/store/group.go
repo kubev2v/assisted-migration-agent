@@ -20,8 +20,13 @@ const (
 	groupColName        = "name"
 	groupColDescription = "description"
 	groupColFilter      = "filter"
+	groupColTags        = "tags"
 	groupColCreatedAt   = "created_at"
 	groupColUpdatedAt   = "updated_at"
+
+	groupMatchesTable      = "group_matches"
+	groupMatchesColGroupID = "group_id"
+	groupMatchesColVMIDs   = "vm_ids"
 )
 
 var (
@@ -30,12 +35,13 @@ var (
 		groupColName,
 		groupColDescription,
 		groupColFilter,
+		groupColTags,
 		groupColCreatedAt,
 		groupColUpdatedAt).
 		From(groupTable)
 
-	returningSuffix = fmt.Sprintf("RETURNING %s, %s, %s, %s, %s, %s",
-		groupColID, groupColName, groupColDescription, groupColFilter, groupColCreatedAt, groupColUpdatedAt)
+	returningSuffix = fmt.Sprintf("RETURNING %s, %s, %s, %s, %s, %s, %s",
+		groupColID, groupColName, groupColDescription, groupColFilter, groupColTags, groupColCreatedAt, groupColUpdatedAt)
 )
 
 type GroupStore struct {
@@ -74,9 +80,11 @@ func (s *GroupStore) List(ctx context.Context, filters []sq.Sqlizer, limit, offs
 	var groups []models.Group
 	for rows.Next() {
 		var g models.Group
-		if err := rows.Scan(&g.ID, &g.Name, &g.Description, &g.Filter, &g.CreatedAt, &g.UpdatedAt); err != nil {
+		var tags StringArray
+		if err := rows.Scan(&g.ID, &g.Name, &g.Description, &g.Filter, &tags, &g.CreatedAt, &g.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scanning group row: %w", err)
 		}
+		g.Tags = tags
 		groups = append(groups, g)
 	}
 
@@ -117,13 +125,15 @@ func (s *GroupStore) Get(ctx context.Context, id int) (*models.Group, error) {
 
 	row := s.db.QueryRowContext(ctx, query, args...)
 	var g models.Group
-	err = row.Scan(&g.ID, &g.Name, &g.Description, &g.Filter, &g.CreatedAt, &g.UpdatedAt)
+	var tags StringArray
+	err = row.Scan(&g.ID, &g.Name, &g.Description, &g.Filter, &tags, &g.CreatedAt, &g.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, srvErrors.NewResourceNotFoundError("group", fmt.Sprintf("%d", id))
 	}
 	if err != nil {
 		return nil, fmt.Errorf("scanning group: %w", err)
 	}
+	g.Tags = tags
 
 	return &g, nil
 }
@@ -132,9 +142,14 @@ func (s *GroupStore) Get(ctx context.Context, id int) (*models.Group, error) {
 func (s *GroupStore) Create(ctx context.Context, group models.Group) (*models.Group, error) {
 	now := time.Now()
 
+	tags := group.Tags
+	if tags == nil {
+		tags = []string{}
+	}
+
 	query, args, err := sq.Insert(groupTable).
-		Columns(groupColName, groupColDescription, groupColFilter, groupColCreatedAt, groupColUpdatedAt).
-		Values(group.Name, group.Description, group.Filter, now, now).
+		Columns(groupColName, groupColDescription, groupColFilter, groupColTags, groupColCreatedAt, groupColUpdatedAt).
+		Values(group.Name, group.Description, group.Filter, tags, now, now).
 		Suffix(returningSuffix).
 		ToSql()
 	if err != nil {
@@ -144,23 +159,31 @@ func (s *GroupStore) Create(ctx context.Context, group models.Group) (*models.Gr
 	row := s.db.QueryRowContext(ctx, query, args...)
 
 	var g models.Group
-	err = row.Scan(&g.ID, &g.Name, &g.Description, &g.Filter, &g.CreatedAt, &g.UpdatedAt)
+	var scannedTags StringArray
+	err = row.Scan(&g.ID, &g.Name, &g.Description, &g.Filter, &scannedTags, &g.CreatedAt, &g.UpdatedAt)
 	if err != nil {
 		if isUniqueConstraintError(err) {
 			return nil, srvErrors.NewDuplicateResourceError("group", "name", group.Name)
 		}
 		return nil, fmt.Errorf("creating group: %w", err)
 	}
+	g.Tags = scannedTags
 
 	return &g, nil
 }
 
 // Update updates an existing group by ID.
 func (s *GroupStore) Update(ctx context.Context, id int, group models.Group) (*models.Group, error) {
+	tags := group.Tags
+	if tags == nil {
+		tags = []string{}
+	}
+
 	query, args, err := sq.Update(groupTable).
 		Set(groupColName, group.Name).
 		Set(groupColDescription, group.Description).
 		Set(groupColFilter, group.Filter).
+		Set(groupColTags, tags).
 		Set(groupColUpdatedAt, time.Now()).
 		Where(sq.Eq{groupColID: id}).
 		Suffix(returningSuffix).
@@ -171,7 +194,8 @@ func (s *GroupStore) Update(ctx context.Context, id int, group models.Group) (*m
 
 	row := s.db.QueryRowContext(ctx, query, args...)
 	var g models.Group
-	err = row.Scan(&g.ID, &g.Name, &g.Description, &g.Filter, &g.CreatedAt, &g.UpdatedAt)
+	var scannedTags StringArray
+	err = row.Scan(&g.ID, &g.Name, &g.Description, &g.Filter, &scannedTags, &g.CreatedAt, &g.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, srvErrors.NewResourceNotFoundError("group", fmt.Sprintf("%d", id))
@@ -181,6 +205,7 @@ func (s *GroupStore) Update(ctx context.Context, id int, group models.Group) (*m
 		}
 		return nil, fmt.Errorf("updating group: %w", err)
 	}
+	g.Tags = scannedTags
 
 	return &g, nil
 }
@@ -214,4 +239,107 @@ func (s *GroupStore) Delete(ctx context.Context, id int) error {
 func isUniqueConstraintError(err error) bool {
 	return strings.Contains(err.Error(), "Constraint Error") &&
 		strings.Contains(err.Error(), "Duplicate key")
+}
+
+// RefreshMatches rebuilds group_matches rows by evaluating each group's filter
+// against the VM data. When groupIDs are provided, only those groups are
+// refreshed. When none are provided, all groups are refreshed.
+func (s *GroupStore) RefreshMatches(ctx context.Context, groupIDs ...int) error {
+	var groups []models.Group
+
+	if len(groupIDs) == 0 {
+		var err error
+		groups, err = s.List(ctx, nil, 0, 0)
+		if err != nil {
+			return fmt.Errorf("fetching groups: %w", err)
+		}
+
+		delQuery, _, err := sq.Delete(groupMatchesTable).ToSql()
+		if err != nil {
+			return fmt.Errorf("building delete query: %w", err)
+		}
+		if _, err := s.db.ExecContext(ctx, delQuery); err != nil {
+			return fmt.Errorf("clearing group_matches: %w", err)
+		}
+	} else {
+		for _, id := range groupIDs {
+			g, err := s.Get(ctx, id)
+			if err != nil {
+				return fmt.Errorf("fetching group %d: %w", id, err)
+			}
+			groups = append(groups, *g)
+		}
+
+		delQuery, delArgs, err := sq.Delete(groupMatchesTable).
+			Where(sq.Eq{groupMatchesColGroupID: groupIDs}).
+			ToSql()
+		if err != nil {
+			return fmt.Errorf("building delete query: %w", err)
+		}
+		if _, err := s.db.ExecContext(ctx, delQuery, delArgs...); err != nil {
+			return fmt.Errorf("clearing group_matches for ids: %w", err)
+		}
+	}
+
+	for _, g := range groups {
+		filterSQL := ByFilter(g.Filter)
+		if filterSQL == nil {
+			continue
+		}
+
+		subquery := vmFilterSubquery.Where(filterSQL)
+		subSQL, subArgs, err := subquery.ToSql()
+		if err != nil {
+			return fmt.Errorf("building filter query for group %d: %w", g.ID, err)
+		}
+
+		insertQuery, insertArgs, err := sq.Insert(groupMatchesTable).
+			Columns(groupMatchesColGroupID, groupMatchesColVMIDs).
+			Values(g.ID, sq.Expr(fmt.Sprintf(`(SELECT list("VM ID") FROM (%s))`, subSQL), subArgs...)).
+			ToSql()
+		if err != nil {
+			return fmt.Errorf("building insert query for group %d: %w", g.ID, err)
+		}
+
+		if _, err := s.db.ExecContext(ctx, insertQuery, insertArgs...); err != nil {
+			return fmt.Errorf("inserting matches for group %d: %w", g.ID, err)
+		}
+	}
+
+	return nil
+}
+
+// DeleteMatches removes the group_matches row for a given group ID.
+func (s *GroupStore) DeleteMatches(ctx context.Context, groupID int) error {
+	query, args, err := sq.Delete(groupMatchesTable).
+		Where(sq.Eq{groupMatchesColGroupID: groupID}).
+		ToSql()
+	if err != nil {
+		return fmt.Errorf("building delete query: %w", err)
+	}
+	if _, err := s.db.ExecContext(ctx, query, args...); err != nil {
+		return fmt.Errorf("deleting matches for group %d: %w", groupID, err)
+	}
+	return nil
+}
+
+// GetMatchedIDs returns the pre-computed VM IDs for a group.
+func (s *GroupStore) GetMatchedIDs(ctx context.Context, groupID int) ([]string, error) {
+	query, args, err := sq.Select(fmt.Sprintf("COALESCE(%s, [])", groupMatchesColVMIDs)).
+		From(groupMatchesTable).
+		Where(sq.Eq{groupMatchesColGroupID: groupID}).
+		ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("building query: %w", err)
+	}
+
+	var vmIDs StringArray
+	err = s.db.QueryRowContext(ctx, query, args...).Scan(&vmIDs)
+	if errors.Is(err, sql.ErrNoRows) {
+		return []string{}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("fetching matched VM IDs for group %d: %w", groupID, err)
+	}
+	return vmIDs, nil
 }

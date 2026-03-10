@@ -194,11 +194,20 @@
 // # GroupService
 //
 // GroupService manages CRUD operations for groups. A group is a named filter
-// expression that dynamically matches VMs from the collected inventory.
+// expression (with optional tags) that dynamically matches VMs from the
+// collected inventory.
 //
-// Groups are persisted in the store and their filter expressions are evaluated
-// at query time against the VM table, so results always reflect the current
-// inventory state.
+// Matching VM IDs are pre-computed into the group_matches table at write time,
+// so reads never re-evaluate the filter DSL. Tags from matching groups are
+// surfaced on VMs returned by GET /vms.
+//
+// Write operations (Create, Update, Delete) run inside a store.WithTx
+// transaction to ensure the group row and its group_matches are updated
+// atomically:
+//
+//	Create → store.Group().Create + RefreshMatches(groupID)
+//	Update → store.Group().Update + RefreshMatches(groupID)
+//	Delete → store.Group().DeleteMatches(groupID) + store.Group().Delete
 //
 // Operations:
 //   - List: returns groups with optional name filtering and pagination.
@@ -207,11 +216,11 @@
 //     through filter.ParseWithGroupMap to produce a sq.Sqlizer for the store.
 //     Returns ([]models.Group, total int, error).
 //   - Get: returns a single group by ID
-//   - ListVirtualMachines: evaluates the group's filter against the VM table
-//     with sorting and pagination support
-//   - Create: creates a new group (filter validated at handler level)
-//   - Update: updates an existing group by ID
-//   - Delete: deletes a group by ID
+//   - ListVirtualMachines: reads pre-computed VM IDs from group_matches
+//     and fetches VMs by ID with sorting and pagination support
+//   - Create: creates a new group and refreshes its matches (transactional)
+//   - Update: updates an existing group and refreshes its matches (transactional)
+//   - Delete: deletes a group and its matches (transactional)
 //
 // Usage:
 //

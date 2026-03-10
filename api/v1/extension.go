@@ -23,7 +23,7 @@ func (a *AgentStatus) FromModel(m models.AgentStatus) {
 
 // NewVirtualMachineFromSummary converts a models.VirtualMachineSummary to an API VirtualMachine.
 func NewVirtualMachineFromSummary(vm models.VirtualMachineSummary) VirtualMachine {
-	return VirtualMachine{
+	result := VirtualMachine{
 		Id:           vm.ID,
 		Name:         vm.Name,
 		Cluster:      vm.Cluster,
@@ -36,6 +36,10 @@ func NewVirtualMachineFromSummary(vm models.VirtualMachineSummary) VirtualMachin
 		Template:     &vm.IsTemplate,
 		Inspection:   NewInspectionStatus(vm.Status),
 	}
+	if len(vm.Tags) > 0 {
+		result.Tags = &vm.Tags
+	}
+	return result
 }
 
 func NewCollectorStatus(status models.CollectorStatus) CollectorStatus {
@@ -257,6 +261,9 @@ func NewGroupFromModel(g models.Group) Group {
 	}
 	if g.Description != "" {
 		group.Description = &g.Description
+	}
+	if len(g.Tags) > 0 {
+		group.Tags = &g.Tags
 	}
 	return group
 }

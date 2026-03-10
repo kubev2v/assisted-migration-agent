@@ -8,6 +8,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 	"github.com/kubev2v/assisted-migration-agent/test"
@@ -758,6 +759,100 @@ var _ = Describe("VMStore", func() {
 			Expect(folders).To(HaveLen(1))
 			Expect(folders[0].ID).To(Equal("folder-123"))
 			Expect(folders[0].Name).To(Equal(""))
+		})
+	})
+
+	Context("Tags in List output", func() {
+		BeforeEach(func() {
+			insertVM("vm-1", "web-server", "poweredOn", "cluster-a", 4096)
+			insertVM("vm-2", "db-server", "poweredOn", "cluster-a", 8192)
+			insertVM("vm-3", "app-server", "poweredOff", "cluster-b", 16384)
+		})
+
+		It("should return empty tags when no groups have tags", func() {
+			vms, err := s.VM().List(ctx, nil)
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vms).To(HaveLen(3))
+			for _, vm := range vms {
+				Expect(vm.Tags).To(BeEmpty())
+			}
+		})
+
+		It("should derive tags from group_matches and groups", func() {
+			g, err := s.Group().Create(ctx, models.Group{
+				Name:   "cluster-a-group",
+				Filter: "cluster = 'cluster-a'",
+				Tags:   []string{"prod", "critical"},
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			err = s.Group().RefreshMatches(ctx, g.ID)
+			Expect(err).NotTo(HaveOccurred())
+
+			vms, err := s.VM().List(ctx, nil)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vms).To(HaveLen(3))
+
+			tagsByID := make(map[string][]string)
+			for _, vm := range vms {
+				tagsByID[vm.ID] = vm.Tags
+			}
+
+			Expect(tagsByID["vm-1"]).To(ConsistOf("prod", "critical"))
+			Expect(tagsByID["vm-2"]).To(ConsistOf("prod", "critical"))
+			Expect(tagsByID["vm-3"]).To(BeEmpty())
+		})
+
+		It("should merge tags from multiple groups", func() {
+			g1, err := s.Group().Create(ctx, models.Group{
+				Name:   "cluster-a-group",
+				Filter: "cluster = 'cluster-a'",
+				Tags:   []string{"web"},
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			g2, err := s.Group().Create(ctx, models.Group{
+				Name:   "all-group",
+				Filter: "memory > 0",
+				Tags:   []string{"infra"},
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			err = s.Group().RefreshMatches(ctx, g1.ID, g2.ID)
+			Expect(err).NotTo(HaveOccurred())
+
+			vms, err := s.VM().List(ctx, nil)
+			Expect(err).NotTo(HaveOccurred())
+
+			tagsByID := make(map[string][]string)
+			for _, vm := range vms {
+				tagsByID[vm.ID] = vm.Tags
+			}
+
+			Expect(tagsByID["vm-1"]).To(ConsistOf("web", "infra"))
+			Expect(tagsByID["vm-2"]).To(ConsistOf("web", "infra"))
+			Expect(tagsByID["vm-3"]).To(ConsistOf("infra"))
+		})
+
+		It("should return tags when filter is applied", func() {
+			g, err := s.Group().Create(ctx, models.Group{
+				Name:   "cluster-a-group",
+				Filter: "cluster = 'cluster-a'",
+				Tags:   []string{"prod"},
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			err = s.Group().RefreshMatches(ctx, g.ID)
+			Expect(err).NotTo(HaveOccurred())
+
+			vms, err := s.VM().List(ctx, []sq.Sqlizer{store.ByFilter("cluster = 'cluster-a'")})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vms).To(HaveLen(2))
+
+			for _, vm := range vms {
+				Expect(vm.Tags).To(ConsistOf("prod"))
+			}
 		})
 	})
 })

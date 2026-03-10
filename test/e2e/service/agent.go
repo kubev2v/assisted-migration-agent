@@ -360,6 +360,45 @@ func (a *AgentSvc) CreateGroup(name, filter, description string) (*v1.Group, err
 	return &group, nil
 }
 
+// CreateGroupWithTags creates a new group with the given name, filter, description, and tags.
+func (a *AgentSvc) CreateGroupWithTags(name, filter, description string, tags []string) (*v1.Group, error) {
+	body := v1.CreateGroupRequest{
+		Name:   name,
+		Filter: filter,
+	}
+	if description != "" {
+		body.Description = &description
+	}
+	if len(tags) > 0 {
+		body.Tags = &tags
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling request: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, a.baseURL+"/api/v1/vms/groups", bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	resp, err := a.request(NewAgentRequest(req).withHeader("Content-Type", "application/json"))
+	if err != nil {
+		return nil, fmt.Errorf("sending request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var group v1.Group
+	if err := json.NewDecoder(resp.Body).Decode(&group); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+	return &group, nil
+}
+
 // CreateGroupRaw sends a raw POST to /vms/groups and returns the status code.
 func (a *AgentSvc) CreateGroupRaw(body []byte) (int, error) {
 	req, err := http.NewRequest(http.MethodPost, a.baseURL+"/api/v1/vms/groups", bytes.NewReader(body))

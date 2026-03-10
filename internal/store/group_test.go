@@ -43,6 +43,24 @@ var _ = Describe("GroupStore", func() {
 		}
 	})
 
+	// Helper to insert VM into vinfo table
+	insertVM := func(id, name, folder string) {
+		_, err := db.ExecContext(ctx, `
+			INSERT INTO vinfo ("VM ID", "VM", "Powerstate", "Cluster", "Memory", "Template", "Folder")
+			VALUES (?, ?, 'poweredOn', 'cluster-a', 4096, false, ?)
+		`, id, name, folder)
+		Expect(err).NotTo(HaveOccurred())
+	}
+
+	// Helper to get matched VM IDs for a group from group_matches
+	getMatchedVMIDs := func(groupID int) []string {
+		ids, err := s.Group().GetMatchedIDs(ctx, groupID)
+		if err != nil {
+			return nil
+		}
+		return ids
+	}
+
 	Context("List", func() {
 		It("should return empty list when no groups exist", func() {
 			groups, err := s.Group().List(ctx, nil, 0, 0)
@@ -358,6 +376,125 @@ var _ = Describe("GroupStore", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(groups).To(HaveLen(1))
 			Expect(groups[0].ID).To(Equal(created2.ID))
+		})
+	})
+
+	Context("RefreshMatches", func() {
+		BeforeEach(func() {
+			insertVM("vm-1", "web-server", "production")
+			insertVM("vm-2", "db-server", "production")
+			insertVM("vm-3", "staging-app", "staging")
+			insertVM("vm-4", "dev-server", "development")
+		})
+
+		It("should do nothing when no groups exist", func() {
+			err := s.Group().RefreshMatches(ctx)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should store matching VM IDs for a group", func() {
+			g, err := s.Group().Create(ctx, models.Group{
+				Name:   "prod-group",
+				Filter: "folder = 'production'",
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			err = s.Group().RefreshMatches(ctx, g.ID)
+			Expect(err).NotTo(HaveOccurred())
+
+			ids := getMatchedVMIDs(g.ID)
+			Expect(ids).To(ConsistOf("vm-1", "vm-2"))
+		})
+
+		It("should store matches for multiple groups independently", func() {
+			g1, err := s.Group().Create(ctx, models.Group{
+				Name:   "prod-group",
+				Filter: "folder = 'production'",
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			g2, err := s.Group().Create(ctx, models.Group{
+				Name:   "all-servers",
+				Filter: "name ~ /server/",
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			err = s.Group().RefreshMatches(ctx)
+			Expect(err).NotTo(HaveOccurred())
+
+			ids1 := getMatchedVMIDs(g1.ID)
+			Expect(ids1).To(ConsistOf("vm-1", "vm-2"))
+
+			ids2 := getMatchedVMIDs(g2.ID)
+			Expect(ids2).To(ConsistOf("vm-1", "vm-2", "vm-4"))
+		})
+
+		It("should refresh only specified group IDs", func() {
+			g1, err := s.Group().Create(ctx, models.Group{
+				Name:   "prod-group",
+				Filter: "folder = 'production'",
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			g2, err := s.Group().Create(ctx, models.Group{
+				Name:   "staging-group",
+				Filter: "folder = 'staging'",
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Refresh all first
+			err = s.Group().RefreshMatches(ctx)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(getMatchedVMIDs(g1.ID)).To(ConsistOf("vm-1", "vm-2"))
+			Expect(getMatchedVMIDs(g2.ID)).To(ConsistOf("vm-3"))
+
+			// Refresh only g1 — g2 should remain unchanged
+			err = s.Group().RefreshMatches(ctx, g1.ID)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(getMatchedVMIDs(g1.ID)).To(ConsistOf("vm-1", "vm-2"))
+			Expect(getMatchedVMIDs(g2.ID)).To(ConsistOf("vm-3"))
+		})
+
+		It("should rebuild matches when filter changes", func() {
+			g, err := s.Group().Create(ctx, models.Group{
+				Name:   "prod-group",
+				Filter: "folder = 'production'",
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			err = s.Group().RefreshMatches(ctx, g.ID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(getMatchedVMIDs(g.ID)).To(ConsistOf("vm-1", "vm-2"))
+
+			g.Filter = "folder = 'staging'"
+			_, err = s.Group().Update(ctx, g.ID, *g)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = s.Group().RefreshMatches(ctx, g.ID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(getMatchedVMIDs(g.ID)).To(ConsistOf("vm-3"))
+		})
+
+		It("should return empty list after group is deleted and matches cleared", func() {
+			g, err := s.Group().Create(ctx, models.Group{
+				Name:   "prod-group",
+				Filter: "folder = 'production'",
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			err = s.Group().RefreshMatches(ctx, g.ID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(getMatchedVMIDs(g.ID)).To(ConsistOf("vm-1", "vm-2"))
+
+			err = s.Group().Delete(ctx, g.ID)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = s.Group().DeleteMatches(ctx, g.ID)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(getMatchedVMIDs(g.ID)).To(BeEmpty())
 		})
 	})
 })

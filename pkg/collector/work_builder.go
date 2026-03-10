@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"regexp"
+	"strings"
 
 	"go.uber.org/zap"
 
@@ -176,27 +178,34 @@ func (b *WorkBuilder) createFolderGroups(ctx context.Context) error {
 		return fmt.Errorf("getting folders: %w", err)
 	}
 
-	// Create group for each folder
-	for _, folder := range folders {
-		group := models.Group{
-			Name:        folder.Name,
-			Description: fmt.Sprintf("VMs in folder: %s", folder.Name),
-			Filter:      fmt.Sprintf("folder = '%s'", folder.Name),
+	if err := b.store.WithTx(ctx, func(txCtx context.Context) error {
+		for _, folder := range folders {
+			tag := sanitizeTag(folder.Name)
+			group := models.Group{
+				Name:        folder.Name,
+				Description: fmt.Sprintf("VMs in folder: %s", folder.Name),
+				Filter:      fmt.Sprintf("folder = '%s'", folder.Name),
+				Tags:        []string{tag},
+			}
+			if _, err := b.store.Group().Create(txCtx, group); err != nil {
+				zap.S().Named("collector_service").Warnw("failed to create folder group",
+					"folder", folder.Name, "error", err)
+			}
 		}
-		if _, err := b.store.Group().Create(ctx, group); err != nil {
-			zap.S().Named("collector_service").Warnw("failed to create folder group",
-				"folder", folder.Name, "error", err)
-		}
-	}
 
-	// Create "No Folder" group for VMs without a folder
-	noFolderGroup := models.Group{
-		Name:        "No Folder",
-		Description: "VMs not organized in any folder",
-		Filter:      "folder = ''",
-	}
-	if _, err := b.store.Group().Create(ctx, noFolderGroup); err != nil {
-		zap.S().Named("collector_service").Warnw("failed to create no-folder group", "error", err)
+		noFolderGroup := models.Group{
+			Name:        "No Folder",
+			Description: "VMs not organized in any folder",
+			Filter:      "folder = ''",
+			Tags:        []string{},
+		}
+		if _, err := b.store.Group().Create(txCtx, noFolderGroup); err != nil {
+			zap.S().Named("collector_service").Warnw("failed to create no-folder group", "error", err)
+		}
+
+		return b.store.Group().RefreshMatches(txCtx)
+	}); err != nil {
+		return fmt.Errorf("creating folder groups: %w", err)
 	}
 
 	zap.S().Named("collector_service").Infow("folder groups created", "count", len(folders)+1)
@@ -212,4 +221,12 @@ func (b *WorkBuilder) collected() models.WorkUnit {
 			return func(ctx context.Context) (any, error) { return nil, nil }
 		},
 	}
+}
+
+// sanitizeTag converts a folder name into a valid tag by replacing spaces
+// with underscores and stripping characters outside [a-zA-Z0-9_.].
+func sanitizeTag(name string) string {
+	tagSanitizer := regexp.MustCompile(`[^a-zA-Z0-9_.]`)
+	tag := strings.ReplaceAll(name, " ", "_")
+	return tagSanitizer.ReplaceAllString(tag, "")
 }

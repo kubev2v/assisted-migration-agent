@@ -90,6 +90,9 @@ func (h *Handler) CreateGroup(c *gin.Context) {
 	if req.Description != nil {
 		group.Description = *req.Description
 	}
+	if req.Tags != nil {
+		group.Tags = *req.Tags
+	}
 
 	created, err := h.groupSrv.Create(c.Request.Context(), group)
 	if err != nil {
@@ -232,6 +235,9 @@ func (h *Handler) UpdateGroup(c *gin.Context, id string) {
 	}
 	if req.Description != nil {
 		existing.Description = *req.Description
+	}
+	if req.Tags != nil {
+		existing.Tags = *req.Tags
 	}
 
 	updated, err := h.groupSrv.Update(c.Request.Context(), groupID, *existing)

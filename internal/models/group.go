@@ -9,6 +9,7 @@ type Group struct {
 	Name        string
 	Description string
 	Filter      string
+	Tags        []string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }
