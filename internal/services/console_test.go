@@ -206,6 +206,39 @@ var _ = Describe("Console Service", func() {
 			Eventually(requestReceived, 1500*time.Millisecond).Should(Receive())
 		})
 
+		// Given a configuration with connected agent mode saved in DB
+		// When we stop the service immediately after creation
+		// Then it should not block even if the run loop has just been started
+		It("should not block when stopped immediately after startup in connected mode", func() {
+			// Arrange
+			config := &models.Configuration{
+				AgentMode: models.AgentModeConnected,
+			}
+			err := st.Configuration().Save(context.Background(), config)
+			Expect(err).NotTo(HaveOccurred())
+
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer server.Close()
+
+			client, err := console.NewConsoleClient(server.URL, "")
+			Expect(err).NotTo(HaveOccurred())
+
+			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act
+			done := make(chan struct{})
+			go func() {
+				consoleSrv.Stop()
+				close(done)
+			}()
+
+			// Assert
+			Eventually(done, 500*time.Millisecond).Should(BeClosed())
+		})
+
 		// Given a configuration with disconnected agent mode saved in DB
 		// When we create a new console service
 		// Then it should remain in disconnected status
@@ -358,6 +391,38 @@ var _ = Describe("Console Service", func() {
 
 			// Wait longer than updateInterval (50ms) to ensure no more requests are sent
 			Consistently(requestReceived, 150*time.Millisecond).ShouldNot(Receive())
+		})
+
+		// Given a console service in disconnected mode
+		// When we switch to connected mode and immediately back to disconnected mode
+		// Then the disconnect path should not block waiting for the run loop to initialize
+		It("should not block when switching to disconnected immediately after connected", func() {
+			// Arrange
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer server.Close()
+
+			client, err := console.NewConsoleClient(server.URL, "")
+			Expect(err).NotTo(HaveOccurred())
+
+			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(consoleSrv.SetMode(context.Background(), models.AgentModeConnected)).To(BeNil())
+
+			// Act
+			done := make(chan struct{})
+			go func() {
+				Expect(consoleSrv.SetMode(context.Background(), models.AgentModeDisconnected)).To(BeNil())
+				close(done)
+			}()
+
+			// Assert
+			Eventually(done, 500*time.Millisecond).Should(BeClosed())
+			Eventually(func() models.ConsoleStatusType {
+				return consoleSrv.Status().Target
+			}, 500*time.Millisecond).Should(Equal(models.ConsoleStatusDisconnected))
 		})
 
 		// Given a console service in disconnected mode
