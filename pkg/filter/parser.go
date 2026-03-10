@@ -143,9 +143,17 @@ func (p *parser) equality() Expression {
 
 	var op Token
 	switch p.tok {
-	case equal, notEqual, greater, gte, less, lte, like, notLike:
+	case equal, notEqual, greater, gte, less, lte:
 		op = p.tok
 		p.next()
+	case like, notLike:
+		op = p.tok
+		p.next()
+		p.expect(regexLit)
+	case like2:
+		op = p.tok
+		p.next()
+		p.expect(stringLit)
 	default:
 		panic(p.errorf(p.pos, "expected operator instead of %s", p.tok))
 	}

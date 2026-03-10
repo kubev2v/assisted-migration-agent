@@ -221,6 +221,9 @@ func toSql(expr Expression, mf MapFunc) (sq.Sqlizer, error) {
 			return sq.And{left, right}, nil
 		case or:
 			return sq.Or{left, right}, nil
+		case like2:
+			pattern := fmt.Sprintf("%%%v%%", rightArgs[0])
+			return sq.Expr(fmt.Sprintf("(%s %s ?)", leftSQL, e.Op.Sql()), append(leftArgs, pattern)...), nil
 		default:
 			return sq.Expr(fmt.Sprintf("(%s %s %s)", leftSQL, e.Op.Sql(), rightSQL), args...), nil
 		}

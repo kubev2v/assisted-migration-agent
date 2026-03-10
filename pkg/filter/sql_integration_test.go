@@ -925,6 +925,90 @@ var _ = Describe("Filter Integration with DuckDB", func() {
 	// parameterized and treated as data, not executable SQL.
 	// ============================================================
 
+	// ============================================================
+	// LIKE OPERATOR (like2) — substring match via SQL LIKE '%...%'
+	// ============================================================
+
+	Context("LIKE operator (like2) - substring match", func() {
+		It("should match VMs containing substring", func() {
+			names, err := queryVMs("name like 'web'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(Equal([]string{"vm-web-01", "vm-web-02"}))
+		})
+
+		It("should match VMs containing 'db'", func() {
+			names, err := queryVMs("name like 'db'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(Equal([]string{"vm-db-01", "vm-db-02"}))
+		})
+
+		It("should match VMs containing 'worker'", func() {
+			names, err := queryVMs("name like 'worker'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(Equal([]string{"vm-worker-01", "vm-worker-02"}))
+		})
+
+		It("should match single VM with unique substring", func() {
+			names, err := queryVMs("name like 'analytics'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(Equal([]string{"vm-analytics"}))
+		})
+
+		It("should match all VMs when substring is common prefix", func() {
+			names, err := queryVMs("name like 'vm-'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(HaveLen(10))
+		})
+
+		It("should return empty for non-matching substring", func() {
+			names, err := queryVMs("name like 'nonexistent'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(BeEmpty())
+		})
+
+		It("should match suffix substring", func() {
+			names, err := queryVMs("name like '-01'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(Equal([]string{"vm-cache-01", "vm-db-01", "vm-web-01", "vm-worker-01"}))
+		})
+
+		It("should combine like with AND", func() {
+			names, err := queryVMs("name like 'db' and active = true")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(Equal([]string{"vm-db-01", "vm-db-02"}))
+		})
+
+		It("should combine like with OR", func() {
+			names, err := queryVMs("name like 'web' or name like 'cache'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(Equal([]string{"vm-cache-01", "vm-web-01", "vm-web-02"}))
+		})
+
+		It("should combine like with memory filter", func() {
+			names, err := queryVMs("name like 'db' and memory >= 32GB")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(Equal([]string{"vm-db-01"}))
+		})
+
+		It("should be case-sensitive", func() {
+			names, err := queryVMs("name like 'WEB'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(BeEmpty())
+		})
+	})
+
+	Context("SQL Injection Prevention - LIKE operator", func() {
+		It("should treat injection in like value as literal substring", func() {
+			names, err := queryVMs("name like '\\'; DROP TABLE vms; --'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(BeEmpty())
+
+			names, err = queryVMs("name = 'vm-web-01'")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(names).To(Equal([]string{"vm-web-01"}))
+		})
+	})
+
 	Context("SQL Injection Prevention - String Values", func() {
 		It("should treat DROP TABLE as literal string value", func() {
 			// This should search for a VM named literally "'; DROP TABLE vms; --"

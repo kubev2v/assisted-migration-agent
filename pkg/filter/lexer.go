@@ -61,6 +61,8 @@ func (l *lexer) Scan() (int, Token, string) {
 		case "true", "false":
 			tok = boolean
 			val = name
+		case "like":
+			tok = like2
 		default:
 			tok = identifier
 			val = name

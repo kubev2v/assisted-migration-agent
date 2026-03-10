@@ -166,6 +166,11 @@ var _ = Describe("Parser", func() {
 			// ===== IN/NOT IN COMBINED =====
 			{input: "status in ['a'] and name = 'test'", output: `((status IN ["a"]) and (name equal "test"))`},
 			{input: "status not in ['x'] or active = true", output: `((status NOT IN ["x"]) or (active equal true))`},
+
+			// ===== LIKE (like2) OPERATOR =====
+			{input: "name like 'test'", output: `(name like2 "test")`},
+			{input: "name like 'prod-db'", output: `(name like2 "prod-db")`},
+			{input: "name like 'test' and active = true", output: `((name like2 "test") and (active equal true))`},
 		}
 
 		for _, test := range tests {
@@ -188,6 +193,9 @@ var _ = Describe("Parser", func() {
 			"   ",
 			"name = = 'test'",
 			"= 'test'",
+			"name ~ 'string'",
+			"name !~ 'string'",
+			"name like /pattern/",
 		}
 
 		for _, input := range inputs {
@@ -200,5 +208,4 @@ var _ = Describe("Parser", func() {
 			})
 		}
 	})
-
 })

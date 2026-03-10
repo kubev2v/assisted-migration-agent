@@ -27,6 +27,7 @@ const (
 	comma
 	lSquareBracket
 	rSquareBracket
+	like2
 )
 
 var tokenNames = map[Token]string{
@@ -54,6 +55,7 @@ var tokenNames = map[Token]string{
 	comma:          ",",
 	lSquareBracket: "[",
 	rSquareBracket: "]",
+	like2:          "like2",
 }
 
 func (t Token) String() string {
@@ -72,6 +74,7 @@ var tokenSql = map[Token]string{
 	notEqual: "!=",
 	like:     "",    // translated to regexp_matches(...)
 	notLike:  "NOT", // translated to NOT regexp_matches(...)
+	like2:    "LIKE",
 }
 
 func (t Token) Sql() string {

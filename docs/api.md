@@ -57,6 +57,12 @@ Filter by expression:
 curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=cluster = 'production' and memory >= 8GB"
 ```
 
+Filter by substring match:
+
+```bash
+curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=name like 'prod'"
+```
+
 Sort by cluster ascending, then by name descending:
 
 ```bash

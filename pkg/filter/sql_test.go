@@ -628,6 +628,57 @@ var _ = Describe("SQL Generation", func() {
 		}
 	})
 
+	Context("LIKE operator (like2)", func() {
+		type testCase struct {
+			input  string
+			output string
+		}
+
+		tests := []testCase{
+			{input: "name like 'test'", output: `("name" LIKE '%test%')`},
+			{input: "name like 'prod-db'", output: `("name" LIKE '%prod-db%')`},
+			{input: "name like 'web'", output: `("name" LIKE '%web%')`},
+		}
+
+		for _, test := range tests {
+			test := test
+			It("should generate SQL for: "+test.input, func() {
+				expr, err := parse([]byte(test.input))
+				Expect(err).ToNot(HaveOccurred())
+				sql, err := toSqlString(expr, sqlTestMapper)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(sql).To(Equal(test.output))
+			})
+		}
+
+		It("should properly parameterize the like2 value", func() {
+			expr, err := parse([]byte("name like 'test'"))
+			Expect(err).ToNot(HaveOccurred())
+			sqlizer, err := toSql(expr, sqlTestMapper)
+			Expect(err).ToNot(HaveOccurred())
+			sql, args, err := sqlizer.ToSql()
+			Expect(err).ToNot(HaveOccurred())
+			Expect(sql).To(Equal(`("name" LIKE ?)`))
+			Expect(args).To(Equal([]interface{}{"%test%"}))
+		})
+
+		It("should combine like2 with AND", func() {
+			expr, err := parse([]byte("name like 'prod' and active = true"))
+			Expect(err).ToNot(HaveOccurred())
+			sql, err := toSqlString(expr, sqlTestMapper)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(sql).To(Equal(`(("name" LIKE '%prod%') AND ("active" = TRUE))`))
+		})
+
+		It("should combine like2 with OR", func() {
+			expr, err := parse([]byte("name like 'web' or name like 'db'"))
+			Expect(err).ToNot(HaveOccurred())
+			sql, err := toSqlString(expr, sqlTestMapper)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(sql).To(Equal(`(("name" LIKE '%web%') OR ("name" LIKE '%db%'))`))
+		})
+	})
+
 	Context("IN operator", func() {
 		It("should generate SQL for single value IN", func() {
 			expr, err := parse([]byte("status in ['active']"))
@@ -949,6 +1000,10 @@ var _ = Describe("SQL Generation", func() {
 
 		It("should return NOT for notLike token (handled specially)", func() {
 			Expect(notLike.Sql()).To(Equal("NOT"))
+		})
+
+		It("should map like2 token to SQL LIKE", func() {
+			Expect(like2.Sql()).To(Equal("LIKE"))
 		})
 
 		It("should return empty string for illegal token", func() {

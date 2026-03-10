@@ -21,6 +21,9 @@ curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=status
 # Regex: names starting with "web-"
 curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=name ~ /^web-/"
 
+# Substring match: names containing "prod"
+curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=name like 'prod'"
+
 # With pagination
 curl -G "http://localhost:8000/api/v1/vms" \
   --data-urlencode "byExpression=cluster = 'DC1' and template = false" \
@@ -39,7 +42,8 @@ curl -G "http://localhost:8000/api/v1/vms" \
 ## Expression grammar (summary)
 
 - **Comparisons:** `field = value`, `!=`, `<`, `<=`, `>`, `>=`
-- **Regex:** `field ~ /pattern/`, `field !~ /pattern/`
+- **Regex:** `field ~ /pattern/`, `field !~ /pattern/` (right-hand side must be a regex literal `/…/`)
+- **Substring:** `field like 'text'` (SQL `LIKE '%text%'`; right-hand side must be a string literal)
 - **Lists:** `field in ['a','b']`, `field not in ['a','b']`
 - **Logic:** `and`, `or`; use `( ... )` to group. AND binds tighter than OR.
 
@@ -58,6 +62,7 @@ status != 'poweredOff'
 memory >= 16GB
 template = false
 name ~ /^prod-/
+name like 'prod'
 cluster in ['prod', 'staging']
 (cluster = 'prod' or cluster = 'staging') and concern.category != 'Critical'
 ```
@@ -322,8 +327,9 @@ Identifiers are **case-insensitive**. Dotted names refer to joined tables (e.g. 
 | `>=`     | Greater than or equal            | `cpus >= 4`                |
 | `<`      | Less than                        | `storage_used < 1000`      |
 | `<=`     | Less than or equal               | `memory <= 16GB`           |
-| `~`      | Regex match                      | `name ~ /^prod-/`          |
-| `!~`     | Regex not match                  | `name !~ /test/`           |
+| `~`      | Regex match (requires `/regex/`) | `name ~ /^prod-/`          |
+| `!~`     | Regex not match (requires `/regex/`) | `name !~ /test/`       |
+| `like`   | Substring match (SQL LIKE `%…%`) | `name like 'prod'`         |
 | `in`     | Value in list                    | `cluster in ['a','b']`     |
 | `not in` | Value not in list                | `status not in ['suspended']` |
 | `and`    | Logical AND                      | `a = '1' and b = '2'`      |

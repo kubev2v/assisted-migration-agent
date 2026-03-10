@@ -952,6 +952,145 @@ var _ = Describe("VM endpoint e2e tests", Ordered, func() {
 	})
 
 	// -----------------------------------------------------------------
+	// LIKE operator (substring match via byExpression)
+	// -----------------------------------------------------------------
+	Context("LIKE operator filters", func() {
+		It("should filter VMs by name substring using like", func() {
+			// Arrange — extract a common substring from the actual VM names
+			all := listAllVMs()
+			Expect(len(all.Vms)).To(BeNumerically(">", 0))
+
+			firstName := all.Vms[0].Name
+			Expect(len(firstName)).To(BeNumerically(">=", 3))
+			substr := firstName[:3]
+			GinkgoWriter.Printf("First VM name: %s, using '%s' as like substring\n", firstName, substr)
+			expr := fmt.Sprintf("name like '%s'", substr)
+
+			// Act
+			pageSize := 100
+			result, err := agentSvc.ListVMs(&service.VMListParams{
+				ByExpression: &expr,
+				PageSize:     &pageSize,
+			})
+
+			// Assert
+			Expect(err).ToNot(HaveOccurred())
+			GinkgoWriter.Printf("VMs matching like '%s': %d\n", substr, result.Total)
+			Expect(result.Total).To(BeNumerically(">", 0))
+			for _, vm := range result.Vms {
+				Expect(vm.Name).To(ContainSubstring(substr))
+			}
+		})
+
+		It("should return empty for non-matching like substring", func() {
+			// Arrange
+			expr := "name like 'ZZZZNOTEXIST'"
+
+			// Act
+			result, err := agentSvc.ListVMs(&service.VMListParams{
+				ByExpression: &expr,
+			})
+
+			// Assert
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result.Total).To(Equal(0))
+			Expect(result.Vms).To(BeEmpty())
+		})
+
+		It("should combine like with memory filter", func() {
+			// Arrange — derive substring from actual VM names
+			all := listAllVMs()
+			Expect(len(all.Vms)).To(BeNumerically(">", 0))
+			firstName := all.Vms[0].Name
+			Expect(len(firstName)).To(BeNumerically(">=", 3))
+			substr := firstName[:3]
+			expr := fmt.Sprintf("name like '%s' and memory >= 32GB", substr)
+
+			// Act
+			pageSize := 100
+			result, err := agentSvc.ListVMs(&service.VMListParams{
+				ByExpression: &expr,
+				PageSize:     &pageSize,
+			})
+
+			// Assert
+			Expect(err).ToNot(HaveOccurred())
+			for _, vm := range result.Vms {
+				Expect(vm.Name).To(ContainSubstring(substr))
+				Expect(vm.Memory).To(BeNumerically(">=", 32768))
+			}
+		})
+
+		It("should combine like with regex in same expression", func() {
+			// Arrange — use first VM's name to derive both a like substring and a regex pattern
+			all := listAllVMs()
+			Expect(len(all.Vms)).To(BeNumerically(">", 0))
+			firstName := all.Vms[0].Name
+			Expect(len(firstName)).To(BeNumerically(">=", 3))
+			substr := firstName[:3]
+			expr := fmt.Sprintf("name like '%s' and name ~ /%s/", substr, substr)
+
+			// Act
+			pageSize := 100
+			result, err := agentSvc.ListVMs(&service.VMListParams{
+				ByExpression: &expr,
+				PageSize:     &pageSize,
+			})
+
+			// Assert
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result.Total).To(BeNumerically(">", 0))
+			for _, vm := range result.Vms {
+				Expect(vm.Name).To(ContainSubstring(substr))
+			}
+		})
+	})
+
+	// -----------------------------------------------------------------
+	// Regex operator enforcement (~ requires /regex/, not 'string')
+	// -----------------------------------------------------------------
+	Context("regex operator validation", func() {
+		It("should reject ~ with string literal instead of regex", func() {
+			// Arrange — ~ requires /regex/, not 'string'
+			expr := "name ~ 'test'"
+
+			// Act
+			_, err := agentSvc.ListVMs(&service.VMListParams{
+				ByExpression: &expr,
+			})
+
+			// Assert
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("should reject !~ with string literal instead of regex", func() {
+			// Arrange
+			expr := "name !~ 'test'"
+
+			// Act
+			_, err := agentSvc.ListVMs(&service.VMListParams{
+				ByExpression: &expr,
+			})
+
+			// Assert
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("should reject like with regex literal instead of string", func() {
+			// Arrange — like requires 'string', not /regex/
+			expr := "name like /pattern/"
+
+			// Act
+			_, err := agentSvc.ListVMs(&service.VMListParams{
+				ByExpression: &expr,
+			})
+
+			// Assert
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	// -----------------------------------------------------------------
 	// Edge cases
 	// -----------------------------------------------------------------
 	Context("edge cases", func() {

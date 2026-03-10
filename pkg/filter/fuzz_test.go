@@ -20,6 +20,8 @@ func FuzzParse(f *testing.F) {
 	f.Add([]byte("status in ['active', 'pending']"))
 	f.Add([]byte("status not in ['deleted', 'archived']"))
 	f.Add([]byte("status in []"))
+	f.Add([]byte("name like 'prod'"))
+	f.Add([]byte("name like 'web' and active = true"))
 	f.Add([]byte(""))
 	f.Add([]byte("((("))
 	f.Add([]byte("name = ''"))
@@ -87,6 +89,11 @@ func FuzzParseSecurityProperties(f *testing.F) {
 	f.Add([]byte("name = 'tеst'")) // Cyrillic 'е'
 	f.Add([]byte("name = 'café'"))
 
+	// LIKE operator injection
+	f.Add([]byte("name like 'test'"))
+	f.Add([]byte("name like '\\'; DROP TABLE vms; --'"))
+	f.Add([]byte("name like 'x; DELETE FROM users'"))
+
 	// IN operator injection
 	f.Add([]byte("cluster in ['a', 'b; DROP TABLE--']"))
 	f.Add([]byte("cluster in ['normal', '\\'; DELETE FROM x--']"))
@@ -135,6 +142,9 @@ func FuzzIdentifierWhitelist(f *testing.F) {
 	f.Add([]byte("constructor = 'x'"))
 	f.Add([]byte("password = 'secret'"))
 	f.Add([]byte("internal.field = 'value'"))
+
+	// LIKE operator
+	f.Add([]byte("name like 'prod'"))
 
 	// Mixed valid and invalid
 	f.Add([]byte("name = 'test' and invalid_field = 'x'"))
