@@ -25,7 +25,7 @@ jobs:
             -H "Content-Type: application/json" \
             https://api.github.com/repos/kubev2v/migration-planner/dispatches \
             -d '{
-              "event_type": "remote_repo_updated",
+              "event_type": "agent_repo_updated",
               "client_payload": {
                 "sha": "${{ github.sha }}",
                 "repo": "${{ github.repository }}"
