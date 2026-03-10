@@ -12,7 +12,8 @@ import (
 // (GET /version)
 func (h *Handler) GetVersion(c *gin.Context) {
 	c.JSON(http.StatusOK, v1.VersionInfo{
-		Version:   h.cfg.Agent.Version,
-		GitCommit: h.cfg.Agent.GitCommit,
+		Version:     h.cfg.Agent.Version,
+		GitCommit:   h.cfg.Agent.GitCommit,
+		UiGitCommit: h.cfg.Agent.UIGitCommit,
 	})
 }

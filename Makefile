@@ -14,6 +14,7 @@ MAIN_PATH=./main.go
 
 IMAGE_NAME ?= assisted-migration-agent
 IMAGE_TAG ?= latest
+AGENT_UI_IMAGE ?= quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent-ui
 AGENT_UI_IMAGE_TAG ?= latest
 
 GOBASE=$(shell pwd)
@@ -50,9 +51,10 @@ help:
 	@echo "    clean-opa-policies: clean OPA policies directory"
 
 # Build the application
+UI_GIT_COMMIT ?= unknown
 build:
 	@echo "Building $(BINARY_NAME)..."
-	go build -ldflags="-X main.gitCommit=${PLANNER_AGENT_GIT_COMMIT} -X main.version=${PLANNER_AGENT_VERSION}" -o $(BINARY_PATH) $(MAIN_PATH)
+	go build -ldflags="-X main.gitCommit=${PLANNER_AGENT_GIT_COMMIT} -X main.version=${PLANNER_AGENT_VERSION} -X main.uiGitCommit=${UI_GIT_COMMIT}" -o $(BINARY_PATH) $(MAIN_PATH)
 	@echo "Build complete: $(BINARY_PATH)"
 
 build.e2e:
@@ -89,7 +91,14 @@ e2e.container.clean:
 # Build container image
 image:
 	@echo "📦 Building container image $(IMAGE_NAME):$(IMAGE_TAG)..."
-	$(PODMAN) build --build-arg GIT_COMMIT=$(PLANNER_AGENT_GIT_COMMIT) --build-arg VERSION=$(PLANNER_AGENT_VERSION) --build-arg AGENT_UI_IMAGE_TAG=$(AGENT_UI_IMAGE_TAG) -t $(IMAGE_NAME):$(IMAGE_TAG) -f Containerfile .
+	@echo "   Using UI image: $(AGENT_UI_IMAGE):$(AGENT_UI_IMAGE_TAG)"
+	$(PODMAN) build \
+		--build-arg PLANNER_AGENT_GIT_COMMIT=$(PLANNER_AGENT_GIT_COMMIT) \
+		--build-arg PLANNER_AGENT_VERSION=$(PLANNER_AGENT_VERSION) \
+		--build-arg AGENT_UI_IMAGE=$(AGENT_UI_IMAGE) \
+		--build-arg AGENT_UI_IMAGE_TAG=$(AGENT_UI_IMAGE_TAG) \
+		-t $(IMAGE_NAME):$(IMAGE_TAG) \
+		-f Containerfile .
 	@echo "✅ Image built: $(IMAGE_NAME):$(IMAGE_TAG)"
 
 # Run container image locally
@@ -122,6 +131,7 @@ run.image: image
 		--server-mode prod \
 		--server-statics-folder /app/static \
 		--data-folder /var/lib/agent \
+		--opa-policies-folder /app/policies \
 		--console-url http://host.containers.internal:7443
 	@echo "✅ Container started. View logs with: podman logs -f $(CONTAINER_NAME)"
 

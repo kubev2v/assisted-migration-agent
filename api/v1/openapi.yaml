@@ -516,6 +516,7 @@ components:
       required:
         - version
         - gitCommit
+        - uiGitCommit
       properties:
         version:
           type: string
@@ -523,6 +524,9 @@ components:
         gitCommit:
           type: string
           description: Git commit SHA used to build the agent
+        uiGitCommit:
+          type: string
+          description: Git commit SHA of the UI used to build the agent
 
     CollectorStartRequest:
       allOf:

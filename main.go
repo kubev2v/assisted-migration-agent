@@ -16,8 +16,9 @@ import (
 
 // These are set at build time via -ldflags
 var (
-	version   = "v0.0.0"  // Set via -ldflags "-X main.version=..."
-	gitCommit = "unknown" // Set via -ldflags "-X main.gitCommit=..."
+	version     = "v0.0.0"  // Set via -ldflags "-X main.version=..."
+	gitCommit   = "unknown" // Set via -ldflags "-X main.gitCommit=..."
+	uiGitCommit = "unknown" // Set via -ldflags "-X main.uiGitCommit=..."
 )
 
 func main() {
@@ -37,6 +38,7 @@ func main() {
 		config.WithAgent(config.Agent{
 			Version:             version,
 			GitCommit:           gitCommit,
+			UIGitCommit:         uiGitCommit,
 			NumWorkers:          3,
 			Mode:                "disconnected",
 			UpdateInterval:      5 * time.Second,
@@ -60,6 +62,7 @@ func main() {
 	defer undo()
 
 	rootCmd.AddCommand(cmd.NewRunCommand(cfg))
+	rootCmd.AddCommand(cmd.NewVersionCommand(cfg))
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Printf("%s", err)

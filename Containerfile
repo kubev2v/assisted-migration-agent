@@ -1,12 +1,31 @@
 # =============================================================================
 # Stage 1: Fetch the UI
 # =============================================================================
+ARG AGENT_UI_IMAGE=quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent-ui
 ARG AGENT_UI_IMAGE_TAG=latest
-FROM --platform=linux/amd64 quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent-ui:${AGENT_UI_IMAGE_TAG} AS ui-builder
+FROM --platform=linux/amd64 ${AGENT_UI_IMAGE}:${AGENT_UI_IMAGE_TAG} AS ui-builder
 
 
 # =============================================================================
-# Stage 2: Build the backend
+# Stage 2: Extract UI metadata
+# =============================================================================
+FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/ubi-minimal AS ui-metadata-extractor
+
+ARG AGENT_UI_IMAGE=quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent-ui
+ARG AGENT_UI_IMAGE_TAG=latest
+
+# Install skopeo to inspect the UI image
+RUN microdnf install -y skopeo && microdnf clean all
+
+# Extract UI git commit from the UI image labels and save to file
+RUN echo "Inspecting image: ${AGENT_UI_IMAGE}:${AGENT_UI_IMAGE_TAG}" && \
+    UI_GIT_COMMIT=$(skopeo inspect --format '{{index .Labels "vcs-ref"}}' docker://${AGENT_UI_IMAGE}:${AGENT_UI_IMAGE_TAG} || echo "unknown") && \
+    echo "UI Git Commit: ${UI_GIT_COMMIT}" && \
+    echo -n "${UI_GIT_COMMIT}" > /tmp/ui-git-commit.txt
+
+
+# =============================================================================
+# Stage 3: Build the backend
 # =============================================================================
 FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/go-toolset AS backend-builder
 
@@ -16,13 +35,20 @@ RUN go mod download
 
 USER 0
 COPY . .
+# Copy UI git commit from metadata extractor stage
+COPY --from=ui-metadata-extractor /tmp/ui-git-commit.txt /tmp/ui-git-commit.txt
+
 ARG PLANNER_AGENT_GIT_COMMIT=unknown
 ARG PLANNER_AGENT_VERSION=v0.0.0
-RUN make build PLANNER_AGENT_GIT_COMMIT=${PLANNER_AGENT_GIT_COMMIT} PLANNER_AGENT_VERSION=${PLANNER_AGENT_VERSION} BINARY_PATH=/tmp/agent
+
+# Build the agent with UI git commit
+RUN UI_GIT_COMMIT=$(cat /tmp/ui-git-commit.txt) && \
+    echo "Building with UI_GIT_COMMIT=${UI_GIT_COMMIT}" && \
+    make build PLANNER_AGENT_GIT_COMMIT=${PLANNER_AGENT_GIT_COMMIT} PLANNER_AGENT_VERSION=${PLANNER_AGENT_VERSION} UI_GIT_COMMIT=${UI_GIT_COMMIT} BINARY_PATH=/tmp/agent
 
 
 # =============================================================================
-# Stage 3: Setup OPA policies
+# Stage 4: Setup OPA policies
 # =============================================================================
 FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/ubi-minimal AS opa-builder
 
@@ -42,7 +68,7 @@ RUN mkdir -p /app/policies /app/forklift && \
 
 
 # =============================================================================
-# Stage 4: Final runtime image
+# Stage 5: Final runtime image
 # =============================================================================
 FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/ubi-minimal
 
