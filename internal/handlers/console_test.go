@@ -221,6 +221,9 @@ var _ = Describe("Console Handlers", func() {
 
 			// Assert
 			Expect(w.Code).To(Equal(http.StatusConflict))
+			var response map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
+			Expect(response["error"]).To(Equal("mode change conflict: console stopped"))
 		})
 
 		// Given a console service that returns an internal error
@@ -242,6 +245,9 @@ var _ = Describe("Console Handlers", func() {
 
 			// Assert
 			Expect(w.Code).To(Equal(http.StatusInternalServerError))
+			var response map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
+			Expect(response["error"]).To(Equal("database error"))
 		})
 	})
 })

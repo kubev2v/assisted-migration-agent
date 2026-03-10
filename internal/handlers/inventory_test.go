@@ -119,6 +119,17 @@ var _ = Describe("Inventory Handlers", func() {
 			Expect(response["error"]).To(ContainSubstring("inventory not found"))
 		})
 
+		It("should return 500 when inventory data is not valid JSON", func() {
+			mockInventory.InventoryResult = &models.Inventory{Data: []byte("not valid json")}
+
+			req := httptest.NewRequest(http.MethodGet, "/inventory", nil)
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusInternalServerError))
+		})
+
 		// Given an internal error occurs when fetching inventory
 		// When we request the inventory
 		// Then it should return 500 Internal Server Error

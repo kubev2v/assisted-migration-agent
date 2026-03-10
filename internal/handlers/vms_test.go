@@ -253,6 +253,21 @@ var _ = Describe("VMs Handlers", func() {
 
 			// Assert
 			Expect(w.Code).To(Equal(http.StatusInternalServerError))
+			var body map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
+			Expect(body["error"]).To(Equal("failed to list VMs: database error"))
+		})
+
+		It("should return 400 when byExpression is invalid", func() {
+			req := httptest.NewRequest(http.MethodGet, "/vms?byExpression=!!!invalid", nil)
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusBadRequest))
+			var body map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
+			Expect(body["error"]).To(HavePrefix("expression filter is invalid:"))
 		})
 	})
 
@@ -310,6 +325,20 @@ var _ = Describe("VMs Handlers", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(response["error"]).To(ContainSubstring("not found"))
 		})
+
+		It("should return 500 for non-404 Get errors", func() {
+			mockVM.GetError = errors.New("database connection lost")
+
+			req := httptest.NewRequest(http.MethodGet, "/vms/vm-1", nil)
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusInternalServerError))
+			var body map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
+			Expect(body["error"]).To(Equal("database connection lost"))
+		})
 	})
 
 	Context("Inspector endpoints", func() {
@@ -350,6 +379,9 @@ var _ = Describe("VMs Handlers", func() {
 
 			// Assert
 			Expect(w.Code).To(Equal(http.StatusBadRequest))
+			var body map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
+			Expect(body["error"]).To(Equal("invalid request body"))
 		})
 
 		// Given missing vCenter credentials
@@ -357,8 +389,8 @@ var _ = Describe("VMs Handlers", func() {
 		// Then it should return 400 Bad Request
 		It("StartInspection should return 400 for missing credentials", func() {
 			// Arrange
-			body := `{"vcenterCredentials":{"url":"","username":"","password":""},"vmIds":["vm-1"]}`
-			req := httptest.NewRequest(http.MethodPost, "/vms/inspector", strings.NewReader(body))
+			reqBody := `{"vcenterCredentials":{"url":"","username":"","password":""},"vmIds":["vm-1"]}`
+			req := httptest.NewRequest(http.MethodPost, "/vms/inspector", strings.NewReader(reqBody))
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
@@ -367,6 +399,9 @@ var _ = Describe("VMs Handlers", func() {
 
 			// Assert
 			Expect(w.Code).To(Equal(http.StatusBadRequest))
+			var body map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
+			Expect(body["error"]).To(ContainSubstring("Url is required"))
 		})
 
 		// Given an empty VM list in the request
@@ -374,8 +409,8 @@ var _ = Describe("VMs Handlers", func() {
 		// Then it should return 400 Bad Request
 		It("StartInspection should return 400 for empty VM list", func() {
 			// Arrange
-			body := `{"vcenterCredentials":{"url":"https://test","username":"user","password":"pass"},"vmIds":[]}`
-			req := httptest.NewRequest(http.MethodPost, "/vms/inspector", strings.NewReader(body))
+			reqBody := `{"vcenterCredentials":{"url":"https://test","username":"user","password":"pass"},"vmIds":[]}`
+			req := httptest.NewRequest(http.MethodPost, "/vms/inspector", strings.NewReader(reqBody))
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
@@ -384,6 +419,9 @@ var _ = Describe("VMs Handlers", func() {
 
 			// Assert
 			Expect(w.Code).To(Equal(http.StatusBadRequest))
+			var body map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
+			Expect(body["error"]).To(Equal("vmIds is required"))
 		})
 
 		// Given valid credentials and VM list
@@ -421,6 +459,9 @@ var _ = Describe("VMs Handlers", func() {
 
 			// Assert
 			Expect(w.Code).To(Equal(http.StatusBadRequest))
+			var body map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
+			Expect(body["error"]).NotTo(BeEmpty())
 		})
 
 		// Given an empty VM list in the request
@@ -428,8 +469,8 @@ var _ = Describe("VMs Handlers", func() {
 		// Then it should return 400 Bad Request
 		It("AddVMsToInspection should return 400 for empty VM list", func() {
 			// Arrange
-			body := `[]`
-			req := httptest.NewRequest(http.MethodPatch, "/vms/inspector", strings.NewReader(body))
+			reqBody := `[]`
+			req := httptest.NewRequest(http.MethodPatch, "/vms/inspector", strings.NewReader(reqBody))
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
@@ -438,6 +479,9 @@ var _ = Describe("VMs Handlers", func() {
 
 			// Assert
 			Expect(w.Code).To(Equal(http.StatusBadRequest))
+			var body map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
+			Expect(body["error"]).To(Equal("no vms provided"))
 		})
 
 		// Given a running inspector and a valid VM list
@@ -537,6 +581,9 @@ var _ = Describe("VMs Handlers", func() {
 
 			// Assert
 			Expect(w.Code).To(Equal(http.StatusInternalServerError))
+			var body map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
+			Expect(body["error"]).To(Equal("failed to get VM status: database error"))
 		})
 
 		// Given a VM that has been cancelled
@@ -579,11 +626,11 @@ var _ = Describe("VMs Handlers", func() {
 
 			// Assert
 			Expect(w.Code).To(Equal(http.StatusInternalServerError))
+			var body map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
+			Expect(body["error"]).To(Equal("cancel failed"))
 		})
 
-		// Given cancel succeeds but GetVmStatus returns ResourceNotFoundError
-		// When we remove a VM from inspection
-		// Then it should return 404 Not Found
 		It("RemoveVMFromInspection should return 404 when VM not found after cancel", func() {
 			// Arrange
 			mockInspector.GetVmStatusError = srvErrors.NewResourceNotFoundError("vm inspection status", "vm-1")
@@ -596,11 +643,11 @@ var _ = Describe("VMs Handlers", func() {
 
 			// Assert
 			Expect(w.Code).To(Equal(http.StatusNotFound))
+			var response v1.VmInspectionStatus
+			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
+			Expect(response.State).To(Equal(v1.VmInspectionStatusStateNotFound))
 		})
 
-		// Given cancel succeeds but GetVmStatus returns an internal error
-		// When we remove a VM from inspection
-		// Then it should return 500 Internal Server Error
 		It("RemoveVMFromInspection should return 500 when GetVmStatus fails", func() {
 			// Arrange
 			mockInspector.GetVmStatusError = errors.New("database error")
@@ -613,11 +660,11 @@ var _ = Describe("VMs Handlers", func() {
 
 			// Assert
 			Expect(w.Code).To(Equal(http.StatusInternalServerError))
+			var body map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
+			Expect(body["error"]).To(Equal("failed to get VM status: database error"))
 		})
 
-		// Given the inspector service returns an error on Stop
-		// When we stop the inspection
-		// Then it should return 500 Internal Server Error
 		It("StopInspection should return 500 when stop fails", func() {
 			// Arrange
 			mockInspector.StopError = errors.New("stop failed")
@@ -630,16 +677,16 @@ var _ = Describe("VMs Handlers", func() {
 
 			// Assert
 			Expect(w.Code).To(Equal(http.StatusInternalServerError))
+			var body map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
+			Expect(body["error"]).To(Equal("stop failed"))
 		})
 
-		// Given the inspector service returns an error on Start
-		// When we start the inspection with valid input
-		// Then it should return 500 Internal Server Error
 		It("StartInspection should return 500 when start fails", func() {
 			// Arrange
 			mockInspector.StartError = errors.New("start failed")
-			body := `{"vcenterCredentials":{"url":"https://test","username":"user","password":"pass"},"vmIds":["vm-1"]}`
-			req := httptest.NewRequest(http.MethodPost, "/vms/inspector", strings.NewReader(body))
+			reqBody := `{"vcenterCredentials":{"url":"https://test","username":"user","password":"pass"},"vmIds":["vm-1"]}`
+			req := httptest.NewRequest(http.MethodPost, "/vms/inspector", strings.NewReader(reqBody))
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
@@ -648,16 +695,16 @@ var _ = Describe("VMs Handlers", func() {
 
 			// Assert
 			Expect(w.Code).To(Equal(http.StatusInternalServerError))
+			var body map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
+			Expect(body["error"]).To(Equal("failed to start inspector: start failed"))
 		})
 
-		// Given the inspector service returns an error on Add
-		// When we add VMs to inspection
-		// Then it should return 400 Bad Request
 		It("AddVMsToInspection should return 400 when add fails", func() {
 			// Arrange
 			mockInspector.AddError = errors.New("inspector not running")
-			body := `["vm-1","vm-2"]`
-			req := httptest.NewRequest(http.MethodPatch, "/vms/inspector", strings.NewReader(body))
+			reqBody := `["vm-1","vm-2"]`
+			req := httptest.NewRequest(http.MethodPatch, "/vms/inspector", strings.NewReader(reqBody))
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
@@ -666,7 +713,92 @@ var _ = Describe("VMs Handlers", func() {
 
 			// Assert
 			Expect(w.Code).To(Equal(http.StatusBadRequest))
+			var body map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
+			Expect(body["error"]).To(Equal("inspector not running"))
 		})
+
+		It("RemoveVMFromInspection should return 404 when inspector not running", func() {
+			mockInspector.CancelVmsInspectionError = srvErrors.NewInspectorNotRunningError()
+
+			req := httptest.NewRequest(http.MethodDelete, "/vms/vm-1/inspector", nil)
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusNotFound))
+			var body map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
+			Expect(body["error"]).To(Equal("inspector not running"))
+		})
+
+		It("AddVMsToInspection should return 404 when inspector not running", func() {
+			mockInspector.AddError = srvErrors.NewInspectorNotRunningError()
+			body := `["vm-1","vm-2"]`
+			req := httptest.NewRequest(http.MethodPatch, "/vms/inspector", strings.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusNotFound))
+			var respBody map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &respBody)).To(Succeed())
+			Expect(respBody["error"]).To(Equal("inspector not running"))
+		})
+
+		It("StopInspection should return 404 when inspector not running", func() {
+			mockInspector.StopError = srvErrors.NewInspectorNotRunningError()
+
+			req := httptest.NewRequest(http.MethodDelete, "/vms/inspector", nil)
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusNotFound))
+			var body map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
+			Expect(body["error"]).To(Equal("inspector not running"))
+		})
+
+		It("StopInspection should return 400 when state is invalid", func() {
+			mockInspector.StopError = srvErrors.NewInvalidStateError()
+
+			req := httptest.NewRequest(http.MethodDelete, "/vms/inspector", nil)
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusBadRequest))
+			var body map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
+			Expect(body["error"]).To(Equal("invalid state for this operation"))
+		})
+	})
+})
+
+var _ = Describe("Version Handler", func() {
+	It("should return version info", func() {
+		gin.SetMode(gin.TestMode)
+		handler := handlers.NewHandler(config.Configuration{
+			Agent: config.Agent{
+				Version:   "1.2.3",
+				GitCommit: "abc123",
+			},
+		})
+		router := gin.New()
+		router.GET("/version", handler.GetVersion)
+
+		req := httptest.NewRequest(http.MethodGet, "/version", nil)
+		w := httptest.NewRecorder()
+
+		router.ServeHTTP(w, req)
+
+		Expect(w.Code).To(Equal(http.StatusOK))
+		var resp v1.VersionInfo
+		Expect(json.Unmarshal(w.Body.Bytes(), &resp)).To(Succeed())
+		Expect(resp.Version).To(Equal("1.2.3"))
+		Expect(resp.GitCommit).To(Equal("abc123"))
 	})
 })
 
