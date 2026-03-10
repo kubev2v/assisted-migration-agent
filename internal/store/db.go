@@ -67,6 +67,19 @@ func NewDB(path string) (*sql.DB, error) {
 			_ = conn.Close()
 			return nil, fmt.Errorf("setting extension directory: %w", err)
 		}
+
+		// Install and load sqlite_scanner extension from the extension directory
+		extPath := filepath.Join(extDir, "sqlite_scanner.duckdb_extension")
+
+		if _, err := conn.Exec(fmt.Sprintf("INSTALL '%s'", extPath)); err != nil {
+			_ = conn.Close()
+			return nil, fmt.Errorf("installing sqlite_scanner extension: %w", err)
+		}
+
+		if _, err := conn.Exec(fmt.Sprintf("LOAD '%s'", extPath)); err != nil {
+			_ = conn.Close()
+			return nil, fmt.Errorf("loading sqlite_scanner extension: %w", err)
+		}
 	}
 
 	return conn, nil

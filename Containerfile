@@ -68,7 +68,23 @@ RUN mkdir -p /app/policies /app/forklift && \
 
 
 # =============================================================================
-# Stage 5: Final runtime image
+# Stage 5: Download DuckDB extensions (for air-gapped environments)
+# =============================================================================
+FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/ubi-minimal AS duckdb-extensions
+
+RUN microdnf install -y wget gzip && \
+    microdnf clean all
+
+WORKDIR /extensions
+
+# Download sqlite_scanner extension for DuckDB v1.4.3 linux_amd64
+ARG DUCKDB_VERSION=v1.4.3
+RUN wget -q "https://extensions.duckdb.org/${DUCKDB_VERSION}/linux_amd64/sqlite_scanner.duckdb_extension.gz" && \
+    gunzip sqlite_scanner.duckdb_extension.gz
+
+
+# =============================================================================
+# Stage 6: Final runtime image
 # =============================================================================
 FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/ubi-minimal
 
@@ -86,14 +102,25 @@ COPY --from=ui-builder /apps/agent-ui/dist /app/static
 # Copy OPA policies
 COPY --from=opa-builder /app/policies /app/policies
 
+# Copy DuckDB extensions
+COPY --from=duckdb-extensions /extensions /app/extensions
+
 # Create data directory (mounted via AGENT_DATA_FOLDER)
 RUN mkdir -p /var/lib/agent && \
-    chown -R 1001:0 /app/static /app/policies /var/lib/agent
+    chown -R 1001:0 /app/static /app/policies /app/extensions /var/lib/agent
+
+# Create entrypoint script
+RUN printf '#!/bin/sh\n\
+# Copy DuckDB extensions to persistent data folder\n\
+if [ -d /app/extensions ] && [ -d /var/lib/agent ]; then\n\
+    cp -n /app/extensions/*.duckdb_extension /var/lib/agent/ 2>/dev/null || true\n\
+fi\n\
+exec /app/agent "$@"\n' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 USER 1001
 
 # Expose HTTP port (configurable via --server-http-port, default: 8000)
 EXPOSE 8000
 
-ENTRYPOINT ["/app/agent"]
+ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["run"]
