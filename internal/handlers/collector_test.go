@@ -168,6 +168,9 @@ var _ = Describe("Collector Handlers", func() {
 
 			// Assert
 			Expect(w.Code).To(Equal(http.StatusBadRequest))
+			var response map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
+			Expect(response["error"]).To(ContainSubstring("Username is required"))
 		})
 
 		// Given a request missing the password field
@@ -189,6 +192,9 @@ var _ = Describe("Collector Handlers", func() {
 
 			// Assert
 			Expect(w.Code).To(Equal(http.StatusBadRequest))
+			var response map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
+			Expect(response["error"]).To(ContainSubstring("Password is required"))
 		})
 
 		// Given a request with an invalid URL format
@@ -261,6 +267,9 @@ var _ = Describe("Collector Handlers", func() {
 
 			// Assert
 			Expect(w.Code).To(Equal(http.StatusConflict))
+			var response map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
+			Expect(response["error"]).To(Equal("collection already in progress"))
 		})
 
 		// Given a collector service that returns an unexpected error
@@ -284,6 +293,9 @@ var _ = Describe("Collector Handlers", func() {
 
 			// Assert
 			Expect(w.Code).To(Equal(http.StatusInternalServerError))
+			var response map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
+			Expect(response["error"]).To(Equal("unexpected error"))
 		})
 	})
 
