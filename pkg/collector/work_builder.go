@@ -180,12 +180,11 @@ func (b *WorkBuilder) createFolderGroups(ctx context.Context) error {
 
 	if err := b.store.WithTx(ctx, func(txCtx context.Context) error {
 		for _, folder := range folders {
-			tag := sanitizeTag(folder.Name)
 			group := models.Group{
 				Name:        folder.Name,
 				Description: fmt.Sprintf("VMs in folder: %s", folder.Name),
-				Filter:      fmt.Sprintf("folder = '%s'", folder.Name),
-				Tags:        []string{tag},
+				Filter:      fmt.Sprintf("folder = '%s'", strings.ReplaceAll(folder.Name, `'`, `\'`)),
+				Tags:        []string{sanitizeTag(folder.Name)},
 			}
 			if _, err := b.store.Group().Create(txCtx, group); err != nil {
 				zap.S().Named("collector_service").Warnw("failed to create folder group",
