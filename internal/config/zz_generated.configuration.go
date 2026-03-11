@@ -219,6 +219,7 @@ func (a *Agent) ToOption() AgentOption {
 		to.UIGitCommit = a.UIGitCommit
 		to.NumWorkers = a.NumWorkers
 		to.DataFolder = a.DataFolder
+		to.VddkParentDirectory = a.VddkParentDirectory
 		to.OpaPoliciesFolder = a.OpaPoliciesFolder
 		to.UpdateInterval = a.UpdateInterval
 		to.LegacyStatusEnabled = a.LegacyStatusEnabled
@@ -236,6 +237,7 @@ func (a *Agent) DebugMap() map[string]any {
 	debugMap["UIGitCommit"] = helpers.DebugValue(a.UIGitCommit, false)
 	debugMap["NumWorkers"] = helpers.DebugValue(a.NumWorkers, false)
 	debugMap["DataFolder"] = helpers.DebugValue(a.DataFolder, false)
+	debugMap["VddkParentDirectory"] = helpers.DebugValue(a.VddkParentDirectory, false)
 	debugMap["OpaPoliciesFolder"] = helpers.DebugValue(a.OpaPoliciesFolder, false)
 	debugMap["UpdateInterval"] = helpers.DebugValue(a.UpdateInterval, false)
 	debugMap["LegacyStatusEnabled"] = helpers.DebugValue(a.LegacyStatusEnabled, false)
@@ -311,6 +313,13 @@ func WithNumWorkers(numWorkers int) AgentOption {
 func WithDataFolder(dataFolder string) AgentOption {
 	return func(a *Agent) {
 		a.DataFolder = dataFolder
+	}
+}
+
+// WithVddkParentDirectory returns an option that can set VddkParentDirectory on a Agent
+func WithVddkParentDirectory(vddkParentDirectory string) AgentOption {
+	return func(a *Agent) {
+		a.VddkParentDirectory = vddkParentDirectory
 	}
 }
 

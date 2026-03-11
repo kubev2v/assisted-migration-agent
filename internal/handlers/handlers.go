@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"mime/multipart"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
@@ -38,8 +39,15 @@ type InspectorService interface {
 	Add(ctx context.Context, vmIDs []string) error
 	GetStatus() models.InspectorStatus
 	GetVmStatus(ctx context.Context, id string) (models.InspectionStatus, error)
+	IsBusy() bool
 	CancelVmsInspection(ctx context.Context, vmIDs ...string) error
 	Stop(ctx context.Context) error
+}
+
+// VddkService defines the interface for vddk operations. Vddk is required for running InspectorService properly.
+type VddkService interface {
+	Upload(h *multipart.FileHeader) (*models.VddkStatus, error)
+	Status() (*models.VddkStatus, error)
 }
 
 // GroupService defines the interface for group operations.
@@ -58,6 +66,7 @@ type Handler struct {
 	collectorSrv CollectorService
 	inventorySrv InventoryService
 	inspectorSrv InspectorService
+	VddkSrv      VddkService
 	vmSrv        VMService
 	groupSrv     GroupService
 }
@@ -88,6 +97,11 @@ func (h *Handler) WithVMService(srv VMService) *Handler {
 
 func (h *Handler) WithInspectorService(srv InspectorService) *Handler {
 	h.inspectorSrv = srv
+	return h
+}
+
+func (h *Handler) WithVddkService(srv VddkService) *Handler {
+	h.VddkSrv = srv
 	return h
 }
 

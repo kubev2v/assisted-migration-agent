@@ -113,6 +113,7 @@ var _ = Describe("ServiceManager", func() {
 			Expect(mgr.ConsoleService()).NotTo(BeNil())
 			Expect(mgr.CollectorService()).NotTo(BeNil())
 			Expect(mgr.InspectorService()).NotTo(BeNil())
+			Expect(mgr.VddkService()).NotTo(BeNil())
 			Expect(mgr.InventoryService()).NotTo(BeNil())
 			Expect(mgr.VirtualMachineService()).NotTo(BeNil())
 			Expect(mgr.GroupService()).NotTo(BeNil())

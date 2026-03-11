@@ -1,37 +1,28 @@
 package handlers
 
 import (
-	"crypto/md5"
-	"encoding/hex"
 	"errors"
-	"io"
 	"net/http"
-	"os"
-	"path/filepath"
 
 	"github.com/gin-gonic/gin"
+
+	v1 "github.com/kubev2v/assisted-migration-agent/api/v1"
+	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
 const (
-	maxVDDKSize  = 64 << 20 // 64Mb
-	vddkFilename = "vddk.tar.gz"
+	MaxVDDKSize = 64 << 20 // 64Mb
 )
 
 // (POST /vddk)
 func (h *Handler) PostVddk(c *gin.Context) {
-	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxVDDKSize)
-
-	dst, err := os.Create(filepath.Join(h.cfg.Agent.DataFolder, vddkFilename))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	if h.inspectorSrv != nil && h.inspectorSrv.IsBusy() {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "VDDK upload is not allowed while inspector is running"})
 		return
 	}
-	defer func() {
-		_ = dst.Close()
-	}()
 
-	hash := md5.New()
-	written, err := io.Copy(io.MultiWriter(dst, hash), c.Request.Body)
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, MaxVDDKSize)
+	file, err := c.FormFile("file")
 	if err != nil {
 		var maxBytesErr *http.MaxBytesError
 		if errors.As(err, &maxBytesErr) {
@@ -42,8 +33,38 @@ func (h *Handler) PostVddk(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"bytes": written,
-		"md5":   hex.EncodeToString(hash.Sum(nil)),
+	s, err := h.VddkSrv.Upload(file)
+	if err != nil {
+		if srvErrors.IsResourceInProgressError(err) {
+			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, &v1.VddkProperties{
+		Version: s.Version,
+		Bytes:   s.Bytes,
+		Md5:     s.Md5,
+	})
+}
+
+// (GET /vddk)
+func (h *Handler) GetVddkStatus(c *gin.Context) {
+	s, err := h.VddkSrv.Status()
+	if err != nil {
+		if srvErrors.IsResourceNotFoundError(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, &v1.VddkProperties{
+		Version: s.Version,
+		Bytes:   s.Bytes,
+		Md5:     s.Md5,
 	})
 }
