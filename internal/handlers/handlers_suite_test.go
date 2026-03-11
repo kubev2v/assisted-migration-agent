@@ -2,6 +2,7 @@ package handlers_test
 
 import (
 	"context"
+	"io"
 	"testing"
 
 	"github.com/gin-gonic/gin/binding"
@@ -108,6 +109,11 @@ type MockInspectorService struct {
 	GetVmStatusCallCount         int
 	CancelVmsInspectionCallCount int
 	StopCallCount                int
+	IsBusyResult                 bool
+}
+
+func (m *MockInspectorService) IsBusy() bool {
+	return m.IsBusyResult
 }
 
 func (m *MockInspectorService) Start(ctx context.Context, vmIDs []string, cred *models.Credentials) error {
@@ -138,6 +144,26 @@ func (m *MockInspectorService) CancelVmsInspection(ctx context.Context, vmIDs ..
 func (m *MockInspectorService) Stop(ctx context.Context) error {
 	m.StopCallCount++
 	return m.StopError
+}
+
+// MockVddkService is a mock implementation of VddkService.
+type MockVddkService struct {
+	UploadResult *models.VddkStatus
+	UploadError  error
+	StatusResult *models.VddkStatus
+	StatusError  error
+	UploadCount  int
+	StatusCount  int
+}
+
+func (m *MockVddkService) Upload(ctx context.Context, filename string, r io.Reader) (*models.VddkStatus, error) {
+	m.UploadCount++
+	return m.UploadResult, m.UploadError
+}
+
+func (m *MockVddkService) Status(ctx context.Context) (*models.VddkStatus, error) {
+	m.StatusCount++
+	return m.StatusResult, m.StatusError
 }
 
 // MockGroupService is a mock implementation of GroupService.

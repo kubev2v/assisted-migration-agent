@@ -297,6 +297,18 @@ type VcenterCredentials struct {
 	Username string `binding:"required,min=1" json:"username"`
 }
 
+// VddkProperties defines model for VddkProperties.
+type VddkProperties struct {
+	// Bytes provided tarball bytes
+	Bytes *int64 `json:"bytes,omitempty"`
+
+	// Md5 md5 sum of the uploaded tarball
+	Md5 string `json:"md5"`
+
+	// Version The matching vSphere Client version
+	Version string `json:"version"`
+}
+
 // VersionInfo defines model for VersionInfo.
 type VersionInfo struct {
 	// GitCommit Git commit SHA used to build the agent

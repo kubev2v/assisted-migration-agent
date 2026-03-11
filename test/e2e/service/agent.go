@@ -5,6 +5,8 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -617,6 +619,73 @@ func (a *AgentSvc) StartInspectionRaw(body []byte) (int, error) {
 	}
 	_ = resp.Body.Close()
 	return resp.StatusCode, nil
+}
+
+// UploadVddk uploads a VDDK tarball via POST /api/v1/vddk and returns the reported VddkProperties on success.
+func (a *AgentSvc) UploadVddk(fileContent []byte, filename string) (*v1.VddkProperties, error) {
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+	part, err := w.CreateFormFile("file", filename)
+	if err != nil {
+		return nil, fmt.Errorf("creating form file: %w", err)
+	}
+	if _, err := part.Write(fileContent); err != nil {
+		return nil, fmt.Errorf("writing file part: %w", err)
+	}
+	if err := w.Close(); err != nil {
+		return nil, fmt.Errorf("closing multipart writer: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, a.baseURL+"/api/v1/vddk", &buf)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("Content-Type", w.FormDataContentType())
+
+	resp, err := a.request(NewAgentRequest(req))
+	if err != nil {
+		return nil, fmt.Errorf("sending request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var props v1.VddkProperties
+	if err := json.NewDecoder(resp.Body).Decode(&props); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+	return &props, nil
+}
+
+// GetVddkStatus returns the current VDDK status from GET /api/v1/vddk. Returns (nil, error) when VDDK is not found (404).
+func (a *AgentSvc) GetVddkStatus() (*v1.VddkProperties, error) {
+	req, err := http.NewRequest(http.MethodGet, a.baseURL+"/api/v1/vddk", nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	resp, err := a.request(NewAgentRequest(req))
+	if err != nil {
+		return nil, fmt.Errorf("sending request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("vddk not found")
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var props v1.VddkProperties
+	if err := json.NewDecoder(resp.Body).Decode(&props); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+	return &props, nil
 }
 
 func (a *AgentSvc) request(r *AgentReq) (*http.Response, error) {

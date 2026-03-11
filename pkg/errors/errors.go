@@ -24,6 +24,10 @@ func NewConfigurationNotFoundError() *ResourceNotFoundError {
 	return NewResourceNotFoundError("configuration", "")
 }
 
+func NewVddkNotFoundError() *ResourceNotFoundError {
+	return NewResourceNotFoundError("vddk", "")
+}
+
 func (e *ResourceNotFoundError) Error() string {
 	if e.ID != "" {
 		return fmt.Sprintf("%s '%s' not found", e.Kind, e.ID)
@@ -56,19 +60,31 @@ func IsDuplicateResourceError(err error) bool {
 	return errors.As(err, &e)
 }
 
-// CollectionInProgressError indicates a collection is already running.
-type CollectionInProgressError struct{}
-
-func NewCollectionInProgressError() *CollectionInProgressError {
-	return &CollectionInProgressError{}
+// OperationInProgressError indicates that the operation is already running.
+type OperationInProgressError struct {
+	operation string
 }
 
-func (e *CollectionInProgressError) Error() string {
-	return "collection already in progress"
+func NewOperationInProgressError(op string) *OperationInProgressError {
+	return &OperationInProgressError{
+		operation: op,
+	}
 }
 
-func IsCollectionInProgressError(err error) bool {
-	var e *CollectionInProgressError
+func NewCollectionInProgressError() *OperationInProgressError {
+	return NewOperationInProgressError("collection")
+}
+
+func NewVddkUploadInProgressError() *OperationInProgressError {
+	return NewOperationInProgressError("vddk upload")
+}
+
+func (e *OperationInProgressError) Error() string {
+	return fmt.Sprintf("%s already in progress", e.operation)
+}
+
+func IsOperationInProgressError(err error) bool {
+	var e *OperationInProgressError
 	return errors.As(err, &e)
 }
 

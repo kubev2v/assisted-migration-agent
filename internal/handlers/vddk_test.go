@@ -2,144 +2,198 @@ package handlers_test
 
 import (
 	"bytes"
-	"crypto/md5"
-	"encoding/hex"
 	"encoding/json"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	v1 "github.com/kubev2v/assisted-migration-agent/api/v1"
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
 	"github.com/kubev2v/assisted-migration-agent/internal/handlers"
+	"github.com/kubev2v/assisted-migration-agent/internal/models"
+	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
-var _ = Describe("PostVddk", func() {
+var _ = Describe("VDDK Handlers", func() {
 	var (
-		tempDir string
-		handler *handlers.Handler
-		router  *gin.Engine
+		mockVddk      *MockVddkService
+		mockInspector *MockInspectorService
+		handler       *handlers.Handler
+		router        *gin.Engine
 	)
 
 	BeforeEach(func() {
-		var err error
-		tempDir, err = os.MkdirTemp("", "vddk-test")
-		Expect(err).NotTo(HaveOccurred())
-
 		gin.SetMode(gin.TestMode)
-		handler = handlers.NewHandler(config.Configuration{Agent: config.Agent{DataFolder: tempDir}})
+		mockVddk = &MockVddkService{}
+		mockInspector = &MockInspectorService{}
+		handler = handlers.NewHandler(config.Configuration{}).
+			WithVddkService(mockVddk).
+			WithInspectorService(mockInspector)
 		router = gin.New()
-		router.POST("/vddk", handler.PostVddk)
+		wrapper := v1.ServerInterfaceWrapper{
+			Handler:      handler,
+			ErrorHandler: func(c *gin.Context, err error, statusCode int) { c.JSON(statusCode, gin.H{"msg": err.Error()}) },
+		}
+		router.GET("/vddk", wrapper.GetVddkStatus)
+		router.POST("/vddk", wrapper.PostVddk)
 	})
 
-	AfterEach(func() {
-		_ = os.RemoveAll(tempDir)
+	Context("GetVddkStatus", func() {
+		It("should return 200 and vddk properties when vddk is present", func() {
+			mockVddk.StatusResult = &models.VddkStatus{
+				Version: "8.0.3",
+				Md5:     "d41d8cd98f00b204e9800998ecf8427e",
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "/vddk", nil)
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusOK))
+			Expect(w.Header().Get("Content-Type")).To(Equal("application/json; charset=utf-8"))
+
+			var result v1.VddkProperties
+			Expect(json.Unmarshal(w.Body.Bytes(), &result)).To(Succeed())
+			Expect(result.Version).To(Equal("8.0.3"))
+			Expect(result.Md5).To(Equal("d41d8cd98f00b204e9800998ecf8427e"))
+			Expect(mockVddk.StatusCount).To(Equal(1))
+		})
+
+		It("should return 404 when vddk not found", func() {
+			mockVddk.StatusError = srvErrors.NewVddkNotFoundError()
+
+			req := httptest.NewRequest(http.MethodGet, "/vddk", nil)
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusNotFound))
+			var response map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
+			Expect(response["error"]).To(ContainSubstring("vddk not found"))
+		})
+
+		It("should return 500 for other errors", func() {
+			mockVddk.StatusError = http.ErrNotSupported
+
+			req := httptest.NewRequest(http.MethodGet, "/vddk", nil)
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusInternalServerError))
+		})
 	})
 
-	// Given a valid VDDK tarball content
-	// When we upload the file
-	// Then it should save the file and return bytes and md5 hash
-	It("should upload file successfully and return bytes and md5", func() {
-		// Arrange
-		content := []byte("test vddk tarball content")
-		expectedMD5 := md5.Sum(content)
+	Context("PostVddk", func() {
+		buildMultipartRequest := func(filename string, body []byte) *http.Request {
+			var buf bytes.Buffer
+			w := multipart.NewWriter(&buf)
+			part, err := w.CreateFormFile("file", filename)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = part.Write(body)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(w.Close()).To(Succeed())
 
-		req := httptest.NewRequest(http.MethodPost, "/vddk", bytes.NewReader(content))
-		req.Header.Set("Content-Type", "application/octet-stream")
-		w := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodPost, "/vddk", &buf)
+			req.Header.Set("Content-Type", w.FormDataContentType())
+			return req
+		}
 
-		// Act
-		router.ServeHTTP(w, req)
+		It("should return 200 and vddk properties on successful upload", func() {
+			mockVddk.UploadResult = &models.VddkStatus{
+				Version: "8.0.3",
+				Md5:     "abc123",
+			}
 
-		// Assert
-		Expect(w.Code).To(Equal(http.StatusOK))
+			req := buildMultipartRequest("VMware-vix-disklib-8.0.3-23950268.x86_64.tar.gz", []byte("fake-tar-gz-content"))
+			w := httptest.NewRecorder()
 
-		var response map[string]any
-		err := json.Unmarshal(w.Body.Bytes(), &response)
-		Expect(err).NotTo(HaveOccurred())
+			router.ServeHTTP(w, req)
 
-		Expect(response["bytes"]).To(BeNumerically("==", len(content)))
-		Expect(response["md5"]).To(Equal(hex.EncodeToString(expectedMD5[:])))
+			Expect(w.Code).To(Equal(http.StatusOK))
+			var result v1.VddkProperties
+			Expect(json.Unmarshal(w.Body.Bytes(), &result)).To(Succeed())
+			Expect(result.Version).To(Equal("8.0.3"))
+			Expect(result.Md5).To(Equal("abc123"))
+			Expect(mockVddk.UploadCount).To(Equal(1))
+		})
 
-		savedPath := filepath.Join(tempDir, "vddk.tar.gz")
-		savedContent, err := os.ReadFile(savedPath)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(savedContent).To(Equal(content))
-	})
+		It("should return 400 when inspector is busy", func() {
+			mockInspector.IsBusyResult = true
 
-	// Given a file larger than 64MB
-	// When we try to upload the file
-	// Then it should return 413 Request Entity Too Large
-	It("should return 413 when file exceeds 64MB", func() {
-		// Arrange
-		largeContent := strings.NewReader(strings.Repeat("x", 64<<20+1))
+			req := buildMultipartRequest("VMware-vix-disklib-8.0.3-23950268.x86_64.tar.gz", []byte("content"))
+			w := httptest.NewRecorder()
 
-		req := httptest.NewRequest(http.MethodPost, "/vddk", largeContent)
-		req.Header.Set("Content-Type", "application/octet-stream")
-		w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
 
-		// Act
-		router.ServeHTTP(w, req)
+			Expect(w.Code).To(Equal(http.StatusBadRequest))
+			var response map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
+			Expect(response["error"]).To(ContainSubstring("inspector is running"))
+			Expect(mockVddk.UploadCount).To(Equal(0))
+		})
 
-		// Assert
-		Expect(w.Code).To(Equal(http.StatusRequestEntityTooLarge))
+		It("should return 409 when vddk upload already in progress", func() {
+			mockVddk.UploadError = srvErrors.NewVddkUploadInProgressError()
 
-		var response map[string]any
-		err := json.Unmarshal(w.Body.Bytes(), &response)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(response["error"]).NotTo(BeEmpty())
-	})
+			req := buildMultipartRequest("VMware-vix-disklib-8.0.3-23950268.x86_64.tar.gz", []byte("content"))
+			w := httptest.NewRecorder()
 
-	// Given a non-existent data directory
-	// When we try to upload a file
-	// Then it should return 500 Internal Server Error
-	It("should return 500 when dataDir does not exist", func() {
-		// Arrange
-		nonExistentDir := filepath.Join(tempDir, "nonexistent")
-		handler = handlers.NewHandler(config.Configuration{Agent: config.Agent{DataFolder: nonExistentDir}})
-		router = gin.New()
-		router.POST("/vddk", handler.PostVddk)
+			router.ServeHTTP(w, req)
 
-		content := []byte("test content")
-		req := httptest.NewRequest(http.MethodPost, "/vddk", bytes.NewReader(content))
-		req.Header.Set("Content-Type", "application/octet-stream")
-		w := httptest.NewRecorder()
+			Expect(w.Code).To(Equal(http.StatusConflict))
+			var response map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
+			Expect(response["error"]).To(ContainSubstring("already in progress"))
+		})
 
-		// Act
-		router.ServeHTTP(w, req)
+		It("should return 500 when upload fails", func() {
+			mockVddk.UploadError = http.ErrAbortHandler
 
-		// Assert
-		Expect(w.Code).To(Equal(http.StatusInternalServerError))
+			req := buildMultipartRequest("VMware-vix-disklib-8.0.3-23950268.x86_64.tar.gz", []byte("content"))
+			w := httptest.NewRecorder()
 
-		var response map[string]any
-		err := json.Unmarshal(w.Body.Bytes(), &response)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(response["error"]).To(ContainSubstring("no such file or directory"))
-	})
+			router.ServeHTTP(w, req)
 
-	// Given an empty request body
-	// When we upload the file
-	// Then it should succeed with zero bytes
-	It("should handle empty request body", func() {
-		// Arrange
-		req := httptest.NewRequest(http.MethodPost, "/vddk", nil)
-		req.Header.Set("Content-Type", "application/octet-stream")
-		w := httptest.NewRecorder()
+			Expect(w.Code).To(Equal(http.StatusInternalServerError))
+		})
 
-		// Act
-		router.ServeHTTP(w, req)
+		It("should return 500 when no file is in the request", func() {
+			req := httptest.NewRequest(http.MethodPost, "/vddk", bytes.NewReader(nil))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			w := httptest.NewRecorder()
 
-		// Assert
-		Expect(w.Code).To(Equal(http.StatusOK))
+			router.ServeHTTP(w, req)
 
-		var response map[string]any
-		err := json.Unmarshal(w.Body.Bytes(), &response)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(response["bytes"]).To(BeNumerically("==", 0))
+			Expect(w.Code).To(Equal(http.StatusInternalServerError))
+		})
+
+		It("should return 413 when request body exceeds max VDDK file size", func() {
+			var buf bytes.Buffer
+			w := multipart.NewWriter(&buf)
+			part, err := w.CreateFormFile("file", "VMware-vix-disklib-8.0.3-23950268.x86_64.tar.gz")
+			Expect(err).NotTo(HaveOccurred())
+			_, err = part.Write(make([]byte, handlers.MaxVDDKSize+1)) // write a multipart body larger than MaxVDDKSize
+			Expect(err).NotTo(HaveOccurred())
+			Expect(w.Close()).To(Succeed())
+
+			req := httptest.NewRequest(http.MethodPost, "/vddk", &buf)
+			req.Header.Set("Content-Type", w.FormDataContentType())
+			rec := httptest.NewRecorder()
+
+			router.ServeHTTP(rec, req)
+
+			Expect(rec.Code).To(Equal(http.StatusRequestEntityTooLarge))
+			var response map[string]any
+			Expect(json.Unmarshal(rec.Body.Bytes(), &response)).To(Succeed())
+			Expect(response["error"]).To(ContainSubstring("request body too large"))
+			Expect(mockVddk.UploadCount).To(Equal(0))
+		})
 	})
 })

@@ -33,7 +33,7 @@ func (h *Handler) StartCollector(c *gin.Context) {
 	}
 
 	if err := h.collectorSrv.Start(c.Request.Context(), creds); err != nil {
-		if srvErrors.IsCollectionInProgressError(err) {
+		if srvErrors.IsOperationInProgressError(err) {
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 			return
 		}

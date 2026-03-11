@@ -172,7 +172,7 @@ var _ = Describe("Errors", func() {
 			err := srvErrors.NewCollectionInProgressError()
 
 			// Act & Assert
-			Expect(srvErrors.IsCollectionInProgressError(err)).To(BeTrue())
+			Expect(srvErrors.IsOperationInProgressError(err)).To(BeTrue())
 		})
 
 		// Given a CollectionInProgressError wrapped with fmt.Errorf
@@ -183,7 +183,7 @@ var _ = Describe("Errors", func() {
 			wrapped := fmt.Errorf("start failed: %w", srvErrors.NewCollectionInProgressError())
 
 			// Act & Assert
-			Expect(srvErrors.IsCollectionInProgressError(wrapped)).To(BeTrue())
+			Expect(srvErrors.IsOperationInProgressError(wrapped)).To(BeTrue())
 		})
 
 		// Given a plain error
@@ -191,7 +191,7 @@ var _ = Describe("Errors", func() {
 		// Then it should return false
 		It("should not match unrelated errors", func() {
 			// Act & Assert
-			Expect(srvErrors.IsCollectionInProgressError(errors.New("nope"))).To(BeFalse())
+			Expect(srvErrors.IsOperationInProgressError(errors.New("nope"))).To(BeFalse())
 		})
 	})
 
@@ -460,13 +460,13 @@ var _ = Describe("Errors", func() {
 
 			// Act & Assert
 			Expect(srvErrors.IsDuplicateResourceError(notFound)).To(BeFalse())
-			Expect(srvErrors.IsCollectionInProgressError(notFound)).To(BeFalse())
+			Expect(srvErrors.IsOperationInProgressError(notFound)).To(BeFalse())
 			Expect(srvErrors.IsResourceNotFoundError(duplicate)).To(BeFalse())
-			Expect(srvErrors.IsCollectionInProgressError(duplicate)).To(BeFalse())
+			Expect(srvErrors.IsOperationInProgressError(duplicate)).To(BeFalse())
 			Expect(srvErrors.IsResourceNotFoundError(inProgress)).To(BeFalse())
 			Expect(srvErrors.IsModeConflictError(inProgress)).To(BeFalse())
 			Expect(srvErrors.IsResourceNotFoundError(modeConflict)).To(BeFalse())
-			Expect(srvErrors.IsCollectionInProgressError(modeConflict)).To(BeFalse())
+			Expect(srvErrors.IsOperationInProgressError(modeConflict)).To(BeFalse())
 		})
 	})
 })

@@ -9,6 +9,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/kubev2v/assisted-migration-agent/internal/util"
 	"github.com/kubev2v/assisted-migration-agent/test/e2e/infra"
 	"github.com/kubev2v/assisted-migration-agent/test/e2e/service"
 
@@ -127,6 +128,65 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 				// Assert
 				ginkgo.GinkgoWriter.Printf("Observed %d requests\n", len(reqs))
 				gm.Expect(reqs).ToNot(gm.BeEmpty(), "gm.Expected requests in connected mode")
+			})
+		})
+
+		ginkgo.Context("vddk", func() {
+			var agentSvc *service.AgentSvc
+
+			ginkgo.BeforeEach(func() {
+				obs = infra.NewObserver(requests)
+				agentSvc = service.DefaultAgentSvc(cfg.AgentAPIUrl)
+			})
+
+			ginkgo.AfterEach(func() {
+				obs.Close()
+				if ginkgo.CurrentSpecReport().Failed() {
+					ginkgo.GinkgoWriter.Println("Keeping containers running (test failed)")
+					return
+				}
+				ginkgo.GinkgoWriter.Println("Stopping agent...")
+				_ = infraManager.RemoveAgent()
+			})
+
+			// Given an agent running
+			// When a VDDK tarball is uploaded via POST /vddk
+			// Then GET /vddk returns 200 with version, bytes, and md5 matching the upload
+			ginkgo.It("should upload VDDK tarball and return status with version, bytes, and md5", func() {
+				agentID := uuid.NewString()
+				_, err := infraManager.StartAgent(infra.AgentConfig{
+					AgentID:        agentID,
+					SourceID:       uuid.NewString(),
+					ConsoleURL:     cfg.AgentProxyUrl,
+					UpdateInterval: "1s",
+				})
+				gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to start agent")
+				ginkgo.GinkgoWriter.Printf("Agent started with ID: %s\n", agentID)
+
+				gm.Eventually(func() error {
+					_, err := agentSvc.Status()
+					return err
+				}, 30*time.Second, 1*time.Second).Should(gm.BeNil())
+
+				tarGz := util.BuildTarGz(
+					util.TarEntry{
+						Path:    "lib/lib64.so",
+						Content: "vddk-library-content",
+					})
+				filename := "VMware-vix-disklib-8.0.3-23950268.x86_64.tar.gz"
+
+				uploaded, err := agentSvc.UploadVddk(tarGz, filename)
+				gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to upload VDDK")
+				gm.Expect(uploaded).ToNot(gm.BeNil())
+				gm.Expect(uploaded.Version).To(gm.Equal("8.0.3"), "version should be parsed from filename")
+				gm.Expect(*uploaded.Bytes).To(gm.Equal(int64(len(tarGz))), "bytes should match uploaded size")
+				gm.Expect(uploaded.Md5).ToNot(gm.BeEmpty(), "md5 should be set")
+
+				status, err := agentSvc.GetVddkStatus()
+				gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to get VDDK status")
+				gm.Expect(status).ToNot(gm.BeNil())
+				gm.Expect(status.Version).To(gm.Equal("8.0.3"))
+				gm.Expect(status.Md5).To(gm.Equal(uploaded.Md5))
 			})
 		})
 

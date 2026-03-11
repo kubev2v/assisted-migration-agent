@@ -377,7 +377,7 @@
 //	│ Error Type                  │ Status │ When                         │
 //	├─────────────────────────────┼────────┼──────────────────────────────┤
 //	│ Validation error            │ 400    │ Invalid request params       │
-//	│ ResourceNotFoundError       │ 404    │ Resource doesn't exist       │
+//	│ ResourceNotFoundError       │ 404     │ Resource doesn't exist      │
 //	│ CollectionInProgressError   │ 409    │ Collection already running   │
 //	│ ModeConflictError           │ 409    │ Mode change after fatal err  │
 //	│ MaxBytesError               │ 413    │ Upload exceeds size limit    │

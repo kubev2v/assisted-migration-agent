@@ -9,7 +9,7 @@
 //	│ Error Type               │ HTTP   │ Description                         │
 //	├──────────────────────────┼────────┼─────────────────────────────────────┤
 //	│ ResourceNotFoundError    │ 404    │ Requested resource doesn't exist    │
-//	│ CollectionInProgressError│ 409    │ Collection already running          │
+//	│ OperationInProgressError │ 409   │ Already running                      │
 //	│ InvalidStateError        │ 500    │ Invalid state for operation         │
 //	│ ModeConflictError        │ 409    │ Mode change blocked by fatal error  │
 //	│ VCenterError             │ 500    │ vCenter connection/auth failure     │
@@ -31,17 +31,16 @@
 //	    c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 //	}
 //
-// # CollectionInProgressError
+// # OperationInProgressError
 //
-// Indicates an attempt to start collection while one is already running.
-// The collector only allows one collection at a time.
+// Indicates an attempt to start a operation while one is already running.
 //
 // Constructor:
-//   - NewCollectionInProgressError()
+//   - NewOperationInProgressError()
 //
 // Usage:
 //
-//	if errors.IsCollectionInProgressError(err) {
+//	if errors.IsOperationInProgressError(err) {
 //	    c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 //	}
 //
@@ -131,7 +130,7 @@
 //	switch {
 //	case errors.IsResourceNotFoundError(err):
 //	    c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-//	case errors.IsCollectionInProgressError(err):
+//	case errors.IsOperationInProgressError(err):
 //	    c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 //	case errors.IsModeConflictError(err):
 //	    c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
