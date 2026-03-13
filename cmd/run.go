@@ -147,7 +147,7 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 
 				if err := srv.Start(ctx); err != nil {
 					if !errors.Is(err, http.ErrServerClosed) {
-						zap.S().Errorw("failed to start http server", "error", err)
+						zap.S().Fatalw("failed to start http server", "error", err)
 					}
 				}
 			}()
@@ -246,7 +246,7 @@ func initStore(cfg *config.Configuration) (*store.Store, error) {
 		dbPath = ":memory:"
 		zap.S().Warn("data-folder not set, using in-memory database (data will not persist)")
 	}
-	db, err := store.NewDB(dbPath)
+	db, err := store.NewDB(store.NewDefaultExtentionLoader(), dbPath)
 	if err != nil {
 		zap.S().Errorw("failed to initialize database", "error", err)
 		return nil, err

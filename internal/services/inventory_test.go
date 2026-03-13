@@ -26,7 +26,7 @@ var _ = Describe("InventoryService", func() {
 		ctx = context.Background()
 
 		var err error
-		db, err = store.NewDB(":memory:")
+		db, err = store.NewDB(nil, ":memory:")
 		Expect(err).NotTo(HaveOccurred())
 
 		st = store.NewStore(db, test.NewMockValidator())

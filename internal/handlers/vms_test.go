@@ -817,7 +817,7 @@ var _ = Describe("VMs Handlers Integration", func() {
 		gin.SetMode(gin.TestMode)
 
 		var err error
-		db, err = store.NewDB(":memory:")
+		db, err = store.NewDB(nil, ":memory:")
 		Expect(err).NotTo(HaveOccurred())
 
 		st = store.NewStore(db, test.NewMockValidator())

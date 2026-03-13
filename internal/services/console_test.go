@@ -71,7 +71,7 @@ var _ = Describe("Console Service", func() {
 		collector = NewMockCollector(models.CollectorStateReady)
 
 		var err error
-		db, err = store.NewDB(":memory:")
+		db, err = store.NewDB(nil, ":memory:")
 		Expect(err).NotTo(HaveOccurred())
 
 		err = migrations.Run(context.Background(), db)
