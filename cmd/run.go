@@ -35,9 +35,7 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/server"
 	"github.com/kubev2v/assisted-migration-agent/internal/services"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
-	collectorv1 "github.com/kubev2v/assisted-migration-agent/pkg/collector"
 	"github.com/kubev2v/assisted-migration-agent/pkg/console"
-	"github.com/kubev2v/assisted-migration-agent/pkg/scheduler"
 )
 
 func NewRunCommand(cfg *config.Configuration) *cobra.Command {
@@ -68,19 +66,16 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 			wg := sync.WaitGroup{}
 			wg.Add(1)
 
-			store, err := initStore(cfg)
+			st, err := initStore(cfg)
 			if err != nil {
 				return err
 			}
 
-			if err := store.Migrate(context.Background()); err != nil {
+			if err := st.Migrate(context.Background()); err != nil {
 				zap.S().Errorw("failed to run migrations", "error", err)
 				return err
 			}
 			zap.S().Info("database initialized successfully")
-
-			// init scheduler
-			sched := scheduler.NewDefaultScheduler(cfg.Agent.NumWorkers)
 
 			// read jwt token for agent
 			jwt := ""
@@ -101,20 +96,14 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 				return fmt.Errorf("failed to create console client: %w", err)
 			}
 
-			// create collector service
-			workBuilder := collectorv1.NewWorkBuilder(store, cfg.Agent.DataFolder, cfg.Agent.OpaPoliciesFolder)
-			collectorSrv := services.NewCollectorService(sched, store, workBuilder)
-
-			// create inspector service
-			inspectorSrv := services.NewInspectorService(sched, store).WithBuilder(models.UnimplementedInspectorWorkBuilder{})
-
-			consoleSrv, err := services.NewConsoleService(cfg.Agent, sched, consoleClient, collectorSrv, store)
-			if err != nil {
-				return fmt.Errorf("failed to create console service: %w", err)
+			svcMgr := services.NewServiceManager(
+				services.WithConfig(cfg),
+				services.WithStore(st),
+				services.WithConsoleClient(consoleClient),
+			)
+			if err := svcMgr.Initialize(); err != nil {
+				return fmt.Errorf("failed to initialize services: %w", err)
 			}
-			inventorySrv := services.NewInventoryService(store)
-			vmSrv := services.NewVMService(store)
-			groupSrv := services.NewGroupService(store)
 
 			// register custom validators
 			if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
@@ -123,12 +112,12 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 
 			// init handlers
 			h := handlers.NewHandler(*cfg).
-				WithConsoleService(consoleSrv).
-				WithCollectorService(collectorSrv).
-				WithInventoryService(inventorySrv).
-				WithVMService(vmSrv).
-				WithInspectorService(inspectorSrv).
-				WithGroupService(groupSrv)
+				WithConsoleService(svcMgr.ConsoleService()).
+				WithCollectorService(svcMgr.CollectorService()).
+				WithInventoryService(svcMgr.InventoryService()).
+				WithVMService(svcMgr.VirtualMachineService()).
+				WithInspectorService(svcMgr.InspectorService()).
+				WithGroupService(svcMgr.GroupService())
 
 			srv, err := server.NewServer(cfg, func(router *gin.RouterGroup) {
 				v1.RegisterHandlers(router, h)
@@ -164,11 +153,8 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 
 			zap.S().Info("server shutdown")
 
-			consoleSrv.Stop()
-			collectorSrv.Stop()
-			_ = inspectorSrv.Stop(context.Background())
-			sched.Close()
-			_ = store.Close()
+			svcMgr.Stop(context.Background())
+			_ = st.Close()
 
 			zap.S().Info("services and scheduler closed")
 
