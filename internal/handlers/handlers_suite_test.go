@@ -37,7 +37,7 @@ func (m *MockCollectorService) GetStatus() models.CollectorStatus {
 	return m.StatusResult
 }
 
-func (m *MockCollectorService) Start(ctx context.Context, creds *models.Credentials) error {
+func (m *MockCollectorService) Start(ctx context.Context, creds models.Credentials) error {
 	m.StartCallCount++
 	return m.StartError
 }

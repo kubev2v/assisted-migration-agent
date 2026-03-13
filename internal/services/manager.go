@@ -7,7 +7,6 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
-	collectorv1 "github.com/kubev2v/assisted-migration-agent/pkg/collector"
 	"github.com/kubev2v/assisted-migration-agent/pkg/console"
 	"github.com/kubev2v/assisted-migration-agent/pkg/scheduler"
 )
@@ -67,13 +66,11 @@ func (m *ServiceManager) Initialize() error {
 
 	m.scheduler = scheduler.NewDefaultScheduler(m.cfg.Agent.NumWorkers)
 
-	workBuilder := collectorv1.NewWorkBuilder(
+	m.collector = NewCollectorService(
 		m.store,
 		m.cfg.Agent.DataFolder,
 		m.cfg.Agent.OpaPoliciesFolder,
 	)
-
-	m.collector = NewCollectorService(m.scheduler, m.store, workBuilder)
 	m.inspector = NewInspectorService(m.scheduler, m.store).
 		WithBuilder(models.UnimplementedInspectorWorkBuilder{})
 

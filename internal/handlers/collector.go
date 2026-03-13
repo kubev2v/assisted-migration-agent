@@ -26,7 +26,7 @@ func (h *Handler) StartCollector(c *gin.Context) {
 		return
 	}
 
-	creds := &models.Credentials{
+	creds := models.Credentials{
 		URL:      req.Url,
 		Username: req.Username,
 		Password: req.Password,
