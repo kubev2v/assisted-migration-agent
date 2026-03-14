@@ -12,8 +12,6 @@ const (
 	CollectorStateReady CollectorStateType = "ready"
 	// CollectorStateConnecting - verifying credentials with vCenter
 	CollectorStateConnecting CollectorStateType = "connecting"
-	// CollectorStateConnected - credentials verified
-	CollectorStateConnected CollectorStateType = "connected"
 	// CollectorStateCollecting - async collection in progress
 	CollectorStateCollecting CollectorStateType = "collecting"
 	// CollectorStateParsing - parsing collected data into duckdb
