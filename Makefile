@@ -195,16 +195,6 @@ generate:
 	@$(MAKE) format
 	@echo "Code generation complete."
 
-# Generate protobuf code using buf in container
-generate.proto:
-	@echo "Generating protobuf code with buf in container..."
-	$(PODMAN) run --rm \
-		-v $(CURDIR)/api/v1/:/workspace \
-		-w /workspace \
-		bufbuild/buf:latest \
-		generate
-	@echo "Protobuf generation complete."
-
 tidy:
 	@echo "🧹 Tidying go modules..."
 	git ls-files go.mod '**/*go.mod' -z | xargs -0 -I{} bash -xc 'cd $$(dirname {}) && go mod tidy'

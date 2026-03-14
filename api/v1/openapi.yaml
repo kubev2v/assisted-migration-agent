@@ -542,11 +542,17 @@ components:
           enum:
             - ready
             - connecting
-            - connected
             - collecting
             - parsing
             - collected
             - error
+          x-enum-varnames:
+            - CollectorStatusStatusReady
+            - CollectorStatusStatusConnecting
+            - CollectorStatusStatusCollecting
+            - CollectorStatusStatusParsing
+            - CollectorStatusStatusCollected
+            - CollectorStatusStatusError
         error:
           type: string
           description: Error message when status is error
@@ -562,6 +568,9 @@ components:
           enum:
             - connected
             - disconnected
+          x-enum-varnames:
+            - AgentStatusModeConnected
+            - AgentStatusModeDisconnected
           description: Target mode for the agent
         console_connection:
           type: string
@@ -881,6 +890,13 @@ components:
             - Advisory
             - Error
             - Other
+          x-enum-varnames:
+            - VMIssueCategoryCritical
+            - VMIssueCategoryWarning
+            - VMIssueCategoryInformation
+            - VMIssueCategoryAdvisory
+            - VMIssueCategoryError
+            - VMIssueCategoryOther
           description: Severity category of the issue. Unknown categories are mapped to 'Other'.
 
     VirtualMachineListResponse:
@@ -920,6 +936,14 @@ components:
             - canceled
             - completed
             - error
+          x-enum-varnames:
+            - InspectorStatusStateCanceled
+            - InspectorStatusStateCanceling
+            - InspectorStatusStateCompleted
+            - InspectorStatusStateError
+            - InspectorStatusStateInitiating
+            - InspectorStatusStateReady
+            - InspectorStatusStateRunning
           description: Inspector state
         error:
           type: string

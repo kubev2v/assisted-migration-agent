@@ -31,7 +31,6 @@ const (
 const (
 	CollectorStatusStatusCollected  CollectorStatusStatus = "collected"
 	CollectorStatusStatusCollecting CollectorStatusStatus = "collecting"
-	CollectorStatusStatusConnected  CollectorStatusStatus = "connected"
 	CollectorStatusStatusConnecting CollectorStatusStatus = "connecting"
 	CollectorStatusStatusError      CollectorStatusStatus = "error"
 	CollectorStatusStatusParsing    CollectorStatusStatus = "parsing"
@@ -40,13 +39,13 @@ const (
 
 // Defines values for InspectorStatusState.
 const (
-	InspectorStatusStateCanceled   InspectorStatusState = "canceled"
-	InspectorStatusStateCanceling  InspectorStatusState = "canceling"
-	InspectorStatusStateCompleted  InspectorStatusState = "completed"
-	InspectorStatusStateError      InspectorStatusState = "error"
-	InspectorStatusStateInitiating InspectorStatusState = "Initiating"
-	InspectorStatusStateReady      InspectorStatusState = "ready"
-	InspectorStatusStateRunning    InspectorStatusState = "running"
+	InspectorStatusStateCanceled   InspectorStatusState = "ready"
+	InspectorStatusStateCanceling  InspectorStatusState = "Initiating"
+	InspectorStatusStateCompleted  InspectorStatusState = "running"
+	InspectorStatusStateError      InspectorStatusState = "canceling"
+	InspectorStatusStateInitiating InspectorStatusState = "canceled"
+	InspectorStatusStateReady      InspectorStatusState = "completed"
+	InspectorStatusStateRunning    InspectorStatusState = "error"
 )
 
 // Defines values for VMIssueCategory.

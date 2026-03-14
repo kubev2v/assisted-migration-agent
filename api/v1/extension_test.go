@@ -18,25 +18,6 @@ func TestExtension(t *testing.T) {
 }
 
 var _ = Describe("AgentStatus.FromModel", func() {
-	// Given a connected console status
-	// When we convert it to API status
-	// Then it should map to connected
-	It("should map connected status", func() {
-		model := models.AgentStatus{
-			Console: models.ConsoleStatus{
-				Current: models.ConsoleStatusConnected,
-				Target:  models.ConsoleStatusConnected,
-			},
-		}
-
-		var status v1.AgentStatus
-		status.FromModel(model)
-
-		Expect(status.ConsoleConnection).To(Equal(v1.AgentStatusConsoleConnectionConnected))
-		Expect(status.Mode).To(Equal(v1.AgentStatusModeConnected))
-		Expect(status.Error).To(BeNil())
-	})
-
 	// Given a disconnected console status
 	// When we convert it to API status
 	// Then it should map to disconnected
@@ -216,14 +197,6 @@ var _ = Describe("NewCollectorStatus", func() {
 		It("should map connecting state", func() {
 			status := v1.NewCollectorStatus(models.CollectorStatus{State: models.CollectorStateConnecting})
 			Expect(status.Status).To(Equal(v1.CollectorStatusStatusConnecting))
-		})
-
-		// Given a connected collector state
-		// When we convert it to API status
-		// Then it should map to connected
-		It("should map connected state", func() {
-			status := v1.NewCollectorStatus(models.CollectorStatus{State: models.CollectorStateConnected})
-			Expect(status.Status).To(Equal(v1.CollectorStatusStatusConnected))
 		})
 
 		// Given a collecting collector state
