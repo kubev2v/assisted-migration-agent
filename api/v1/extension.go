@@ -50,8 +50,6 @@ func NewCollectorStatus(status models.CollectorStatus) CollectorStatus {
 		c.Status = CollectorStatusStatusReady
 	case models.CollectorStateConnecting:
 		c.Status = CollectorStatusStatusConnecting
-	case models.CollectorStateConnected:
-		c.Status = CollectorStatusStatusConnected
 	case models.CollectorStateCollecting:
 		c.Status = CollectorStatusStatusCollecting
 	case models.CollectorStateCollected:

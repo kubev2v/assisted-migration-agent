@@ -23,15 +23,14 @@ const (
 
 // Defines values for AgentStatusMode.
 const (
-	AgentStatusModeConnected    AgentStatusMode = "connected"
-	AgentStatusModeDisconnected AgentStatusMode = "disconnected"
+	Connected    AgentStatusMode = "connected"
+	Disconnected AgentStatusMode = "disconnected"
 )
 
 // Defines values for CollectorStatusStatus.
 const (
 	CollectorStatusStatusCollected  CollectorStatusStatus = "collected"
 	CollectorStatusStatusCollecting CollectorStatusStatus = "collecting"
-	CollectorStatusStatusConnected  CollectorStatusStatus = "connected"
 	CollectorStatusStatusConnecting CollectorStatusStatus = "connecting"
 	CollectorStatusStatusError      CollectorStatusStatus = "error"
 	CollectorStatusStatusParsing    CollectorStatusStatus = "parsing"
@@ -51,12 +50,12 @@ const (
 
 // Defines values for VMIssueCategory.
 const (
-	VMIssueCategoryAdvisory    VMIssueCategory = "Advisory"
-	VMIssueCategoryCritical    VMIssueCategory = "Critical"
-	VMIssueCategoryError       VMIssueCategory = "Error"
-	VMIssueCategoryInformation VMIssueCategory = "Information"
-	VMIssueCategoryOther       VMIssueCategory = "Other"
-	VMIssueCategoryWarning     VMIssueCategory = "Warning"
+	Advisory    VMIssueCategory = "Advisory"
+	Critical    VMIssueCategory = "Critical"
+	Error       VMIssueCategory = "Error"
+	Information VMIssueCategory = "Information"
+	Other       VMIssueCategory = "Other"
+	Warning     VMIssueCategory = "Warning"
 )
 
 // Defines values for VmInspectionStatusState.
