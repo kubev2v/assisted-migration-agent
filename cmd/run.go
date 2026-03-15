@@ -117,6 +117,7 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 				WithInventoryService(svcMgr.InventoryService()).
 				WithVMService(svcMgr.VirtualMachineService()).
 				WithInspectorService(svcMgr.InspectorService()).
+				WithVddkService(svcMgr.VddkService()).
 				WithGroupService(svcMgr.GroupService())
 
 			srv, err := server.NewServer(cfg, func(router *gin.RouterGroup) {
@@ -276,6 +277,7 @@ func registerAgentFlags(flagSet *pflag.FlagSet, config *config.Configuration) {
 	flagSet.StringVar(&config.Agent.Version, "version", config.Agent.Version, "Agent version to report to console")
 	flagSet.IntVar(&config.Agent.NumWorkers, "num-workers", config.Agent.NumWorkers, "Number of scheduler workers")
 	flagSet.StringVar(&config.Agent.DataFolder, "data-folder", config.Agent.DataFolder, "Path to the persistent data folder")
+	flagSet.StringVar(&config.Agent.VddkParentDirectory, "vddk-parent-folder", config.Agent.VddkParentDirectory, "Directory containing VDDK files and configuration")
 	flagSet.BoolVar(&config.Agent.LegacyStatusEnabled, "legacy-status-enabled", config.Agent.LegacyStatusEnabled, "Use agent's legacy status like waiting-for-credentials")
 }
 

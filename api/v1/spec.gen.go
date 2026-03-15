@@ -46,6 +46,9 @@ type ServerInterface interface {
 	// Get collected inventory
 	// (GET /inventory)
 	GetInventory(c *gin.Context, params GetInventoryParams)
+	// Get VDDK status
+	// (GET /vddk)
+	GetVddkStatus(c *gin.Context)
 	// Upload VDDK tarball
 	// (POST /vddk)
 	PostVddk(c *gin.Context)
@@ -340,6 +343,19 @@ func (siw *ServerInterfaceWrapper) GetInventory(c *gin.Context) {
 	siw.Handler.GetInventory(c, params)
 }
 
+// GetVddkStatus operation middleware
+func (siw *ServerInterfaceWrapper) GetVddkStatus(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetVddkStatus(c)
+}
+
 // PostVddk operation middleware
 func (siw *ServerInterfaceWrapper) PostVddk(c *gin.Context) {
 
@@ -578,6 +594,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.GET(options.BaseURL+"/groups/:id", wrapper.GetGroup)
 	router.PATCH(options.BaseURL+"/groups/:id", wrapper.UpdateGroup)
 	router.GET(options.BaseURL+"/inventory", wrapper.GetInventory)
+	router.GET(options.BaseURL+"/vddk", wrapper.GetVddkStatus)
 	router.POST(options.BaseURL+"/vddk", wrapper.PostVddk)
 	router.GET(options.BaseURL+"/version", wrapper.GetVersion)
 	router.GET(options.BaseURL+"/vms", wrapper.GetVMs)

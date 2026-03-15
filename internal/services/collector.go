@@ -54,7 +54,7 @@ func (c *CollectorService) Start(ctx context.Context, creds *models.Credentials)
 	defer c.mu.Unlock()
 
 	if c.isBusy() {
-		return srvErrors.NewCollectionInProgressError()
+		return srvErrors.NewCollectorInProgressError()
 	}
 
 	if !c.canCollect() {

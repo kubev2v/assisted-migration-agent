@@ -251,7 +251,7 @@ var _ = Describe("Collector Handlers", func() {
 		// Then it should return 409 Conflict
 		It("should return 409 when collection already in progress", func() {
 			// Arrange
-			mockCollector.StartError = srvErrors.NewCollectionInProgressError()
+			mockCollector.StartError = srvErrors.NewCollectorInProgressError()
 			body := v1.CollectorStartRequest{
 				Url:      "https://vcenter.example.com",
 				Username: "admin",
@@ -269,7 +269,7 @@ var _ = Describe("Collector Handlers", func() {
 			Expect(w.Code).To(Equal(http.StatusConflict))
 			var response map[string]any
 			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
-			Expect(response["error"]).To(Equal("collection already in progress"))
+			Expect(response["error"]).To(Equal("collector already in progress"))
 		})
 
 		// Given a collector service that returns an unexpected error

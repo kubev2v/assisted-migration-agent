@@ -171,6 +171,7 @@ func (c *ContainerInfraManager) StartAgent(cfg AgentConfig) (string, error) {
 		WithEnvVar("AGENT_AGENT_ID", cfg.AgentID).
 		WithEnvVar("AGENT_SOURCE_ID", cfg.SourceID).
 		WithEnvVar("AGENT_DATA_FOLDER", "/var/lib/agent").
+		WithEnvVar("AGENT_VDDK_PARENT_FOLDER", "/var/lib/agent").
 		WithEnvVar("AGENT_CONSOLE_URL", cfg.ConsoleURL).
 		WithEnvVar("AGENT_CONSOLE_UPDATE_INTERVAL", updateInterval)
 

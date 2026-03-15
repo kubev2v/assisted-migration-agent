@@ -21,6 +21,7 @@ type ServiceManager struct {
 	console   *Console
 	collector *CollectorService
 	inspector *InspectorService
+	vddk      *VddkService
 	inventory *InventoryService
 	vm        *VMService
 	group     *GroupService
@@ -76,6 +77,7 @@ func (m *ServiceManager) Initialize() error {
 	m.collector = NewCollectorService(m.scheduler, m.store, workBuilder)
 	m.inspector = NewInspectorService(m.scheduler, m.store).
 		WithBuilder(models.UnimplementedInspectorWorkBuilder{})
+	m.vddk = NewVddkService(m.cfg.Agent.VddkParentDirectory)
 
 	consoleSrv, err := NewConsoleService(
 		m.cfg.Agent,
@@ -109,6 +111,10 @@ func (m *ServiceManager) CollectorService() *CollectorService {
 
 func (m *ServiceManager) InspectorService() *InspectorService {
 	return m.inspector
+}
+
+func (m *ServiceManager) VddkService() *VddkService {
+	return m.vddk
 }
 
 func (m *ServiceManager) InventoryService() *InventoryService {

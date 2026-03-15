@@ -36,6 +36,7 @@ type Agent struct {
 	UIGitCommit         string        `debugmap:"visible" default:"unknown"`
 	NumWorkers          int           `debugmap:"visible" default:"3"`
 	DataFolder          string        `debugmap:"visible"`
+	VddkParentDirectory string        `debugmap:"visible" default:"/tmp"`
 	OpaPoliciesFolder   string        `debugmap:"visible"`
 	UpdateInterval      time.Duration `debugmap:"visible" default:"5s"`
 	LegacyStatusEnabled bool          `debugmap:"visible" default:"true"`

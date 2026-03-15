@@ -29,6 +29,7 @@ require (
 	github.com/xuri/excelize/v2 v2.9.1
 	go.podman.io/common v0.66.1
 	go.uber.org/zap v1.27.0
+	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.34.1
 	k8s.io/apimachinery v0.34.1
 )

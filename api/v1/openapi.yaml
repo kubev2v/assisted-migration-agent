@@ -469,6 +469,22 @@ paths:
           description: Internal server error
 
   /vddk:
+    get:
+      summary: Get VDDK status
+      operationId: getVddkStatus
+      responses:
+        '200':
+          description: |
+            Returns the current properties of the uploaded VMware VDDK tar. 
+            If the VDDK package has not been uploaded, a 404 response is returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VddkProperties'
+        '404':
+          description: Vddk not found
+        '500':
+          description: Internal server error
     post:
       summary: Upload VDDK tarball
       requestBody:
@@ -490,18 +506,9 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - md5
-                  - bytes
-                properties:
-                  md5:
-                    type: string
-                    description: md5 sum of the uploaded tarball
-                  bytes:
-                    type: integer
-                    format: int64
-                    description: written bytes
+                $ref: '#/components/schemas/VddkProperties'
+        '409':
+          description: Conflict
         '413':
           description: File exceeds 64MB limit
         '400':
@@ -511,6 +518,24 @@ paths:
 
 components:
   schemas:
+    VddkProperties:
+      type: object
+      required:
+        - version
+        - md5
+        - bytes
+      properties:
+        version:
+          type: string
+          description: The matching vSphere Client version
+        md5:
+          type: string
+          description: md5 sum of the uploaded tarball
+        bytes:
+          type: integer
+          format: int64
+          description: provided tarball bytes
+
     VersionInfo:
       type: object
       required:
