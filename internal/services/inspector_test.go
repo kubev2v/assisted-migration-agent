@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kubev2v/assisted-migration-agent/pkg/vmware"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -19,6 +21,17 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/test"
 )
 
+type vmWorkStep string
+
+const (
+	vmWorkValidationStep     vmWorkStep = "validation"
+	vmWorkCreateSnapshotStep vmWorkStep = "create-snapshot"
+	vmWorkInspectionStep     vmWorkStep = "inspect"
+	vmWorkSaveStep           vmWorkStep = "save-inspection-result"
+	vmWorkRemoveSnapshotStep vmWorkStep = "remove-snapshot"
+	totalVmWorkSteps                    = 5
+)
+
 // getVCenterCredentials returns test credentials for vCenter.
 // vcsim accepts any username/password, but we use standard test values.
 func getVCenterCredentials() *models.Credentials {
@@ -29,18 +42,20 @@ func getVCenterCredentials() *models.Credentials {
 	}
 }
 
-// testsMockInspectorWorkBuilder implements models.InspectorWorkBuilder for testing
+// testsMockInspectorWorkBuilder implements models.InspectionWorkBuilder for testing
 type testsMockInspectorWorkBuilder struct {
 	vmWorkErr map[string]error // per-VM errors
 	workDelay time.Duration
 	inspected []string
 	mu        sync.Mutex
+	workDone  map[string][]vmWorkStep // Per-VM steps done
 }
 
 func newMockInspectorWorkBuilder() *testsMockInspectorWorkBuilder {
 	return &testsMockInspectorWorkBuilder{
 		vmWorkErr: make(map[string]error),
 		inspected: make([]string, 0),
+		workDone:  make(map[string][]vmWorkStep),
 	}
 }
 
@@ -62,9 +77,17 @@ func (m *testsMockInspectorWorkBuilder) getInspectedVMs() []string {
 	return result
 }
 
-func (m *testsMockInspectorWorkBuilder) Build(vmID string) []models.InspectorWorkUnit {
-	return []models.InspectorWorkUnit{
-		{
+func (m *testsMockInspectorWorkBuilder) getVmWorkDone(id string) []vmWorkStep {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	result := make([]vmWorkStep, len(m.workDone[id]))
+	copy(result, m.workDone[id])
+	return result
+}
+
+func (m *testsMockInspectorWorkBuilder) Build(vmID string) models.VMWorkflow {
+	return models.VMWorkflow{
+		Validate: models.InspectorWorkUnit{
 			Work: func() func(ctx context.Context) (any, error) {
 				return func(ctx context.Context) (any, error) {
 					if m.workDelay > 0 {
@@ -81,10 +104,43 @@ func (m *testsMockInspectorWorkBuilder) Build(vmID string) []models.InspectorWor
 
 					m.mu.Lock()
 					m.inspected = append(m.inspected, vmID)
+					m.workDone[vmID] = append(m.workDone[vmID], vmWorkValidationStep)
 					m.mu.Unlock()
 
 					return nil, nil
 				}
+			},
+		},
+		CreateSnapshot: models.InspectorWorkUnit{
+			Work: func() func(ctx context.Context) (any, error) {
+				m.mu.Lock()
+				m.workDone[vmID] = append(m.workDone[vmID], vmWorkCreateSnapshotStep)
+				m.mu.Unlock()
+				return vmware.UnimplementedVMWorkUnit(0, "")
+			},
+		},
+		Inspect: models.InspectorWorkUnit{
+			Work: func() func(ctx context.Context) (any, error) {
+				m.mu.Lock()
+				m.workDone[vmID] = append(m.workDone[vmID], vmWorkInspectionStep)
+				m.mu.Unlock()
+				return vmware.UnimplementedVMWorkUnit(0, "")
+			},
+		},
+		Save: models.InspectorWorkUnit{
+			Work: func() func(ctx context.Context) (any, error) {
+				m.mu.Lock()
+				m.workDone[vmID] = append(m.workDone[vmID], vmWorkSaveStep)
+				m.mu.Unlock()
+				return vmware.UnimplementedVMWorkUnit(0, "")
+			},
+		},
+		RemoveSnapshot: models.InspectorWorkUnit{
+			Work: func() func(ctx context.Context) (any, error) {
+				m.mu.Lock()
+				m.workDone[vmID] = append(m.workDone[vmID], vmWorkRemoveSnapshotStep)
+				m.mu.Unlock()
+				return vmware.UnimplementedVMWorkUnit(0, "")
 			},
 		},
 	}
@@ -367,6 +423,63 @@ var _ = Describe("InspectorService", func() {
 				status2, err := st.Inspection().Get(ctx, "vm-2")
 				Expect(err).NotTo(HaveOccurred())
 				Expect(status2.State).To(Equal(models.InspectionStateCanceled))
+			})
+
+			It("should stop running VM gracefully and set status to canceled", func() {
+				// Use a long delay so vm-0 stays in "running" (inside runVMWork) long enough
+				builder := newMockInspectorWorkBuilder().withWorkDelay(3 * time.Second)
+				srv = services.NewInspectorService(sched, st).WithBuilder(builder)
+
+				err := srv.Start(ctx, []string{"vm-0"}, getVCenterCredentials())
+				Expect(err).NotTo(HaveOccurred())
+
+				// Add more Vms
+				additionalVms := []string{"vm-1", "vm-2"}
+				err = srv.Add(ctx, additionalVms)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Wait until vm-0 is in running state (inspector set it and is inside runVMWork)
+				Eventually(func() models.InspectionState {
+					status, err := st.Inspection().Get(ctx, "vm-0")
+					if err != nil {
+						return ""
+					}
+					return status.State
+				}).Should(Equal(models.InspectionStateRunning))
+
+				// Cancel vm-0 while it is running; this calls StopVM and cancels its context
+				err = srv.CancelVmsInspection(ctx, "vm-0")
+				Expect(err).NotTo(HaveOccurred())
+
+				// VM should end up canceled (runVMWork returns InspectionCanceledError, run loop sets state)
+				Eventually(func() models.InspectionState {
+					status, err := st.Inspection().Get(ctx, "vm-0")
+					if err != nil {
+						return ""
+					}
+					return status.State
+				}).Should(Equal(models.InspectionStateCanceled))
+
+				// Should not perform all the tasks
+				Expect(len(builder.getVmWorkDone("vm-0"))).To(BeNumerically("<", totalVmWorkSteps))
+				// In any case should remove the snapshot
+				Eventually(func() []vmWorkStep {
+					return builder.getVmWorkDone("vm-0")
+				}, 30*time.Second, 2*time.Second).Should(ContainElement(vmWorkRemoveSnapshotStep))
+
+				// all additional VMs should reach completed state
+				Eventually(func() bool {
+					vmsStatuses, err := st.Inspection().List(ctx, store.NewInspectionQueryFilter())
+					if err != nil {
+						return false
+					}
+					for _, vm := range additionalVms {
+						if vmsStatuses[vm].State != models.InspectionStateCompleted {
+							return false
+						}
+					}
+					return true
+				}, 30*time.Second, 2*time.Second).Should(BeTrue())
 			})
 		})
 	})

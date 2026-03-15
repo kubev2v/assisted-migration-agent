@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 
+	"github.com/kubev2v/assisted-migration-agent/pkg/vmware"
+
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
-	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	collectorv1 "github.com/kubev2v/assisted-migration-agent/pkg/collector"
 	"github.com/kubev2v/assisted-migration-agent/pkg/console"
@@ -75,7 +76,7 @@ func (m *ServiceManager) Initialize() error {
 
 	m.collector = NewCollectorService(m.scheduler, m.store, workBuilder)
 	m.inspector = NewInspectorService(m.scheduler, m.store).
-		WithBuilder(models.UnimplementedInspectorWorkBuilder{})
+		WithBuilder(vmware.UnimplementedInspectionWorkBuilder{})
 
 	consoleSrv, err := NewConsoleService(
 		m.cfg.Agent,
