@@ -10,7 +10,7 @@
 //   - Interface-based dependencies for testability
 //   - Mutex-protected state for thread safety
 //   - Channel-based signaling for goroutine coordination
-//   - Async work execution through a shared scheduler
+//   - Async work execution through WorkPipeline and Scheduler
 //
 // # Service Dependency Graph
 //
@@ -18,7 +18,7 @@
 //	    │
 //	    ▼
 //	Services Layer
-//	    ├── CollectorService ──► Store, Scheduler, WorkBuilder
+//	    ├── CollectorService ──► Store, WorkPipeline (owns its own Scheduler)
 //	    ├── Console ──────────► Store, Scheduler, Console Client, Collector
 //	    ├── InventoryService ─► Store
 //	    └── VMService ────────► Store
@@ -30,24 +30,25 @@
 //
 // State Machine:
 //
-//	┌───────┐    ┌────────────┐    ┌────────────┐    ┌───────────┐
-//	│ Ready │───►│ Connecting │───►│ Collecting │───►│ Collected │
-//	└───────┘    └────────────┘    └────────────┘    └───────────┘
-//	    ▲              │                 │            (terminal)
-//	    │              │                 │
-//	    │   (cancel)   │     (cancel)    │
-//	    ├──────────────┴─────────────────┤
-//	    │                                │
-//	    │              │                 │
-//	    │              ▼                 ▼
-//	    │         ┌─────────────────────────┐
-//	    └─────────│          Error          │
-//	   (restart)  └─────────────────────────┘
+//	┌───────┐    ┌────────────┐    ┌────────────┐    ┌─────────┐    ┌───────────┐
+//	│ Ready │───►│ Connecting │───►│ Collecting │───►│ Parsing │───►│ Collected │
+//	└───────┘    └────────────┘    └────────────┘    └─────────┘    └───────────┘
+//	    ▲              │                 │                │          (terminal)
+//	    │              │                 │                │
+//	    │   (cancel)   │     (cancel)    │    (cancel)    │
+//	    ├──────────────┴─────────────────┴────────────────┤
+//	    │                                                 │
+//	    │              │                 │                │
+//	    │              ▼                 ▼                ▼
+//	    │         ┌────────────────────────────────────────────┐
+//	    └─────────│                   Error                    │
+//	   (restart)  └────────────────────────────────────────────┘
 //
 // States:
 //   - Ready: Initial state, waiting for collection request
 //   - Connecting: Verifying vCenter credentials
 //   - Collecting: Inventory collection in progress
+//   - Parsing: Ingesting collected data into DuckDB, building inventory
 //   - Collected: Collection completed successfully (terminal state, no way back)
 //   - Error: An error occurred during operation (can restart from here)
 //
@@ -55,12 +56,12 @@
 //   - Only one collection can be in progress at a time (returns CollectionInProgressError otherwise)
 //   - Once inventory is collected, the Collected state is terminal - subsequent Start calls are no-ops
 //   - Collection can be cancelled mid-execution via Stop, returning to Ready state
-//   - Work units are executed sequentially through the scheduler
+//   - Work units are executed sequentially via a WorkPipeline (see pipeline.go)
 //   - On service initialization, if inventory exists in store, state starts as Collected
 //
 // Usage:
 //
-//	collector := services.NewCollectorService(scheduler, store, workBuilder)
+//	collector := services.NewCollectorService(store, dataDir, opaPoliciesDir)
 //	err := collector.Start(ctx, credentials)
 //	status := collector.GetStatus()
 //	collector.Stop() // Cancel if needed
@@ -133,12 +134,13 @@
 // status values for compatibility with v1 agent version:
 //
 //	┌─────────────────────────────────────────────────────────┐
-//	│  Current State    │  Legacy Status                      │
+//	|  Current State    |  Legacy Status                      |
 //	├───────────────────┼─────────────────────────────────────┤
-//	│  Ready            │  waiting-for-credentials            │
-//	│  Connecting       │  collecting                         │
-//	│  Collecting       │  collecting                         │
-//	│  Collected        │  collected                          │
+//	|  Ready            |  waiting-for-credentials            |
+//	|  Connecting       |  collecting                         |
+//	|  Collecting       |  collecting                         |
+//	|  Parsing          |  collecting                         |
+//	|  Collected        |  collected                          |
 //	└─────────────────────────────────────────────────────────┘
 //
 // Error handling:
@@ -244,7 +246,7 @@
 //
 // CollectorService and Console:
 //   - State protected by sync.Mutex
-//   - Goroutine lifecycle managed via channels and context cancellation
+//   - Goroutine lifecycle managed via channels
 //   - Single work-in-progress at a time
 //
 // InventoryService, VMService, and GroupService:

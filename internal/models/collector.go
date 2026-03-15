@@ -1,9 +1,5 @@
 package models
 
-import (
-	"context"
-)
-
 // CollectorStateType represents the current state of the collector.
 type CollectorStateType string
 
@@ -51,13 +47,8 @@ type CollectorStatus struct {
 	Error error
 }
 
-type WorkBuilder interface {
-	WithCredentials(creds *Credentials) WorkBuilder
-	Build() []WorkUnit
-}
-
-// WorkUnit represents a unit of work in the collector workflow.
-type WorkUnit struct {
-	Status func() CollectorStatus
-	Work   func() func(ctx context.Context) (any, error)
+// CollectorResult is the shared result struct threaded through collector work units.
+type CollectorResult struct {
+	SQLitePath string
+	Inventory  []byte
 }

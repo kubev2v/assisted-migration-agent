@@ -11,7 +11,7 @@ import (
 // CollectorService defines the interface for collector operations.
 type CollectorService interface {
 	GetStatus() models.CollectorStatus
-	Start(ctx context.Context, creds *models.Credentials) error
+	Start(ctx context.Context, creds models.Credentials) error
 	Stop()
 }
 
