@@ -78,7 +78,6 @@ func (m *ServiceManager) Initialize() error {
 
 	consoleSrv, err := NewConsoleService(
 		m.cfg.Agent,
-		m.scheduler,
 		m.consoleClient,
 		m.collector,
 		m.store,

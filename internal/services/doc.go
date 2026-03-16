@@ -18,10 +18,11 @@
 //	    │
 //	    ▼
 //	Services Layer
-//	    ├── CollectorService ──► Store, WorkPipeline (owns its own Scheduler)
-//	    ├── Console ──────────► Store, Scheduler, Console Client, Collector
+//	    ├── CollectorService ──► Store, WorkPipeline (owns its own Scheduler[CollectorResult])
+//	    ├── Console ──────────► Store, WorkPipeline (creates Scheduler[any] per run loop), Console Client, Collector
 //	    ├── InventoryService ─► Store
-//	    └── VMService ────────► Store
+//	    ├── VMService ────────► Store
+//	    └── GroupService ─────► Store
 //
 // # CollectorService
 //
@@ -56,8 +57,12 @@
 //   - Only one collection can be in progress at a time (returns CollectionInProgressError otherwise)
 //   - Once inventory is collected, the Collected state is terminal - subsequent Start calls are no-ops
 //   - Collection can be cancelled mid-execution via Stop, returning to Ready state
-//   - Work units are executed sequentially via a WorkPipeline (see pipeline.go)
-//   - On service initialization, if inventory exists in store, state starts as Collected
+//   - Work units are executed sequentially via a callback-free WorkPipeline (see pipeline.go)
+//   - The pipeline is pull-based: GetStatus reads pipeline.State() rather than receiving callbacks
+//   - The collector tolerates a stale pipeline — completed pipelines remain attached until
+//     replaced by a new Start() or detached by Stop()
+//   - GetStatus checks the database for inventory first (authoritative for Collected),
+//     then falls back to the pipeline state, then Ready
 //
 // Usage:
 //
@@ -97,8 +102,10 @@
 // The mode is persisted to the database so it survives agent restarts.
 //
 // The service implements:
-//   - Periodic status and inventory dispatching on a configurable interval
+//   - Periodic status and inventory dispatching via a reusable WorkPipeline
 //   - SHA256 hash-based deduplication to avoid sending unchanged inventory
+//   - Two-phase run loop: process result → wait (with backoff) → restart pipeline.
+//     Retries fire after the backoff interval, not before it.
 //   - Exponential backoff (up to 60s) for transient errors (5xx, network issues)
 //   - Immediate termination on fatal errors (4xx client errors)
 //   - Legacy status mode compatibility for older console versions
@@ -148,9 +155,17 @@
 //   - Fatal errors (4xx): Sets fatalStopped flag, exits run loop permanently
 //   - Mode changes blocked after fatal stop to prevent retry loops
 //
+// Shutdown protocol:
+//
+// Stop() and SetMode(disconnected) use a non-blocking send on the close channel.
+// If run() is alive, the send succeeds and a normal handshake follows. If run()
+// already exited (fatal error, Start failure), the buffer contains an ack from
+// run()'s deferred cleanup; the non-blocking send falls through to default and
+// drains the existing ack. This prevents deadlocks regardless of how run() exited.
+//
 // Usage:
 //
-//	console := services.NewConsoleService(cfg, scheduler, client, collector, store)
+//	console := services.NewConsoleService(cfg, client, collector, store)
 //	mode, err := console.GetMode(ctx)
 //	err = console.SetMode(ctx, models.AgentModeConnected)
 //	status := console.Status()
@@ -244,10 +259,16 @@
 //
 // # Thread Safety
 //
-// CollectorService and Console:
-//   - State protected by sync.Mutex
-//   - Goroutine lifecycle managed via channels
-//   - Single work-in-progress at a time
+// CollectorService:
+//   - Pipeline and scheduler lifecycle protected by sync.Mutex
+//   - Pipeline state is pull-based (no callbacks crossing lock boundaries)
+//   - Single pipeline at a time; stale completed pipelines tolerated
+//
+// Console:
+//   - Mode changes protected by sync.Mutex (prevents double run loop)
+//   - consoleState has its own separate mutex for status reads/writes,
+//     preventing deadlocks between the run loop and mode changes
+//   - Shutdown uses non-blocking channel send to handle self-exit safely
 //
 // InventoryService, VMService, and GroupService:
 //   - Stateless (only hold store reference)

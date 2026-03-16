@@ -21,7 +21,6 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	"github.com/kubev2v/assisted-migration-agent/pkg/console"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
-	"github.com/kubev2v/assisted-migration-agent/pkg/scheduler"
 	"github.com/kubev2v/assisted-migration-agent/test"
 )
 
@@ -54,7 +53,6 @@ func (m *MockCollector) SetError(err error) {
 
 var _ = Describe("Console Service", func() {
 	var (
-		sched     *scheduler.Scheduler[any]
 		collector *MockCollector
 		agentID   string
 		sourceID  string
@@ -67,7 +65,6 @@ var _ = Describe("Console Service", func() {
 		agentID = uuid.New().String()
 		sourceID = uuid.New().String()
 
-		sched = scheduler.NewScheduler[any](1)
 		collector = NewMockCollector(models.CollectorStateReady)
 
 		var err error
@@ -87,9 +84,6 @@ var _ = Describe("Console Service", func() {
 	})
 
 	AfterEach(func() {
-		if sched != nil {
-			sched.Close()
-		}
 		if db != nil {
 			_ = db.Close()
 		}
@@ -111,7 +105,7 @@ var _ = Describe("Console Service", func() {
 			cfg.Mode = "disconnected"
 
 			// Act
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
@@ -138,7 +132,7 @@ var _ = Describe("Console Service", func() {
 			cfg.Mode = "disconnected"
 
 			// Act
-			_, err = services.NewConsoleService(cfg, sched, client, collector, st)
+			_, err = services.NewConsoleService(cfg, client, collector, st)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Assert - Wait longer than updateInterval (50ms) to ensure no requests are fired
@@ -167,7 +161,7 @@ var _ = Describe("Console Service", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
@@ -199,7 +193,7 @@ var _ = Describe("Console Service", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
-			_, err = services.NewConsoleService(cfg, sched, client, collector, st)
+			_, err = services.NewConsoleService(cfg, client, collector, st)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Assert
@@ -225,7 +219,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
@@ -259,7 +253,7 @@ var _ = Describe("Console Service", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
@@ -284,7 +278,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(consoleSrv).NotTo(BeNil())
 
@@ -313,7 +307,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
@@ -341,7 +335,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
@@ -371,7 +365,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(consoleSrv.SetMode(context.Background(), models.AgentModeConnected)).To(BeNil())
 			Eventually(requestReceived, 500*time.Millisecond).Should(Receive())
@@ -406,7 +400,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(consoleSrv.SetMode(context.Background(), models.AgentModeConnected)).To(BeNil())
@@ -438,7 +432,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
@@ -473,7 +467,7 @@ var _ = Describe("Console Service", func() {
 
 			collector.SetState(models.CollectorStateCollected)
 
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(consoleSrv.SetMode(context.Background(), models.AgentModeConnected)).To(BeNil())
 
@@ -508,7 +502,7 @@ var _ = Describe("Console Service", func() {
 
 			collector.SetState(models.CollectorStateCollected)
 
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(consoleSrv.SetMode(context.Background(), models.AgentModeConnected)).To(BeNil())
 
@@ -536,7 +530,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
@@ -572,7 +566,7 @@ var _ = Describe("Console Service", func() {
 			err = st.Inventory().Save(context.Background(), []byte(`{"vms": [{"name": "vm1"}]}`))
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
@@ -603,7 +597,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
@@ -635,7 +629,7 @@ var _ = Describe("Console Service", func() {
 			err = st.Inventory().Save(context.Background(), []byte(`{"vms": [{"name": "vm1"}]}`))
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
@@ -679,7 +673,7 @@ var _ = Describe("Console Service", func() {
 			err = st.Inventory().Save(context.Background(), []byte(`{"vms": [{"name": "vm1"}]}`))
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
@@ -724,7 +718,7 @@ var _ = Describe("Console Service", func() {
 			err = st.Inventory().Save(context.Background(), []byte(`{"vms": [{"name": "vm1"}]}`))
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
@@ -754,7 +748,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
 			Expect(err).NotTo(HaveOccurred())
 			err = consoleSrv.SetMode(context.Background(), models.AgentModeConnected)
 			Expect(err).NotTo(HaveOccurred())
@@ -785,7 +779,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
 			Expect(err).NotTo(HaveOccurred())
 			err = consoleSrv.SetMode(context.Background(), models.AgentModeConnected)
 			Expect(err).NotTo(HaveOccurred())
@@ -825,7 +819,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
@@ -860,7 +854,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
@@ -912,7 +906,7 @@ var _ = Describe("Console Service", func() {
 			err = st.Inventory().Save(context.Background(), []byte(`{"vms": [{"name": "vm1"}]}`))
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
@@ -944,7 +938,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
@@ -973,7 +967,7 @@ var _ = Describe("Console Service", func() {
 			Expect(err).NotTo(HaveOccurred())
 			cfg.Mode = "disconnected"
 
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act - set the same mode (disconnected -> disconnected)
@@ -999,7 +993,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
 			Expect(err).NotTo(HaveOccurred())
 
 			// First connect so that the run loop starts and receives the 410
@@ -1033,7 +1027,7 @@ var _ = Describe("Console Service", func() {
 			Expect(err).NotTo(HaveOccurred())
 			cfg.Mode = "disconnected"
 
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
@@ -1057,7 +1051,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
 			Expect(err).NotTo(HaveOccurred())
 
 			err = consoleSrv.SetMode(context.Background(), models.AgentModeConnected)
@@ -1091,7 +1085,7 @@ var _ = Describe("Console Service", func() {
 			Expect(err).NotTo(HaveOccurred())
 			cfg.LegacyStatusEnabled = true
 
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
@@ -1132,7 +1126,7 @@ var _ = Describe("Console Service", func() {
 			collector.SetState(models.CollectorStateError)
 			collector.SetError(errors.New("invalid credentials"))
 
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
@@ -1171,7 +1165,7 @@ var _ = Describe("Console Service", func() {
 			collector.SetState(models.CollectorStateError)
 			collector.SetError(errors.New("connection refused"))
 
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
@@ -1213,7 +1207,7 @@ var _ = Describe("Console Service", func() {
 			collector.SetState(models.CollectorStateCollected)
 			collector.SetError(nil)
 
-			consoleSrv, err := services.NewConsoleService(cfg, sched, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
