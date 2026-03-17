@@ -1,0 +1,18 @@
+name: Jira PR Sync
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+    branches:
+      - main
+      - 'release-*'
+
+jobs:
+  sync-jira:
+    uses: kubev2v/migration-planner-workflows/.github/workflows/jira-pr-sync.yml@main
+    with:
+      ticket-prefix: 'ECOPROJECT'
+    secrets:
+      JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+      JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
+      JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
