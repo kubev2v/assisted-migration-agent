@@ -71,6 +71,10 @@ func NewOperationInProgressError(op string) *OperationInProgressError {
 	}
 }
 
+func NewInspectionInProgressError() *OperationInProgressError {
+	return NewOperationInProgressError("inspection")
+}
+
 func NewCollectionInProgressError() *OperationInProgressError {
 	return NewOperationInProgressError("collection")
 }
@@ -167,21 +171,6 @@ func (e *ConsoleClientError) Error() string {
 func IsConsoleClientError(err error) bool {
 	var e *ConsoleClientError
 	return errors.As(err, &e)
-}
-
-// InspectorWorkError indicates that an error occurred during the work
-type InspectorWorkError struct {
-	msg string
-}
-
-func NewInspectorWorkError(format string, args ...any) error {
-	return &InspectorWorkError{
-		msg: fmt.Sprintf(format, args...),
-	}
-}
-
-func (e *InspectorWorkError) Error() string {
-	return e.msg
 }
 
 // InspectorNotRunningError indicates that inspector not currently running

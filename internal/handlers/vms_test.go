@@ -362,12 +362,12 @@ var _ = Describe("VMs Handlers", func() {
 			Expect(response.State).To(Equal(v1.VmInspectionStatusStateCanceled))
 		})
 
-		// Given CancelVmsInspection returns an error
+		// Given Cancel returns an error
 		// When we remove a VM from inspection
 		// Then it should return 500 Internal Server Error
 		It("RemoveVMFromInspection should return 500 when cancel fails", func() {
 			// Arrange
-			mockInspector.CancelVmsInspectionError = errors.New("cancel failed")
+			mockInspector.CancelError = errors.New("cancel failed")
 
 			req := httptest.NewRequest(http.MethodDelete, "/vms/vm-1/inspection", nil)
 			w := httptest.NewRecorder()
@@ -382,44 +382,11 @@ var _ = Describe("VMs Handlers", func() {
 			Expect(body["error"]).To(Equal("cancel failed"))
 		})
 
-		It("RemoveVMFromInspection should return 404 when VM not found after cancel", func() {
-			// Arrange
-			mockInspector.GetVmStatusError = srvErrors.NewResourceNotFoundError("vm inspection status", "vm-1")
-
-			req := httptest.NewRequest(http.MethodDelete, "/vms/vm-1/inspection", nil)
-			w := httptest.NewRecorder()
-
-			// Act
-			router.ServeHTTP(w, req)
-
-			// Assert
-			Expect(w.Code).To(Equal(http.StatusNotFound))
-			var response v1.VmInspectionStatus
-			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
-			Expect(response.State).To(Equal(v1.VmInspectionStatusStateNotStarted))
-		})
-
-		It("RemoveVMFromInspection should return 500 when GetVmStatus fails", func() {
-			// Arrange
-			mockInspector.GetVmStatusError = errors.New("database error")
-
-			req := httptest.NewRequest(http.MethodDelete, "/vms/vm-1/inspection", nil)
-			w := httptest.NewRecorder()
-
-			// Act
-			router.ServeHTTP(w, req)
-
-			// Assert
-			Expect(w.Code).To(Equal(http.StatusInternalServerError))
-			var body map[string]any
-			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
-			Expect(body["error"]).To(Equal("failed to get VM status: database error"))
-		})
-
 		It("RemoveVMFromInspection should return 400 when inspector not running", func() {
-			mockInspector.CancelVmsInspectionError = srvErrors.NewInspectorNotRunningError()
+			mockInspector.CancelError = srvErrors.NewInspectorNotRunningError()
 
 			req := httptest.NewRequest(http.MethodDelete, "/vms/vm-1/inspection", nil)
+
 			w := httptest.NewRecorder()
 
 			router.ServeHTTP(w, req)
@@ -459,12 +426,13 @@ var _ = Describe("Version Handler", func() {
 
 var _ = Describe("VMs Handlers Integration", func() {
 	var (
-		ctx     context.Context
-		db      *sql.DB
-		st      *store.Store
-		vmSrv   *services.VMService
-		handler *handlers.Handler
-		router  *gin.Engine
+		ctx           context.Context
+		db            *sql.DB
+		st            *store.Store
+		vmSrv         *services.VMService
+		mockInspector *MockInspectorService
+		handler       *handlers.Handler
+		router        *gin.Engine
 	)
 
 	BeforeEach(func() {
@@ -486,7 +454,12 @@ var _ = Describe("VMs Handlers Integration", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		vmSrv = services.NewVMService(st)
-		handler = handlers.NewHandler(config.Configuration{}).WithVMService(vmSrv)
+		mockInspector = &MockInspectorService{
+			GetVmStatusResult: models.InspectionStatus{State: models.InspectionStateNotStarted},
+		}
+		handler = handlers.NewHandler(config.Configuration{}).
+			WithVMService(vmSrv).
+			WithInspectorService(mockInspector)
 		router = gin.New()
 		router.GET("/vms", func(c *gin.Context) {
 			var params v1.GetVMsParams

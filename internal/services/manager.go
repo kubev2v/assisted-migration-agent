@@ -72,8 +72,14 @@ func (m *ServiceManager) Initialize() error {
 		m.cfg.Agent.DataFolder,
 		m.cfg.Agent.OpaPoliciesFolder,
 	)
-	m.inspector = NewInspectorService(m.scheduler, m.store).
-		WithBuilder(models.UnimplementedInspectorWorkBuilder{})
+
+	// Todo: remove WithWorkUnitsBuilder when service is ready
+	m.inspector = NewInspectorService().
+		WithInspectionBuilder(
+			func(id string) []models.WorkUnit[models.InspectionStatus, models.InspectionResult] {
+				return make([]models.WorkUnit[models.InspectionStatus, models.InspectionResult], 0)
+			})
+
 	m.vddk = NewVddkService(m.cfg.Agent.DataFolder, m.store)
 
 	consoleSrv, err := NewConsoleService(
@@ -84,7 +90,7 @@ func (m *ServiceManager) Initialize() error {
 	)
 	if err != nil {
 		m.collector.Stop()
-		_ = m.inspector.Stop(context.Background())
+		_ = m.inspector.Stop()
 		m.scheduler.Close()
 		return err
 	}
@@ -128,6 +134,6 @@ func (m *ServiceManager) GroupService() *GroupService {
 func (m *ServiceManager) Stop(ctx context.Context) {
 	m.console.Stop()
 	m.collector.Stop()
-	_ = m.inspector.Stop(ctx)
+	_ = m.inspector.Stop()
 	m.scheduler.Close()
 }

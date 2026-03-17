@@ -40,7 +40,6 @@ const (
 // Defines values for InspectorStatusState.
 const (
 	InspectorStatusStateCanceled   InspectorStatusState = "canceled"
-	InspectorStatusStateCanceling  InspectorStatusState = "canceling"
 	InspectorStatusStateCompleted  InspectorStatusState = "completed"
 	InspectorStatusStateError      InspectorStatusState = "error"
 	InspectorStatusStateInitiating InspectorStatusState = "Initiating"

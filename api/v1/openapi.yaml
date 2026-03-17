@@ -937,7 +937,6 @@ components:
             - ready
             - Initiating
             - running
-            - canceling
             - canceled
             - completed
             - error
@@ -945,7 +944,6 @@ components:
             - InspectorStatusStateReady
             - InspectorStatusStateInitiating
             - InspectorStatusStateRunning
-            - InspectorStatusStateCanceling
             - InspectorStatusStateCanceled
             - InspectorStatusStateCompleted
             - InspectorStatusStateError
