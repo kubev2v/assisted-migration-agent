@@ -2,10 +2,13 @@ package store
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 
 	sq "github.com/Masterminds/squirrel"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
+	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
 // Constants for vddk table
@@ -39,6 +42,9 @@ func (s *VddkStore) Get(ctx context.Context) (*models.VddkStatus, error) {
 	var status models.VddkStatus
 	err = row.Scan(&status.Version, &status.Md5)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, srvErrors.NewVddkNotFoundError()
+		}
 		return nil, err
 	}
 	return &status, nil

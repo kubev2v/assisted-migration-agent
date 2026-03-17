@@ -10,6 +10,7 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
+	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 	"github.com/kubev2v/assisted-migration-agent/test"
 )
 
@@ -40,10 +41,10 @@ var _ = Describe("VddkStore", func() {
 	})
 
 	Context("Get", func() {
-		It("expect ErrNoRows when no vddk status exists", func() {
+		It("should return ResourceNotFoundError when no vddk status exists", func() {
 			_, err := s.Vddk().Get(ctx)
 			Expect(err).To(HaveOccurred())
-			Expect(err).To(Equal(sql.ErrNoRows))
+			Expect(srvErrors.IsResourceNotFoundError(err)).To(BeTrue())
 		})
 
 		It("returns saved version and md5", func() {

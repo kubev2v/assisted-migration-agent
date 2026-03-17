@@ -9,7 +9,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/kubev2v/assisted-migration-agent/internal/util"
+	"github.com/kubev2v/assisted-migration-agent/test"
 	"github.com/kubev2v/assisted-migration-agent/test/e2e/infra"
 	"github.com/kubev2v/assisted-migration-agent/test/e2e/service"
 
@@ -168,8 +168,8 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 					return err
 				}, 30*time.Second, 1*time.Second).Should(gm.BeNil())
 
-				tarGz := util.BuildTarGz(
-					util.TarEntry{
+				tarGz := test.BuildTarGz(
+					test.TarEntry{
 						Path:    "lib/lib64.so",
 						Content: "vddk-library-content",
 					})
