@@ -9,8 +9,6 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/kubev2v/assisted-migration-agent/internal/util"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -54,8 +52,8 @@ var _ = Describe("VddkService", func() {
 
 	Describe("Upload", func() {
 		It("extracts tar.gz, saves status and returns version/bytes/md5", func() {
-			tarGz := util.BuildTarGz(
-				util.TarEntry{
+			tarGz := test.BuildTarGz(
+				test.TarEntry{
 					Path:    "lib/lib64.so",
 					Content: "vddk-library-content",
 				})
@@ -89,8 +87,8 @@ var _ = Describe("VddkService", func() {
 
 		It("does not override previous content when upload is invalid", func() {
 			// Upload valid VDDK first
-			tarGz := util.BuildTarGz(
-				util.TarEntry{
+			tarGz := test.BuildTarGz(
+				test.TarEntry{
 					Path:    "lib/lib64.so",
 					Content: "original-vddk-content",
 				})
@@ -126,8 +124,8 @@ var _ = Describe("VddkService", func() {
 		})
 
 		It("returns error when filename format is invalid", func() {
-			tarGz := util.BuildTarGz(
-				util.TarEntry{
+			tarGz := test.BuildTarGz(
+				test.TarEntry{
 					Path:    "lib/foo.so",
 					Content: "x",
 				})
@@ -136,8 +134,8 @@ var _ = Describe("VddkService", func() {
 		})
 
 		It("returns VddkUploadInProgressError when upload is already in progress", func() {
-			tarGz := util.BuildTarGz(
-				util.TarEntry{
+			tarGz := test.BuildTarGz(
+				test.TarEntry{
 					Path:    "slow",
 					Content: "x",
 				})
@@ -181,8 +179,8 @@ var _ = Describe("VddkService", func() {
 
 		It("returns saved status when config exists", func() {
 			// Upload once to create config
-			tarGz := util.BuildTarGz(
-				util.TarEntry{
+			tarGz := test.BuildTarGz(
+				test.TarEntry{
 					Path:    "lib/x.so",
 					Content: "y",
 				})
@@ -200,8 +198,8 @@ var _ = Describe("VddkService", func() {
 	Describe("extractVersion", func() {
 		// extractVersion is unexported; we test via Upload with different filenames and tar layouts
 		It("parses version from VMware-vix-disklib-X.Y.Z-... filename", func() {
-			tarGz := util.BuildTarGz(
-				util.TarEntry{
+			tarGz := test.BuildTarGz(
+				test.TarEntry{
 					Path:    "lib/x.so",
 					Content: "z",
 				})
@@ -212,8 +210,8 @@ var _ = Describe("VddkService", func() {
 		})
 
 		It("extracts version from lib64 libvixDiskLib.so when filename has no version", func() {
-			tarGz := util.BuildTarGz(
-				util.TarEntry{
+			tarGz := test.BuildTarGz(
+				test.TarEntry{
 					Path:    "vmware-vix-disklib-distrib/lib64/libvixDiskLib.so.8.0.3",
 					Content: "library-content",
 				})
@@ -229,8 +227,8 @@ var _ = Describe("VddkService", func() {
 		})
 
 		It("returns error when filename has no version and tar has no lib64 libvixDiskLib.so", func() {
-			tarGz := util.BuildTarGz(
-				util.TarEntry{
+			tarGz := test.BuildTarGz(
+				test.TarEntry{
 					Path:    "lib/foo.so",
 					Content: "x",
 				})

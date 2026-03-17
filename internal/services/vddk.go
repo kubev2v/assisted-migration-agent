@@ -1,11 +1,11 @@
 package services
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"context"
 	"crypto/md5"
-	"database/sql"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -17,7 +17,6 @@ import (
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
-	"github.com/kubev2v/assisted-migration-agent/internal/util"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
@@ -55,12 +54,12 @@ func (v *VddkService) Upload(ctx context.Context, filename string, r io.Reader) 
 		_ = os.RemoveAll(tmpDir)
 	}()
 
-	if err := os.MkdirAll(tmpDir, 0755); err != nil {
+	if err := os.MkdirAll(tmpDir, 0o755); err != nil {
 		return nil, fmt.Errorf("creating temp dir: %w", err)
 	}
 
 	hash := md5.New()
-	if err := util.ExtractTarGz(io.TeeReader(r, hash), tmpDir); err != nil {
+	if err := extractTarGz(io.TeeReader(r, hash), tmpDir); err != nil {
 		return nil, fmt.Errorf("extracting vddk: %w", err)
 	}
 
@@ -71,8 +70,9 @@ func (v *VddkService) Upload(ctx context.Context, filename string, r io.Reader) 
 	}
 
 	// Replace existing VDDK folder
-	_ = os.RemoveAll(v.DstPath())
-	if err := os.Rename(tmpDir, v.DstPath()); err != nil {
+	destinationPath := filepath.Join(v.parentFolder, vddkFolder)
+	_ = os.RemoveAll(destinationPath)
+	if err := os.Rename(tmpDir, destinationPath); err != nil {
 		return nil, fmt.Errorf("error replacing vddk folder: %w", err)
 	}
 
@@ -89,14 +89,7 @@ func (v *VddkService) Upload(ctx context.Context, filename string, r io.Reader) 
 }
 
 func (v *VddkService) Status(ctx context.Context) (*models.VddkStatus, error) {
-	s, err := v.store.Vddk().Get(ctx)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, srvErrors.NewVddkNotFoundError()
-		}
-		return nil, err
-	}
-	return s, nil
+	return v.store.Vddk().Get(ctx)
 }
 
 func (v *VddkService) acquireUpload() bool {
@@ -141,6 +134,56 @@ func (v *VddkService) extractVersion(filename, extractedFolder string) (string, 
 	return "", fmt.Errorf("no version found in filename '%s' or tar content", filename)
 }
 
-func (v *VddkService) DstPath() string {
-	return filepath.Join(v.parentFolder, vddkFolder)
+// extractTarGz extracts all files and directories from a given reader and overrides a specified destination folder
+func extractTarGz(r io.Reader, destDir string) error {
+	gzr, err := gzip.NewReader(r)
+	if err != nil {
+		return fmt.Errorf("creating gzip reader: %w", err)
+	}
+	defer func() {
+		_ = gzr.Close()
+	}()
+
+	tarReader := tar.NewReader(gzr)
+
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break // end of archive
+		}
+		if err != nil {
+			return err
+		}
+
+		targetPath := filepath.Clean(filepath.Join(destDir, header.Name))
+		// Ensure the target path is inside destDir
+		if !strings.HasPrefix(targetPath, filepath.Clean(destDir)+string(os.PathSeparator)) &&
+			targetPath != filepath.Clean(destDir) {
+			return fmt.Errorf("illegal file path: %s", targetPath)
+		}
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			// create directory
+			if err := os.MkdirAll(targetPath, os.FileMode(header.Mode)); err != nil {
+				return err
+			}
+		case tar.TypeReg:
+			// create file
+			outFile, err := os.Create(targetPath)
+			if err != nil {
+				return err
+			}
+			if _, err := io.Copy(outFile, tarReader); err != nil {
+				_ = outFile.Close()
+				return err
+			}
+			_ = outFile.Close()
+			if err := os.Chmod(targetPath, os.FileMode(header.Mode)); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
