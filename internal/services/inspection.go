@@ -14,6 +14,11 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/pkg/scheduler"
 )
 
+const (
+	defaultInspectionSchedulerNormalWorkers   = 5
+	defaultInspectionSchedulerReservedWorkers = 0
+)
+
 type (
 	inspectionPipeline    = WorkPipeline[models.InspectionStatus, models.InspectionResult]
 	inspectionWorkBuilder func(id string) []models.WorkUnit[models.InspectionStatus, models.InspectionResult]
@@ -119,7 +124,10 @@ func (i *inspectionService) GetVmStatus(id string) models.InspectionStatus {
 func (i *inspectionService) Start(operator *vmware.VMManager, vmIDs []string) error {
 	i.operator = operator
 
-	sched := scheduler.NewScheduler[models.InspectionResult](5)
+	sched, err := scheduler.NewScheduler[models.InspectionResult](defaultInspectionSchedulerNormalWorkers, defaultInspectionSchedulerReservedWorkers)
+	if err != nil {
+		return err
+	}
 	i.scheduler = sched
 
 	if i.buildFn == nil {
@@ -251,7 +259,6 @@ func (i *inspectionService) save(ctx context.Context, id string) error {
 }
 
 func (i *inspectionService) removeSnapshot(ctx context.Context, id string) error {
-
 	zap.S().Named("inspector_service").Infow("removing VM snapshot", "vmId", id)
 
 	removeSnapReq := vmware.RemoveSnapshotRequest{

@@ -35,6 +35,10 @@ It does not own service lifecycle, cleanup callbacks, or shared concurrency poli
 
 It is useful only when multiple work items or multiple pipelines share it.
 
+The scheduler may also reserve a small amount of worker capacity for
+priority work. This exists to preserve liveness during cancellation and stop
+flows, not to create a general-purpose "importance" ranking for all work.
+
 ### Service
 
 The service owns orchestration:
@@ -58,6 +62,36 @@ So the intended layering is:
 - `WorkPipeline[S, R]`: per-run typed sequencing and state
 - service: typed orchestration and shared scheduler ownership
 - `Scheduler[R]`: shared concurrency control for one workflow domain
+
+## Why Reserved Workers Exist
+
+Reserved workers solve a specific problem: cleanup or finalization work must
+still make progress even when normal capacity is saturated.
+
+This matters for stop semantics. A pipeline may be canceled while all normal
+workers are busy running regular work. If cleanup units are queued behind that
+same normal capacity, the stop request can stall because the cleanup needed to
+finish the stop has no path to execution.
+
+Reserved workers prevent that starvation.
+
+The intended semantics are:
+
+- normal work (`priority == 0`) uses only normal workers
+- priority work (`priority > 0`) may use normal workers or reserved workers
+
+The important point is the rationale: reserved workers are primarily for
+cleanup-related work triggered during stop or cancellation flows. They are not
+meant to be a general scheduling policy for "more important" business work.
+
+With that model:
+
+- normal throughput is still governed by the normal worker pool
+- stop/cleanup work retains a path to execution
+- services can preserve existing stop semantics while still enqueueing cleanup units
+
+Without reserved workers, a service can request stop but have its cleanup work
+starved behind the very work it is trying to cancel.
 
 ## Why `WorkPipeline` Has No Callbacks
 

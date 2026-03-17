@@ -25,8 +25,14 @@ func unit(status string, fn func(ctx context.Context, r int) (int, error)) model
 var _ = Describe("WorkPipeline", func() {
 	var sched *scheduler.Scheduler[int]
 
+	newScheduler := func(normalWorkers int, reservedWorkers int) *scheduler.Scheduler[int] {
+		s, err := scheduler.NewScheduler[int](normalWorkers, reservedWorkers)
+		Expect(err).NotTo(HaveOccurred())
+		return s
+	}
+
 	BeforeEach(func() {
-		sched = scheduler.NewScheduler[int](1)
+		sched = newScheduler(1, 0)
 	})
 
 	AfterEach(func() {
@@ -335,7 +341,7 @@ var _ = Describe("WorkPipeline", func() {
 		// Then both should complete with their own correct results
 		It("should run two pipelines concurrently on a multi-worker scheduler", func() {
 			// Arrange
-			multiSched := scheduler.NewScheduler[int](4)
+			multiSched := newScheduler(4, 0)
 			defer multiSched.Close()
 
 			pipelines := make([]*services.WorkPipeline[string, int], 2)
@@ -373,7 +379,7 @@ var _ = Describe("WorkPipeline", func() {
 		// Then the fast pipeline should complete successfully and the slow one should be canceled
 		It("should allow stopping one pipeline without affecting the other", func() {
 			// Arrange
-			multiSched := scheduler.NewScheduler[int](4)
+			multiSched := newScheduler(4, 0)
 			defer multiSched.Close()
 
 			gate := make(chan struct{})
@@ -415,7 +421,7 @@ var _ = Describe("WorkPipeline", func() {
 		// Then each pipeline should report its own result independently
 		It("should isolate errors between pipelines on the same scheduler", func() {
 			// Arrange
-			multiSched := scheduler.NewScheduler[int](2)
+			multiSched := newScheduler(2, 0)
 			defer multiSched.Close()
 
 			failUnits := []models.WorkUnit[string, int]{
@@ -451,7 +457,7 @@ var _ = Describe("WorkPipeline", func() {
 		// Then no goroutine should panic or deadlock, and all pipelines should end up not running
 		It("should handle start + immediate stop without races", func() {
 			// Arrange
-			stressSched := scheduler.NewScheduler[int](4)
+			stressSched := newScheduler(4, 0)
 			defer stressSched.Close()
 
 			const n = 10
@@ -499,7 +505,7 @@ var _ = Describe("WorkPipeline", func() {
 		// Then no goroutine should panic or deadlock
 		It("should handle concurrent Stop calls without races", func() {
 			// Arrange
-			stressSched := scheduler.NewScheduler[int](1)
+			stressSched := newScheduler(1, 0)
 			defer stressSched.Close()
 
 			units := []models.WorkUnit[string, int]{
@@ -544,7 +550,7 @@ var _ = Describe("WorkPipeline", func() {
 		// Then all 10 should complete with correct results
 		It("should run 10 independent pipelines concurrently without races", func() {
 			// Arrange
-			stressSched := scheduler.NewScheduler[int](4)
+			stressSched := newScheduler(4, 0)
 			defer stressSched.Close()
 
 			const n = 10

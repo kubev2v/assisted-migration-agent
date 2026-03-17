@@ -183,7 +183,11 @@ func (c *Console) Status() models.ConsoleStatus {
 func (c *Console) run(closeCh chan any) {
 	c.state.SetCurrent(models.ConsoleStatusConnected)
 
-	sched := scheduler.NewScheduler[any](1)
+	sched, err := scheduler.NewScheduler[any](1, 0)
+	if err != nil {
+		c.state.SetError(err)
+		return
+	}
 	pipeline := NewWorkPipeline("pending", sched, c.buildWorkUnits())
 
 	defer func() {

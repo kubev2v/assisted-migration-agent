@@ -89,7 +89,10 @@ func (c *CollectorService) Start(ctx context.Context, creds models.Credentials) 
 		c.scheduler.Close()
 	}
 
-	sched := scheduler.NewScheduler[models.CollectorResult](1)
+	sched, err := scheduler.NewScheduler[models.CollectorResult](1, 0)
+	if err != nil {
+		return err
+	}
 	c.scheduler = sched
 
 	buildFn := c.buildWorkUnits
