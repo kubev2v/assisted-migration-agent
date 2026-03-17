@@ -38,3 +38,7 @@ type InspectionStatus struct {
 	State InspectionState
 	Error error
 }
+
+// InspectionResult is the shared result struct threaded through inspection work units.
+// InspectionResult Todo: pass here data between inspection phase to saving step
+type InspectionResult struct{}

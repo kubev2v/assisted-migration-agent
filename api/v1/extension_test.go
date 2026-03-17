@@ -340,11 +340,6 @@ var _ = Describe("NewInspectorStatus", func() {
 			Expect(status.State).To(Equal(v1.InspectorStatusStateRunning))
 		})
 
-		It("should map canceling state", func() {
-			status := v1.NewInspectorStatus(models.InspectorStatus{State: models.InspectorStateCanceling})
-			Expect(status.State).To(Equal(v1.InspectorStatusStateCanceling))
-		})
-
 		It("should map canceled state", func() {
 			status := v1.NewInspectorStatus(models.InspectorStatus{State: models.InspectorStateCanceled})
 			Expect(status.State).To(Equal(v1.InspectorStatusStateCanceled))

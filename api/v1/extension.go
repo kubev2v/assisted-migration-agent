@@ -194,8 +194,6 @@ func NewInspectorStatus(status models.InspectorStatus) InspectorStatus {
 		c.State = InspectorStatusStateInitiating
 	case models.InspectorStateRunning:
 		c.State = InspectorStatusStateRunning
-	case models.InspectorStateCanceling:
-		c.State = InspectorStatusStateCanceling
 	case models.InspectorStateCanceled:
 		c.State = InspectorStatusStateCanceled
 	case models.InspectorStateCompleted:

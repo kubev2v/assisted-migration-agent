@@ -394,19 +394,6 @@ var _ = Describe("Errors", func() {
 		})
 	})
 
-	Context("InspectorWorkError", func() {
-		// Given an InspectorWorkError created with format args
-		// When Error() is called
-		// Then it should contain the formatted message
-		It("should format message with args", func() {
-			// Arrange
-			err := srvErrors.NewInspectorWorkError("vm %s failed: %s", "vm-1", "snapshot error")
-
-			// Act & Assert
-			Expect(err.Error()).To(Equal("vm vm-1 failed: snapshot error"))
-		})
-	})
-
 	Context("InspectorNotRunningError", func() {
 		// Given an InspectorNotRunningError
 		// When Error() is called

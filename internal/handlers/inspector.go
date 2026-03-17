@@ -32,6 +32,10 @@ func (h *Handler) StartInspection(c *gin.Context) {
 	}
 
 	if err := h.inspectorSrv.Start(c.Request.Context(), req.VmIds, cred); err != nil {
+		if srvErrors.IsOperationInProgressError(err) {
+			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to start inspector: %v", err)})
 		return
 	}
@@ -48,7 +52,7 @@ func (h *Handler) GetInspectorStatus(c *gin.Context) {
 // StopInspection stops inspector entirely
 // (DELETE /inspector)
 func (h *Handler) StopInspection(c *gin.Context) {
-	if err := h.inspectorSrv.Stop(c.Request.Context()); err != nil {
+	if err := h.inspectorSrv.Stop(); err != nil {
 		if srvErrors.IsInspectorNotRunningError(err) {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return

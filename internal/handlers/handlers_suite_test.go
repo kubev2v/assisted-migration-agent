@@ -100,8 +100,7 @@ type MockInspectorService struct {
 	AddError                     error
 	GetStatusResult              models.InspectorStatus
 	GetVmStatusResult            models.InspectionStatus
-	GetVmStatusError             error
-	CancelVmsInspectionError     error
+	CancelError                  error
 	StopError                    error
 	StartCallCount               int
 	AddCallCount                 int
@@ -121,7 +120,7 @@ func (m *MockInspectorService) Start(ctx context.Context, vmIDs []string, cred *
 	return m.StartError
 }
 
-func (m *MockInspectorService) Add(ctx context.Context, vmIDs []string) error {
+func (m *MockInspectorService) Add(id string) error {
 	m.AddCallCount++
 	return m.AddError
 }
@@ -131,17 +130,17 @@ func (m *MockInspectorService) GetStatus() models.InspectorStatus {
 	return m.GetStatusResult
 }
 
-func (m *MockInspectorService) GetVmStatus(ctx context.Context, id string) (models.InspectionStatus, error) {
+func (m *MockInspectorService) GetVmStatus(id string) models.InspectionStatus {
 	m.GetVmStatusCallCount++
-	return m.GetVmStatusResult, m.GetVmStatusError
+	return m.GetVmStatusResult
 }
 
-func (m *MockInspectorService) CancelVmsInspection(ctx context.Context, vmIDs ...string) error {
+func (m *MockInspectorService) Cancel(id string) error {
 	m.CancelVmsInspectionCallCount++
-	return m.CancelVmsInspectionError
+	return m.CancelError
 }
 
-func (m *MockInspectorService) Stop(ctx context.Context) error {
+func (m *MockInspectorService) Stop() error {
 	m.StopCallCount++
 	return m.StopError
 }

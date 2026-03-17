@@ -36,12 +36,12 @@ type VMService interface {
 // InspectorService defines the interface for deep inspector operations.
 type InspectorService interface {
 	Start(ctx context.Context, vmIDs []string, cred *models.Credentials) error
-	Add(ctx context.Context, vmIDs []string) error
+	Add(id string) error
 	GetStatus() models.InspectorStatus
-	GetVmStatus(ctx context.Context, id string) (models.InspectionStatus, error)
+	GetVmStatus(id string) models.InspectionStatus
 	IsBusy() bool
-	CancelVmsInspection(ctx context.Context, vmIDs ...string) error
-	Stop(ctx context.Context) error
+	Cancel(id string) error
+	Stop() error
 }
 
 // VddkService defines the interface for vddk operations. Vddk is required for running InspectorService properly.

@@ -90,9 +90,10 @@ func (h *Handler) GetVMs(c *gin.Context, params v1.GetVMsParams) {
 		pageCount = 1
 	}
 
-	// Map to API response
+	// Get inspection status and Map to API response
 	apiVMs := make([]v1.VirtualMachine, 0, len(vms))
 	for _, vm := range vms {
+		vm.Status = h.inspectorSrv.GetVmStatus(vm.ID)
 		apiVMs = append(apiVMs, v1.NewVirtualMachineFromSummary(vm))
 	}
 
@@ -123,7 +124,7 @@ func (h *Handler) GetVM(c *gin.Context, id string) {
 // AddVMToInspection add VM to inspection queue
 // (POST /vms/{id}/inspection)
 func (h *Handler) AddVMToInspection(c *gin.Context, id string) {
-	if err := h.inspectorSrv.Add(c.Request.Context(), []string{id}); err != nil {
+	if err := h.inspectorSrv.Add(id); err != nil {
 		if srvErrors.IsInspectorNotRunningError(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -138,7 +139,7 @@ func (h *Handler) AddVMToInspection(c *gin.Context, id string) {
 // RemoveVMFromInspection removes VM from inspection queue
 // (DELETE /vms/{id}/inspection)
 func (h *Handler) RemoveVMFromInspection(c *gin.Context, id string) {
-	if err := h.inspectorSrv.CancelVmsInspection(c.Request.Context(), id); err != nil {
+	if err := h.inspectorSrv.Cancel(id); err != nil {
 		if srvErrors.IsInspectorNotRunningError(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -147,15 +148,5 @@ func (h *Handler) RemoveVMFromInspection(c *gin.Context, id string) {
 		return
 	}
 
-	s, err := h.inspectorSrv.GetVmStatus(c.Request.Context(), id)
-	if err != nil {
-		if srvErrors.IsResourceNotFoundError(err) {
-			c.JSON(http.StatusNotFound, v1.VmInspectionStatus{State: v1.VmInspectionStatusStateNotStarted})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to get VM status: %v", err)})
-		return
-	}
-
-	c.JSON(http.StatusOK, v1.NewInspectionStatus(s))
+	c.JSON(http.StatusOK, v1.NewInspectionStatus(h.inspectorSrv.GetVmStatus(id)))
 }
