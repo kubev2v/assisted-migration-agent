@@ -961,13 +961,13 @@ components:
             - completed
             - error
           x-enum-varnames:
-            - InspectorStatusStateCanceled
+            - InspectorStatusStateReady
+            - InspectorStatusStateInitiating
+            - InspectorStatusStateRunning
             - InspectorStatusStateCanceling
+            - InspectorStatusStateCanceled
             - InspectorStatusStateCompleted
             - InspectorStatusStateError
-            - InspectorStatusStateInitiating
-            - InspectorStatusStateReady
-            - InspectorStatusStateRunning
           description: Inspector state
         error:
           type: string

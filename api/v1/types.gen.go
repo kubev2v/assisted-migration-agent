@@ -39,13 +39,13 @@ const (
 
 // Defines values for InspectorStatusState.
 const (
-	InspectorStatusStateCanceled   InspectorStatusState = "ready"
-	InspectorStatusStateCanceling  InspectorStatusState = "Initiating"
-	InspectorStatusStateCompleted  InspectorStatusState = "running"
-	InspectorStatusStateError      InspectorStatusState = "canceling"
-	InspectorStatusStateInitiating InspectorStatusState = "canceled"
-	InspectorStatusStateReady      InspectorStatusState = "completed"
-	InspectorStatusStateRunning    InspectorStatusState = "error"
+	InspectorStatusStateCanceled   InspectorStatusState = "canceled"
+	InspectorStatusStateCanceling  InspectorStatusState = "canceling"
+	InspectorStatusStateCompleted  InspectorStatusState = "completed"
+	InspectorStatusStateError      InspectorStatusState = "error"
+	InspectorStatusStateInitiating InspectorStatusState = "Initiating"
+	InspectorStatusStateReady      InspectorStatusState = "ready"
+	InspectorStatusStateRunning    InspectorStatusState = "running"
 )
 
 // Defines values for VMIssueCategory.
