@@ -10,7 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 
 	v1 "github.com/kubev2v/assisted-migration-agent/api/v1"
-	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/services"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
@@ -121,117 +120,11 @@ func (h *Handler) GetVM(c *gin.Context, id string) {
 	c.JSON(http.StatusOK, v1.NewVirtualMachineDetailFromModel(*vm))
 }
 
-// GetVMInspectionStatus returns the inspection status for a specific VM
-// (GET /vms/{id}/inspector)
-func (h *Handler) GetVMInspectionStatus(c *gin.Context, id string) {
-	s, err := h.inspectorSrv.GetVmStatus(c.Request.Context(), id)
-	if err != nil {
-		if srvErrors.IsResourceNotFoundError(err) {
-			c.JSON(http.StatusNotFound, v1.VmInspectionStatus{State: v1.VmInspectionStatusStateNotStarted})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to get VM status: %v", err)})
-		return
-	}
-
-	c.JSON(http.StatusOK, v1.NewInspectionStatus(s))
-}
-
-// RemoveVMFromInspection removes VM from inspection queue
-// (DELETE /vms/{id}/inspector)
-func (h *Handler) RemoveVMFromInspection(c *gin.Context, id string) {
-	if err := h.inspectorSrv.CancelVmsInspection(c.Request.Context(), id); err != nil {
+// AddVMToInspection add VM to inspection queue
+// (POST /vms/{id}/inspection)
+func (h *Handler) AddVMToInspection(c *gin.Context, id string) {
+	if err := h.inspectorSrv.Add(c.Request.Context(), []string{id}); err != nil {
 		if srvErrors.IsInspectorNotRunningError(err) {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	s, err := h.inspectorSrv.GetVmStatus(c.Request.Context(), id)
-	if err != nil {
-		if srvErrors.IsResourceNotFoundError(err) {
-			c.JSON(http.StatusNotFound, v1.VmInspectionStatus{State: v1.VmInspectionStatusStateNotStarted})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to get VM status: %v", err)})
-		return
-	}
-
-	c.JSON(http.StatusOK, v1.NewInspectionStatus(s))
-}
-
-// GetInspectorStatus returns the inspector status
-// (GET /vms/inspector)
-func (h *Handler) GetInspectorStatus(c *gin.Context) {
-	c.JSON(http.StatusOK, v1.NewInspectorStatus(h.inspectorSrv.GetStatus()))
-}
-
-// StartInspection starts inspection for VMs
-// (POST /vms/inspector)
-func (h *Handler) StartInspection(c *gin.Context) {
-	var req v1.InspectorStartRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": validationErrorMessage(err)})
-		return
-	}
-
-	if len(req.VmIds) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "vmIds is required"})
-		return
-	}
-
-	cred := &models.Credentials{
-		URL:      req.VcenterCredentials.Url,
-		Username: req.VcenterCredentials.Username,
-		Password: req.VcenterCredentials.Password,
-	}
-
-	if err := h.inspectorSrv.Start(c.Request.Context(), req.VmIds, cred); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to start inspector: %v", err)})
-		return
-	}
-
-	c.JSON(http.StatusAccepted, v1.InspectorStatus{State: v1.InspectorStatusStateInitiating})
-}
-
-// AddVMsToInspection adds more VMs to inspection queue
-// (PATCH /vms/inspector)
-func (h *Handler) AddVMsToInspection(c *gin.Context) {
-	var vmsMoid v1.VMIdArray
-	if err := c.ShouldBindJSON(&vmsMoid); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	if len(vmsMoid) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "no vms provided"})
-		return
-	}
-
-	if err := h.inspectorSrv.Add(c.Request.Context(), vmsMoid); err != nil {
-		if srvErrors.IsInspectorNotRunningError(err) {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusAccepted, v1.NewInspectorStatus(h.inspectorSrv.GetStatus()))
-
-}
-
-// StopInspection stops inspector entirely
-// (DELETE /vms/inspector)
-func (h *Handler) StopInspection(c *gin.Context) {
-	if err := h.inspectorSrv.Stop(c.Request.Context()); err != nil {
-		if srvErrors.IsInspectorNotRunningError(err) {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-			return
-		}
-		if srvErrors.IsInvalidStateError(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -240,4 +133,29 @@ func (h *Handler) StopInspection(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusAccepted, v1.NewInspectorStatus(h.inspectorSrv.GetStatus()))
+}
+
+// RemoveVMFromInspection removes VM from inspection queue
+// (DELETE /vms/{id}/inspection)
+func (h *Handler) RemoveVMFromInspection(c *gin.Context, id string) {
+	if err := h.inspectorSrv.CancelVmsInspection(c.Request.Context(), id); err != nil {
+		if srvErrors.IsInspectorNotRunningError(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	s, err := h.inspectorSrv.GetVmStatus(c.Request.Context(), id)
+	if err != nil {
+		if srvErrors.IsResourceNotFoundError(err) {
+			c.JSON(http.StatusNotFound, v1.VmInspectionStatus{State: v1.VmInspectionStatusStateNotStarted})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to get VM status: %v", err)})
+		return
+	}
+
+	c.JSON(http.StatusOK, v1.NewInspectionStatus(s))
 }

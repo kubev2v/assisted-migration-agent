@@ -7,7 +7,6 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	. "github.com/onsi/ginkgo/v2"
@@ -48,14 +47,10 @@ var _ = Describe("VMs Handlers", func() {
 		router.GET("/vms/:id", func(c *gin.Context) {
 			handler.GetVM(c, c.Param("id"))
 		})
-		router.GET("/vms/inspector", handler.GetInspectorStatus)
-		router.POST("/vms/inspector", handler.StartInspection)
-		router.PATCH("/vms/inspector", handler.AddVMsToInspection)
-		router.DELETE("/vms/inspector", handler.StopInspection)
-		router.GET("/vms/:id/inspector", func(c *gin.Context) {
-			handler.GetVMInspectionStatus(c, c.Param("id"))
+		router.POST("/vms/:id/inspection", func(c *gin.Context) {
+			handler.AddVMToInspection(c, c.Param("id"))
 		})
-		router.DELETE("/vms/:id/inspector", func(c *gin.Context) {
+		router.DELETE("/vms/:id/inspection", func(c *gin.Context) {
 			handler.RemoveVMFromInspection(c, c.Param("id"))
 		})
 	})
@@ -341,251 +336,7 @@ var _ = Describe("VMs Handlers", func() {
 		})
 	})
 
-	Context("Inspector endpoints", func() {
-		// Given an inspector service
-		// When we request the inspector status
-		// Then it should return the current status
-		It("GetInspectorStatus should return status", func() {
-			// Arrange
-			mockInspector.GetStatusResult = models.InspectorStatus{
-				State: models.InspectorStateReady,
-			}
-
-			req := httptest.NewRequest(http.MethodGet, "/vms/inspector", nil)
-			w := httptest.NewRecorder()
-
-			// Act
-			router.ServeHTTP(w, req)
-
-			// Assert
-			Expect(w.Code).To(Equal(http.StatusOK))
-			var response v1.InspectorStatus
-			err := json.Unmarshal(w.Body.Bytes(), &response)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(response.State).To(Equal(v1.InspectorStatusStateReady))
-		})
-
-		// Given an invalid JSON request body
-		// When we try to start an inspection
-		// Then it should return 400 Bad Request
-		It("StartInspection should return 400 for invalid request body", func() {
-			// Arrange
-			req := httptest.NewRequest(http.MethodPost, "/vms/inspector", strings.NewReader("invalid json"))
-			req.Header.Set("Content-Type", "application/json")
-			w := httptest.NewRecorder()
-
-			// Act
-			router.ServeHTTP(w, req)
-
-			// Assert
-			Expect(w.Code).To(Equal(http.StatusBadRequest))
-			var body map[string]any
-			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
-			Expect(body["error"]).To(Equal("invalid request body"))
-		})
-
-		// Given missing vCenter credentials
-		// When we try to start an inspection
-		// Then it should return 400 Bad Request
-		It("StartInspection should return 400 for missing credentials", func() {
-			// Arrange
-			reqBody := `{"vcenterCredentials":{"url":"","username":"","password":""},"vmIds":["vm-1"]}`
-			req := httptest.NewRequest(http.MethodPost, "/vms/inspector", strings.NewReader(reqBody))
-			req.Header.Set("Content-Type", "application/json")
-			w := httptest.NewRecorder()
-
-			// Act
-			router.ServeHTTP(w, req)
-
-			// Assert
-			Expect(w.Code).To(Equal(http.StatusBadRequest))
-			var body map[string]any
-			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
-			Expect(body["error"]).To(ContainSubstring("Url is required"))
-		})
-
-		// Given an empty VM list in the request
-		// When we try to start an inspection
-		// Then it should return 400 Bad Request
-		It("StartInspection should return 400 for empty VM list", func() {
-			// Arrange
-			reqBody := `{"vcenterCredentials":{"url":"https://test","username":"user","password":"pass"},"vmIds":[]}`
-			req := httptest.NewRequest(http.MethodPost, "/vms/inspector", strings.NewReader(reqBody))
-			req.Header.Set("Content-Type", "application/json")
-			w := httptest.NewRecorder()
-
-			// Act
-			router.ServeHTTP(w, req)
-
-			// Assert
-			Expect(w.Code).To(Equal(http.StatusBadRequest))
-			var body map[string]any
-			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
-			Expect(body["error"]).To(Equal("vmIds is required"))
-		})
-
-		// Given valid credentials and VM list
-		// When we start an inspection
-		// Then it should return 202 Accepted with initiating status
-		It("StartInspection should start inspection successfully", func() {
-			// Arrange
-			body := `{"vcenterCredentials":{"url":"https://test","username":"user","password":"pass"},"vmIds":["vm-1"]}`
-			req := httptest.NewRequest(http.MethodPost, "/vms/inspector", strings.NewReader(body))
-			req.Header.Set("Content-Type", "application/json")
-			w := httptest.NewRecorder()
-
-			// Act
-			router.ServeHTTP(w, req)
-
-			// Assert
-			Expect(w.Code).To(Equal(http.StatusAccepted))
-			var response v1.InspectorStatus
-			err := json.Unmarshal(w.Body.Bytes(), &response)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(response.State).To(Equal(v1.InspectorStatusStateInitiating))
-		})
-
-		// Given an invalid JSON request body
-		// When we try to add VMs to inspection
-		// Then it should return 400 Bad Request
-		It("AddVMsToInspection should return 400 for invalid JSON", func() {
-			// Arrange
-			req := httptest.NewRequest(http.MethodPatch, "/vms/inspector", strings.NewReader("invalid json"))
-			req.Header.Set("Content-Type", "application/json")
-			w := httptest.NewRecorder()
-
-			// Act
-			router.ServeHTTP(w, req)
-
-			// Assert
-			Expect(w.Code).To(Equal(http.StatusBadRequest))
-			var body map[string]any
-			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
-			Expect(body["error"]).NotTo(BeEmpty())
-		})
-
-		// Given an empty VM list in the request
-		// When we try to add VMs to inspection
-		// Then it should return 400 Bad Request
-		It("AddVMsToInspection should return 400 for empty VM list", func() {
-			// Arrange
-			reqBody := `[]`
-			req := httptest.NewRequest(http.MethodPatch, "/vms/inspector", strings.NewReader(reqBody))
-			req.Header.Set("Content-Type", "application/json")
-			w := httptest.NewRecorder()
-
-			// Act
-			router.ServeHTTP(w, req)
-
-			// Assert
-			Expect(w.Code).To(Equal(http.StatusBadRequest))
-			var body map[string]any
-			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
-			Expect(body["error"]).To(Equal("no vms provided"))
-		})
-
-		// Given a running inspector and a valid VM list
-		// When we add VMs to inspection
-		// Then it should return 202 Accepted
-		It("AddVMsToInspection should add VMs successfully", func() {
-			// Arrange
-			mockInspector.GetStatusResult = models.InspectorStatus{
-				State: models.InspectorStateRunning,
-			}
-			body := `["vm-1","vm-2"]`
-			req := httptest.NewRequest(http.MethodPatch, "/vms/inspector", strings.NewReader(body))
-			req.Header.Set("Content-Type", "application/json")
-			w := httptest.NewRecorder()
-
-			// Act
-			router.ServeHTTP(w, req)
-
-			// Assert
-			Expect(w.Code).To(Equal(http.StatusAccepted))
-		})
-
-		// Given a running inspector
-		// When we stop the inspection
-		// Then it should return 202 Accepted
-		It("StopInspection should stop inspector successfully", func() {
-			// Arrange
-			mockInspector.GetStatusResult = models.InspectorStatus{
-				State: models.InspectorStateCanceled,
-			}
-			req := httptest.NewRequest(http.MethodDelete, "/vms/inspector", nil)
-			w := httptest.NewRecorder()
-
-			// Act
-			router.ServeHTTP(w, req)
-
-			// Assert
-			Expect(w.Code).To(Equal(http.StatusAccepted))
-		})
-
-		// Given a VM that has not been inspected
-		// When we request its inspection status
-		// Then it should return 404 Not Found
-		It("GetVMInspectionStatus should return 404 for non-existent VM", func() {
-			// Arrange
-			mockInspector.GetVmStatusError = srvErrors.NewResourceNotFoundError("vm inspection status", "123")
-
-			req := httptest.NewRequest(http.MethodGet, "/vms/123/inspector", nil)
-			w := httptest.NewRecorder()
-
-			// Act
-			router.ServeHTTP(w, req)
-
-			// Assert
-			Expect(w.Code).To(Equal(http.StatusNotFound))
-			var response v1.VmInspectionStatus
-			err := json.Unmarshal(w.Body.Bytes(), &response)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(response.State).To(Equal(v1.VmInspectionStatusStateNotStarted))
-		})
-
-		// Given a VM that has been inspected
-		// When we request its inspection status
-		// Then it should return the inspection status
-		It("GetVMInspectionStatus should return VM status", func() {
-			// Arrange
-			mockInspector.GetVmStatusResult = models.InspectionStatus{
-				State: models.InspectionStatePending,
-			}
-
-			req := httptest.NewRequest(http.MethodGet, "/vms/123/inspector", nil)
-			w := httptest.NewRecorder()
-
-			// Act
-			router.ServeHTTP(w, req)
-
-			// Assert
-			Expect(w.Code).To(Equal(http.StatusOK))
-			var response v1.VmInspectionStatus
-			err := json.Unmarshal(w.Body.Bytes(), &response)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(response.State).To(Equal(v1.VmInspectionStatusStatePending))
-		})
-
-		// Given a GetVmStatus internal error (not ResourceNotFoundError)
-		// When we request inspection status
-		// Then it should return 500 Internal Server Error
-		It("GetVMInspectionStatus should return 500 for internal error", func() {
-			// Arrange
-			mockInspector.GetVmStatusError = errors.New("database error")
-
-			req := httptest.NewRequest(http.MethodGet, "/vms/123/inspector", nil)
-			w := httptest.NewRecorder()
-
-			// Act
-			router.ServeHTTP(w, req)
-
-			// Assert
-			Expect(w.Code).To(Equal(http.StatusInternalServerError))
-			var body map[string]any
-			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
-			Expect(body["error"]).To(Equal("failed to get VM status: database error"))
-		})
-
+	Context("VM inspection endpoints (/vms/{id}/inspection)", func() {
 		// Given a VM that has been cancelled
 		// When we remove it from inspection
 		// Then it should return 200 with the VM status
@@ -595,7 +346,7 @@ var _ = Describe("VMs Handlers", func() {
 				State: models.InspectionStateCanceled,
 			}
 
-			req := httptest.NewRequest(http.MethodDelete, "/vms/vm-1/inspector", nil)
+			req := httptest.NewRequest(http.MethodDelete, "/vms/vm-1/inspection", nil)
 			w := httptest.NewRecorder()
 
 			// Act
@@ -618,7 +369,7 @@ var _ = Describe("VMs Handlers", func() {
 			// Arrange
 			mockInspector.CancelVmsInspectionError = errors.New("cancel failed")
 
-			req := httptest.NewRequest(http.MethodDelete, "/vms/vm-1/inspector", nil)
+			req := httptest.NewRequest(http.MethodDelete, "/vms/vm-1/inspection", nil)
 			w := httptest.NewRecorder()
 
 			// Act
@@ -635,7 +386,7 @@ var _ = Describe("VMs Handlers", func() {
 			// Arrange
 			mockInspector.GetVmStatusError = srvErrors.NewResourceNotFoundError("vm inspection status", "vm-1")
 
-			req := httptest.NewRequest(http.MethodDelete, "/vms/vm-1/inspector", nil)
+			req := httptest.NewRequest(http.MethodDelete, "/vms/vm-1/inspection", nil)
 			w := httptest.NewRecorder()
 
 			// Act
@@ -652,7 +403,7 @@ var _ = Describe("VMs Handlers", func() {
 			// Arrange
 			mockInspector.GetVmStatusError = errors.New("database error")
 
-			req := httptest.NewRequest(http.MethodDelete, "/vms/vm-1/inspector", nil)
+			req := httptest.NewRequest(http.MethodDelete, "/vms/vm-1/inspection", nil)
 			w := httptest.NewRecorder()
 
 			// Act
@@ -665,106 +416,10 @@ var _ = Describe("VMs Handlers", func() {
 			Expect(body["error"]).To(Equal("failed to get VM status: database error"))
 		})
 
-		It("StopInspection should return 500 when stop fails", func() {
-			// Arrange
-			mockInspector.StopError = errors.New("stop failed")
-
-			req := httptest.NewRequest(http.MethodDelete, "/vms/inspector", nil)
-			w := httptest.NewRecorder()
-
-			// Act
-			router.ServeHTTP(w, req)
-
-			// Assert
-			Expect(w.Code).To(Equal(http.StatusInternalServerError))
-			var body map[string]any
-			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
-			Expect(body["error"]).To(Equal("stop failed"))
-		})
-
-		It("StartInspection should return 500 when start fails", func() {
-			// Arrange
-			mockInspector.StartError = errors.New("start failed")
-			reqBody := `{"vcenterCredentials":{"url":"https://test","username":"user","password":"pass"},"vmIds":["vm-1"]}`
-			req := httptest.NewRequest(http.MethodPost, "/vms/inspector", strings.NewReader(reqBody))
-			req.Header.Set("Content-Type", "application/json")
-			w := httptest.NewRecorder()
-
-			// Act
-			router.ServeHTTP(w, req)
-
-			// Assert
-			Expect(w.Code).To(Equal(http.StatusInternalServerError))
-			var body map[string]any
-			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
-			Expect(body["error"]).To(Equal("failed to start inspector: start failed"))
-		})
-
-		It("AddVMsToInspection should return 400 when add fails", func() {
-			// Arrange
-			mockInspector.AddError = errors.New("inspector not running")
-			reqBody := `["vm-1","vm-2"]`
-			req := httptest.NewRequest(http.MethodPatch, "/vms/inspector", strings.NewReader(reqBody))
-			req.Header.Set("Content-Type", "application/json")
-			w := httptest.NewRecorder()
-
-			// Act
-			router.ServeHTTP(w, req)
-
-			// Assert
-			Expect(w.Code).To(Equal(http.StatusBadRequest))
-			var body map[string]any
-			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
-			Expect(body["error"]).To(Equal("inspector not running"))
-		})
-
-		It("RemoveVMFromInspection should return 404 when inspector not running", func() {
+		It("RemoveVMFromInspection should return 400 when inspector not running", func() {
 			mockInspector.CancelVmsInspectionError = srvErrors.NewInspectorNotRunningError()
 
-			req := httptest.NewRequest(http.MethodDelete, "/vms/vm-1/inspector", nil)
-			w := httptest.NewRecorder()
-
-			router.ServeHTTP(w, req)
-
-			Expect(w.Code).To(Equal(http.StatusNotFound))
-			var body map[string]any
-			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
-			Expect(body["error"]).To(Equal("inspector not running"))
-		})
-
-		It("AddVMsToInspection should return 404 when inspector not running", func() {
-			mockInspector.AddError = srvErrors.NewInspectorNotRunningError()
-			body := `["vm-1","vm-2"]`
-			req := httptest.NewRequest(http.MethodPatch, "/vms/inspector", strings.NewReader(body))
-			req.Header.Set("Content-Type", "application/json")
-			w := httptest.NewRecorder()
-
-			router.ServeHTTP(w, req)
-
-			Expect(w.Code).To(Equal(http.StatusNotFound))
-			var respBody map[string]any
-			Expect(json.Unmarshal(w.Body.Bytes(), &respBody)).To(Succeed())
-			Expect(respBody["error"]).To(Equal("inspector not running"))
-		})
-
-		It("StopInspection should return 404 when inspector not running", func() {
-			mockInspector.StopError = srvErrors.NewInspectorNotRunningError()
-
-			req := httptest.NewRequest(http.MethodDelete, "/vms/inspector", nil)
-			w := httptest.NewRecorder()
-
-			router.ServeHTTP(w, req)
-
-			Expect(w.Code).To(Equal(http.StatusNotFound))
-			var body map[string]any
-			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
-			Expect(body["error"]).To(Equal("inspector not running"))
-		})
-
-		It("StopInspection should return 400 when state is invalid", func() {
-			mockInspector.StopError = srvErrors.NewInvalidStateError()
-
-			req := httptest.NewRequest(http.MethodDelete, "/vms/inspector", nil)
+			req := httptest.NewRequest(http.MethodDelete, "/vms/vm-1/inspection", nil)
 			w := httptest.NewRecorder()
 
 			router.ServeHTTP(w, req)
@@ -772,7 +427,7 @@ var _ = Describe("VMs Handlers", func() {
 			Expect(w.Code).To(Equal(http.StatusBadRequest))
 			var body map[string]any
 			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
-			Expect(body["error"]).To(Equal("invalid state for this operation"))
+			Expect(body["error"]).To(Equal("inspector not running"))
 		})
 	})
 })

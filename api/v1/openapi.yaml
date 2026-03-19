@@ -187,28 +187,32 @@ paths:
         '500':
           description: Internal server error
 
-  /vms/{id}/inspector:
-    get:
-      summary: Get inspection status for a specific VirtualMachine
-      operationId: getVMInspectionStatus
+  /vms/{id}/inspection:
+    post:
+      summary: Add VirtualMachine to inspection queue
+      operationId: addVMToInspection
       parameters:
         - name: id
           in: path
           required: true
-          description: VirtualMachine ID
           schema:
             type: string
       responses:
-        '200':
-          description: VirtualMachine inspection status
+        '202':
+          description: VM added to inspection queue
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/VmInspectionStatus'
+        '400':
+          description: Inspector not running
         '404':
           description: VirtualMachine not found
+        '409':
+          description: VM already in inspection queue
         '500':
           description: Internal server error
+
     delete:
       summary: Remove VirtualMachine from inspection queue
       operationId: removeVMFromInspection
@@ -226,13 +230,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/VmInspectionStatus'
         '400':
-          description: Invalid request
+          description: Inspector not running or VirtualMachine cannot be canceled
         '404':
-          description: Inspector not running
+          description: VirtualMachine not found or not in the queue
         '500':
           description: Internal server error
 
-  /vms/inspector:
+  /inspector:
     get:
       summary: Get inspector status
       operationId: getInspectorStatus
@@ -265,29 +269,6 @@ paths:
           description: Invalid request
         '409':
           description: Inspector already running
-        '500':
-          description: Internal server error
-    patch:
-      summary: Add more VMs to inspection queue
-      operationId: addVMsToInspection
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/VMIdArray'
-            example: ["vm-1236", "vm-1237"]
-      responses:
-        '202':
-          description: VMs added to inspection queue
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/InspectorStatus'
-        '400':
-          description: Invalid request
-        '404':
-          description: Inspector not running
         '500':
           description: Internal server error
     delete:

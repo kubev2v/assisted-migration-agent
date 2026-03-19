@@ -608,7 +608,7 @@ func (a *AgentSvc) StartCollectorRaw(body []byte) (int, error) {
 
 // StartInspectionRaw sends a raw POST to /vms/inspector and returns the status code.
 func (a *AgentSvc) StartInspectionRaw(body []byte) (int, error) {
-	req, err := http.NewRequest(http.MethodPost, a.baseURL+"/api/v1/vms/inspector", bytes.NewReader(body))
+	req, err := http.NewRequest(http.MethodPost, a.baseURL+"/api/v1/inspector", bytes.NewReader(body))
 	if err != nil {
 		return 0, fmt.Errorf("creating request: %w", err)
 	}

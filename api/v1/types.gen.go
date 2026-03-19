@@ -546,11 +546,8 @@ type CreateGroupJSONRequestBody = CreateGroupRequest
 // UpdateGroupJSONRequestBody defines body for UpdateGroup for application/json ContentType.
 type UpdateGroupJSONRequestBody = UpdateGroupRequest
 
-// PostVddkMultipartRequestBody defines body for PostVddk for multipart/form-data ContentType.
-type PostVddkMultipartRequestBody PostVddkMultipartBody
-
-// AddVMsToInspectionJSONRequestBody defines body for AddVMsToInspection for application/json ContentType.
-type AddVMsToInspectionJSONRequestBody = VMIdArray
-
 // StartInspectionJSONRequestBody defines body for StartInspection for application/json ContentType.
 type StartInspectionJSONRequestBody = InspectorStartRequest
+
+// PostVddkMultipartRequestBody defines body for PostVddk for multipart/form-data ContentType.
+type PostVddkMultipartRequestBody PostVddkMultipartBody

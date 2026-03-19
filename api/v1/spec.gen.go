@@ -43,6 +43,15 @@ type ServerInterface interface {
 	// Update group
 	// (PATCH /groups/{id})
 	UpdateGroup(c *gin.Context, id string)
+	// Stop inspector entirely
+	// (DELETE /inspector)
+	StopInspection(c *gin.Context)
+	// Get inspector status
+	// (GET /inspector)
+	GetInspectorStatus(c *gin.Context)
+	// Start inspection for VMs
+	// (POST /inspector)
+	StartInspection(c *gin.Context)
 	// Get collected inventory
 	// (GET /inventory)
 	GetInventory(c *gin.Context, params GetInventoryParams)
@@ -58,27 +67,15 @@ type ServerInterface interface {
 	// Get list of VMs with filtering and pagination
 	// (GET /vms)
 	GetVMs(c *gin.Context, params GetVMsParams)
-	// Stop inspector entirely
-	// (DELETE /vms/inspector)
-	StopInspection(c *gin.Context)
-	// Get inspector status
-	// (GET /vms/inspector)
-	GetInspectorStatus(c *gin.Context)
-	// Add more VMs to inspection queue
-	// (PATCH /vms/inspector)
-	AddVMsToInspection(c *gin.Context)
-	// Start inspection for VMs
-	// (POST /vms/inspector)
-	StartInspection(c *gin.Context)
 	// Get details about a vm
 	// (GET /vms/{id})
 	GetVM(c *gin.Context, id string)
 	// Remove VirtualMachine from inspection queue
-	// (DELETE /vms/{id}/inspector)
+	// (DELETE /vms/{id}/inspection)
 	RemoveVMFromInspection(c *gin.Context, id string)
-	// Get inspection status for a specific VirtualMachine
-	// (GET /vms/{id}/inspector)
-	GetVMInspectionStatus(c *gin.Context, id string)
+	// Add VirtualMachine to inspection queue
+	// (POST /vms/{id}/inspection)
+	AddVMToInspection(c *gin.Context, id string)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -309,6 +306,45 @@ func (siw *ServerInterfaceWrapper) UpdateGroup(c *gin.Context) {
 	siw.Handler.UpdateGroup(c, id)
 }
 
+// StopInspection operation middleware
+func (siw *ServerInterfaceWrapper) StopInspection(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.StopInspection(c)
+}
+
+// GetInspectorStatus operation middleware
+func (siw *ServerInterfaceWrapper) GetInspectorStatus(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetInspectorStatus(c)
+}
+
+// StartInspection operation middleware
+func (siw *ServerInterfaceWrapper) StartInspection(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.StartInspection(c)
+}
+
 // GetInventory operation middleware
 func (siw *ServerInterfaceWrapper) GetInventory(c *gin.Context) {
 
@@ -432,58 +468,6 @@ func (siw *ServerInterfaceWrapper) GetVMs(c *gin.Context) {
 	siw.Handler.GetVMs(c, params)
 }
 
-// StopInspection operation middleware
-func (siw *ServerInterfaceWrapper) StopInspection(c *gin.Context) {
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.StopInspection(c)
-}
-
-// GetInspectorStatus operation middleware
-func (siw *ServerInterfaceWrapper) GetInspectorStatus(c *gin.Context) {
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.GetInspectorStatus(c)
-}
-
-// AddVMsToInspection operation middleware
-func (siw *ServerInterfaceWrapper) AddVMsToInspection(c *gin.Context) {
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.AddVMsToInspection(c)
-}
-
-// StartInspection operation middleware
-func (siw *ServerInterfaceWrapper) StartInspection(c *gin.Context) {
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.StartInspection(c)
-}
-
 // GetVM operation middleware
 func (siw *ServerInterfaceWrapper) GetVM(c *gin.Context) {
 
@@ -532,8 +516,8 @@ func (siw *ServerInterfaceWrapper) RemoveVMFromInspection(c *gin.Context) {
 	siw.Handler.RemoveVMFromInspection(c, id)
 }
 
-// GetVMInspectionStatus operation middleware
-func (siw *ServerInterfaceWrapper) GetVMInspectionStatus(c *gin.Context) {
+// AddVMToInspection operation middleware
+func (siw *ServerInterfaceWrapper) AddVMToInspection(c *gin.Context) {
 
 	var err error
 
@@ -553,7 +537,7 @@ func (siw *ServerInterfaceWrapper) GetVMInspectionStatus(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.GetVMInspectionStatus(c, id)
+	siw.Handler.AddVMToInspection(c, id)
 }
 
 // GinServerOptions provides options for the Gin server.
@@ -593,16 +577,15 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.DELETE(options.BaseURL+"/groups/:id", wrapper.DeleteGroup)
 	router.GET(options.BaseURL+"/groups/:id", wrapper.GetGroup)
 	router.PATCH(options.BaseURL+"/groups/:id", wrapper.UpdateGroup)
+	router.DELETE(options.BaseURL+"/inspector", wrapper.StopInspection)
+	router.GET(options.BaseURL+"/inspector", wrapper.GetInspectorStatus)
+	router.POST(options.BaseURL+"/inspector", wrapper.StartInspection)
 	router.GET(options.BaseURL+"/inventory", wrapper.GetInventory)
 	router.GET(options.BaseURL+"/vddk", wrapper.GetVddkStatus)
 	router.POST(options.BaseURL+"/vddk", wrapper.PostVddk)
 	router.GET(options.BaseURL+"/version", wrapper.GetVersion)
 	router.GET(options.BaseURL+"/vms", wrapper.GetVMs)
-	router.DELETE(options.BaseURL+"/vms/inspector", wrapper.StopInspection)
-	router.GET(options.BaseURL+"/vms/inspector", wrapper.GetInspectorStatus)
-	router.PATCH(options.BaseURL+"/vms/inspector", wrapper.AddVMsToInspection)
-	router.POST(options.BaseURL+"/vms/inspector", wrapper.StartInspection)
 	router.GET(options.BaseURL+"/vms/:id", wrapper.GetVM)
-	router.DELETE(options.BaseURL+"/vms/:id/inspector", wrapper.RemoveVMFromInspection)
-	router.GET(options.BaseURL+"/vms/:id/inspector", wrapper.GetVMInspectionStatus)
+	router.DELETE(options.BaseURL+"/vms/:id/inspection", wrapper.RemoveVMFromInspection)
+	router.POST(options.BaseURL+"/vms/:id/inspection", wrapper.AddVMToInspection)
 }
