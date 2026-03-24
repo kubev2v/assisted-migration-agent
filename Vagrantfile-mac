@@ -1,0 +1,34 @@
+# Specific for running x86 on Apple Silicon Mac:
+# make sure smb is enabled https://developer.hashicorp.com/vagrant/docs/synced-folders/smb#macos-host
+# brew install qemu
+# brew install vagrant
+# vagrant plugin install vagrant-qemu
+# vagrant up
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "generic/fedora36"
+  config.vm.synced_folder ".", "/home/vagrant/assisted-migration-agent"
+  config.vm.network :forwarded_port, guest: 22, host: 2322, id: "ssh"
+  config.vm.provider "qemu" do |qemu|
+    qemu.arch = "x86_64"
+    qemu.machine = "q35"
+    qemu.cpu = "max"
+    qemu.memory = "4096"
+    qemu.cpus = "4"
+    qemu.net_device = "virtio-net-pci"
+  end
+  config.vm.provision "shell", inline: <<-SHELL
+    dnf -y update
+
+    dnf -y install \
+    podman \
+    buildah \
+    jq \
+    make \
+    git \
+
+    curl -L https://go.dev/dl/go1.25.7.linux-amd64.tar.gz --output go1.25.7.linux-amd64.tar.gz
+    rm -rf /usr/local/go && tar -C /usr/local -xzf go1.25.7.linux-amd64.tar.gz
+    rm go1.25.7.linux-amd64.tar.gz
+  SHELL
+end
