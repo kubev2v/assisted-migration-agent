@@ -24,6 +24,15 @@ const (
 	CollectorLegacyStateCollected             CollectorStateType = "up-to-date"
 )
 
+// This list should represent the least permissions required for the collection.
+// The goal is to pass this array to the ValidateUserPrivilegesOnEntity function
+// in order to determine whether the user has minimum required permissions.
+var ReadOnlyPrivileges = []string{
+	"System.View",
+	"System.Read",
+	"System.Anonymous",
+}
+
 func (c CollectorStateType) ToV1() CollectorStateType {
 	switch c {
 	case CollectorStateReady:

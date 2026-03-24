@@ -24,6 +24,8 @@ import (
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	vmwareAuth "github.com/kubev2v/assisted-migration-agent/pkg/vmware"
+
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
@@ -76,6 +78,18 @@ func (c *VSphereCollector) VerifyCredentials(ctx context.Context, creds *models.
 	if err := client.Login(verifyCtx, u.User); err != nil {
 		return srvErrors.NewVCenterError(err)
 	}
+
+	zap.S().Named("collector").Info("verifying the user has vCenter read-only permissions")
+	requiredPermissions := models.ReadOnlyPrivileges
+	// Get vCenter root folder
+	content := client.Client.ServiceContent
+	rootFolder := content.RootFolder
+	if err := vmwareAuth.ValidateUserPrivilegesOnEntity(ctx, client.Client, rootFolder, requiredPermissions, creds.Username); err != nil {
+		_ = client.Logout(verifyCtx)
+		client.CloseIdleConnections()
+		return srvErrors.NewVCenterError(err)
+	}
+	zap.S().Named("collector").Info("vCenter read-only permissions verified")
 
 	_ = client.Logout(verifyCtx)
 	client.CloseIdleConnections()
