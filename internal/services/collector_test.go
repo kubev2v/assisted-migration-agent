@@ -331,6 +331,36 @@ var _ = Describe("CollectorService", func() {
 		})
 	})
 
+	Context("verifyCredentials", func() {
+		// Given a collector service where permissions verification fails
+		// When Start is called
+		// Then the state should transition to error with the permissions error message
+		It("should set error state when permissions verification fails", func() {
+			// Arrange
+			permissionsErr := errors.New("user 'testuser' is missing required privileges")
+			srv = services.NewCollectorService(st, "", "").
+				WithWorkUnits(mockCollectorUnits(st, permissionsErr, nil, nil))
+			creds := models.Credentials{
+				URL:      "https://vcenter.example.com",
+				Username: "testuser",
+				Password: "secret",
+			}
+
+			// Act
+			err := srv.Start(ctx, creds)
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(func() models.CollectorStateType {
+				return srv.GetStatus().State
+			}).Should(Equal(models.CollectorStateError))
+
+			status := srv.GetStatus()
+			Expect(status.Error.Error()).To(ContainSubstring("is missing required privileges"))
+		})
+	})
+
 	Context("Stop cancellation", func() {
 		// Given a collector service with a blocking work unit that is running
 		// When Stop is called
