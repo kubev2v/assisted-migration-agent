@@ -188,3 +188,21 @@ func IsInspectorNotRunningError(err error) bool {
 	var e *InspectorNotRunningError
 	return errors.As(err, &e)
 }
+
+// InspectionLimitReachedError indicates the configured per-cycle VM inspection limit was exceeded.
+type InspectionLimitReachedError struct {
+	Limit int
+}
+
+func NewInspectionLimitReachedError(limit int) *InspectionLimitReachedError {
+	return &InspectionLimitReachedError{Limit: limit}
+}
+
+func (e *InspectionLimitReachedError) Error() string {
+	return fmt.Sprintf("inspection limit reached (%d VMs per cycle)", e.Limit)
+}
+
+func IsInspectionLimitReachedError(err error) bool {
+	var e *InspectionLimitReachedError
+	return errors.As(err, &e)
+}

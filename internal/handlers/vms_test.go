@@ -337,6 +337,20 @@ var _ = Describe("VMs Handlers", func() {
 	})
 
 	Context("VM inspection endpoints (/vms/{id}/inspection)", func() {
+		It("AddVMToInspection should return 400 when inspection limit is reached", func() {
+			mockInspector.AddError = srvErrors.NewInspectionLimitReachedError(10)
+
+			req := httptest.NewRequest(http.MethodPost, "/vms/vm-9/inspection", nil)
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusBadRequest))
+			var body map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
+			Expect(body["error"]).To(Equal(srvErrors.NewInspectionLimitReachedError(10).Error()))
+		})
+
 		// Given a VM that has been cancelled
 		// When we remove it from inspection
 		// Then it should return 200 with the VM status
