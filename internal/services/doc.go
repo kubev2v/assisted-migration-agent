@@ -84,7 +84,16 @@
 // WorkPipeline per VM. Default work units are validate → create snapshot → inspect → save →
 // remove snapshot; tests may replace the builder via WithInspectionBuilder.
 //
-// State machine (service-level, models.InspectorState — matches HTTP inspector status; there is no
+// inspectionService exists as a separate layer because InspectorService and per-VM pipeline
+// management have different responsibilities and concurrency boundaries. InspectorService
+// owns the service lifecycle — vSphere client, run loop, service-level state machine — while
+// inspectionService owns concurrent pipeline coordination: the shared scheduler, the per-VM
+// pipeline map, and its own mutex for short-held map operations. Keeping them apart lets each
+// layer manage its own lock without nesting, and lets inspectionService be tested and reasoned
+// about independently of vSphere connection handling.
+//
+// State machine (service-level, models.InspectorState — matches HTTP inspector status;
+// there is no per-VM state machine, per-VM status is derived from WorkPipeline state):
 //
 //	┌───────┐     ┌────────────┐     ┌─────────┐     ┌───────────┐
 //	│ Ready │────►│ Initiating │────►│ Running │────►│ Completed │
@@ -108,6 +117,8 @@
 //   - Error: Init failed (vSphere connect or inspectionSvc.start); error is stored on InspectorStatus
 //   - Completed: Normal terminal state when all VM pipelines finish without Stop
 //   - Canceled: Terminal state after Stop() once pipelines have stopped (no intermediate “canceling” state in GetStatus)
+//
+// All terminal states (Completed, Canceled, Error) accept a new Start() call (IsBusy returns false).
 //
 // Key behaviors:
 //   - Only one inspection run at a time (InspectionInProgressError if already busy)
