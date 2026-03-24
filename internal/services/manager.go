@@ -74,7 +74,7 @@ func (m *ServiceManager) Initialize() error {
 	)
 
 	// Todo: remove WithWorkUnitsBuilder when service is ready
-	m.inspector = NewInspectorService().
+	m.inspector = NewInspectorService(10).
 		WithInspectionBuilder(
 			func(id string) []models.WorkUnit[models.InspectionStatus, models.InspectionResult] {
 				return make([]models.WorkUnit[models.InspectionStatus, models.InspectionResult], 0)

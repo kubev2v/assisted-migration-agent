@@ -125,6 +125,21 @@ var _ = Describe("Inspector Handler", func() {
 			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
 			Expect(body["error"]).To(Equal("failed to start inspector: start failed"))
 		})
+
+		It("should return 400 when inspection limit is reached", func() {
+			mockInspector.StartError = srvErrors.NewInspectionLimitReachedError(10)
+			reqBody := `{"VcenterCredentials":{"url":"https://test","username":"user","password":"pass"},"vmIds":["vm-1","vm-2","vm-3"]}`
+			req := httptest.NewRequest(http.MethodPost, "/inspector", strings.NewReader(reqBody))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusBadRequest))
+			var body map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
+			Expect(body["error"]).To(Equal(srvErrors.NewInspectionLimitReachedError(10).Error()))
+		})
 	})
 
 	Context("StopInspection", func() {

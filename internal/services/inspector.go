@@ -18,22 +18,25 @@ import (
 // InspectorService orchestrates vCenter VM inspection: one asynchronous WorkPipeline per VM,
 // a shared vSphere client for the run, and service-level status.
 type InspectorService struct {
-	mu            sync.Mutex
-	cred          *models.Credentials
-	vsphereClient *govmomi.Client
-	inspectionSvc *inspectionService
-	state         InspectorState
-	stop          chan struct{}
+	mu              sync.Mutex
+	cred            *models.Credentials
+	vsphereClient   *govmomi.Client
+	inspectionSvc   *inspectionService
+	state           InspectorState
+	stop            chan struct{}
+	inspectionLimit int
 }
 
 // NewInspectorService returns an idle inspector using the default inspection work units
 // (validate, snapshot, inspect, save, remove snapshot).
-func NewInspectorService() *InspectorService {
+// inspectionLimit is the maximum distinct VMs per cycle (Start batch + Add); non-positive means unlimited.
+func NewInspectorService(inspectionLimit int) *InspectorService {
 	return &InspectorService{
 		state: InspectorState{
 			state: models.InspectorStateReady,
 		},
-		inspectionSvc: newInspectionService(),
+		inspectionSvc:   newInspectionService(),
+		inspectionLimit: inspectionLimit,
 	}
 }
 
@@ -54,6 +57,10 @@ func (i *InspectorService) Start(ctx context.Context, vmIDs []string, cred *mode
 
 	if i.IsBusy() {
 		return srvErrors.NewInspectionInProgressError()
+	}
+
+	if len(vmIDs) > i.inspectionLimit {
+		return srvErrors.NewInspectionLimitReachedError(i.inspectionLimit)
 	}
 
 	i.state.Set(models.InspectorStateInitiating)
@@ -91,6 +98,10 @@ func (i *InspectorService) Add(id string) error {
 
 	if !i.IsBusy() {
 		return srvErrors.NewInspectorNotRunningError()
+	}
+
+	if i.inspectionSvc.TotalPipelines() >= i.inspectionLimit {
+		return srvErrors.NewInspectionLimitReachedError(i.inspectionLimit)
 	}
 
 	if err := i.inspectionSvc.Add(id); err != nil {

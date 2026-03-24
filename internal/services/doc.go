@@ -119,7 +119,7 @@
 //
 // Usage:
 //
-//	inspector := services.NewInspectorService()
+//	inspector := services.NewInspectorService(10)
 //	err := inspector.Start(ctx, []string{"vm-1", "vm-2"}, credentials)
 //	status := inspector.GetStatus()
 //	vmStatus := inspector.GetVmStatus("vm-1")

@@ -62,6 +62,14 @@ func (i *inspectionService) Add(id string) error {
 	return nil
 }
 
+// TotalPipelines returns the number of VM pipelines registered in the current inspection cycle.
+func (i *inspectionService) TotalPipelines() int {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+
+	return len(i.pipelines)
+}
+
 // CancelVmInspection stops the pipeline for id, if present.
 func (i *inspectionService) CancelVmInspection(id string) {
 	i.mu.Lock()

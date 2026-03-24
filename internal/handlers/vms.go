@@ -125,7 +125,7 @@ func (h *Handler) GetVM(c *gin.Context, id string) {
 // (POST /vms/{id}/inspection)
 func (h *Handler) AddVMToInspection(c *gin.Context, id string) {
 	if err := h.inspectorSrv.Add(id); err != nil {
-		if srvErrors.IsInspectorNotRunningError(err) {
+		if srvErrors.IsInspectorNotRunningError(err) || srvErrors.IsInspectionLimitReachedError(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}

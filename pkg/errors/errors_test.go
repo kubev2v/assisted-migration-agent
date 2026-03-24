@@ -434,6 +434,26 @@ var _ = Describe("Errors", func() {
 		})
 	})
 
+	Context("InspectionLimitReachedError", func() {
+		It("should format the message", func() {
+			err := srvErrors.NewInspectionLimitReachedError(10)
+			Expect(err.Error()).To(Equal("inspection limit reached (10 VMs per cycle)"))
+		})
+
+		It("should be detected by IsInspectionLimitReachedError", func() {
+			Expect(srvErrors.IsInspectionLimitReachedError(srvErrors.NewInspectionLimitReachedError(5))).To(BeTrue())
+		})
+
+		It("should be detected when wrapped", func() {
+			wrapped := fmt.Errorf("start: %w", srvErrors.NewInspectionLimitReachedError(3))
+			Expect(srvErrors.IsInspectionLimitReachedError(wrapped)).To(BeTrue())
+		})
+
+		It("should not match unrelated errors", func() {
+			Expect(srvErrors.IsInspectionLimitReachedError(errors.New("nope"))).To(BeFalse())
+		})
+	})
+
 	Context("cross-type isolation", func() {
 		// Given errors of different types
 		// When each Is* function checks the wrong type
