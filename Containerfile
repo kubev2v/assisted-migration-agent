@@ -85,7 +85,12 @@ RUN wget -q "https://extensions.duckdb.org/${DUCKDB_VERSION}/linux_amd64/sqlite_
 # =============================================================================
 # Stage 6: Final runtime image
 # =============================================================================
-FROM --platform=linux/amd64 quay.io/centos/centos:stream9
+FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/ubi
+
+# Add CentOS Stream 10 repos for virt-v2v and dependencies
+RUN echo -e '[centos-stream-baseos]\nname=CentOS Stream 9 - BaseOS\nbaseurl=https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/\ngpgcheck=0\nenabled=1' > /etc/yum.repos.d/centos-stream-baseos.repo && \
+    echo -e '[centos-stream-appstream]\nname=CentOS Stream 9 - AppStream\nbaseurl=https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/\ngpgcheck=0\nenabled=1' > /etc/yum.repos.d/centos-stream-appstream.repo && \
+    echo -e '[centos-stream-crb]\nname=CentOS Stream 9 - CRB\nbaseurl=https://mirror.stream.centos.org/9-stream/CRB/x86_64/os/\ngpgcheck=0\nenabled=1' > /etc/yum.repos.d/centos-stream-crb.repo
 
 RUN dnf install -y ca-certificates tzdata \
     libguestfs \
