@@ -150,8 +150,8 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 			})
 
 			// Given an agent running
-			// When a VDDK tarball is uploaded via POST /vddk
-			// Then GET /vddk returns 200 with version, bytes, and md5 matching the upload
+			// When a VDDK tarball is uploaded via POST /inspector/vddk
+			// Then GET /inspector/vddk returns 200 with version, bytes, and md5 matching the upload
 			ginkgo.It("should upload VDDK tarball and return status with version, bytes, and md5", func() {
 				agentID := uuid.NewString()
 				_, err := infraManager.StartAgent(infra.AgentConfig{

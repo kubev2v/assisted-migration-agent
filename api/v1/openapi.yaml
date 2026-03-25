@@ -138,7 +138,7 @@ paths:
               type: string
           style: form
           explode: true
-          example: ["cluster:asc", "name:desc"]
+          example: [ "cluster:asc", "name:desc" ]
         - name: page
           in: query
           description: Page number for pagination
@@ -240,6 +240,21 @@ paths:
     get:
       summary: Get inspector status
       operationId: getInspectorStatus
+      parameters:
+        - name: includeVddk
+          in: query
+          required: false
+          description: If true, include uploaded VDDK metadata (`version`, `md5`) when present. omitted if VDDK was never uploaded.
+          schema:
+            type: boolean
+            default: false
+        - name: includeCredentials
+          in: query
+          required: false
+          description: If true, include configured vCenter URL and username (password is never returned). omitted if was never set.
+          schema:
+            type: boolean
+            default: false
       responses:
         '200':
           description: Inspector status
@@ -257,7 +272,15 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/InspectorStartRequest'
+              type: object
+              description: Array of VirtualMachine id
+              required:
+                  - vmIds
+              properties:
+                vmIds:
+                  type: array
+                  items:
+                    type: string
       responses:
         '202':
           description: Inspection started
@@ -287,6 +310,24 @@ paths:
           description: Inspector not running
         '500':
           description: Internal server error
+
+  /inspector/credentials:
+    put:
+      summary: Set or replace inspector credentials
+      operationId: putInspectorCredentials
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VcenterCredentials'
+      responses:
+        "200":
+          description: Credentials updated successfully
+        "400":
+          description: Bad Credentials
+        "500":
+          description: Internal server error
   /version:
     get:
       summary: Get agent version information
@@ -298,6 +339,55 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VersionInfo'
+
+  /inspector/vddk:
+    get:
+      summary: Get VDDK status
+      operationId: getInspectorVddkStatus
+      responses:
+        '200':
+          description: |
+            Returns the current properties of the uploaded VMware VDDK tar.
+            If the VDDK package has not been uploaded, a 404 response is returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VddkProperties'
+        '404':
+          description: Vddk not found
+        '500':
+          description: Internal server error
+    put:
+      summary: Upload VDDK tarball
+      operationId: putInspectorVddk
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: VDDK tarball
+      responses:
+        '200':
+          description: Upload successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VddkProperties'
+        '409':
+          description: Conflict
+        '413':
+          description: File exceeds 64MB limit
+        '400':
+          description: Bad request
+        '500':
+          description: Internal server error
 
   /groups:
     get:
@@ -379,7 +469,7 @@ paths:
               type: string
           style: form
           explode: true
-          example: ["cluster:asc", "name:desc"]
+          example: [ "cluster:asc", "name:desc" ]
         - name: page
           in: query
           description: Page number for pagination
@@ -446,54 +536,6 @@ paths:
       responses:
         '204':
           description: Group deleted
-        '500':
-          description: Internal server error
-
-  /vddk:
-    get:
-      summary: Get VDDK status
-      operationId: getVddkStatus
-      responses:
-        '200':
-          description: |
-            Returns the current properties of the uploaded VMware VDDK tar. 
-            If the VDDK package has not been uploaded, a 404 response is returned.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VddkProperties'
-        '404':
-          description: Vddk not found
-        '500':
-          description: Internal server error
-    post:
-      summary: Upload VDDK tarball
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              required:
-                - file
-              properties:
-                file:
-                  type: string
-                  format: binary
-                  description: VDDK tarball
-      responses:
-        '200':
-          description: Upload successful
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VddkProperties'
-        '409':
-          description: Conflict
-        '413':
-          description: File exceeds 64MB limit
-        '400':
-          description: Bad request
         '500':
           description: Internal server error
 
@@ -948,30 +990,15 @@ components:
             - InspectorStatusStateCompleted
             - InspectorStatusStateError
           description: Inspector state
+        credentials:
+          allOf:
+            - $ref: '#/components/schemas/VcenterCredentials'
+        vddk:
+          allOf:
+            - $ref: '#/components/schemas/VddkProperties'
         error:
           type: string
           description: Error message when state is error
-
-    InspectorStartRequest:
-      type: object
-      required:
-        - VcenterCredentials
-        - vmIds
-      properties:
-        VcenterCredentials:
-          $ref: '#/components/schemas/VcenterCredentials'
-          x-oapi-codegen-extra-tags:
-            binding: "required"
-        vmIds:
-          $ref: '#/components/schemas/VMIdArray'
-          x-oapi-codegen-extra-tags:
-            binding: "required,min=1"
-
-    VMIdArray:
-      type: array
-      items:
-        type: string
-      description: Array of VirtualMachine id
 
     VcenterCredentials:
       required:
@@ -1022,7 +1049,7 @@ components:
           items:
             type: string
           description: Tags associated with this group (applied to matching VMs)
-          example: ["production", "critical"]
+          example: [ "production", "critical" ]
         createdAt:
           type: string
           format: date-time

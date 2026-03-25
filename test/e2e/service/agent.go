@@ -621,7 +621,7 @@ func (a *AgentSvc) StartInspectionRaw(body []byte) (int, error) {
 	return resp.StatusCode, nil
 }
 
-// UploadVddk uploads a VDDK tarball via POST /api/v1/vddk and returns the reported VddkProperties on success.
+// UploadVddk uploads a VDDK tarball via PUT /api/v1/inspector/vddk and returns the reported VddkProperties on success.
 func (a *AgentSvc) UploadVddk(fileContent []byte, filename string) (*v1.VddkProperties, error) {
 	var buf bytes.Buffer
 	w := multipart.NewWriter(&buf)
@@ -636,7 +636,7 @@ func (a *AgentSvc) UploadVddk(fileContent []byte, filename string) (*v1.VddkProp
 		return nil, fmt.Errorf("closing multipart writer: %w", err)
 	}
 
-	req, err := http.NewRequest(http.MethodPost, a.baseURL+"/api/v1/vddk", &buf)
+	req, err := http.NewRequest(http.MethodPut, a.baseURL+"/api/v1/inspector/vddk", &buf)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
@@ -660,9 +660,9 @@ func (a *AgentSvc) UploadVddk(fileContent []byte, filename string) (*v1.VddkProp
 	return &props, nil
 }
 
-// GetVddkStatus returns the current VDDK status from GET /api/v1/vddk. Returns (nil, error) when VDDK is not found (404).
+// GetVddkStatus returns the current VDDK status from GET /api/v1/inspector/vddk. Returns (nil, error) when VDDK is not found (404).
 func (a *AgentSvc) GetVddkStatus() (*v1.VddkProperties, error) {
-	req, err := http.NewRequest(http.MethodGet, a.baseURL+"/api/v1/vddk", nil)
+	req, err := http.NewRequest(http.MethodGet, a.baseURL+"/api/v1/inspector/vddk", nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}

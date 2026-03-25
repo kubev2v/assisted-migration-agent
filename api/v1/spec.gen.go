@@ -48,19 +48,22 @@ type ServerInterface interface {
 	StopInspection(c *gin.Context)
 	// Get inspector status
 	// (GET /inspector)
-	GetInspectorStatus(c *gin.Context)
+	GetInspectorStatus(c *gin.Context, params GetInspectorStatusParams)
 	// Start inspection for VMs
 	// (POST /inspector)
 	StartInspection(c *gin.Context)
+	// Set or replace inspector credentials
+	// (PUT /inspector/credentials)
+	PutInspectorCredentials(c *gin.Context)
+	// Get VDDK status
+	// (GET /inspector/vddk)
+	GetInspectorVddkStatus(c *gin.Context)
+	// Upload VDDK tarball
+	// (PUT /inspector/vddk)
+	PutInspectorVddk(c *gin.Context)
 	// Get collected inventory
 	// (GET /inventory)
 	GetInventory(c *gin.Context, params GetInventoryParams)
-	// Get VDDK status
-	// (GET /vddk)
-	GetVddkStatus(c *gin.Context)
-	// Upload VDDK tarball
-	// (POST /vddk)
-	PostVddk(c *gin.Context)
 	// Get agent version information
 	// (GET /version)
 	GetVersion(c *gin.Context)
@@ -322,6 +325,27 @@ func (siw *ServerInterfaceWrapper) StopInspection(c *gin.Context) {
 // GetInspectorStatus operation middleware
 func (siw *ServerInterfaceWrapper) GetInspectorStatus(c *gin.Context) {
 
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetInspectorStatusParams
+
+	// ------------- Optional query parameter "includeVddk" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "includeVddk", c.Request.URL.Query(), &params.IncludeVddk)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter includeVddk: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Optional query parameter "includeCredentials" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "includeCredentials", c.Request.URL.Query(), &params.IncludeCredentials)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter includeCredentials: %w", err), http.StatusBadRequest)
+		return
+	}
+
 	for _, middleware := range siw.HandlerMiddlewares {
 		middleware(c)
 		if c.IsAborted() {
@@ -329,7 +353,7 @@ func (siw *ServerInterfaceWrapper) GetInspectorStatus(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.GetInspectorStatus(c)
+	siw.Handler.GetInspectorStatus(c, params)
 }
 
 // StartInspection operation middleware
@@ -343,6 +367,45 @@ func (siw *ServerInterfaceWrapper) StartInspection(c *gin.Context) {
 	}
 
 	siw.Handler.StartInspection(c)
+}
+
+// PutInspectorCredentials operation middleware
+func (siw *ServerInterfaceWrapper) PutInspectorCredentials(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.PutInspectorCredentials(c)
+}
+
+// GetInspectorVddkStatus operation middleware
+func (siw *ServerInterfaceWrapper) GetInspectorVddkStatus(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetInspectorVddkStatus(c)
+}
+
+// PutInspectorVddk operation middleware
+func (siw *ServerInterfaceWrapper) PutInspectorVddk(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.PutInspectorVddk(c)
 }
 
 // GetInventory operation middleware
@@ -377,32 +440,6 @@ func (siw *ServerInterfaceWrapper) GetInventory(c *gin.Context) {
 	}
 
 	siw.Handler.GetInventory(c, params)
-}
-
-// GetVddkStatus operation middleware
-func (siw *ServerInterfaceWrapper) GetVddkStatus(c *gin.Context) {
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.GetVddkStatus(c)
-}
-
-// PostVddk operation middleware
-func (siw *ServerInterfaceWrapper) PostVddk(c *gin.Context) {
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.PostVddk(c)
 }
 
 // GetVersion operation middleware
@@ -580,9 +617,10 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.DELETE(options.BaseURL+"/inspector", wrapper.StopInspection)
 	router.GET(options.BaseURL+"/inspector", wrapper.GetInspectorStatus)
 	router.POST(options.BaseURL+"/inspector", wrapper.StartInspection)
+	router.PUT(options.BaseURL+"/inspector/credentials", wrapper.PutInspectorCredentials)
+	router.GET(options.BaseURL+"/inspector/vddk", wrapper.GetInspectorVddkStatus)
+	router.PUT(options.BaseURL+"/inspector/vddk", wrapper.PutInspectorVddk)
 	router.GET(options.BaseURL+"/inventory", wrapper.GetInventory)
-	router.GET(options.BaseURL+"/vddk", wrapper.GetVddkStatus)
-	router.POST(options.BaseURL+"/vddk", wrapper.PostVddk)
 	router.GET(options.BaseURL+"/version", wrapper.GetVersion)
 	router.GET(options.BaseURL+"/vms", wrapper.GetVMs)
 	router.GET(options.BaseURL+"/vms/:id", wrapper.GetVM)

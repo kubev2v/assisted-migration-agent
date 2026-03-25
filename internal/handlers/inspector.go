@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -11,10 +12,14 @@ import (
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
+const (
+	MaxVDDKSize = 64 << 20 // 64Mb
+)
+
 // StartInspection starts inspection for VMs
 // (POST /inspector)
 func (h *Handler) StartInspection(c *gin.Context) {
-	var req v1.InspectorStartRequest
+	var req v1.StartInspectionJSONRequestBody
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": validationErrorMessage(err)})
 		return
@@ -25,18 +30,17 @@ func (h *Handler) StartInspection(c *gin.Context) {
 		return
 	}
 
-	cred := &models.Credentials{
-		URL:      req.VcenterCredentials.Url,
-		Username: req.VcenterCredentials.Username,
-		Password: req.VcenterCredentials.Password,
+	if _, err := h.vddkSrv.Status(c.Request.Context()); err != nil && srvErrors.IsResourceNotFoundError(err) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "must upload a vddk before starting an inspection"})
+		return
 	}
 
-	if err := h.inspectorSrv.Start(c.Request.Context(), req.VmIds, cred); err != nil {
+	if err := h.inspectorSrv.Start(c.Request.Context(), req.VmIds); err != nil {
 		if srvErrors.IsOperationInProgressError(err) {
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 			return
 		}
-		if srvErrors.IsInspectionLimitReachedError(err) {
+		if srvErrors.IsInspectionLimitReachedError(err) || srvErrors.IsCredentialsNotSetError(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -49,8 +53,28 @@ func (h *Handler) StartInspection(c *gin.Context) {
 
 // GetInspectorStatus returns the inspector status
 // (GET /inspector)
-func (h *Handler) GetInspectorStatus(c *gin.Context) {
-	c.JSON(http.StatusOK, v1.NewInspectorStatus(h.inspectorSrv.GetStatus()))
+func (h *Handler) GetInspectorStatus(c *gin.Context, params v1.GetInspectorStatusParams) {
+	inspS := h.inspectorSrv.GetStatus()
+
+	apiStatus := v1.NewInspectorStatus(inspS)
+
+	if params.IncludeCredentials != nil && *params.IncludeCredentials {
+		apiStatus = apiStatus.WithCredentials(inspS.Credentials)
+	}
+
+	if params.IncludeVddk != nil && *params.IncludeVddk && h.vddkSrv != nil {
+		s, err := h.vddkSrv.Status(c.Request.Context())
+		if err != nil {
+			if !srvErrors.IsResourceNotFoundError(err) {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+		} else {
+			apiStatus = apiStatus.WithVddk(s)
+		}
+	}
+
+	c.JSON(http.StatusOK, apiStatus)
 }
 
 // StopInspection stops inspector entirely
@@ -66,4 +90,94 @@ func (h *Handler) StopInspection(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusAccepted, v1.NewInspectorStatus(h.inspectorSrv.GetStatus()))
+}
+
+// PutInspectorCredentials sets or replaces vCenter credentials used by the inspector.
+// (PUT /inspector/credentials)
+func (h *Handler) PutInspectorCredentials(c *gin.Context) {
+	var req v1.VcenterCredentials
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": validationErrorMessage(err)})
+		return
+	}
+
+	creds := models.Credentials{
+		URL:      req.Url,
+		Username: req.Username,
+		Password: req.Password,
+	}
+
+	if err := h.inspectorSrv.Credentials(c.Request.Context(), creds); err != nil {
+		if srvErrors.IsVCenterError(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Status(http.StatusOK)
+}
+
+// PutInspectorVddk (PUT /inspector/vddk)
+func (h *Handler) PutInspectorVddk(c *gin.Context) {
+	if h.inspectorSrv != nil && h.inspectorSrv.IsBusy() {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "VDDK upload is not allowed while inspector is running"})
+		return
+	}
+
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, MaxVDDKSize)
+	file, err := c.FormFile("file")
+	if err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	r, err := file.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer func() {
+		_ = r.Close()
+	}()
+
+	s, err := h.vddkSrv.Upload(c.Request.Context(), file.Filename, r)
+	if err != nil {
+		if srvErrors.IsOperationInProgressError(err) {
+			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, &v1.VddkProperties{
+		Version: s.Version,
+		Bytes:   &file.Size,
+		Md5:     s.Md5,
+	})
+}
+
+// GetInspectorVddkStatus returns VDDK upload metadata (GET /inspector/vddk).
+func (h *Handler) GetInspectorVddkStatus(c *gin.Context) {
+	s, err := h.vddkSrv.Status(c.Request.Context())
+	if err != nil {
+		if srvErrors.IsResourceNotFoundError(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, &v1.VddkProperties{
+		Version: s.Version,
+		Md5:     s.Md5,
+	})
 }

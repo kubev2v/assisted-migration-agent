@@ -42,7 +42,15 @@ func NewInspectorService(inspectionLimit int) *InspectorService {
 
 // GetStatus returns the current inspector status.
 func (i *InspectorService) GetStatus() models.InspectorStatus {
-	return i.state.Status()
+	s := i.state.Status()
+	if i.cred != nil {
+		c := &models.Credentials{
+			URL:      i.cred.URL,
+			Username: i.cred.Username,
+		}
+		s.Credentials = c
+	}
+	return s
 }
 
 // GetVmStatus returns the inspection state for one VM from its WorkPipeline.
@@ -51,12 +59,16 @@ func (i *InspectorService) GetVmStatus(id string) models.InspectionStatus {
 }
 
 // Start connects to vSphere, starts pipelines for each vmIDs entry, and launches the run loop.
-func (i *InspectorService) Start(ctx context.Context, vmIDs []string, cred *models.Credentials) error {
+func (i *InspectorService) Start(ctx context.Context, vmIDs []string) error {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
 	if i.IsBusy() {
 		return srvErrors.NewInspectionInProgressError()
+	}
+
+	if i.cred == nil {
+		return srvErrors.NewCredentialsNotSetError()
 	}
 
 	if len(vmIDs) > i.inspectionLimit {
@@ -66,7 +78,7 @@ func (i *InspectorService) Start(ctx context.Context, vmIDs []string, cred *mode
 	i.state.Set(models.InspectorStateInitiating)
 	zap.S().Infow("starting inspector", "vmCount", len(vmIDs))
 
-	vClient, err := vmware.NewVsphereClient(ctx, cred.URL, cred.Username, cred.Password, true)
+	vClient, err := vmware.NewVsphereClient(ctx, i.cred.URL, i.cred.Username, i.cred.Password, true)
 	if err != nil {
 		zap.S().Named("inspector_service").Errorw("failed to connect to vSphere", "error", err)
 		i.state.SetError(err)
@@ -76,7 +88,6 @@ func (i *InspectorService) Start(ctx context.Context, vmIDs []string, cred *mode
 	zap.S().Named("inspector_service").Info("vSphere connection established")
 
 	i.vsphereClient = vClient
-	i.cred = cred
 	i.stop = make(chan struct{}, 1)
 
 	if err := i.inspectionSvc.Start(vmware.NewVMManager(i.vsphereClient, i.cred.Username), vmIDs); err != nil {
@@ -88,6 +99,15 @@ func (i *InspectorService) Start(ctx context.Context, vmIDs []string, cred *mode
 
 	go i.run(context.Background())
 
+	return nil
+}
+
+func (i *InspectorService) Credentials(ctx context.Context, credentials models.Credentials) error {
+	if err := vmware.VerifyCredentials(ctx, &credentials, "inspector"); err != nil {
+		return srvErrors.NewVCenterError(err)
+	}
+
+	i.cred = &credentials
 	return nil
 }
 

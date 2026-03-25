@@ -102,7 +102,7 @@
 //	┌────────┬──────────────────┬───────────────────────────────────────┐
 //	│ Method │ Endpoint         │ Description                           │
 //	├────────┼──────────────────┼───────────────────────────────────────┤
-//	│ POST   │ /vddk            │ Upload VDDK tarball (max 64MB)        │
+//	│ PUT    │ /inspector/vddk  │ Upload VDDK tarball (max 64MB)        │
 //	└────────┴──────────────────┴───────────────────────────────────────┘
 //
 // # Agent Handler
@@ -334,7 +334,7 @@
 //
 // # VDDK Handler
 //
-// POST /vddk - Uploads a VDDK tarball to the agent's data directory.
+// PUT /inspector/vddk - Untar and override a VDDK tarball to the agent's data directory.
 //
 // The request body should contain the raw tarball data (application/octet-stream).
 // Maximum file size is 64MB.

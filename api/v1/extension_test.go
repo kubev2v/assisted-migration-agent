@@ -370,6 +370,53 @@ var _ = Describe("NewInspectorStatus", func() {
 			Expect(status.Error).To(BeNil())
 		})
 	})
+
+	Context("WithCredentials", func() {
+		It("should copy URL and username and omit password", func() {
+			base := v1.NewInspectorStatus(models.InspectorStatus{State: models.InspectorStateReady})
+			out := base.WithCredentials(&models.Credentials{
+				URL:      "https://vcenter.example/sdk",
+				Username: "admin",
+				Password: "secret",
+			})
+			Expect(out.Credentials).NotTo(BeNil())
+			Expect(out.Credentials.Url).To(Equal("https://vcenter.example/sdk"))
+			Expect(out.Credentials.Username).To(Equal("admin"))
+			Expect(out.Credentials.Password).To(BeEmpty())
+		})
+
+		It("should leave credentials unset when nil", func() {
+			base := v1.NewInspectorStatus(models.InspectorStatus{State: models.InspectorStateReady})
+			out := base.WithCredentials(nil)
+			Expect(out.Credentials).To(BeNil())
+		})
+	})
+
+	Context("WithVddk", func() {
+		It("should set version and md5 on VddkProperties", func() {
+			base := v1.NewInspectorStatus(models.InspectorStatus{State: models.InspectorStateReady})
+			out := base.WithVddk(&models.VddkStatus{Version: "8.0.3", Md5: "d41d8cd98f00b204e9800998ecf8427e"})
+			Expect(out.Vddk).NotTo(BeNil())
+			Expect(out.Vddk.Version).To(Equal("8.0.3"))
+			Expect(out.Vddk.Md5).To(Equal("d41d8cd98f00b204e9800998ecf8427e"))
+			Expect(out.Vddk.Bytes).To(BeNil())
+		})
+	})
+
+	Context("WithCredentials and WithVddk together", func() {
+		It("should chain both on the same status", func() {
+			base := v1.NewInspectorStatus(models.InspectorStatus{State: models.InspectorStateReady})
+			out := base.WithCredentials(&models.Credentials{
+				URL: "https://vc/sdk", Username: "u", Password: "p",
+			}).WithVddk(&models.VddkStatus{Version: "9", Md5: "md5sum"})
+
+			Expect(out.Credentials).NotTo(BeNil())
+			Expect(out.Credentials.Url).To(Equal("https://vc/sdk"))
+			Expect(out.Vddk).NotTo(BeNil())
+			Expect(out.Vddk.Version).To(Equal("9"))
+			Expect(out.Vddk.Md5).To(Equal("md5sum"))
+		})
+	})
 })
 
 var _ = Describe("NewVirtualMachineDetailFromModel", func() {

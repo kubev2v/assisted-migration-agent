@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"net/url"
 	"time"
+
+	"github.com/kubev2v/assisted-migration-agent/pkg/vmware"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/provider/container/vsphere"
@@ -16,16 +17,11 @@ import (
 	libcontainer "github.com/kubev2v/forklift/pkg/lib/inventory/container"
 	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
 	libweb "github.com/kubev2v/forklift/pkg/lib/inventory/web"
-	"github.com/vmware/govmomi"
-	"github.com/vmware/govmomi/session"
-	"github.com/vmware/govmomi/vim25"
-	"github.com/vmware/govmomi/vim25/soap"
 	"go.uber.org/zap"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
-	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
 type Collector interface {
@@ -50,38 +46,7 @@ func NewVSphereCollector(dbPath string) *VSphereCollector {
 }
 
 func (c *VSphereCollector) VerifyCredentials(ctx context.Context, creds *models.Credentials) error {
-	u, err := url.ParseRequestURI(creds.URL)
-	if err != nil {
-		return err
-	}
-	if u.Path == "" || u.Path == "/" {
-		u.Path = "/sdk"
-	}
-	u.User = url.UserPassword(creds.Username, creds.Password)
-
-	verifyCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	vimClient, err := vim25.NewClient(verifyCtx, soap.NewClient(u, true))
-	if err != nil {
-		return err
-	}
-
-	client := &govmomi.Client{
-		SessionManager: session.NewManager(vimClient),
-		Client:         vimClient,
-	}
-
-	zap.S().Named("collector").Info("verifying vCenter credentials")
-	if err := client.Login(verifyCtx, u.User); err != nil {
-		return srvErrors.NewVCenterError(err)
-	}
-
-	_ = client.Logout(verifyCtx)
-	client.CloseIdleConnections()
-
-	zap.S().Named("collector").Info("vCenter credentials verified successfully")
-	return nil
+	return vmware.VerifyCredentials(ctx, creds, "collector")
 }
 
 func (c *VSphereCollector) Collect(ctx context.Context, creds *models.Credentials) error {

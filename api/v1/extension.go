@@ -184,7 +184,7 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 	return details
 }
 
-func NewInspectorStatus(status models.InspectorStatus) InspectorStatus {
+func NewInspectorStatus(status models.InspectorStatus) *InspectorStatus {
 	var c InspectorStatus
 
 	switch status.State {
@@ -209,7 +209,28 @@ func NewInspectorStatus(status models.InspectorStatus) InspectorStatus {
 		c.Error = &e
 	}
 
-	return c
+	return &c
+}
+
+func (s *InspectorStatus) WithCredentials(c *models.Credentials) *InspectorStatus {
+	if c != nil {
+		vc := VcenterCredentials{
+			Url:      c.URL,
+			Username: c.Username,
+		}
+		s.Credentials = &vc
+	}
+	return s
+}
+
+func (s *InspectorStatus) WithVddk(v *models.VddkStatus) *InspectorStatus {
+	if v != nil {
+		s.Vddk = &VddkProperties{
+			Version: v.Version,
+			Md5:     v.Md5,
+		}
+	}
+	return s
 }
 
 func NewInspectionStatus(status models.InspectionStatus) VmInspectionStatus {

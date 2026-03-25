@@ -171,8 +171,11 @@ var _ = Describe("InspectorService", func() {
 				builder := newMockInspectionBuilder().withWorkDelay(1 * time.Second)
 				srv = services.NewInspectorService(10).WithInspectionBuilder(builder.builder())
 
+				err := srv.Credentials(ctx, *getVCenterCredentials())
+				Expect(err).NotTo(HaveOccurred())
+
 				// Start inspector with vm-0 (will stay running due to inspection delay)
-				err := srv.Start(ctx, []string{"vm-0"}, getVCenterCredentials())
+				err = srv.Start(ctx, []string{"vm-0"})
 				Expect(err).NotTo(HaveOccurred())
 
 				// Wait for inspector to be in running state
@@ -226,7 +229,10 @@ var _ = Describe("InspectorService", func() {
 			builder := newMockInspectionBuilder().withWorkDelay(1 * time.Second)
 			srv = services.NewInspectorService(10).WithInspectionBuilder(builder.builder())
 
-			err := srv.Start(ctx, []string{"vm-0"}, getVCenterCredentials())
+			err := srv.Credentials(ctx, *getVCenterCredentials())
+			Expect(err).NotTo(HaveOccurred())
+
+			err = srv.Start(ctx, []string{"vm-0"})
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() models.InspectorState {
@@ -273,8 +279,11 @@ var _ = Describe("InspectorService", func() {
 				builder := newMockInspectionBuilder().withWorkDelay(1 * time.Second)
 				srv = services.NewInspectorService(10).WithInspectionBuilder(builder.builder())
 
+				err := srv.Credentials(ctx, *getVCenterCredentials())
+				Expect(err).NotTo(HaveOccurred())
+
 				// Start inspector with vm-0 (will stay running due to delay)
-				err := srv.Start(ctx, []string{"vm-0"}, getVCenterCredentials())
+				err = srv.Start(ctx, []string{"vm-0"})
 				Expect(err).NotTo(HaveOccurred())
 
 				// Wait for inspector to be in running state
@@ -335,7 +344,10 @@ var _ = Describe("InspectorService", func() {
 			builder := newMockInspectionBuilder()
 			srv = services.NewInspectorService(10).WithInspectionBuilder(builder.builder())
 
-			err := srv.Start(ctx, []string{"vm-1"}, getVCenterCredentials())
+			err := srv.Credentials(ctx, *getVCenterCredentials())
+			Expect(err).NotTo(HaveOccurred())
+
+			err = srv.Start(ctx, []string{"vm-1"})
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() models.InspectorState {
@@ -354,7 +366,10 @@ var _ = Describe("InspectorService", func() {
 			builder := newMockInspectionBuilder()
 			srv = services.NewInspectorService(10).WithInspectionBuilder(builder.builder())
 
-			err := srv.Start(ctx, []string{"vm-1", "vm-2", "vm-3"}, getVCenterCredentials())
+			err := srv.Credentials(ctx, *getVCenterCredentials())
+			Expect(err).NotTo(HaveOccurred())
+
+			err = srv.Start(ctx, []string{"vm-1", "vm-2", "vm-3"})
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() models.InspectorState {
@@ -369,33 +384,31 @@ var _ = Describe("InspectorService", func() {
 
 		It("should return error for invalid cred", func() {
 			// Use invalid credentials to trigger connection error
-			invalidCreds := &models.Credentials{
+			invalidCreds := models.Credentials{
 				URL:      "https://invalid-host:8989/sdk",
 				Username: "invalid",
 				Password: "invalid",
 			}
 
-			err := srv.Start(ctx, []string{"vm-1"}, invalidCreds)
+			err := srv.Credentials(ctx, invalidCreds)
 			Expect(err).To(HaveOccurred())
-			errMsg := err.Error()
-			Expect(errMsg).To(Or(
-				ContainSubstring("connection refused"),
-				ContainSubstring("no such host"),
-				ContainSubstring("timeout"),
-				ContainSubstring("connection"),
-				ContainSubstring("failed to connect"),
-				ContainSubstring("dial tcp"),
-			))
 
+			err = srv.Start(ctx, []string{"vm-1"})
+			Expect(srvErrors.IsCredentialsNotSetError(err)).To(BeTrue())
+
+			// Bad request from the user, Hence the Inspector should remain in ready state.
 			status := srv.GetStatus()
-			Expect(status.State).To(Equal(models.InspectorStateError))
+			Expect(status.State).To(Equal(models.InspectorStateReady))
 		})
 
 		It("should mark VM as error when inspection fails and continue with next VM", func() {
 			builder := newMockInspectionBuilder().withVmError("vm-1", errors.New("inspection failed"))
 			srv = services.NewInspectorService(10).WithInspectionBuilder(builder.builder())
 
-			err := srv.Start(ctx, []string{"vm-1", "vm-2"}, getVCenterCredentials())
+			err := srv.Credentials(ctx, *getVCenterCredentials())
+			Expect(err).NotTo(HaveOccurred())
+
+			err = srv.Start(ctx, []string{"vm-1", "vm-2"})
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() models.InspectorState {
@@ -416,15 +429,18 @@ var _ = Describe("InspectorService", func() {
 			builder := newMockInspectionBuilder()
 			srv = services.NewInspectorService(10).WithInspectionBuilder(builder.builder())
 
+			err := srv.Credentials(ctx, *getVCenterCredentials())
+			Expect(err).NotTo(HaveOccurred())
+
 			// First run
-			err := srv.Start(ctx, []string{"vm-1"}, getVCenterCredentials())
+			err = srv.Start(ctx, []string{"vm-1"})
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() models.InspectorState {
 				return srv.GetStatus().State
 			}, time.Second*10).Should(Equal(models.InspectorStateCompleted))
 
-			err = srv.Start(ctx, []string{"vm-2", "vm-3"}, getVCenterCredentials())
+			err = srv.Start(ctx, []string{"vm-2", "vm-3"})
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() models.InspectorState {
@@ -444,7 +460,10 @@ var _ = Describe("InspectorService", func() {
 			builder := newMockInspectionBuilder().withWorkDelay(100 * time.Millisecond)
 			srv = services.NewInspectorService(10).WithInspectionBuilder(builder.builder())
 
-			err := srv.Start(ctx, []string{"vm-1"}, getVCenterCredentials())
+			err := srv.Credentials(ctx, *getVCenterCredentials())
+			Expect(err).NotTo(HaveOccurred())
+
+			err = srv.Start(ctx, []string{"vm-1"})
 			Expect(err).NotTo(HaveOccurred())
 
 			// Should be busy while running
@@ -467,7 +486,10 @@ var _ = Describe("InspectorService", func() {
 			builder := newMockInspectionBuilder().withWorkDelay(1 * time.Second)
 			srv = services.NewInspectorService(10).WithInspectionBuilder(builder.builder())
 
-			err := srv.Start(ctx, []string{"vm-1", "vm-2", "vm-3"}, getVCenterCredentials())
+			err := srv.Credentials(ctx, *getVCenterCredentials())
+			Expect(err).NotTo(HaveOccurred())
+
+			err = srv.Start(ctx, []string{"vm-1", "vm-2", "vm-3"})
 			Expect(err).NotTo(HaveOccurred())
 
 			// Wait for running state
@@ -495,7 +517,10 @@ var _ = Describe("InspectorService", func() {
 			srv = services.NewInspectorService(2).
 				WithInspectionBuilder(builder.builder())
 
-			err := srv.Start(ctx, []string{"vm-1", "vm-2", "vm-3"}, getVCenterCredentials())
+			err := srv.Credentials(ctx, *getVCenterCredentials())
+			Expect(err).NotTo(HaveOccurred())
+
+			err = srv.Start(ctx, []string{"vm-1", "vm-2", "vm-3"})
 			Expect(err).To(HaveOccurred())
 			Expect(srvErrors.IsInspectionLimitReachedError(err)).To(BeTrue())
 
@@ -511,7 +536,10 @@ var _ = Describe("InspectorService", func() {
 			srv = services.NewInspectorService(2).
 				WithInspectionBuilder(builder.builder())
 
-			err := srv.Start(ctx, []string{"vm-1", "vm-2"}, getVCenterCredentials())
+			err := srv.Credentials(ctx, *getVCenterCredentials())
+			Expect(err).NotTo(HaveOccurred())
+
+			err = srv.Start(ctx, []string{"vm-1", "vm-2"})
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() models.InspectorState {
@@ -526,7 +554,10 @@ var _ = Describe("InspectorService", func() {
 			srv = services.NewInspectorService(2).
 				WithInspectionBuilder(builder.builder())
 
-			err := srv.Start(ctx, []string{"vm-0"}, getVCenterCredentials())
+			err := srv.Credentials(ctx, *getVCenterCredentials())
+			Expect(err).NotTo(HaveOccurred())
+
+			err = srv.Start(ctx, []string{"vm-0"})
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() models.InspectorState {

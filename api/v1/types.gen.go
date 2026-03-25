@@ -192,21 +192,16 @@ type GuestNetwork struct {
 	PrefixLength *int32 `json:"prefixLength,omitempty"`
 }
 
-// InspectorStartRequest defines model for InspectorStartRequest.
-type InspectorStartRequest struct {
-	VcenterCredentials VcenterCredentials `json:"VcenterCredentials"`
-
-	// VmIds Array of VirtualMachine id
-	VmIds VMIdArray `json:"vmIds"`
-}
-
 // InspectorStatus defines model for InspectorStatus.
 type InspectorStatus struct {
+	Credentials *VcenterCredentials `json:"credentials,omitempty"`
+
 	// Error Error message when state is error
 	Error *string `json:"error,omitempty"`
 
 	// State Inspector state
 	State InspectorStatusState `json:"state"`
+	Vddk  *VddkProperties      `json:"vddk,omitempty"`
 }
 
 // InspectorStatusState Inspector state
@@ -256,9 +251,6 @@ type VMDisk struct {
 	// Shared Whether this disk is shared between multiple VMs
 	Shared *bool `json:"shared,omitempty"`
 }
-
-// VMIdArray Array of VirtualMachine id
-type VMIdArray = []string
 
 // VMIssue defines model for VMIssue.
 type VMIssue struct {
@@ -503,6 +495,26 @@ type GetGroupParams struct {
 	PageSize *int `form:"pageSize,omitempty" json:"pageSize,omitempty"`
 }
 
+// GetInspectorStatusParams defines parameters for GetInspectorStatus.
+type GetInspectorStatusParams struct {
+	// IncludeVddk If true, include uploaded VDDK metadata (`version`, `md5`) when present. omitted if VDDK was never uploaded.
+	IncludeVddk *bool `form:"includeVddk,omitempty" json:"includeVddk,omitempty"`
+
+	// IncludeCredentials If true, include configured vCenter URL and username (password is never returned). omitted if was never set.
+	IncludeCredentials *bool `form:"includeCredentials,omitempty" json:"includeCredentials,omitempty"`
+}
+
+// StartInspectionJSONBody defines parameters for StartInspection.
+type StartInspectionJSONBody struct {
+	VmIds []string `json:"vmIds"`
+}
+
+// PutInspectorVddkMultipartBody defines parameters for PutInspectorVddk.
+type PutInspectorVddkMultipartBody struct {
+	// File VDDK tarball
+	File openapi_types.File `json:"file"`
+}
+
 // GetInventoryParams defines parameters for GetInventory.
 type GetInventoryParams struct {
 	// WithAgentId If true, include the agentId in the response (Compatible with manual inventory upload).
@@ -510,12 +522,6 @@ type GetInventoryParams struct {
 
 	// GroupId Filter inventory to VMs matching this group's filter expression
 	GroupId *string `form:"group_id,omitempty" json:"group_id,omitempty"`
-}
-
-// PostVddkMultipartBody defines parameters for PostVddk.
-type PostVddkMultipartBody struct {
-	// File VDDK tarball
-	File openapi_types.File `json:"file"`
 }
 
 // GetVMsParams defines parameters for GetVMs.
@@ -546,7 +552,10 @@ type CreateGroupJSONRequestBody = CreateGroupRequest
 type UpdateGroupJSONRequestBody = UpdateGroupRequest
 
 // StartInspectionJSONRequestBody defines body for StartInspection for application/json ContentType.
-type StartInspectionJSONRequestBody = InspectorStartRequest
+type StartInspectionJSONRequestBody StartInspectionJSONBody
 
-// PostVddkMultipartRequestBody defines body for PostVddk for multipart/form-data ContentType.
-type PostVddkMultipartRequestBody PostVddkMultipartBody
+// PutInspectorCredentialsJSONRequestBody defines body for PutInspectorCredentials for application/json ContentType.
+type PutInspectorCredentialsJSONRequestBody = VcenterCredentials
+
+// PutInspectorVddkMultipartRequestBody defines body for PutInspectorVddk for multipart/form-data ContentType.
+type PutInspectorVddkMultipartRequestBody PutInspectorVddkMultipartBody

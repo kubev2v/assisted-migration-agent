@@ -97,6 +97,7 @@ func (m *MockVMService) Get(ctx context.Context, id string) (*models.VM, error) 
 // MockInspectorService is a mock implementation of InspectorService.
 type MockInspectorService struct {
 	StartError                   error
+	CredentialsError             error
 	AddError                     error
 	GetStatusResult              models.InspectorStatus
 	GetVmStatusResult            models.InspectionStatus
@@ -115,9 +116,14 @@ func (m *MockInspectorService) IsBusy() bool {
 	return m.IsBusyResult
 }
 
-func (m *MockInspectorService) Start(ctx context.Context, vmIDs []string, cred *models.Credentials) error {
+func (m *MockInspectorService) Start(ctx context.Context, vmIDs []string) error {
 	m.StartCallCount++
 	return m.StartError
+}
+
+func (m *MockInspectorService) Credentials(ctx context.Context, creds models.Credentials) error {
+	_, _ = ctx, creds
+	return m.CredentialsError
 }
 
 func (m *MockInspectorService) Add(id string) error {

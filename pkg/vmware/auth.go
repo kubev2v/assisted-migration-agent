@@ -3,6 +3,16 @@ package vmware
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"time"
+
+	"github.com/vmware/govmomi"
+	"github.com/vmware/govmomi/session"
+	"github.com/vmware/govmomi/vim25/soap"
+	"go.uber.org/zap"
+
+	"github.com/kubev2v/assisted-migration-agent/internal/models"
+	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 
 	"github.com/vmware/govmomi/vim25"
 
@@ -51,4 +61,39 @@ func ValidateUserPrivilegesOnEntity(
 
 func (m *VMManager) ValidatePrivileges(ctx context.Context, moid string, requiredPrivileges []string) error {
 	return ValidateUserPrivilegesOnEntity(ctx, m.gc.Client, refFromMoid(moid), requiredPrivileges, m.username)
+}
+
+func VerifyCredentials(ctx context.Context, creds *models.Credentials, resourceName string) error {
+	u, err := url.ParseRequestURI(creds.URL)
+	if err != nil {
+		return err
+	}
+	if u.Path == "" || u.Path == "/" {
+		u.Path = "/sdk"
+	}
+	u.User = url.UserPassword(creds.Username, creds.Password)
+
+	verifyCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	vimClient, err := vim25.NewClient(verifyCtx, soap.NewClient(u, true))
+	if err != nil {
+		return err
+	}
+
+	client := &govmomi.Client{
+		SessionManager: session.NewManager(vimClient),
+		Client:         vimClient,
+	}
+
+	zap.S().Named(resourceName).Info("verifying vCenter credentials")
+	if err := client.Login(verifyCtx, u.User); err != nil {
+		return srvErrors.NewVCenterError(err)
+	}
+
+	_ = client.Logout(verifyCtx)
+	client.CloseIdleConnections()
+
+	zap.S().Named(resourceName).Info("vCenter credentials verified successfully")
+	return nil
 }

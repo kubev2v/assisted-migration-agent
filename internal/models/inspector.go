@@ -20,6 +20,7 @@ const (
 
 // InspectorStatus holds the current Inspector state and metadata.
 type InspectorStatus struct {
-	State InspectorState
-	Error error
+	State       InspectorState
+	Credentials *Credentials
+	Error       error
 }
