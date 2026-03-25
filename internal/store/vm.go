@@ -67,6 +67,7 @@ func (s *VMStore) List(ctx context.Context, filters []sq.Sqlizer, opts ...ListOp
 	for rows.Next() {
 		var vm models.VirtualMachineSummary
 		var sqlErr string
+		var inspectionConcernCount int
 		var tags StringArray
 		err := rows.Scan(
 			&vm.ID,
@@ -77,18 +78,20 @@ func (s *VMStore) List(ctx context.Context, filters []sq.Sqlizer, opts ...ListOp
 			&vm.Memory,
 			&vm.DiskSize,
 			&vm.IssueCount,
-			&vm.Status.State,
+			&vm.InspectionStatus.State,
 			&vm.IsTemplate,
 			&vm.IsMigratable,
 			&sqlErr,
+			&inspectionConcernCount,
 			&tags,
 		)
 		if err != nil {
 			return nil, err
 		}
 		if sqlErr != "" {
-			vm.Status.Error = errors.New(sqlErr)
+			vm.InspectionStatus.Error = errors.New(sqlErr)
 		}
+		vm.InspectionConcernCount = inspectionConcernCount
 		vm.Tags = tags
 		vms = append(vms, vm)
 	}

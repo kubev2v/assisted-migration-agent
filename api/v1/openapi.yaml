@@ -613,14 +613,12 @@ components:
             - completed
             - canceled
             - error
-            - not_started
           x-enum-varnames:
             - VmInspectionStatusStatePending
             - VmInspectionStatusStateRunning
             - VmInspectionStatusStateCompleted
             - VmInspectionStatusStateCanceled
             - VmInspectionStatusStateError
-            - VmInspectionStatusStateNotStarted
           description: Current inspection state
         error:
           type: string
@@ -628,6 +626,31 @@ components:
         results:
           type: object
           description: Inspection results
+
+    VmInspectionResults:
+      type: object
+      description: VirtualMachine Inspection results
+      properties:
+        concerns:
+          type: array
+          items:
+            $ref: '#/components/schemas/VmInspectionConcern'
+
+    VmInspectionConcern:
+      type: object
+      description: Represents the structure of vm-migration-detective library inspection concerns
+      required:
+        - message
+        - category
+        - label
+      properties:
+        label:
+          type: string
+          description: Short label identifying the concern
+        message:
+          type: string
+        category:
+          type: string
 
     VirtualMachine:
       type: object
@@ -640,7 +663,6 @@ components:
         - diskSize
         - memory
         - issueCount
-        - inspection
       properties:
         name:
           type: string
@@ -674,8 +696,11 @@ components:
         template:
           type: boolean
           description: True if the vm is a template. False otherwise
-        inspection:
+        inspectionStatus:
           $ref: '#/components/schemas/VmInspectionStatus'
+        inspectionConcernCount:
+          type: integer
+          description: Number of inspection concerns recorded for the latest persisted inspection result
         tags:
           type: array
           items:
@@ -803,8 +828,7 @@ components:
             $ref: '#/components/schemas/VMIssue'
           description: List of issues affecting this VirtualMachine
         inspection:
-          $ref: '#/components/schemas/VmInspectionStatus'
-          description: Current inspection status for this VirtualMachine
+          $ref: '#/components/schemas/VmInspectionResults'
 
     VMDisk:
       type: object

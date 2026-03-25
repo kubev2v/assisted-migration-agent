@@ -34,11 +34,19 @@ func NewVirtualMachineFromSummary(vm models.VirtualMachineSummary) VirtualMachin
 		IssueCount:   vm.IssueCount,
 		Migratable:   &vm.IsMigratable,
 		Template:     &vm.IsTemplate,
-		Inspection:   NewInspectionStatus(vm.Status),
 	}
 	if len(vm.Tags) > 0 {
 		result.Tags = &vm.Tags
 	}
+
+	if vm.InspectionStatus.State != models.InspectionStateNotStarted {
+		s := NewInspectionStatus(vm.InspectionStatus)
+		result.InspectionStatus = &s
+	}
+	if vm.InspectionConcernCount > 0 {
+		result.InspectionConcernCount = &vm.InspectionConcernCount
+	}
+
 	return result
 }
 
@@ -130,6 +138,17 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 	}
 	if vm.ToolsRunningStatus != "" {
 		details.ToolsRunningStatus = &vm.ToolsRunningStatus
+	}
+	if len(vm.InspectionConcerns) > 0 {
+		concerns := make([]VmInspectionConcern, 0, len(vm.InspectionConcerns))
+		for _, co := range vm.InspectionConcerns {
+			concerns = append(concerns, VmInspectionConcern{
+				Category: co.Category,
+				Label:    co.Label,
+				Message:  co.Msg,
+			})
+		}
+		details.Inspection = &VmInspectionResults{Concerns: &concerns}
 	}
 
 	details.Template = &vm.IsTemplate
@@ -225,8 +244,6 @@ func NewInspectionStatus(status models.InspectionStatus) VmInspectionStatus {
 		c.State = VmInspectionStatusStateCompleted
 	case models.InspectionStateError.Value():
 		c.State = VmInspectionStatusStateError
-	default:
-		c.State = VmInspectionStatusStateNotStarted
 	}
 
 	if status.Error != nil {

@@ -22,32 +22,34 @@
 //
 // # Architecture Overview
 //
-//	┌─────────────────────────────────────────────────────────────────┐
-//	│                         Store (facade)                          │
-//	├─────────────────────────────────────────────────────────────────┤
-//	│  ConfigurationStore  │  InventoryStore  │   GroupStore        │
-//	│         ▼            │        ▼          │       ▼             │
-//	│   configuration      │    inventory      │    groups           │
-//	│      (local)         │     (local)       │    (local)          │
-//	├──────────────────────┴──────────────────┴─────────────────────┤
-//	│                          VMStore                               │
-//	│                             ▼                                  │
-//	│    vinfo, vdisk, concerns (from duckdb_parser)                 │
-//	└────────────────────────────────────────────────────────────────┘
+//	┌─────────────────────────────────────────────────────────────────────────────────────┐
+//	│                                   Store (facade)                                    │
+//	├─────────────────────────────────────────────────────────────────────────────────────┤
+//	│  ConfigurationStore │  InventoryStore     │   GroupStore        │  InspectionStore  │
+//	│         ▼           │        ▼            │       ▼             │         ▼         │
+//	│   configuration     │    inventory        │    groups           │  vm_inspection_*  │
+//	│      (local)        │     (local)         │    (local)          │      (local)      │
+//	├─────────────────────┴─────────────────────┴──────────────────── ┴───────────────────┤
+//	│                                       VMStore                                       │
+//	│                                          ▼                                          │
+//	│             vinfo, vdisk, concerns (duckdb_parser); joins local tables              │
+//	└─────────────────────────────────────────────────────────────────────────────────────┘
 //
 // # Data Sources
 //
 // Tables created by LOCAL MIGRATIONS (internal/store/migrations/sql/):
 //
-//	┌────────────────────┬─────────────────────────────────────────────┐
-//	│  Table             │  Purpose                                    │
-//	├────────────────────┼─────────────────────────────────────────────┤
-//	│  configuration     │  Agent runtime config (agent_mode)          │
-//	│  inventory         │  Raw inventory JSON blob with timestamps    │
-//	│  groups            │  Named filter expressions for VM grouping   │
-//	│  group_matches     │  Pre-computed group→VM ID matches           │
-//	│  schema_migrations │  Migration version tracking                 │
-//	└────────────────────┴─────────────────────────────────────────────┘
+//	┌─────────────────────────┬─────────────────────────────────────────────┐
+//	│  Table                  │  Purpose                                    │
+//	├─────────────────────────┼─────────────────────────────────────────────┤
+//	│  configuration          │  Agent runtime config (agent_mode)          │
+//	│  inventory              │  Raw inventory JSON blob with timestamps    │
+//	│  groups                 │  Named filter expressions for VM grouping   │
+//	│  group_matches          │  Pre-computed group→VM ID matches           │
+//	│  schema_migrations      │  Migration version tracking                 │
+//	│  vm_inspection_status   │ Per-VM deep-inspection state / queue        │
+//	│  vm_inspection_concerns │ Per-run inspection concern rows (FK vinfo)  │
+//	└─────────────────────────┴─────────────────────────────────────────────┘
 //
 // Tables created by DUCKDB_PARSER (parser.Init()):
 //
@@ -74,7 +76,7 @@
 //
 //	Store.Migrate(ctx)
 //	    ├── parser.Init()     → Creates vinfo, vdisk, concerns, etc.
-//	    └── migrations.Run()  → Creates configuration, inventory
+//	    └── migrations.Run()  → Creates configuration, inventory, inspection tables, …
 //
 // # Store Components
 //
@@ -156,6 +158,19 @@
 //   - DeleteMatches(ctx, groupID int) → error
 //     Removes the group_matches row for a group (used on group deletion).
 //
+// # InspectionStore
+//
+// Persists deep-inspection workflow state and structured concern lines from
+// inspection runs. This is separate from the duckdb_parser `concerns` table
+// (inventory migration assessment / issue counts).
+//
+// Each call to InsertResult allocates a new inspection_id (vm_inspection_id_seq)
+// and inserts one row per concern. VM list/filter joins the latest run per VM
+// (max inspection_id) as alias `ic` for inspection_concern.* filter fields.
+//
+// Methods (status): Get, List, First, Add, Update, DeleteAll.
+// Methods (concerns): InsertResult, ListResults.
+//
 // # VMStore
 //
 // Provides read access to VM inventory data. Uses a hybrid approach:
@@ -167,7 +182,9 @@
 // The query is split into two steps so that the filter DSL can reference any
 // raw column from any table, while the output remains one row per VM:
 //
-//  1. Filter step — flat JOIN of all 8 tables, apply WHERE, extract DISTINCT VM IDs
+//  1. Filter step — flat JOIN of vinfo, disks, inventory concerns, inspection
+//     status, inspection concerns (latest run per VM), CPU/mem/net, aggregates,
+//     datastore; apply WHERE; extract DISTINCT VM IDs
 //  2. Output step — aggregated query (subquery JOINs) restricted to matched IDs
 //
 // Filter Subquery (flat JOIN, all columns available):
@@ -177,6 +194,8 @@
 //	LEFT JOIN vdisk dk           ON v."VM ID" = dk."VM ID"
 //	LEFT JOIN concerns c         ON v."VM ID" = c."VM_ID"
 //	LEFT JOIN vm_inspection_status i ON v."VM ID" = i."VM ID"
+//	LEFT JOIN vm_inspection_concerns ic ON v."VM ID" = ic."VM ID"
+//	     AND ic.inspection_id = (SELECT MAX(inspection_id) FROM vm_inspection_concerns imx WHERE imx."VM ID" = v."VM ID")
 //	LEFT JOIN vcpu cpu           ON v."VM ID" = cpu."VM ID"
 //	LEFT JOIN vmemory mem        ON v."VM ID" = mem."VM ID"
 //	LEFT JOIN vnetwork net       ON v."VM ID" = net."VM ID"
@@ -222,9 +241,9 @@
 //
 //   - ByFilter(expr string)
 //     Parses a filter DSL expression (see pkg/filter) into a sq.Sqlizer.
-//     The DSL can reference any column from all 8 joined tables using
-//     dot-notation prefixes: disk.*, concern.*, cpu.*, mem.*, net.*, datastore.*,
-//     inspection.*, plus all flat vinfo columns.
+//     The DSL can reference columns from the flat filter join using
+//     dot-notation prefixes: disk.*, concern.* (inventory), inspection.*,
+//     cpu.*, mem.*, net.*, datastore.*, plus all flat vinfo columns.
 //
 // Pagination & Filtering Options (ListOption):
 //
@@ -344,7 +363,8 @@
 //   - Options can be combined for complex queries
 //
 // Separation of Concerns:
-//   - Local tables: Agent state (configuration, raw inventory)
+//   - Local tables: Agent state (configuration, raw inventory, groups,
+//     vm_inspection_status, vm_inspection_concerns, …)
 //   - Parser tables: Structured VMware inventory (VMs, hosts, datastores)
 //   - VMStore bridges both: queries parser tables, returns domain models
 package store

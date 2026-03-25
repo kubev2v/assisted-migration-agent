@@ -855,4 +855,61 @@ var _ = Describe("VMStore", func() {
 			}
 		})
 	})
+
+	Context("Inspection concerns in List output", func() {
+		Context("single inspection result", func() {
+			BeforeEach(func() {
+				insertVM("vm-insp", "insp-vm", "poweredOn", "cluster-a", 4096)
+				concerns := []models.VmInspectionConcern{
+					{Category: "disk", Label: "Disk", Msg: "ok"},
+					{Category: "network", Label: "Net", Msg: "review"},
+				}
+				err := s.WithTx(ctx, func(txCtx context.Context) error {
+					return s.Inspection().InsertResult(txCtx, "vm-insp", concerns)
+				})
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("should return the concern count for the latest inspection result", func() {
+				vms, err := s.VM().List(ctx, nil, store.WithDefaultSort())
+				Expect(err).NotTo(HaveOccurred())
+
+				var insp *models.VirtualMachineSummary
+				for i := range vms {
+					if vms[i].ID == "vm-insp" {
+						insp = &vms[i]
+						break
+					}
+				}
+				Expect(insp).NotTo(BeNil())
+				Expect(insp.InspectionConcernCount).To(Equal(2))
+			})
+		})
+
+		Context("multiple inspection results", func() {
+			It("should use concerns only from the newest result by max inspection_id", func() {
+				insertVM("vm-multi", "multi-vm", "poweredOn", "cluster-a", 4096)
+				const oldID, newID = 1, 2
+				_, err := db.ExecContext(ctx, `
+					INSERT INTO vm_inspection_concerns ("VM ID", inspection_id, category, label, msg) VALUES
+						('vm-multi', ?, 'stale', 'x', 'from-old'),
+						('vm-multi', ?, 'fresh', 'y', 'from-new')
+				`, oldID, newID)
+				Expect(err).NotTo(HaveOccurred())
+
+				vms, err := s.VM().List(ctx, nil, store.WithDefaultSort())
+				Expect(err).NotTo(HaveOccurred())
+
+				var vm *models.VirtualMachineSummary
+				for i := range vms {
+					if vms[i].ID == "vm-multi" {
+						vm = &vms[i]
+						break
+					}
+				}
+				Expect(vm).NotTo(BeNil())
+				Expect(vm.InspectionConcernCount).To(Equal(1))
+			})
+		})
+	})
 })

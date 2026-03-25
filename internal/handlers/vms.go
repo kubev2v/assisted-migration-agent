@@ -93,7 +93,7 @@ func (h *Handler) GetVMs(c *gin.Context, params v1.GetVMsParams) {
 	// Get inspection status and Map to API response
 	apiVMs := make([]v1.VirtualMachine, 0, len(vms))
 	for _, vm := range vms {
-		vm.Status = h.inspectorSrv.GetVmStatus(vm.ID)
+		vm.InspectionStatus = h.inspectorSrv.GetVmStatus(vm.ID)
 		apiVMs = append(apiVMs, v1.NewVirtualMachineFromSummary(vm))
 	}
 

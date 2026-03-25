@@ -270,6 +270,16 @@ Identifiers are **case-insensitive**. Dotted names refer to joined tables (e.g. 
 | `inspection.status`  | string | Inspection status           |
 | `inspection.error`   | string | Inspection error            |
 
+### vm_inspection_concerns (inspection_concern.*) — persisted deep-inspection concerns
+
+Rows from the latest inspection run per VM (`vm_inspection_concerns` joined at max `inspection_id`). Not the same table as inventory `concern.*`.
+
+| Identifier                 | Type   | Description (backing column) |
+|----------------------------|--------|-----------------------------|
+| `inspection_concern.label`   | string | Label                       |
+| `inspection_concern.category` | string | Category                    |
+| `inspection_concern.msg`     | string | Message                     |
+
 ### vcpu (cpu.*) — CPU attributes
 
 | Identifier            | Type    | Description (backing column) |

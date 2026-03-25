@@ -2,18 +2,19 @@ package models
 
 // VirtualMachineSummary represents a lightweight VM record for list views.
 type VirtualMachineSummary struct {
-	ID           string
-	Name         string
-	PowerState   string
-	Cluster      string
-	Datacenter   string
-	Memory       int32 // MB
-	DiskSize     int64 // MB (stored as MiB in DB, treated as MB)
-	IssueCount   int
-	IsMigratable bool
-	IsTemplate   bool
-	Status       InspectionStatus
-	Tags         []string
+	ID                     string
+	Name                   string
+	PowerState             string
+	Cluster                string
+	Datacenter             string
+	Memory                 int32 // MB
+	DiskSize               int64 // MB (stored as MiB in DB, treated as MB)
+	IssueCount             int
+	IsMigratable           bool
+	IsTemplate             bool
+	InspectionStatus       InspectionStatus
+	InspectionConcernCount int
+	Tags                   []string
 }
 
 type VM struct {
@@ -56,9 +57,9 @@ type VM struct {
 
 	Issues []Issue
 
-	InspectionState   string
-	InspectionError   string
-	InspectionResults []byte
+	InspectionState    string
+	InspectionError    string
+	InspectionConcerns []VmInspectionConcern
 }
 
 type Issue struct {

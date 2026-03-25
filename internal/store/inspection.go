@@ -21,6 +21,17 @@ const (
 	inspectionColSequence = "sequence"
 )
 
+// Column name constants for vm_inspection_concerns table
+const (
+	vmInspectionConcernsTable           = "vm_inspection_concerns"
+	vmInspectionConcernsColVMID         = `"VM ID"`
+	vmInspectionConcernsColInspectionID = "inspection_id"
+	vmInspectionConcernsColCategory     = "category"
+	vmInspectionConcernsColLabel        = "label"
+	vmInspectionConcernsColMsg          = "msg"
+	vmInspectionIDSeq                   = "vm_inspection_id_seq"
+)
+
 type InspectionStore struct {
 	db QueryInterceptor
 }
@@ -101,33 +112,6 @@ func (s *InspectionStore) List(ctx context.Context, filter *InspectionQueryFilte
 	return result, nil
 }
 
-// First returns the VM ID for pending inspection with the lowest sequence value.
-// Returns empty string and sql.ErrNoRows if no matching record is found.
-func (s *InspectionStore) First(ctx context.Context) (string, error) {
-	builder := sq.Select(inspectionColVmID).
-		From(inspectionTable).
-		OrderBy(inspectionColSequence + " ASC").
-		Where(sq.Eq{inspectionColStatus: models.InspectionStatePending.Value()}).
-		Limit(1)
-
-	query, args, err := builder.ToSql()
-	if err != nil {
-		return "", fmt.Errorf("building first pending query: %w", err)
-	}
-
-	row := s.db.QueryRowContext(ctx, query, args...)
-	var vmID string
-	err = row.Scan(&vmID)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return "", sql.ErrNoRows
-		}
-		return "", fmt.Errorf("scanning first pending vm: %w", err)
-	}
-
-	return vmID, nil
-}
-
 // Add inserts new inspection statuses for multiple VMs. Existing VMs are ignored.
 // The sequence is automatically assigned by the database based on insertion order.
 func (s *InspectionStore) Add(ctx context.Context, vmIDs []string, status models.InspectionState) error {
@@ -194,4 +178,102 @@ func (s *InspectionStore) DeleteAll(ctx context.Context) error {
 		return fmt.Errorf("deleting all inspections: %w", err)
 	}
 	return nil
+}
+
+// ##### Inspection concerns (per-run rows keyed by inspection_id)
+
+func (s *InspectionStore) insertConcerns(ctx context.Context, vmID string, inspectionID int64, concerns []models.VmInspectionConcern) error {
+	if len(concerns) == 0 {
+		return nil
+	}
+
+	builder := sq.Insert(vmInspectionConcernsTable).
+		Columns(
+			vmInspectionConcernsColVMID,
+			vmInspectionConcernsColInspectionID,
+			vmInspectionConcernsColCategory,
+			vmInspectionConcernsColLabel,
+			vmInspectionConcernsColMsg,
+		)
+	for _, c := range concerns {
+		builder = builder.Values(vmID, inspectionID, c.Category, c.Label, c.Msg)
+	}
+	query, args, err := builder.ToSql()
+	if err != nil {
+		return fmt.Errorf("building insert inspection concerns: %w", err)
+	}
+	_, err = s.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("inserting inspection concerns for vm %s inspection %d: %w", vmID, inspectionID, err)
+	}
+	return nil
+}
+
+func (s *InspectionStore) InsertResult(ctx context.Context, vmID string, concerns []models.VmInspectionConcern) error {
+	if len(concerns) == 0 {
+		return nil
+	}
+	var inspectionID int64
+	err := s.db.QueryRowContext(ctx, "SELECT nextval('"+vmInspectionIDSeq+"')").Scan(&inspectionID)
+	if err != nil {
+		return fmt.Errorf("allocating inspection id for vm %s: %w", vmID, err)
+	}
+	return s.insertConcerns(ctx, vmID, inspectionID, concerns)
+}
+
+func (s *InspectionStore) ListResults(ctx context.Context, vmID string) ([]models.VmInspectionResult, error) {
+	query, args, err := sq.Select(
+		"c."+vmInspectionConcernsColInspectionID,
+		"c."+vmInspectionConcernsColCategory,
+		"c."+vmInspectionConcernsColLabel,
+		"c."+vmInspectionConcernsColMsg,
+	).From(vmInspectionConcernsTable+" c").
+		Where(sq.Eq{`c.` + vmInspectionConcernsColVMID: vmID}).
+		OrderBy("c."+vmInspectionConcernsColInspectionID+" DESC", "c.id").
+		ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("building list inspection results: %w", err)
+	}
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("executing list inspection results: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var out []models.VmInspectionResult
+	var cur *models.VmInspectionResult
+	var lastID int64 = -1
+
+	for rows.Next() {
+		var inspectionID int64
+		var cat, label, msg sql.NullString
+		if err := rows.Scan(&inspectionID, &cat, &label, &msg); err != nil {
+			return nil, fmt.Errorf("scanning vm inspection result row: %w", err)
+		}
+		if inspectionID != lastID {
+			if cur != nil {
+				out = append(out, *cur)
+			}
+			cur = &models.VmInspectionResult{
+				InspectionID: inspectionID,
+				VMID:         vmID,
+				Concerns:     []models.VmInspectionConcern{},
+			}
+			lastID = inspectionID
+		}
+		if cur != nil {
+			cur.Concerns = append(cur.Concerns, models.VmInspectionConcern{
+				Category: cat.String,
+				Label:    label.String,
+				Msg:      msg.String,
+			})
+		}
+	}
+	if cur != nil {
+		out = append(out, *cur)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating vm inspection results: %w", err)
+	}
+	return out, nil
 }

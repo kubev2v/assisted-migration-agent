@@ -30,7 +30,22 @@ type VMListParams struct {
 }
 
 func (s *VMService) Get(ctx context.Context, id string) (*models.VM, error) {
-	return s.store.VM().Get(ctx, id)
+	vm, err := s.store.VM().Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	results, err := s.store.Inspection().ListResults(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(results) == 0 {
+		return vm, nil
+	}
+
+	vm.InspectionConcerns = results[0].Concerns
+	return vm, nil
 }
 
 func (s *VMService) List(ctx context.Context, params VMListParams) ([]models.VirtualMachineSummary, int, error) {

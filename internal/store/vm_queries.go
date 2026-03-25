@@ -13,10 +13,11 @@ var vmOutputQuery = sq.Select(
 	`v."Memory" AS memory`,
 	`COALESCE(d.total_disk, 0) AS disk_size`,
 	`COALESCE(c.issues_count, 0) AS issue_count`,
-	`COALESCE(i.status, 'not_found') AS status`,
+	`COALESCE(i.status, 'not_started') AS status`,
 	`v."Template" as template`,
 	`COALESCE(crit.critical_count, 0) = 0 AS migratable`,
 	`COALESCE(i.error, '') AS error`,
+	`COALESCE((SELECT COUNT(*)::BIGINT FROM vm_inspection_concerns ic WHERE ic."VM ID" = v."VM ID" AND ic.inspection_id = (SELECT MAX(inspection_id) FROM vm_inspection_concerns imx WHERE imx."VM ID" = v."VM ID")), 0) AS inspection_concern_count`,
 	`COALESCE(t.tags, [])::VARCHAR[] AS tags`,
 ).From("vinfo v").
 	LeftJoin(`(SELECT "VM_ID", COUNT(*) AS issues_count FROM concerns GROUP BY "VM_ID") c ON v."VM ID" = c."VM_ID"`).
@@ -46,4 +47,5 @@ var vmFilterSubquery = sq.Select(`DISTINCT v."VM ID"`).
 	LeftJoin(`(SELECT "VM_ID", COUNT(*) AS issues_count FROM concerns GROUP BY "VM_ID") cc ON v."VM ID" = cc."VM_ID"`).
 	LeftJoin(`(SELECT "VM_ID", COUNT(*) AS critical_count FROM concerns WHERE "Category" = 'Critical' GROUP BY "VM_ID") crit ON v."VM ID" = crit."VM_ID"`).
 	LeftJoin(`(SELECT "VM ID", SUM("Capacity MiB") AS total_disk FROM vdisk GROUP BY "VM ID") d ON v."VM ID" = d."VM ID"`).
-	LeftJoin(`vdatastore ds ON ds."Name" = regexp_extract(COALESCE(dk."Path", dk."Disk Path"), '\[([^\]]+)\]', 1)`)
+	LeftJoin(`vdatastore ds ON ds."Name" = regexp_extract(COALESCE(dk."Path", dk."Disk Path"), '\[([^\]]+)\]', 1)`).
+	LeftJoin(`vm_inspection_concerns ic ON v."VM ID" = ic."VM ID" AND ic.inspection_id = (SELECT MAX(inspection_id) FROM vm_inspection_concerns imx WHERE imx."VM ID" = v."VM ID")`)

@@ -112,6 +112,14 @@ var defaultMapFn MapFunc = func(name string) (string, error) {
 	case "inspection.error":
 		return `i.error`, nil
 
+	// vm_inspection_concerns (ic) — inspection_concern.* prefix (latest persisted inspection run per VM)
+	case "inspection_concern.label":
+		return `ic.label`, nil
+	case "inspection_concern.category":
+		return `ic.category`, nil
+	case "inspection_concern.msg":
+		return `ic.msg`, nil
+
 	// vcpu (cpu) — cpu.* prefix
 	case "cpu.hot_add":
 		return `cpu."Hot Add"`, nil

@@ -82,7 +82,60 @@ var _ = Describe("NewVirtualMachineFromSummary", func() {
 		Expect(vm.Memory).To(Equal(int64(4096)))
 		Expect(vm.DiskSize).To(Equal(int64(102400)))
 		Expect(vm.IssueCount).To(Equal(3))
-		Expect(vm.Inspection.State).To(Equal(v1.VmInspectionStatusStateNotStarted))
+	})
+
+	It("should not return inspection when not started", func() {
+		summary := models.VirtualMachineSummary{
+			InspectionStatus: models.InspectionStatus{State: models.InspectionStateNotStarted},
+		}
+
+		vm := v1.NewVirtualMachineFromSummary(summary)
+
+		Expect(vm.InspectionStatus).To(BeNil())
+		Expect(vm.InspectionConcernCount).To(BeNil())
+	})
+
+	It("should return inspection when initiated", func() {
+		type want struct {
+			modelState models.InspectionState
+			apiState   v1.VmInspectionStatusState
+		}
+		cases := []want{
+			{models.InspectionStatePending, v1.VmInspectionStatusStatePending},
+			{models.InspectionStateRunning, v1.VmInspectionStatusStateRunning},
+			{models.InspectionStateCompleted, v1.VmInspectionStatusStateCompleted},
+			{models.InspectionStateCanceled, v1.VmInspectionStatusStateCanceled},
+			{models.InspectionStateError, v1.VmInspectionStatusStateError},
+		}
+		for _, tc := range cases {
+			summary := models.VirtualMachineSummary{
+				InspectionStatus: models.InspectionStatus{State: tc.modelState},
+			}
+			vm := v1.NewVirtualMachineFromSummary(summary)
+			Expect(vm.InspectionStatus).NotTo(BeNil())
+			Expect(vm.InspectionStatus.State).To(Equal(tc.apiState))
+		}
+	})
+
+	It("should map inspection concern count when completed", func() {
+		summary := models.VirtualMachineSummary{
+			InspectionStatus:       models.InspectionStatus{State: models.InspectionStateCompleted},
+			InspectionConcernCount: 1,
+		}
+		vm := v1.NewVirtualMachineFromSummary(summary)
+		Expect(vm.InspectionStatus).NotTo(BeNil())
+		Expect(vm.InspectionConcernCount).NotTo(BeNil())
+		Expect(*vm.InspectionConcernCount).To(Equal(1))
+	})
+
+	It("should return inspection with status only when started but no concerns", func() {
+		summary := models.VirtualMachineSummary{
+			InspectionStatus: models.InspectionStatus{State: models.InspectionStateRunning},
+		}
+		vm := v1.NewVirtualMachineFromSummary(summary)
+		Expect(vm.InspectionStatus).NotTo(BeNil())
+		Expect(vm.InspectionStatus.State).To(Equal(v1.VmInspectionStatusStateRunning))
+		Expect(vm.InspectionConcernCount).To(BeNil())
 	})
 
 	Context("Tags", func() {
@@ -717,6 +770,60 @@ var _ = Describe("NewVirtualMachineDetailFromModel", func() {
 			details := v1.NewVirtualMachineDetailFromModel(vm)
 
 			Expect(details.Issues).To(BeNil())
+		})
+	})
+
+	Context("inspection concerns", func() {
+		It("should map inspection concerns when present", func() {
+			vm := models.VM{
+				ID:              "vm-insp-concerns",
+				Name:            "Inspected VM",
+				PowerState:      "poweredOn",
+				ConnectionState: "connected",
+				InspectionConcerns: []models.VmInspectionConcern{
+					{Category: "disk", Label: "Disk", Msg: "ok"},
+					{Category: "network", Label: "Network", Msg: "needs review"},
+				},
+			}
+
+			details := v1.NewVirtualMachineDetailFromModel(vm)
+
+			Expect(details.Inspection).NotTo(BeNil())
+			Expect(details.Inspection.Concerns).NotTo(BeNil())
+			Expect(*details.Inspection.Concerns).To(HaveLen(2))
+			Expect((*details.Inspection.Concerns)[0].Category).To(Equal("disk"))
+			Expect((*details.Inspection.Concerns)[0].Label).To(Equal("Disk"))
+			Expect((*details.Inspection.Concerns)[0].Message).To(Equal("ok"))
+			Expect((*details.Inspection.Concerns)[1].Category).To(Equal("network"))
+			Expect((*details.Inspection.Concerns)[1].Label).To(Equal("Network"))
+			Expect((*details.Inspection.Concerns)[1].Message).To(Equal("needs review"))
+		})
+
+		It("should omit inspection when there are no concerns", func() {
+			vm := models.VM{
+				ID:              "vm-no-insp",
+				Name:            "Plain VM",
+				PowerState:      "poweredOn",
+				ConnectionState: "connected",
+			}
+
+			details := v1.NewVirtualMachineDetailFromModel(vm)
+
+			Expect(details.Inspection).To(BeNil())
+		})
+
+		It("should omit inspection when concerns slice is empty", func() {
+			vm := models.VM{
+				ID:                 "vm-empty-insp",
+				Name:               "Empty concerns VM",
+				PowerState:         "poweredOn",
+				ConnectionState:    "connected",
+				InspectionConcerns: []models.VmInspectionConcern{},
+			}
+
+			details := v1.NewVirtualMachineDetailFromModel(vm)
+
+			Expect(details.Inspection).To(BeNil())
 		})
 	})
 })
