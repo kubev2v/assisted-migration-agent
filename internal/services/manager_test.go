@@ -46,10 +46,9 @@ var _ = Describe("ServiceManager", func() {
 
 		cfg = config.NewConfigurationWithOptionsAndDefaults(
 			config.WithAgent(config.Agent{
-				ID:         uuid.New().String(),
-				SourceID:   uuid.New().String(),
-				NumWorkers: 1,
-				Mode:       "disconnected",
+				ID:       uuid.New().String(),
+				SourceID: uuid.New().String(),
+				Mode:     "disconnected",
 			}),
 		)
 	})

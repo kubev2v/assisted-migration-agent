@@ -34,7 +34,6 @@ type Agent struct {
 	Version             string        `debugmap:"visible" default:"v0.0.0"`
 	GitCommit           string        `debugmap:"visible" default:"unknown"`
 	UIGitCommit         string        `debugmap:"visible" default:"unknown"`
-	NumWorkers          int           `debugmap:"visible" default:"3"`
 	DataFolder          string        `debugmap:"visible"`
 	OpaPoliciesFolder   string        `debugmap:"visible"`
 	UpdateInterval      time.Duration `debugmap:"visible" default:"5s"`

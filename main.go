@@ -39,7 +39,6 @@ func main() {
 			Version:             version,
 			GitCommit:           gitCommit,
 			UIGitCommit:         uiGitCommit,
-			NumWorkers:          3,
 			Mode:                "disconnected",
 			UpdateInterval:      5 * time.Second,
 			LegacyStatusEnabled: true,

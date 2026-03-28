@@ -77,7 +77,6 @@ var _ = Describe("Run Command", func() {
 				"--agent-id", "550e8400-e29b-41d4-a716-446655440000",
 				"--source-id", "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
 				"--version", "v1.2.3",
-				"--num-workers", "5",
 				"--data-folder", "/var/data",
 				"--opa-policies-folder", "/etc/policies",
 				"--legacy-status-enabled=false",
@@ -89,7 +88,6 @@ var _ = Describe("Run Command", func() {
 			Expect(cfg.Agent.ID).To(Equal("550e8400-e29b-41d4-a716-446655440000"))
 			Expect(cfg.Agent.SourceID).To(Equal("6ba7b810-9dad-11d1-80b4-00c04fd430c8"))
 			Expect(cfg.Agent.Version).To(Equal("v1.2.3"))
-			Expect(cfg.Agent.NumWorkers).To(Equal(5))
 			Expect(cfg.Agent.DataFolder).To(Equal("/var/data"))
 			Expect(cfg.Agent.OpaPoliciesFolder).To(Equal("/etc/policies"))
 			Expect(cfg.Agent.LegacyStatusEnabled).To(BeFalse())
@@ -149,7 +147,6 @@ var _ = Describe("Run Command", func() {
 			Expect(cfg.Server.ServerMode).To(Equal("dev"))
 			Expect(cfg.Agent.Mode).To(Equal("disconnected"))
 			Expect(cfg.Agent.Version).To(Equal("v0.0.0"))
-			Expect(cfg.Agent.NumWorkers).To(Equal(3))
 			Expect(cfg.Agent.UpdateInterval).To(Equal(5 * time.Second))
 			Expect(cfg.Agent.LegacyStatusEnabled).To(BeTrue())
 			Expect(cfg.Console.URL).To(Equal("http://localhost:7443"))
@@ -167,7 +164,6 @@ var _ = Describe("Run Command", func() {
 			_ = os.Unsetenv("AGENT_AGENT_ID")
 			_ = os.Unsetenv("AGENT_SOURCE_ID")
 			_ = os.Unsetenv("AGENT_VERSION")
-			_ = os.Unsetenv("AGENT_NUM_WORKERS")
 			_ = os.Unsetenv("AGENT_DATA_FOLDER")
 			_ = os.Unsetenv("AGENT_OPA_POLICIES_FOLDER")
 			_ = os.Unsetenv("AGENT_LEGACY_STATUS_ENABLED")
@@ -210,7 +206,6 @@ var _ = Describe("Run Command", func() {
 			_ = os.Setenv("AGENT_AGENT_ID", "11111111-1111-1111-1111-111111111111")
 			_ = os.Setenv("AGENT_SOURCE_ID", "22222222-2222-2222-2222-222222222222")
 			_ = os.Setenv("AGENT_VERSION", "v2.0.0")
-			_ = os.Setenv("AGENT_NUM_WORKERS", "10")
 			_ = os.Setenv("AGENT_DATA_FOLDER", "/env/data")
 			_ = os.Setenv("AGENT_OPA_POLICIES_FOLDER", "/env/policies")
 			_ = os.Setenv("AGENT_LEGACY_STATUS_ENABLED", "false")
@@ -229,7 +224,6 @@ var _ = Describe("Run Command", func() {
 			Expect(cfg.Agent.ID).To(Equal("11111111-1111-1111-1111-111111111111"))
 			Expect(cfg.Agent.SourceID).To(Equal("22222222-2222-2222-2222-222222222222"))
 			Expect(cfg.Agent.Version).To(Equal("v2.0.0"))
-			Expect(cfg.Agent.NumWorkers).To(Equal(10))
 			Expect(cfg.Agent.DataFolder).To(Equal("/env/data"))
 			Expect(cfg.Agent.OpaPoliciesFolder).To(Equal("/env/policies"))
 			Expect(cfg.Agent.LegacyStatusEnabled).To(BeFalse())
@@ -311,7 +305,6 @@ var _ = Describe("Run Command", func() {
 			cfg.Agent.Mode = "disconnected"
 			cfg.Server.ServerMode = "dev"
 			cfg.Server.HTTPPort = 8000
-			cfg.Agent.NumWorkers = 3
 			cfg.Auth.Enabled = false
 		})
 
@@ -568,52 +561,6 @@ var _ = Describe("Run Command", func() {
 
 				// Assert
 				Expect(err).ToNot(HaveOccurred())
-			})
-		})
-
-		Context("num-workers validation", func() {
-			// Given a valid num-workers value
-			// When we validate the configuration
-			// Then validation should pass
-			It("should accept valid num-workers", func() {
-				// Arrange
-				cfg.Agent.NumWorkers = 5
-
-				// Act
-				err := validateConfiguration(cfg)
-
-				// Assert
-				Expect(err).ToNot(HaveOccurred())
-			})
-
-			// Given num-workers set to 0
-			// When we validate the configuration
-			// Then it should fail with appropriate error
-			It("should fail with num-workers = 0", func() {
-				// Arrange
-				cfg.Agent.NumWorkers = 0
-
-				// Act
-				err := validateConfiguration(cfg)
-
-				// Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("invalid num-workers"))
-			})
-
-			// Given a negative num-workers value
-			// When we validate the configuration
-			// Then it should fail with appropriate error
-			It("should fail with negative num-workers", func() {
-				// Arrange
-				cfg.Agent.NumWorkers = -1
-
-				// Act
-				err := validateConfiguration(cfg)
-
-				// Assert
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("invalid num-workers"))
 			})
 		})
 

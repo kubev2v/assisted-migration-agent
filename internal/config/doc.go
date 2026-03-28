@@ -36,7 +36,6 @@
 //	│ ID                  │ ""             │ Agent UUID (required)                │
 //	│ SourceID            │ ""             │ Source UUID (required)               │
 //	│ Version             │ "v0.0.0"       │ Agent version string                 │
-//	│ NumWorkers          │ 3              │ Number of scheduler workers          │
 //	│ DataFolder          │ ""             │ Path to data storage (DuckDB)        │
 //	│ OpaPoliciesFolder   │ ""             │ Path to OPA policy files             │
 //	│ UpdateInterval      │ 5s             │ Console update frequency             │

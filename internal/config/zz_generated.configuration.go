@@ -217,7 +217,6 @@ func (a *Agent) ToOption() AgentOption {
 		to.Version = a.Version
 		to.GitCommit = a.GitCommit
 		to.UIGitCommit = a.UIGitCommit
-		to.NumWorkers = a.NumWorkers
 		to.DataFolder = a.DataFolder
 		to.OpaPoliciesFolder = a.OpaPoliciesFolder
 		to.UpdateInterval = a.UpdateInterval
@@ -234,7 +233,6 @@ func (a *Agent) DebugMap() map[string]any {
 	debugMap["Version"] = helpers.DebugValue(a.Version, false)
 	debugMap["GitCommit"] = helpers.DebugValue(a.GitCommit, false)
 	debugMap["UIGitCommit"] = helpers.DebugValue(a.UIGitCommit, false)
-	debugMap["NumWorkers"] = helpers.DebugValue(a.NumWorkers, false)
 	debugMap["DataFolder"] = helpers.DebugValue(a.DataFolder, false)
 	debugMap["OpaPoliciesFolder"] = helpers.DebugValue(a.OpaPoliciesFolder, false)
 	debugMap["UpdateInterval"] = helpers.DebugValue(a.UpdateInterval, false)
@@ -297,13 +295,6 @@ func WithGitCommit(gitCommit string) AgentOption {
 func WithUIGitCommit(uIGitCommit string) AgentOption {
 	return func(a *Agent) {
 		a.UIGitCommit = uIGitCommit
-	}
-}
-
-// WithNumWorkers returns an option that can set NumWorkers on a Agent
-func WithNumWorkers(numWorkers int) AgentOption {
-	return func(a *Agent) {
-		a.NumWorkers = numWorkers
 	}
 }
 

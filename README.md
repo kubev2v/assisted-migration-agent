@@ -66,7 +66,6 @@ bin/agent run \
 | `--mode` | `disconnected` | `connected` \| `disconnected` |
 | `--data-folder` | — | Path to persistent data folder (uses in-memory if not set) |
 | `--opa-policies-folder` | *required* | Path to OPA policies folder for VM validation |
-| `--num-workers` | `3` | Number of scheduler workers |
 | `--version` | `v0.0.0` | Agent version to report to console |
 | `--legacy-status-enabled` | `true` | Use legacy status like waiting-for-credentials |
 | `--server-http-port` | `8000` | HTTP server port |

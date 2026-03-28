@@ -8,13 +8,11 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/pkg/console"
-	"github.com/kubev2v/assisted-migration-agent/pkg/scheduler"
 )
 
 type ServiceManager struct {
 	cfg           *config.Configuration
 	store         *store.Store
-	scheduler     *scheduler.Scheduler[any]
 	consoleClient *console.Client
 
 	console   *Console
@@ -65,8 +63,6 @@ func (m *ServiceManager) Initialize() error {
 		return errors.New("console client is required")
 	}
 
-	m.scheduler = scheduler.NewDefaultScheduler(m.cfg.Agent.NumWorkers)
-
 	m.collector = NewCollectorService(
 		m.store,
 		m.cfg.Agent.DataFolder,
@@ -91,7 +87,6 @@ func (m *ServiceManager) Initialize() error {
 	if err != nil {
 		m.collector.Stop()
 		_ = m.inspector.Stop()
-		m.scheduler.Close()
 		return err
 	}
 	m.console = consoleSrv
@@ -135,5 +130,4 @@ func (m *ServiceManager) Stop(ctx context.Context) {
 	m.console.Stop()
 	m.collector.Stop()
 	_ = m.inspector.Stop()
-	m.scheduler.Close()
 }

@@ -215,10 +215,6 @@ func validateConfiguration(cfg *config.Configuration) error {
 		return fmt.Errorf("invalid http-port %d: must be between 1 and 65535", cfg.Server.HTTPPort)
 	}
 
-	if cfg.Agent.NumWorkers < 1 {
-		return fmt.Errorf("invalid num-workers %d: must be at least 1", cfg.Agent.NumWorkers)
-	}
-
 	if cfg.Auth.Enabled && cfg.Auth.JWTFilePath == "" {
 		return errors.New("authentication-jwt-filepath must be set when authentication is enabled")
 	}
@@ -275,7 +271,6 @@ func registerAgentFlags(flagSet *pflag.FlagSet, config *config.Configuration) {
 	flagSet.StringVar(&config.Agent.ID, "agent-id", config.Agent.ID, "Unique identifier (UUID) for this agent")
 	flagSet.StringVar(&config.Agent.SourceID, "source-id", config.Agent.SourceID, "Source identifier (UUID) for this agent")
 	flagSet.StringVar(&config.Agent.Version, "version", config.Agent.Version, "Agent version to report to console")
-	flagSet.IntVar(&config.Agent.NumWorkers, "num-workers", config.Agent.NumWorkers, "Number of scheduler workers")
 	flagSet.StringVar(&config.Agent.DataFolder, "data-folder", config.Agent.DataFolder, "Path to the persistent data folder")
 	flagSet.BoolVar(&config.Agent.LegacyStatusEnabled, "legacy-status-enabled", config.Agent.LegacyStatusEnabled, "Use agent's legacy status like waiting-for-credentials")
 }
