@@ -13,6 +13,7 @@ permissions:
 
 jobs:
   sync-jira:
+    if: 1 == 2 # The workflow is not working. Disable it for now.
     uses: kubev2v/migration-planner-workflows/.github/workflows/jira-pr-sync.yml@main
     with:
       ticket-prefix: 'ECOPROJECT'
