@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
@@ -73,7 +74,35 @@ func (m *ServiceManager) Initialize() error {
 	m.inspector = NewInspectorService(10).
 		WithInspectionBuilder(
 			func(id string) []models.WorkUnit[models.InspectionStatus, models.InspectionResult] {
-				return make([]models.WorkUnit[models.InspectionStatus, models.InspectionResult], 0)
+				units := []models.WorkUnit[models.InspectionStatus, models.InspectionResult]{
+					{
+						Status: func() models.InspectionStatus {
+							return models.InspectionStatus{State: models.InspectionStateRunning}
+						},
+						Work: func(ctx context.Context, result models.InspectionResult) (models.InspectionResult, error) {
+							time.Sleep(5 * time.Second)
+							err := m.store.WithTx(ctx, func(txCtx context.Context) error {
+								return m.store.Inspection().InsertResult(txCtx, id, []models.VmInspectionConcern{
+									{
+										Msg:      "No Inspection Concerns found",
+										Category: "Information",
+										Label:    "",
+									},
+								})
+							})
+							return result, err
+						},
+					},
+					{
+						Status: func() models.InspectionStatus {
+							return models.InspectionStatus{State: models.InspectionStateCompleted}
+						},
+						Work: func(ctx context.Context, result models.InspectionResult) (models.InspectionResult, error) {
+							return result, nil
+						},
+					},
+				}
+				return units
 			})
 
 	m.vddk = NewVddkService(m.cfg.Agent.DataFolder, m.store)
