@@ -9,8 +9,8 @@ import (
 )
 
 // sqlTestMapper maps variable names to simple quoted column names.
-var sqlTestMapper MapFunc = func(name string) (string, error) {
-	return fmt.Sprintf(`"%s"`, name), nil
+var sqlTestMapper MapFunc = func(name string) (string, FieldType, error) {
+	return fmt.Sprintf(`"%s"`, name), AnyField, nil
 }
 
 // toSqlString is a test helper that converts a Sqlizer to a string with args interpolated.
@@ -867,20 +867,20 @@ var _ = Describe("SQL Generation", func() {
 		for _, tc := range fields {
 			tc := tc
 			It("should map "+tc.field, func() {
-				col, err := defaultMapFn(tc.field)
+				col, _, err := defaultMapFn(tc.field)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(col).To(Equal(tc.expect))
 			})
 		}
 
 		It("should be case-insensitive", func() {
-			col, err := defaultMapFn("MEMORY")
+			col, _, err := defaultMapFn("MEMORY")
 			Expect(err).ToNot(HaveOccurred())
 			Expect(col).To(Equal(`v."Memory"`))
 		})
 
 		It("should return error for unknown field", func() {
-			_, err := defaultMapFn("nonexistent")
+			_, _, err := defaultMapFn("nonexistent")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("unknown filter field"))
 		})
@@ -888,25 +888,25 @@ var _ = Describe("SQL Generation", func() {
 
 	Context("groupMapFn field mappings", func() {
 		It("should map name", func() {
-			col, err := groupMapFn("name")
+			col, _, err := groupMapFn("name")
 			Expect(err).ToNot(HaveOccurred())
 			Expect(col).To(Equal("name"))
 		})
 
 		It("should map description", func() {
-			col, err := groupMapFn("description")
+			col, _, err := groupMapFn("description")
 			Expect(err).ToNot(HaveOccurred())
 			Expect(col).To(Equal("description"))
 		})
 
 		It("should map filter", func() {
-			col, err := groupMapFn("filter")
+			col, _, err := groupMapFn("filter")
 			Expect(err).ToNot(HaveOccurred())
 			Expect(col).To(Equal("filter"))
 		})
 
 		It("should return error for unknown field", func() {
-			_, err := groupMapFn("bogus")
+			_, _, err := groupMapFn("bogus")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("unknown group filter field"))
 		})
@@ -920,9 +920,9 @@ var _ = Describe("SQL Generation", func() {
 		})
 
 		It("should propagate map error from inExpression", func() {
-			failMapper := func(name string) (string, error) {
-				return "", fmt.Errorf("bad field: %s", name)
-			}
+			failMapper := MapFunc(func(name string) (string, FieldType, error) {
+				return "", 0, fmt.Errorf("bad field: %s", name)
+			})
 			expr := &inExpression{
 				Left:   &varExpression{Name: "unknown"},
 				Values: []string{"a"},
@@ -933,9 +933,9 @@ var _ = Describe("SQL Generation", func() {
 		})
 
 		It("should propagate map error from left side of binary expression", func() {
-			failMapper := func(name string) (string, error) {
-				return "", fmt.Errorf("bad field: %s", name)
-			}
+			failMapper := MapFunc(func(name string) (string, FieldType, error) {
+				return "", 0, fmt.Errorf("bad field: %s", name)
+			})
 			expr := &binaryExpression{
 				Left:  &varExpression{Name: "unknown"},
 				Op:    equal,
@@ -947,12 +947,12 @@ var _ = Describe("SQL Generation", func() {
 		})
 
 		It("should propagate map error from right side of binary expression", func() {
-			failMapper := func(name string) (string, error) {
+			failMapper := MapFunc(func(name string) (string, FieldType, error) {
 				if name == "ok" {
-					return `"ok"`, nil
+					return `"ok"`, AnyField, nil
 				}
-				return "", fmt.Errorf("bad field: %s", name)
-			}
+				return "", 0, fmt.Errorf("bad field: %s", name)
+			})
 			expr := &binaryExpression{
 				Left:  &varExpression{Name: "ok"},
 				Op:    equal,
@@ -1015,6 +1015,164 @@ var _ = Describe("SQL Generation", func() {
 
 		It("should return empty string for eol token", func() {
 			Expect(eol.Sql()).To(Equal(""))
+		})
+	})
+
+	Context("Type validation", func() {
+		typedMapper := func(types map[string]FieldType) MapFunc {
+			return func(name string) (string, FieldType, error) {
+				ft, ok := types[name]
+				if !ok {
+					return "", 0, fmt.Errorf("unknown field: %s", name)
+				}
+				return fmt.Sprintf(`"%s"`, name), ft, nil
+			}
+		}
+
+		Context("valid type combinations", func() {
+			type testCase struct {
+				desc   string
+				input  string
+				fields map[string]FieldType
+			}
+
+			tests := []testCase{
+				{"string = string", "name = 'test'", map[string]FieldType{"name": StringField}},
+				{"string != string", "name != 'test'", map[string]FieldType{"name": StringField}},
+				{"string ~ regex", "name ~ /pattern/", map[string]FieldType{"name": StringField}},
+				{"string !~ regex", "name !~ /pattern/", map[string]FieldType{"name": StringField}},
+				{"string like string", "name like 'test'", map[string]FieldType{"name": StringField}},
+				{"numeric = quantity", "memory = 8GB", map[string]FieldType{"memory": NumericField}},
+				{"numeric > quantity", "cpus > 4", map[string]FieldType{"cpus": NumericField}},
+				{"numeric >= quantity", "memory >= 16GB", map[string]FieldType{"memory": NumericField}},
+				{"numeric < quantity", "cpus < 2", map[string]FieldType{"cpus": NumericField}},
+				{"numeric <= quantity", "memory <= 1TB", map[string]FieldType{"memory": NumericField}},
+				{"numeric != quantity", "cpus != 8", map[string]FieldType{"cpus": NumericField}},
+				{"boolean = true", "active = true", map[string]FieldType{"active": BooleanField}},
+				{"boolean = false", "active = false", map[string]FieldType{"active": BooleanField}},
+				{"boolean != true", "active != true", map[string]FieldType{"active": BooleanField}},
+				{"string in list", "status in ['a', 'b']", map[string]FieldType{"status": StringField}},
+				{"string not in list", "status not in ['x']", map[string]FieldType{"status": StringField}},
+				{"any skips validation with string", "x = 'y'", map[string]FieldType{"x": AnyField}},
+				{"any skips validation with bool", "x = true", map[string]FieldType{"x": AnyField}},
+				{"any skips validation with quantity", "x > 8GB", map[string]FieldType{"x": AnyField}},
+				{"any skips validation with regex", "x ~ /p/", map[string]FieldType{"x": AnyField}},
+				{"any skips validation with in", "x in ['a']", map[string]FieldType{"x": AnyField}},
+			}
+
+			for _, test := range tests {
+				test := test
+				It("should accept "+test.desc, func() {
+					expr, err := parse([]byte(test.input))
+					Expect(err).ToNot(HaveOccurred())
+					_, err = toSql(expr, typedMapper(test.fields))
+					Expect(err).ToNot(HaveOccurred())
+				})
+			}
+		})
+
+		Context("invalid type combinations", func() {
+			type testCase struct {
+				desc      string
+				input     string
+				fields    map[string]FieldType
+				errSubstr string
+			}
+
+			tests := []testCase{
+				{"string field with boolean", "name = true", map[string]FieldType{"name": StringField}, `field "name" is string, but got boolean value`},
+				{"string field with numeric", "name > 8GB", map[string]FieldType{"name": StringField}, `field "name" is string, but got numeric value`},
+				{"numeric field with string", "cpus = 'four'", map[string]FieldType{"cpus": NumericField}, `field "cpus" is numeric, but got string value`},
+				{"numeric field with boolean", "cpus = true", map[string]FieldType{"cpus": NumericField}, `field "cpus" is numeric, but got boolean value`},
+				{"numeric field with regex", "cpus ~ /4/", map[string]FieldType{"cpus": NumericField}, `field "cpus" is numeric, but got regex value`},
+				{"boolean field with string", "active = 'yes'", map[string]FieldType{"active": BooleanField}, `field "active" is boolean, but got string value`},
+				{"boolean field with numeric", "active > 1", map[string]FieldType{"active": BooleanField}, `field "active" is boolean, but got numeric value`},
+				{"boolean field with regex", "active ~ /true/", map[string]FieldType{"active": BooleanField}, `field "active" is boolean, but got regex value`},
+				{"numeric field with in", "cpus in ['1']", map[string]FieldType{"cpus": NumericField}, `field "cpus" is numeric, but in/not in requires a string field`},
+				{"boolean field with not in", "active not in ['x']", map[string]FieldType{"active": BooleanField}, `field "active" is boolean, but in/not in requires a string field`},
+			}
+
+			for _, test := range tests {
+				test := test
+				It("should reject "+test.desc, func() {
+					expr, err := parse([]byte(test.input))
+					Expect(err).ToNot(HaveOccurred())
+					_, err = toSql(expr, typedMapper(test.fields))
+					Expect(err).To(HaveOccurred())
+					Expect(err.Error()).To(Equal(test.errSubstr))
+				})
+			}
+		})
+
+		Context("compound expressions", func() {
+			fields := map[string]FieldType{
+				"name":   StringField,
+				"memory": NumericField,
+				"active": BooleanField,
+			}
+
+			It("should accept valid AND expression", func() {
+				expr, err := parse([]byte("name = 'test' and memory > 8GB and active = true"))
+				Expect(err).ToNot(HaveOccurred())
+				_, err = toSql(expr, typedMapper(fields))
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("should accept valid OR expression", func() {
+				expr, err := parse([]byte("name = 'test' or active = false"))
+				Expect(err).ToNot(HaveOccurred())
+				_, err = toSql(expr, typedMapper(fields))
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("should reject if any branch is invalid in AND", func() {
+				expr, err := parse([]byte("name = 'ok' and memory = true"))
+				Expect(err).ToNot(HaveOccurred())
+				_, err = toSql(expr, typedMapper(fields))
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring(`field "memory" is numeric, but got boolean value`))
+			})
+
+			It("should reject if any branch is invalid in OR", func() {
+				expr, err := parse([]byte("active = 'yes' or name = 'ok'"))
+				Expect(err).ToNot(HaveOccurred())
+				_, err = toSql(expr, typedMapper(fields))
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring(`field "active" is boolean, but got string value`))
+			})
+
+			It("should reject invalid nested in parentheses", func() {
+				expr, err := parse([]byte("(name = 'ok' or active = true) and memory = 'big'"))
+				Expect(err).ToNot(HaveOccurred())
+				_, err = toSql(expr, typedMapper(fields))
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring(`field "memory" is numeric, but got string value`))
+			})
+		})
+
+		Context("ParseWithDefaultMap type validation", func() {
+			It("should reject boolean value for string field", func() {
+				_, err := ParseWithDefaultMap([]byte("name = true"))
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("is string, but got boolean"))
+			})
+
+			It("should reject string value for numeric field", func() {
+				_, err := ParseWithDefaultMap([]byte("memory = 'big'"))
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("is numeric, but got string"))
+			})
+
+			It("should reject numeric value for boolean field", func() {
+				_, err := ParseWithDefaultMap([]byte("template > 5"))
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("is boolean, but got numeric"))
+			})
+
+			It("should accept valid typed expressions", func() {
+				_, err := ParseWithDefaultMap([]byte("memory > 8GB and template = true and name = 'test'"))
+				Expect(err).ToNot(HaveOccurred())
+			})
 		})
 	})
 })

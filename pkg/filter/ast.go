@@ -37,6 +37,7 @@ const (
 // Expression is the abstract syntax tree for any expression.
 type Expression interface {
 	String() string
+	Type() string
 }
 
 // binaryExpression is an expression like "a = b" or "a and b".
@@ -50,6 +51,8 @@ func (e *binaryExpression) String() string {
 	return fmt.Sprintf("(%s %s %s)", e.Left.String(), e.Op.String(), e.Right.String())
 }
 
+func (e *binaryExpression) Type() string { return "binary" }
+
 // stringExpression is a literal string like "foo".
 type stringExpression struct {
 	Value string
@@ -58,6 +61,8 @@ type stringExpression struct {
 func (e *stringExpression) String() string {
 	return strconv.Quote(e.Value)
 }
+
+func (e *stringExpression) Type() string { return "string" }
 
 // varExpression is a variable/identifier like "vm_id" or "primary_ip_address".
 type varExpression struct {
@@ -68,6 +73,8 @@ func (v *varExpression) String() string {
 	return v.Name
 }
 
+func (v *varExpression) Type() string { return "variable" }
+
 // booleanExpression is a boolean literal (true or false).
 type booleanExpression struct {
 	Value bool
@@ -76,6 +83,8 @@ type booleanExpression struct {
 func (b *booleanExpression) String() string {
 	return strconv.FormatBool(b.Value)
 }
+
+func (b *booleanExpression) Type() string { return "boolean" }
 
 // regexExpression is a regex literal like /pattern/.
 type regexExpression struct {
@@ -92,6 +101,8 @@ func newRegexExpression(pos int, pattern string) *regexExpression {
 func (r *regexExpression) String() string {
 	return fmt.Sprintf("/%s/", r.Pattern)
 }
+
+func (r *regexExpression) Type() string { return "regex" }
 
 type quantityExpression struct {
 	Value float64
@@ -133,6 +144,8 @@ func (q *quantityExpression) String() string {
 	return fmt.Sprintf("%.2f%s", q.Value, q.Unit)
 }
 
+func (q *quantityExpression) Type() string { return "numeric" }
+
 // inExpression is an expression like "field IN ['a', 'b']" or "field NOT IN ['a', 'b']".
 type inExpression struct {
 	Left    Expression
@@ -151,3 +164,5 @@ func (e *inExpression) String() string {
 	}
 	return fmt.Sprintf("(%s %s [%s])", e.Left.String(), op, strings.Join(quoted, ", "))
 }
+
+func (e *inExpression) Type() string { return "in" }

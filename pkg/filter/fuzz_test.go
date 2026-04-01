@@ -31,8 +31,8 @@ func FuzzParse(f *testing.F) {
 	f.Add([]byte("= 'test'"))
 	f.Add([]byte("name 'test'"))
 
-	mf := filter.MapFunc(func(name string) (string, error) {
-		return `"` + name + `"`, nil
+	mf := filter.MapFunc(func(name string) (string, filter.FieldType, error) {
+		return `"` + name + `"`, filter.AnyField, nil
 	})
 
 	f.Fuzz(func(t *testing.T, input []byte) {

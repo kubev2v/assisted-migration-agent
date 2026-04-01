@@ -14,8 +14,8 @@ var _ = Describe("Filter Integration with DuckDB", func() {
 	var db *sql.DB
 
 	// testMapper maps filter variable names to SQL column references.
-	var testMapper MapFunc = func(name string) (string, error) {
-		return fmt.Sprintf(`"%s"`, name), nil
+	var testMapper MapFunc = func(name string) (string, FieldType, error) {
+		return fmt.Sprintf(`"%s"`, name), AnyField, nil
 	}
 
 	BeforeEach(func() {
