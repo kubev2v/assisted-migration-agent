@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/google/uuid"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -191,6 +194,44 @@ var _ = Describe("VddkService", func() {
 			}
 			Expect(successCount).To(Equal(1), "exactly one upload should succeed")
 			Expect(inProgressCount).To(Equal(concurrency-1), "all other uploads should get in-progress error")
+		})
+
+		It("returns InvalidVersionError when VDDK version does not match vCenter API version from about", func() {
+			_, err := db.ExecContext(context.Background(),
+				`INSERT INTO about ("APIVersion", "Product", "InstanceUuid") VALUES (?, ?, ?)`,
+				"8.0.3", "VMware vCenter Server", uuid.New())
+			Expect(err).NotTo(HaveOccurred())
+
+			tarGz := test.BuildTarGz(
+				test.TarEntry{
+					Path:    "lib/x.so",
+					Content: "y",
+				})
+			_, err = srv.Upload(context.Background(),
+				"VMware-vix-disklib-9.0.0-23950268.x86_64.tar.gz", bytes.NewReader(tarGz))
+			Expect(err).To(HaveOccurred())
+			Expect(srvErrors.IsInvalidVersionError(err)).To(BeTrue())
+			var inv *srvErrors.InvalidVersionError
+			Expect(errors.As(err, &inv)).To(BeTrue())
+			Expect(inv.Expected).To(Equal("8.0.3"))
+			Expect(inv.Actual).To(Equal("9.0.0"))
+		})
+
+		It("succeeds when vCenter API version has more than three components (compares x.y.z only)", func() {
+			_, err := db.ExecContext(context.Background(),
+				`INSERT INTO about ("APIVersion", "Product", "InstanceUuid") VALUES (?, ?, ?)`,
+				"8.0.3.12345", "VMware vCenter Server", "test-instance-uuid")
+			Expect(err).NotTo(HaveOccurred())
+
+			tarGz := test.BuildTarGz(
+				test.TarEntry{
+					Path:    "lib/x.so",
+					Content: "y",
+				})
+			status, err := srv.Upload(context.Background(),
+				"VMware-vix-disklib-8.0.3-23950268.x86_64.tar.gz", bytes.NewReader(tarGz))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(status.Version).To(Equal("8.0.3"))
 		})
 	})
 

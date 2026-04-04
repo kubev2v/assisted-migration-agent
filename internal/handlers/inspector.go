@@ -153,6 +153,10 @@ func (h *Handler) PutInspectorVddk(c *gin.Context) {
 
 	s, err := h.vddkSrv.Upload(c.Request.Context(), file.Filename, r)
 	if err != nil {
+		if srvErrors.IsInvalidVersionError(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		if srvErrors.IsOperationInProgressError(err) {
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 			return

@@ -66,8 +66,21 @@ func (v *VddkService) Upload(ctx context.Context, filename string, r io.Reader) 
 
 	version, err := v.extractVersion(filename, tmpDir)
 	if err != nil {
-		return nil, fmt.Errorf("vddk filename does not match the expected format: "+
-			"VMware-vix-disklib-X.Y.Z-*.tar.gz (got: %s)", filename)
+		return nil, fmt.Errorf("extracting version: %w", err)
+	}
+
+	expectedVersion, err := v.store.Parser().VCenterApiVersion(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting expected version from duckdb: %w", err)
+	}
+	// Take major.minor.patch (x.y.z) only
+	parts := strings.Split(expectedVersion, ".")
+	if len(parts) > 3 {
+		expectedVersion = strings.Join(parts[:3], ".")
+	}
+
+	if expectedVersion != "" && !(expectedVersion == version) {
+		return nil, srvErrors.NewVddkInvalidVersionError(expectedVersion, version)
 	}
 
 	// Replace existing VDDK folder
