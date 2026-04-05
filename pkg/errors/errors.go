@@ -222,3 +222,25 @@ func IsCredentialsNotSetError(err error) bool {
 	var e *CredentialsNotSetError
 	return errors.As(err, &e)
 }
+
+// InvalidVersionError indicates a version mismatch
+type InvalidVersionError struct {
+	Expected string
+	Actual   string
+}
+
+func NewVddkInvalidVersionError(excepted, actual string) *InvalidVersionError {
+	return &InvalidVersionError{
+		Expected: excepted,
+		Actual:   actual,
+	}
+}
+
+func (e *InvalidVersionError) Error() string {
+	return fmt.Sprintf("invalid version: expected %s, got %s", e.Expected, e.Actual)
+}
+
+func IsInvalidVersionError(err error) bool {
+	var e *InvalidVersionError
+	return errors.As(err, &e)
+}
