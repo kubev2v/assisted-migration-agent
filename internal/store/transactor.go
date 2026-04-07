@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"errors"
 )
 
 type txKeyT int
@@ -24,6 +25,10 @@ func newTransactor(db *sql.DB) *DBTransactor {
 }
 
 func (t *DBTransactor) WithTx(ctx context.Context, fn func(ctx context.Context) error) error {
+	if ctx.Value(txKey) != nil {
+		return errors.New("nested transactions not supported")
+	}
+
 	tx, err := t.db.BeginTx(ctx, &sql.TxOptions{})
 	if err != nil {
 		return err

@@ -114,4 +114,27 @@ var _ = Describe("WithTx", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(groups).To(BeEmpty())
 	})
+
+	It("should fail fast on nested transactions", func() {
+		err := s.WithTx(ctx, func(txCtx context.Context) error {
+			_, err := s.Group().Create(txCtx, models.Group{
+				Name:   "outer",
+				Filter: "memory > 0",
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			return s.WithTx(txCtx, func(innerCtx context.Context) error {
+				_, err := s.Group().Create(innerCtx, models.Group{
+					Name:   "inner",
+					Filter: "memory > 0",
+				})
+				return err
+			})
+		})
+		Expect(err).To(MatchError("nested transactions not supported"))
+
+		groups, err := s.Group().List(ctx, nil, 0, 0)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(groups).To(BeEmpty())
+	})
 })
