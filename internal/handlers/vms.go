@@ -121,21 +121,6 @@ func (h *Handler) GetVM(c *gin.Context, id string) {
 	c.JSON(http.StatusOK, v1.NewVirtualMachineDetailFromModel(*vm))
 }
 
-// AddVMToInspection add VM to inspection queue
-// (POST /vms/{id}/inspection)
-func (h *Handler) AddVMToInspection(c *gin.Context, id string) {
-	if err := h.inspectorSrv.Add(id); err != nil {
-		if srvErrors.IsInspectorNotRunningError(err) || srvErrors.IsInspectionLimitReachedError(err) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusAccepted, v1.NewInspectorStatus(h.inspectorSrv.GetStatus()))
-}
-
 // RemoveVMFromInspection removes VM from inspection queue
 // (DELETE /vms/{id}/inspection)
 func (h *Handler) RemoveVMFromInspection(c *gin.Context, id string) {

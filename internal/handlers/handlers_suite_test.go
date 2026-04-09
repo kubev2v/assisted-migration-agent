@@ -98,13 +98,11 @@ func (m *MockVMService) Get(ctx context.Context, id string) (*models.VM, error) 
 type MockInspectorService struct {
 	StartError                   error
 	CredentialsError             error
-	AddError                     error
 	GetStatusResult              models.InspectorStatus
 	GetVmStatusResult            models.InspectionStatus
 	CancelError                  error
 	StopError                    error
 	StartCallCount               int
-	AddCallCount                 int
 	GetStatusCallCount           int
 	GetVmStatusCallCount         int
 	CancelVmsInspectionCallCount int
@@ -124,11 +122,6 @@ func (m *MockInspectorService) Start(ctx context.Context, vmIDs []string) error 
 func (m *MockInspectorService) Credentials(ctx context.Context, creds models.Credentials) error {
 	_, _ = ctx, creds
 	return m.CredentialsError
-}
-
-func (m *MockInspectorService) Add(id string) error {
-	m.AddCallCount++
-	return m.AddError
 }
 
 func (m *MockInspectorService) GetStatus() models.InspectorStatus {

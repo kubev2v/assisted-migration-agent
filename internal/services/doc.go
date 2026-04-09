@@ -86,11 +86,11 @@
 //
 // inspectionService exists as a separate layer because InspectorService and per-VM pipeline
 // management have different responsibilities and concurrency boundaries. InspectorService
-// owns the service lifecycle — vSphere client, run loop, service-level state machine — while
-// inspectionService owns concurrent pipeline coordination: the shared scheduler, the per-VM
-// pipeline map, and its own mutex for short-held map operations. Keeping them apart lets each
-// layer manage its own lock without nesting, and lets inspectionService be tested and reasoned
-// about independently of vSphere connection handling.
+// owns the service lifecycle — vSphere client, run loop — while inspectionService owns
+// concurrent pipeline coordination: the shared scheduler, the per-VM pipeline map, and its
+// own mutex for short-held map operations. Keeping them apart lets each layer manage its own
+// lock without nesting, and lets inspectionService be tested and reasoned about independently
+// of vSphere connection handling.
 //
 // State machine (service-level, models.InspectorState — matches HTTP inspector status;
 // there is no per-VM state machine, per-VM status is derived from WorkPipeline state):
@@ -123,7 +123,7 @@
 // Key behaviors:
 //   - Only one inspection run at a time (InspectionInProgressError if already busy)
 //   - Start failure during init sets Error, populates GetStatus().Error, tears down client/pipelines, and returns the error
-//   - Start connects to vCenter, then starts a pipeline per initial VM ID; Add enqueues additional VMs while running
+//   - Start connects to vCenter, then starts a pipeline per VM ID
 //   - Stop tears down pipelines and signals the run loop, which ends in Canceled. Cancel stops a single VM’s pipeline
 //   - GetStatus reads InspectorState (separate mutex); GetVmStatus reads the corresponding WorkPipeline state
 //   - run uses a ticker to detect when all per-VM pipelines have finished, then logs out the vSphere client
@@ -134,7 +134,6 @@
 //	err := inspector.Start(ctx, []string{"vm-1", "vm-2"}, credentials)
 //	status := inspector.GetStatus()
 //	vmStatus := inspector.GetVmStatus("vm-1")
-//	err = inspector.Add("vm-3")       // optional, while busy
 //	err = inspector.Cancel("vm-2")    // optional, single VM
 //	err = inspector.Stop()            // cancel entire run
 //
@@ -342,11 +341,11 @@
 //   - Thread-safe through underlying store implementation
 //
 // InspectorService:
-//   - sync.Mutex protects Start, Stop, Add, Cancel and shared fields (client, credentials, stop channel lifecycle)
+//   - sync.Mutex protects Start, Stop, Cancel and shared fields (client, credentials, stop channel lifecycle)
 //   - InspectorState uses its own mutex for GetStatus / state transitions from the run loop
 //   - GetVmStatus delegates to inspectionService without holding the service mutex
 //
 // inspectionService (internal):
-//   - sync.Mutex protects the per-VM pipeline map and stop(); short-held locks around map reads/writes
-//   - Scheduler and pipelines torn down in stop(); isBusy inspects pipeline.IsRunning() under lock
+//   - sync.Mutex protects the per-VM pipeline map and Stop(); short-held locks around map reads/writes
+//   - Scheduler and pipelines torn down in Stop(); IsBusy inspects pipeline.IsRunning() under lock
 package services

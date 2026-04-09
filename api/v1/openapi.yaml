@@ -188,31 +188,6 @@ paths:
           description: Internal server error
 
   /vms/{id}/inspection:
-    post:
-      summary: Add VirtualMachine to inspection queue
-      operationId: addVMToInspection
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '202':
-          description: VM added to inspection queue
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VmInspectionStatus'
-        '400':
-          description: Inspector not running
-        '404':
-          description: VirtualMachine not found
-        '409':
-          description: VM already in inspection queue
-        '500':
-          description: Internal server error
-
     delete:
       summary: Remove VirtualMachine from inspection queue
       operationId: removeVMFromInspection

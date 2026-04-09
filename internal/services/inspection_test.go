@@ -51,49 +51,6 @@ var _ = Describe("inspectionService", func() {
 		})
 	})
 
-	Describe("Add", func() {
-		It("creates pipelines for new VM IDs", func() {
-			svc := newInspectionService(nil).WithWorkUnitsBuilder(func(id string) []models.WorkUnit[models.InspectionStatus, models.InspectionResult] {
-				return []models.WorkUnit[models.InspectionStatus, models.InspectionResult]{
-					{
-						Status: func() models.InspectionStatus {
-							return models.InspectionStatus{State: models.InspectionStateRunning}
-						},
-						Work: func(ctx context.Context, result models.InspectionResult) (models.InspectionResult, error) {
-							return result, nil
-						},
-					},
-					{
-						Status: func() models.InspectionStatus {
-							return models.InspectionStatus{State: models.InspectionStateCompleted}
-						},
-						Work: func(ctx context.Context, result models.InspectionResult) (models.InspectionResult, error) {
-							return result, nil
-						},
-					},
-				}
-			})
-
-			err := svc.Start(nil, nil, []string{"vm-1"})
-			Expect(err).NotTo(HaveOccurred())
-
-			err = svc.Add("vm-2")
-			Expect(err).NotTo(HaveOccurred())
-
-			err = svc.Add("vm-3")
-			Expect(err).NotTo(HaveOccurred())
-
-			Eventually(func() models.InspectionState {
-				s := svc.GetVmStatus("vm-2")
-				return s.State
-			}).Should(Equal(models.InspectionStateCompleted))
-			Eventually(func() models.InspectionState {
-				s := svc.GetVmStatus("vm-3")
-				return s.State
-			}).Should(Equal(models.InspectionStateCompleted))
-		})
-	})
-
 	Describe("CancelVmInspection", func() {
 		It("stops specified pipelines", func() {
 			var block sync.WaitGroup

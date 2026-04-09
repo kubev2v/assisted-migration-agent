@@ -76,9 +76,6 @@ type ServerInterface interface {
 	// Remove VirtualMachine from inspection queue
 	// (DELETE /vms/{id}/inspection)
 	RemoveVMFromInspection(c *gin.Context, id string)
-	// Add VirtualMachine to inspection queue
-	// (POST /vms/{id}/inspection)
-	AddVMToInspection(c *gin.Context, id string)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -553,30 +550,6 @@ func (siw *ServerInterfaceWrapper) RemoveVMFromInspection(c *gin.Context) {
 	siw.Handler.RemoveVMFromInspection(c, id)
 }
 
-// AddVMToInspection operation middleware
-func (siw *ServerInterfaceWrapper) AddVMToInspection(c *gin.Context) {
-
-	var err error
-
-	// ------------- Path parameter "id" -------------
-	var id string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.AddVMToInspection(c, id)
-}
-
 // GinServerOptions provides options for the Gin server.
 type GinServerOptions struct {
 	BaseURL      string
@@ -625,5 +598,4 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.GET(options.BaseURL+"/vms", wrapper.GetVMs)
 	router.GET(options.BaseURL+"/vms/:id", wrapper.GetVM)
 	router.DELETE(options.BaseURL+"/vms/:id/inspection", wrapper.RemoveVMFromInspection)
-	router.POST(options.BaseURL+"/vms/:id/inspection", wrapper.AddVMToInspection)
 }

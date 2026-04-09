@@ -134,26 +134,6 @@ func (i *InspectorService) Credentials(ctx context.Context, credentials models.C
 	return nil
 }
 
-// Add starts an inspection pipeline for id while the service is busy.
-func (i *InspectorService) Add(id string) error {
-	i.mu.Lock()
-	defer i.mu.Unlock()
-
-	if !i.IsBusy() {
-		return srvErrors.NewInspectorNotRunningError()
-	}
-
-	if i.inspectionSvc.TotalPipelines() >= i.inspectionLimit {
-		return srvErrors.NewInspectionLimitReachedError(i.inspectionLimit)
-	}
-
-	if err := i.inspectionSvc.Add(id); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // Stop requests cancellation of all VM pipelines and tears down the scheduler.
 func (i *InspectorService) Stop() error {
 	i.mu.Lock()

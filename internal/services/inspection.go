@@ -7,7 +7,6 @@ import (
 
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 
-	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 	"github.com/kubev2v/assisted-migration-agent/pkg/vmware"
 
 	"go.uber.org/zap"
@@ -29,7 +28,7 @@ type (
 )
 
 // inspectionService owns the scheduler and a map of WorkPipelines keyed by VM ID. InspectorService
-// delegates Start, Add, Stop, Cancel, and status queries here.
+// delegates Start, Stop, Cancel, and status queries here.
 type inspectionService struct {
 	scheduler *scheduler.Scheduler[models.InspectionResult]
 	buildFn   inspectionWorkBuilder
@@ -48,40 +47,60 @@ func newInspectionService(s *store.Store) *inspectionService {
 	}
 }
 
-// WithWorkUnitsBuilder sets the function that produces work units per VM.
-func (i *inspectionService) WithWorkUnitsBuilder(builder inspectionWorkBuilder) *inspectionService {
-	i.buildFn = builder
-	return i
-}
-
-// Add starts a new pipeline for id unless one is already running for that id.
-func (i *inspectionService) Add(id string) error {
+// Start creates the scheduler, resets the pipeline map, and starts one pipeline per vmID.
+func (i *inspectionService) Start(operator *vmware.VMManager, detector *vmdetect.Detector, vmIDs []string) error {
 	i.mu.Lock()
-	pipeline, found := i.pipelines[id]
-	i.mu.Unlock()
+	defer i.mu.Unlock()
 
-	if found && pipeline != nil && pipeline.IsRunning() {
-		return srvErrors.NewInspectionInProgressError()
+	i.operator = operator
+
+	sched, err := scheduler.NewScheduler[models.InspectionResult](defaultInspectionSchedulerNormalWorkers, defaultInspectionSchedulerReservedWorkers)
+	if err != nil {
+		return err
+	}
+	i.scheduler = sched
+
+	if i.buildFn == nil {
+		i.buildFn = i.buildInspectionWorkUnits
 	}
 
-	zap.S().Named("inspection_service").Infow("adding VM inspection pipeline", "vmId", id)
+	i.pipelines = make(map[string]*inspectionPipeline)
 
-	p := NewWorkPipeline(models.InspectionStatus{State: models.InspectionStatePending}, i.scheduler, i.buildFn(id))
-	_ = p.Start()
+	i.detector = detector
 
-	i.mu.Lock()
-	i.pipelines[id] = p
-	i.mu.Unlock()
+	zap.S().Named("inspection_service").Infow("starting VM inspection pipelines", "vmCount", len(vmIDs), "vmIds", vmIDs)
+
+	for _, id := range vmIDs {
+		pipeline := NewWorkPipeline(models.InspectionStatus{State: models.InspectionStatePending}, i.scheduler, i.buildFn(id))
+		_ = pipeline.Start()
+		i.pipelines[id] = pipeline
+	}
 
 	return nil
 }
 
-// TotalPipelines returns the number of VM pipelines registered in the current inspection cycle.
-func (i *inspectionService) TotalPipelines() int {
+// Stop stops every pipeline under lock, then closes the scheduler.
+func (i *inspectionService) Stop() {
 	i.mu.Lock()
-	defer i.mu.Unlock()
+	for _, pipeline := range i.pipelines {
+		p := pipeline
+		if p != nil {
+			p.Stop()
+		}
+	}
+	i.mu.Unlock()
 
-	return len(i.pipelines)
+	s := i.scheduler
+	i.scheduler = nil
+	if s != nil {
+		s.Close()
+	}
+}
+
+// WithWorkUnitsBuilder sets the function that produces work units per VM.
+func (i *inspectionService) WithWorkUnitsBuilder(builder inspectionWorkBuilder) *inspectionService {
+	i.buildFn = builder
+	return i
 }
 
 // CancelVmInspection stops the pipeline for id, if present.
@@ -127,57 +146,6 @@ func (i *inspectionService) GetVmStatus(id string) models.InspectionStatus {
 	}
 
 	return state.State
-}
-
-// Start creates the scheduler, resets the pipeline map, and starts one pipeline per vmID.
-func (i *inspectionService) Start(operator *vmware.VMManager, detector *vmdetect.Detector, vmIDs []string) error {
-	i.operator = operator
-
-	sched, err := scheduler.NewScheduler[models.InspectionResult](defaultInspectionSchedulerNormalWorkers, defaultInspectionSchedulerReservedWorkers)
-	if err != nil {
-		return err
-	}
-	i.scheduler = sched
-
-	if i.buildFn == nil {
-		i.buildFn = i.buildInspectionWorkUnits
-	}
-
-	i.mu.Lock()
-	i.pipelines = make(map[string]*inspectionPipeline)
-	i.mu.Unlock()
-
-	i.detector = detector
-
-	zap.S().Named("inspection_service").Infow("starting VM inspection pipelines", "vmCount", len(vmIDs), "vmIds", vmIDs)
-
-	for _, id := range vmIDs {
-		pipeline := NewWorkPipeline(models.InspectionStatus{State: models.InspectionStatePending}, i.scheduler, i.buildFn(id))
-		_ = pipeline.Start()
-		i.mu.Lock()
-		i.pipelines[id] = pipeline
-		i.mu.Unlock()
-	}
-
-	return nil
-}
-
-// Stop stops every pipeline under lock, then closes the scheduler.
-func (i *inspectionService) Stop() {
-	i.mu.Lock()
-	for _, pipeline := range i.pipelines {
-		p := pipeline
-		if p != nil {
-			p.Stop()
-		}
-	}
-	i.mu.Unlock()
-
-	s := i.scheduler
-	i.scheduler = nil
-	if s != nil {
-		s.Close()
-	}
 }
 
 // buildInspectionWorkUnits is the default pipeline: validate privileges, snapshot, inspect, save, remove snapshot.
