@@ -67,28 +67,6 @@ var _ = Describe("Inspector Handler", func() {
 			Expect(response.State).To(Equal(v1.InspectorStatusStateReady))
 		})
 
-		It("should include credentials when includeCredentials=true", func() {
-			mockInspector.GetStatusResult = models.InspectorStatus{
-				State: models.InspectorStateReady,
-				Credentials: &models.Credentials{
-					URL:      "https://vcenter.example/sdk",
-					Username: "u",
-				},
-			}
-
-			req := httptest.NewRequest(http.MethodGet, "/inspector?includeCredentials=true", nil)
-			w := httptest.NewRecorder()
-			router.ServeHTTP(w, req)
-
-			Expect(w.Code).To(Equal(http.StatusOK))
-			var response v1.InspectorStatus
-			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
-			Expect(response.State).To(Equal(v1.InspectorStatusStateReady))
-			Expect(response.Credentials).NotTo(BeNil())
-			Expect(response.Credentials.Url).To(Equal("https://vcenter.example/sdk"))
-			Expect(response.Credentials.Username).To(Equal("u"))
-		})
-
 		It("should include vddk when includeVddk=true", func() {
 			mockInspector.GetStatusResult = models.InspectorStatus{State: models.InspectorStateReady}
 			mockVddk.StatusResult = &models.VddkStatus{Version: "8.0.3", Md5: "deadbeef"}
@@ -121,7 +99,7 @@ var _ = Describe("Inspector Handler", func() {
 		})
 
 		It("should return 400 for empty VM list", func() {
-			reqBody := `{"vmIds":[]}`
+			reqBody := `{"vmIds":[],"credentials":{"url":"https://vc/sdk","username":"u","password":"p"}}`
 			req := httptest.NewRequest(http.MethodPost, "/inspector", strings.NewReader(reqBody))
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
@@ -135,7 +113,7 @@ var _ = Describe("Inspector Handler", func() {
 		})
 
 		It("should start inspection successfully", func() {
-			body := `{"vmIds":["vm-1"]}`
+			body := `{"vmIds":["vm-1"],"credentials":{"url":"https://vc/sdk","username":"u","password":"p"}}`
 			req := httptest.NewRequest(http.MethodPost, "/inspector", strings.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
@@ -146,12 +124,12 @@ var _ = Describe("Inspector Handler", func() {
 			var response v1.InspectorStatus
 			err := json.Unmarshal(w.Body.Bytes(), &response)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(response.State).To(Equal(v1.InspectorStatusStateInitiating))
+			Expect(response.State).To(Equal(v1.InspectorStatusStateRunning))
 		})
 
 		It("should return 500 when start fails", func() {
 			mockInspector.StartError = errors.New("start failed")
-			reqBody := `{"vmIds":["vm-1"]}`
+			reqBody := `{"vmIds":["vm-1"],"credentials":{"url":"https://vc/sdk","username":"u","password":"p"}}`
 			req := httptest.NewRequest(http.MethodPost, "/inspector", strings.NewReader(reqBody))
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
@@ -166,7 +144,7 @@ var _ = Describe("Inspector Handler", func() {
 
 		It("should return 400 when inspection limit is reached", func() {
 			mockInspector.StartError = srvErrors.NewInspectionLimitReachedError(10)
-			reqBody := `{"vmIds":["vm-1","vm-2","vm-3"]}`
+			reqBody := `{"vmIds":["vm-1","vm-2","vm-3"],"credentials":{"url":"https://vc/sdk","username":"u","password":"p"}}`
 			req := httptest.NewRequest(http.MethodPost, "/inspector", strings.NewReader(reqBody))
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
@@ -224,7 +202,7 @@ var _ = Describe("Inspector Handler", func() {
 	Context("StopInspection", func() {
 		It("should stop inspector successfully", func() {
 			mockInspector.GetStatusResult = models.InspectorStatus{
-				State: models.InspectorStateCanceled,
+				State: models.InspectorStateReady,
 			}
 			req := httptest.NewRequest(http.MethodDelete, "/inspector", nil)
 			w := httptest.NewRecorder()

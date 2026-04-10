@@ -77,7 +77,11 @@ func (m *ServiceManager) Initialize() error {
 	m.collector = NewCollectorService(m.inventory, factory.Build)
 	// rightsizing is wired below after m.rightsizing is constructed
 
-	m.inspector = NewInspectorService(m.store, maxVMsPerCycle, m.cfg.Agent.DataFolder)
+	var err error
+	m.inspector, err = NewInspectorService(m.store, maxVMsPerCycle, m.cfg.Agent.DataFolder)
+	if err != nil {
+		return err
+	}
 
 	m.forecaster = NewForecasterService(m.store, maxPairsPerRun)
 

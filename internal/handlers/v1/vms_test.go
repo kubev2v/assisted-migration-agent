@@ -334,15 +334,8 @@ var _ = Describe("VMs Handlers", func() {
 	})
 
 	Context("VM inspection endpoints (/vms/{id}/inspection)", func() {
-		// Given a VM that has been cancelled
-		// When we remove it from inspection
-		// Then it should return 200 with the VM status
-		It("RemoveVMFromInspection should return status on success", func() {
+		It("RemoveVMFromInspection should return 204 on success", func() {
 			// Arrange
-			mockInspector.GetVmStatusResult = models.InspectionStatus{
-				State: models.InspectionStateCanceled,
-			}
-
 			req := httptest.NewRequest(http.MethodDelete, "/vms/vm-1/inspection", nil)
 			w := httptest.NewRecorder()
 
@@ -350,13 +343,8 @@ var _ = Describe("VMs Handlers", func() {
 			router.ServeHTTP(w, req)
 
 			// Assert
-			Expect(w.Code).To(Equal(http.StatusOK))
+			Expect(w.Code).To(Equal(http.StatusNoContent))
 			Expect(mockInspector.CancelVmsInspectionCallCount).To(Equal(1))
-
-			var response v1.VmInspectionStatus
-			err := json.Unmarshal(w.Body.Bytes(), &response)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(response.State).To(Equal(v1.VmInspectionStatusStateCanceled))
 		})
 
 		// Given Cancel returns an error
@@ -451,9 +439,7 @@ var _ = Describe("VMs Handlers Integration", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		vmSrv = services.NewVMService(st)
-		mockInspector = &MockInspectorService{
-			GetVmStatusResult: models.InspectionStatus{State: models.InspectionStateNotStarted},
-		}
+		mockInspector = &MockInspectorService{}
 		handler = handlers.NewHandler(config.Configuration{}).
 			WithVMService(vmSrv).
 			WithInspectorService(mockInspector)

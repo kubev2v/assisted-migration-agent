@@ -90,10 +90,8 @@ func (h *Handler) GetVMs(c *gin.Context, params v1.GetVMsParams) {
 		pageCount = 1
 	}
 
-	// Get inspection status and Map to API response
 	apiVMs := make([]v1.VirtualMachine, 0, len(vms))
 	for _, vm := range vms {
-		vm.InspectionStatus = h.inspectorSrv.GetVmStatus(vm.ID)
 		apiVMs = append(apiVMs, v1.NewVirtualMachineFromSummary(vm))
 	}
 
@@ -129,9 +127,13 @@ func (h *Handler) RemoveVMFromInspection(c *gin.Context, id string) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
+		if srvErrors.IsResourceNotFoundError(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, v1.NewInspectionStatus(h.inspectorSrv.GetVmStatus(id)))
+	c.Status(http.StatusNoContent)
 }
