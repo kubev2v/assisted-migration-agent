@@ -39,12 +39,8 @@ const (
 
 // Defines values for InspectorStatusState.
 const (
-	InspectorStatusStateCanceled   InspectorStatusState = "canceled"
-	InspectorStatusStateCompleted  InspectorStatusState = "completed"
-	InspectorStatusStateError      InspectorStatusState = "error"
-	InspectorStatusStateInitiating InspectorStatusState = "Initiating"
-	InspectorStatusStateReady      InspectorStatusState = "ready"
-	InspectorStatusStateRunning    InspectorStatusState = "running"
+	InspectorStatusStateReady   InspectorStatusState = "ready"
+	InspectorStatusStateRunning InspectorStatusState = "running"
 )
 
 // Defines values for VMIssueCategory.
@@ -193,11 +189,6 @@ type GuestNetwork struct {
 
 // InspectorStatus defines model for InspectorStatus.
 type InspectorStatus struct {
-	Credentials *VcenterCredentials `json:"credentials,omitempty"`
-
-	// Error Error message when state is error
-	Error *string `json:"error,omitempty"`
-
 	// State Inspector state
 	State InspectorStatusState `json:"state"`
 	Vddk  *VddkProperties      `json:"vddk,omitempty"`
@@ -517,14 +508,12 @@ type GetGroupParams struct {
 type GetInspectorStatusParams struct {
 	// IncludeVddk If true, include uploaded VDDK metadata (`version`, `md5`) when present. omitted if VDDK was never uploaded.
 	IncludeVddk *bool `form:"includeVddk,omitempty" json:"includeVddk,omitempty"`
-
-	// IncludeCredentials If true, include configured vCenter URL and username (password is never returned). omitted if was never set.
-	IncludeCredentials *bool `form:"includeCredentials,omitempty" json:"includeCredentials,omitempty"`
 }
 
 // StartInspectionJSONBody defines parameters for StartInspection.
 type StartInspectionJSONBody struct {
-	VmIds []string `json:"vmIds"`
+	Credentials VcenterCredentials `json:"credentials"`
+	VmIds       []string           `json:"vmIds"`
 }
 
 // PutInspectorVddkMultipartBody defines parameters for PutInspectorVddk.

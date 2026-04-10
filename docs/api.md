@@ -516,14 +516,13 @@ The inspector performs deep inspection of VMs via VDDK. Before starting an inspe
 
 ### GET /api/v1/inspector
 
-Returns the current inspector status. Optionally includes VDDK metadata and/or configured credentials.
+Returns the current inspector status. Optionally includes VDDK metadata.
 
 #### Query Parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `includeVddk` | boolean | `false` | Include uploaded VDDK metadata (`version`, `md5`). Omitted from response if VDDK was never uploaded. |
-| `includeCredentials` | boolean | `false` | Include configured vCenter URL and username (password is never returned). Omitted if credentials were never set. |
 
 #### Examples
 
@@ -533,10 +532,10 @@ Basic status:
 curl http://localhost:8000/api/v1/inspector
 ```
 
-With VDDK and credentials:
+With VDDK:
 
 ```bash
-curl "http://localhost:8000/api/v1/inspector?includeVddk=true&includeCredentials=true"
+curl "http://localhost:8000/api/v1/inspector?includeVddk=true"
 ```
 
 #### Response
@@ -544,10 +543,6 @@ curl "http://localhost:8000/api/v1/inspector?includeVddk=true&includeCredentials
 ```json
 {
   "state": "running",
-  "credentials": {
-    "url": "https://vcenter.local",
-    "username": "admin"
-  },
   "vddk": {
     "version": "8.0.2",
     "md5": "d41d8cd98f00b204e9800998ecf8427e"
@@ -559,9 +554,7 @@ curl "http://localhost:8000/api/v1/inspector?includeVddk=true&includeCredentials
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `state` | string | `ready`, `Initiating`, `running`, `canceled`, `completed`, or `error` |
-| `error` | string | Error message (present only when state is `error`) |
-| `credentials` | object | vCenter URL and username (only when `includeCredentials=true` and credentials are set; password is never returned) |
+| `state` | string | `ready` or `running` |
 | `vddk` | object | VDDK properties (only when `includeVddk=true` and VDDK was uploaded) |
 
 #### Inspector States
@@ -569,20 +562,23 @@ curl "http://localhost:8000/api/v1/inspector?includeVddk=true&includeCredentials
 | State | Description |
 |-------|-------------|
 | `ready` | Inspector is idle, ready to start |
-| `Initiating` | Inspector is initializing (connecting to vCenter, preparing pipelines) |
 | `running` | Inspection is in progress |
-| `canceled` | Inspection was stopped by the user |
-| `completed` | All queued VMs have been inspected |
-| `error` | Inspector encountered an error |
 
 ### POST /api/v1/inspector
 
-Starts inspection for a list of VMs. Requires VDDK to be uploaded and credentials to be set beforehand.
+Starts inspection for a list of VMs. Requires VDDK to be uploaded beforehand. Credentials are provided in the request body.
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/inspector \
   -H "Content-Type: application/json" \
-  -d '{"vmIds": ["vm-001", "vm-002", "vm-003"]}'
+  -d '{
+    "vmIds": ["vm-001", "vm-002", "vm-003"],
+    "credentials": {
+      "url": "https://vcenter.local/sdk",
+      "username": "admin",
+      "password": "secret"
+    }
+  }'
 ```
 
 #### Request Body
@@ -590,14 +586,15 @@ curl -X POST http://localhost:8000/api/v1/inspector \
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `vmIds` | array | yes | List of VM identifiers to inspect |
+| `credentials` | object | yes | vCenter credentials (`url`, `username`, `password`) |
 
 #### Response
 
-**202 Accepted** — returns `InspectorStatus` with state `Initiating`.
+**202 Accepted** — returns `InspectorStatus` with state `running`.
 
 ```json
 {
-  "state": "Initiating"
+  "state": "running"
 }
 ```
 
@@ -605,7 +602,7 @@ curl -X POST http://localhost:8000/api/v1/inspector \
 
 | Status | Condition |
 |--------|-----------|
-| 400 | Empty `vmIds`, VDDK not uploaded, credentials not set, or inspection limit reached |
+| 400 | Empty `vmIds`, VDDK not uploaded, invalid credentials, or inspection limit reached |
 | 409 | Inspector already running |
 
 ### DELETE /api/v1/inspector

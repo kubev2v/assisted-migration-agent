@@ -206,19 +206,3 @@ func IsInspectionLimitReachedError(err error) bool {
 	var e *InspectionLimitReachedError
 	return errors.As(err, &e)
 }
-
-// CredentialsNotSetError indicates that required credentials were not set
-type CredentialsNotSetError struct{}
-
-func NewCredentialsNotSetError() *CredentialsNotSetError {
-	return &CredentialsNotSetError{}
-}
-
-func (e *CredentialsNotSetError) Error() string {
-	return "credentials not set"
-}
-
-func IsCredentialsNotSetError(err error) bool {
-	var e *CredentialsNotSetError
-	return errors.As(err, &e)
-}

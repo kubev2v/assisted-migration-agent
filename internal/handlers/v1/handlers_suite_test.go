@@ -99,12 +99,10 @@ type MockInspectorService struct {
 	StartError                   error
 	CredentialsError             error
 	GetStatusResult              models.InspectorStatus
-	GetVmStatusResult            models.InspectionStatus
 	CancelError                  error
 	StopError                    error
 	StartCallCount               int
 	GetStatusCallCount           int
-	GetVmStatusCallCount         int
 	CancelVmsInspectionCallCount int
 	StopCallCount                int
 	IsBusyResult                 bool
@@ -114,7 +112,7 @@ func (m *MockInspectorService) IsBusy() bool {
 	return m.IsBusyResult
 }
 
-func (m *MockInspectorService) Start(ctx context.Context, vmIDs []string) error {
+func (m *MockInspectorService) Start(ctx context.Context, creds models.Credentials, vmIDs []string) error {
 	m.StartCallCount++
 	return m.StartError
 }
@@ -127,11 +125,6 @@ func (m *MockInspectorService) Credentials(ctx context.Context, creds models.Cre
 func (m *MockInspectorService) GetStatus() models.InspectorStatus {
 	m.GetStatusCallCount++
 	return m.GetStatusResult
-}
-
-func (m *MockInspectorService) GetVmStatus(id string) models.InspectionStatus {
-	m.GetVmStatusCallCount++
-	return m.GetVmStatusResult
 }
 
 func (m *MockInspectorService) Cancel(id string) error {

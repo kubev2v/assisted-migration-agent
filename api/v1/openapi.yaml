@@ -223,13 +223,6 @@ paths:
           schema:
             type: boolean
             default: false
-        - name: includeCredentials
-          in: query
-          required: false
-          description: If true, include configured vCenter URL and username (password is never returned). omitted if was never set.
-          schema:
-            type: boolean
-            default: false
       responses:
         '200':
           description: Inspector status
@@ -248,14 +241,17 @@ paths:
           application/json:
             schema:
               type: object
-              description: Array of VirtualMachine id
+              description: Start inspection request
               required:
                   - vmIds
+                  - credentials
               properties:
                 vmIds:
                   type: array
                   items:
                     type: string
+                credentials:
+                  $ref: '#/components/schemas/VcenterCredentials'
       responses:
         '202':
           description: Inspection started
@@ -976,28 +972,14 @@ components:
           type: string
           enum:
             - ready
-            - Initiating
             - running
-            - canceled
-            - completed
-            - error
           x-enum-varnames:
             - InspectorStatusStateReady
-            - InspectorStatusStateInitiating
             - InspectorStatusStateRunning
-            - InspectorStatusStateCanceled
-            - InspectorStatusStateCompleted
-            - InspectorStatusStateError
           description: Inspector state
-        credentials:
-          allOf:
-            - $ref: '#/components/schemas/VcenterCredentials'
         vddk:
           allOf:
             - $ref: '#/components/schemas/VddkProperties'
-        error:
-          type: string
-          description: Error message when state is error
 
     VcenterCredentials:
       required:

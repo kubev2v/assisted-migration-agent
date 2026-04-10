@@ -39,12 +39,18 @@ func (h *Handler) StartInspection(c *gin.Context) {
 		return
 	}
 
-	if err := h.inspectorSrv.Start(c.Request.Context(), req.VmIds); err != nil {
+	creds := models.Credentials{
+		URL:      req.Credentials.Url,
+		Username: req.Credentials.Username,
+		Password: req.Credentials.Password,
+	}
+
+	if err := h.inspectorSrv.Start(c.Request.Context(), creds, req.VmIds); err != nil {
 		if srvErrors.IsOperationInProgressError(err) {
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 			return
 		}
-		if srvErrors.IsInspectionLimitReachedError(err) || srvErrors.IsCredentialsNotSetError(err) {
+		if srvErrors.IsInspectionLimitReachedError(err) || srvErrors.IsVCenterError(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -52,7 +58,7 @@ func (h *Handler) StartInspection(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusAccepted, v1.InspectorStatus{State: v1.InspectorStatusStateInitiating})
+	c.JSON(http.StatusAccepted, v1.InspectorStatus{State: v1.InspectorStatusStateRunning})
 }
 
 // GetInspectorStatus returns the inspector status
@@ -61,10 +67,6 @@ func (h *Handler) GetInspectorStatus(c *gin.Context, params v1.GetInspectorStatu
 	inspS := h.inspectorSrv.GetStatus()
 
 	apiStatus := v1.NewInspectorStatus(inspS)
-
-	if params.IncludeCredentials != nil && *params.IncludeCredentials {
-		apiStatus = apiStatus.WithCredentials(inspS.Credentials)
-	}
 
 	if params.IncludeVddk != nil && *params.IncludeVddk && h.vddkSrv != nil {
 		s, err := h.vddkSrv.Status(c.Request.Context())

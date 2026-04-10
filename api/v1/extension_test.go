@@ -383,65 +383,14 @@ var _ = Describe("NewInspectorStatus", func() {
 			Expect(status.State).To(Equal(v1.InspectorStatusStateReady))
 		})
 
-		It("should map initiating state", func() {
-			status := v1.NewInspectorStatus(models.InspectorStatus{State: models.InspectorStateInitiating})
-			Expect(status.State).To(Equal(v1.InspectorStatusStateInitiating))
-		})
-
 		It("should map running state", func() {
 			status := v1.NewInspectorStatus(models.InspectorStatus{State: models.InspectorStateRunning})
 			Expect(status.State).To(Equal(v1.InspectorStatusStateRunning))
 		})
 
-		It("should map canceled state", func() {
-			status := v1.NewInspectorStatus(models.InspectorStatus{State: models.InspectorStateCanceled})
-			Expect(status.State).To(Equal(v1.InspectorStatusStateCanceled))
-		})
-
-		It("should map completed state", func() {
-			status := v1.NewInspectorStatus(models.InspectorStatus{State: models.InspectorStateCompleted})
-			Expect(status.State).To(Equal(v1.InspectorStatusStateCompleted))
-		})
-
-		It("should map error state with message", func() {
-			status := v1.NewInspectorStatus(models.InspectorStatus{
-				State: models.InspectorStateError,
-				Error: errors.New("inspection failed"),
-			})
-			Expect(status.State).To(Equal(v1.InspectorStatusStateError))
-			Expect(status.Error).NotTo(BeNil())
-			Expect(*status.Error).To(Equal("inspection failed"))
-		})
-
 		It("should default unknown state to ready", func() {
 			status := v1.NewInspectorStatus(models.InspectorStatus{State: "bogus"})
 			Expect(status.State).To(Equal(v1.InspectorStatusStateReady))
-		})
-
-		It("should not include error when nil", func() {
-			status := v1.NewInspectorStatus(models.InspectorStatus{State: models.InspectorStateReady})
-			Expect(status.Error).To(BeNil())
-		})
-	})
-
-	Context("WithCredentials", func() {
-		It("should copy URL and username and omit password", func() {
-			base := v1.NewInspectorStatus(models.InspectorStatus{State: models.InspectorStateReady})
-			out := base.WithCredentials(&models.Credentials{
-				URL:      "https://vcenter.example/sdk",
-				Username: "admin",
-				Password: "secret",
-			})
-			Expect(out.Credentials).NotTo(BeNil())
-			Expect(out.Credentials.Url).To(Equal("https://vcenter.example/sdk"))
-			Expect(out.Credentials.Username).To(Equal("admin"))
-			Expect(out.Credentials.Password).To(BeEmpty())
-		})
-
-		It("should leave credentials unset when nil", func() {
-			base := v1.NewInspectorStatus(models.InspectorStatus{State: models.InspectorStateReady})
-			out := base.WithCredentials(nil)
-			Expect(out.Credentials).To(BeNil())
 		})
 	})
 
@@ -456,20 +405,6 @@ var _ = Describe("NewInspectorStatus", func() {
 		})
 	})
 
-	Context("WithCredentials and WithVddk together", func() {
-		It("should chain both on the same status", func() {
-			base := v1.NewInspectorStatus(models.InspectorStatus{State: models.InspectorStateReady})
-			out := base.WithCredentials(&models.Credentials{
-				URL: "https://vc/sdk", Username: "u", Password: "p",
-			}).WithVddk(&models.VddkStatus{Version: "9", Md5: "md5sum"})
-
-			Expect(out.Credentials).NotTo(BeNil())
-			Expect(out.Credentials.Url).To(Equal("https://vc/sdk"))
-			Expect(out.Vddk).NotTo(BeNil())
-			Expect(out.Vddk.Version).To(Equal("9"))
-			Expect(out.Vddk.Md5).To(Equal("md5sum"))
-		})
-	})
 })
 
 var _ = Describe("NewVirtualMachineDetailFromModel", func() {
