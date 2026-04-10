@@ -1,4 +1,4 @@
-package handlers_test
+package v1_test
 
 import (
 	"encoding/json"
@@ -17,7 +17,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
-	"github.com/kubev2v/assisted-migration-agent/internal/handlers"
+	handlers "github.com/kubev2v/assisted-migration-agent/internal/handlers/v1"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )

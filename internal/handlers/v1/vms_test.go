@@ -1,4 +1,4 @@
-package handlers_test
+package v1_test
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 
 	v1 "github.com/kubev2v/assisted-migration-agent/api/v1"
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
-	"github.com/kubev2v/assisted-migration-agent/internal/handlers"
+	handlers "github.com/kubev2v/assisted-migration-agent/internal/handlers/v1"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/services"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"

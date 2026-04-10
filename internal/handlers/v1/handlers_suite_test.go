@@ -1,4 +1,4 @@
-package handlers_test
+package v1_test
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/kubev2v/assisted-migration-agent/internal/handlers"
+	handlers "github.com/kubev2v/assisted-migration-agent/internal/handlers/v1"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/services"
 )

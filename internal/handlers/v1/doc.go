@@ -400,4 +400,4 @@
 //
 // The package uses the Gin web framework. Routes are auto-generated from
 // the OpenAPI specification in api/v1/spec.gen.go.
-package handlers
+package v1
