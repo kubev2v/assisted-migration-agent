@@ -1,0 +1,1286 @@
+openapi: 3.0.3
+info:
+  title: Assisted Migration Agent API
+  version: v2
+servers:
+  - url: /api/v2
+tags:
+  - name: Agent
+    description: Agent status and mode management
+  - name: Collectors
+    description: vCenter inventory collection operations
+  - name: Inspectors
+    description: VirtualMachine deep inspection operations
+  - name: Inventories
+    description: Collected inventory resources
+  - name: VirtualMachines
+    description: Virtual machine queries across all vCenters
+  - name: Groups
+    description: VirtualMachine group management
+  - name: Version
+    description: Agent version information
+paths:
+  # ── Agent ──────────────────────────────────────────────────────────────
+  /agent:
+    get:
+      tags: [Agent]
+      summary: Get agent status
+      operationId: getAgentStatus
+      responses:
+        '200':
+          description: Agent status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentStatus'
+        '500':
+          description: Internal server error
+    post:
+      tags: [Agent]
+      summary: Change agent mode
+      operationId: setAgentMode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentModeRequest'
+      responses:
+        '200':
+          description: Mode changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentStatus'
+        '400':
+          description: Invalid request
+        '409':
+          description: Conflict
+        '500':
+          description: Internal server error
+
+  # ── Collectors ─────────────────────────────────────────────────────────
+  /collectors:
+    post:
+      tags: [Collectors]
+      summary: Start collection for a vCenter
+      operationId: startCollector
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VcenterCredentials'
+      responses:
+        '202':
+          description: Collection started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectorStatus'
+        '400':
+          description: Invalid request
+        '409':
+          description: Collection already in progress for this vCenter
+        '500':
+          description: Internal server error
+    get:
+      tags: [Collectors]
+      summary: List all collectors with status
+      operationId: listCollectors
+      responses:
+        '200':
+          description: List of collectors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectorListResponse'
+        '500':
+          description: Internal server error
+
+  /collectors/{vCenterID}:
+    get:
+      tags: [Collectors]
+      summary: Get collector status for a vCenter
+      operationId: getCollectorStatus
+      parameters:
+        - $ref: '#/components/parameters/vCenterID'
+      responses:
+        '200':
+          description: Collector status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectorStatus'
+        '404':
+          description: Collector not found
+        '500':
+          description: Internal server error
+    delete:
+      tags: [Collectors]
+      summary: Stop collector for a vCenter
+      operationId: stopCollector
+      parameters:
+        - $ref: '#/components/parameters/vCenterID'
+      responses:
+        '204':
+          description: Collector stopped
+        '404':
+          description: Collector not found
+        '500':
+          description: Internal server error
+
+  # ── Inspectors ─────────────────────────────────────────────────────────
+  /inspectors:
+    post:
+      tags: [Inspectors]
+      summary: Start inspection for VirtualMachines
+      operationId: startInspector
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InspectorStartRequest'
+      responses:
+        '202':
+          description: Inspection started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectorStatus'
+        '400':
+          description: Invalid request
+        '409':
+          description: Inspection already in progress for this vCenter
+        '500':
+          description: Internal server error
+    get:
+      tags: [Inspectors]
+      summary: List all inspectors with status
+      operationId: listInspectors
+      responses:
+        '200':
+          description: List of inspectors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectorListResponse'
+        '500':
+          description: Internal server error
+
+  /inspectors/{vCenterID}:
+    get:
+      tags: [Inspectors]
+      summary: Get inspector status for a vCenter
+      operationId: getInspectorStatus
+      parameters:
+        - $ref: '#/components/parameters/vCenterID'
+      responses:
+        '200':
+          description: Inspector status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectorStatus'
+        '404':
+          description: Inspector not found
+        '500':
+          description: Internal server error
+    delete:
+      tags: [Inspectors]
+      summary: Stop inspector for a vCenter
+      operationId: stopInspector
+      parameters:
+        - $ref: '#/components/parameters/vCenterID'
+      responses:
+        '204':
+          description: Inspector stopped
+        '404':
+          description: Inspector not found
+        '500':
+          description: Internal server error
+
+  /inspectors/{vCenterID}/vddk:
+    get:
+      tags: [Inspectors]
+      summary: Get VDDK status for a vCenter
+      operationId: getInspectorVddkStatus
+      parameters:
+        - $ref: '#/components/parameters/vCenterID'
+      responses:
+        '200':
+          description: VDDK properties
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VddkProperties'
+        '404':
+          description: VDDK not found
+        '500':
+          description: Internal server error
+    put:
+      tags: [Inspectors]
+      summary: Upload VDDK tarball for a vCenter
+      operationId: putInspectorVddk
+      parameters:
+        - $ref: '#/components/parameters/vCenterID'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: VDDK tarball
+      responses:
+        '200':
+          description: Upload successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VddkProperties'
+        '400':
+          description: Bad request
+        '409':
+          description: Inspector is running, VDDK upload not allowed
+        '413':
+          description: File exceeds 64MB limit
+        '500':
+          description: Internal server error
+
+  # ── Inventories ─────────────────────────────────────────────────────────
+  /inventories:
+    get:
+      tags: [Inventories]
+      summary: List all collected inventories
+      operationId: listInventories
+      responses:
+        '200':
+          description: List of inventories
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryListResponse'
+        '500':
+          description: Internal server error
+
+  /inventories/{vCenterID}:
+    get:
+      tags: [Inventories]
+      summary: Get collected inventory for a vCenter
+      operationId: getInventory
+      parameters:
+        - $ref: '#/components/parameters/vCenterID'
+      responses:
+        '200':
+          description: Collected inventory
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Inventory'
+        '404':
+          description: Inventory not available
+        '500':
+          description: Internal server error
+
+  /inventories/{vCenterID}/groups/{groupId}:
+    get:
+      tags: [Inventories]
+      summary: Get collected inventory for a vCenter scoped to a group
+      operationId: getInventoryByGroup
+      parameters:
+        - $ref: '#/components/parameters/vCenterID'
+        - name: groupId
+          in: path
+          required: true
+          description: Group ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Collected inventory filtered by group
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Inventory'
+        '404':
+          description: Inventory or group not found
+        '500':
+          description: Internal server error
+
+  # ── Virtual Machines ───────────────────────────────────────────────────
+  /virtualmachines:
+    get:
+      tags: [VirtualMachines]
+      summary: List all VirtualMachines from all vCenters
+      operationId: listVirtualMachines
+      parameters:
+        - name: byExpression
+          in: query
+          description: Filter by expression
+          schema:
+            type: string
+        - name: sort
+          in: query
+          description: Sort fields with direction (e.g., "name:asc", "cluster:desc"). Valid fields are name, vCenterState, cluster, diskSize, memory, issues.
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+          example: ["cluster:asc", "name:desc"]
+        - name: page
+          in: query
+          description: Page number for pagination
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: pageSize
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: List of VirtualMachines
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VirtualMachineListResponse'
+        '400':
+          description: Invalid request parameters
+        '500':
+          description: Internal server error
+
+  /virtualmachines/{id}:
+    get:
+      tags: [VirtualMachines]
+      summary: Get VirtualMachine details
+      operationId: getVirtualMachine
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: VirtualMachine ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: VirtualMachine details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VirtualMachineDetail'
+        '404':
+          description: VirtualMachine not found
+        '500':
+          description: Internal server error
+
+  /virtualmachines/{id}/inspection:
+    delete:
+      tags: [VirtualMachines]
+      summary: Remove VirtualMachine from inspection queue
+      operationId: removeVirtualMachineFromInspection
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: VirtualMachine removed from queue
+        '400':
+          description: Inspector not running or VirtualMachine cannot be canceled
+        '404':
+          description: VirtualMachine not found or not in queue
+        '500':
+          description: Internal server error
+
+  # ── Groups ─────────────────────────────────────────────────────────────
+  /groups:
+    get:
+      tags: [Groups]
+      summary: List all groups
+      operationId: listGroups
+      parameters:
+        - name: byName
+          in: query
+          required: false
+          description: Filter groups by name (case-insensitive substring match)
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          description: Page number (1-indexed)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          required: false
+          description: Number of groups per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: List of groups
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupListResponse'
+        '400':
+          description: Invalid filter expression
+        '500':
+          description: Internal server error
+    post:
+      tags: [Groups]
+      summary: Create a new group
+      operationId: createGroup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGroupRequest'
+      responses:
+        '201':
+          description: Group created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+        '400':
+          description: Invalid request
+        '500':
+          description: Internal server error
+
+  /groups/{id}:
+    get:
+      tags: [Groups]
+      summary: Get group by ID with its VirtualMachines
+      operationId: getGroup
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Group ID
+          schema:
+            type: string
+        - name: sort
+          in: query
+          description: Sort fields with direction (e.g., "name:asc", "cluster:desc"). Valid fields are name, vCenterState, cluster, diskSize, memory, issues.
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+          example: ["cluster:asc", "name:desc"]
+        - name: page
+          in: query
+          description: Page number for pagination
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: pageSize
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Group details with VirtualMachines
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupResponse'
+        '404':
+          description: Group not found
+        '500':
+          description: Internal server error
+    patch:
+      tags: [Groups]
+      summary: Update group
+      operationId: updateGroup
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Group ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateGroupRequest'
+      responses:
+        '200':
+          description: Group updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+        '400':
+          description: Invalid request
+        '404':
+          description: Group not found
+        '500':
+          description: Internal server error
+    delete:
+      tags: [Groups]
+      summary: Delete group
+      operationId: deleteGroup
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Group ID
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Group deleted
+        '500':
+          description: Internal server error
+
+  # ── Version ────────────────────────────────────────────────────────────
+  /version:
+    get:
+      tags: [Version]
+      summary: Get agent version information
+      operationId: getVersion
+      responses:
+        '200':
+          description: Version information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionInfo'
+
+# ══════════════════════════════════════════════════════════════════════════
+components:
+  parameters:
+    vCenterID:
+      name: vCenterID
+      in: path
+      required: true
+      description: vCenter identifier (computed hash of the vCenter URL)
+      schema:
+        type: string
+
+  schemas:
+    # ── Collectors ───────────────────────────────────────────────────────
+    CollectorStatus:
+      type: object
+      required:
+        - vCenterID
+        - status
+      properties:
+        vCenterID:
+          type: string
+          description: Computed hash of the vCenter URL
+        status:
+          type: string
+          enum:
+            - connecting
+            - collecting
+            - parsing
+            - collected
+            - error
+          x-enum-varnames:
+            - CollectorStatusStatusConnecting
+            - CollectorStatusStatusCollecting
+            - CollectorStatusStatusParsing
+            - CollectorStatusStatusCollected
+            - CollectorStatusStatusError
+        error:
+          type: string
+          description: Error message when status is error
+
+    CollectorListResponse:
+      type: object
+      required:
+        - collectors
+      properties:
+        collectors:
+          type: array
+          items:
+            $ref: '#/components/schemas/CollectorStatus'
+
+    # ── Inventories ──────────────────────────────────────────────────────
+    Inventory:
+      type: object
+      required:
+        - vCenterID
+        - inventory
+      properties:
+        vCenterID:
+          type: string
+          description: Computed hash of the vCenter URL
+        inventory:
+          $ref: 'https://raw.githubusercontent.com/kubev2v/migration-planner/main/api/v1alpha1/openapi.yaml#/components/schemas/UpdateInventory'
+
+    InventoryListResponse:
+      type: object
+      required:
+        - inventories
+      properties:
+        inventories:
+          type: array
+          items:
+            $ref: '#/components/schemas/Inventory'
+
+    # ── Inspectors ───────────────────────────────────────────────────────
+    InspectorStartRequest:
+      type: object
+      required:
+        - virtualMachines
+        - credentials
+      properties:
+        virtualMachines:
+          type: array
+          minItems: 1
+          items:
+            type: string
+          description: Array of VirtualMachine IDs to inspect
+        credentials:
+          $ref: '#/components/schemas/VcenterCredentials'
+
+    InspectorStatus:
+      type: object
+      required:
+        - vCenterID
+        - state
+      properties:
+        vCenterID:
+          type: string
+          description: Computed hash of the vCenter URL
+        state:
+          type: string
+          enum:
+            - ready
+            - running
+          x-enum-varnames:
+            - InspectorStatusStateReady
+            - InspectorStatusStateRunning
+          description: Inspector state
+
+    InspectorListResponse:
+      type: object
+      required:
+        - inspectors
+      properties:
+        inspectors:
+          type: array
+          items:
+            $ref: '#/components/schemas/InspectorStatus'
+
+    # ── VCenter Credentials ──────────────────────────────────────────────
+    VcenterCredentials:
+      required:
+        - url
+        - username
+        - password
+      properties:
+        url:
+          type: string
+          format: uri
+          description: vCenter URL
+          x-oapi-codegen-extra-tags:
+            binding: "required,url"
+        username:
+          type: string
+          minLength: 1
+          x-oapi-codegen-extra-tags:
+            binding: "required,min=1"
+        password:
+          type: string
+          format: password
+          minLength: 1
+          x-oapi-codegen-extra-tags:
+            binding: "required,min=1"
+
+    # ── VDDK ─────────────────────────────────────────────────────────────
+    VddkProperties:
+      type: object
+      required:
+        - version
+        - md5
+      properties:
+        version:
+          type: string
+          description: The matching vSphere Client version
+        md5:
+          type: string
+          description: md5 sum of the uploaded tarball
+        bytes:
+          type: integer
+          format: int64
+          description: Provided tarball bytes
+
+    # ── Virtual Machines ─────────────────────────────────────────────────
+    VirtualMachine:
+      type: object
+      required:
+        - name
+        - id
+        - vCenterID
+        - vCenterState
+        - cluster
+        - datacenter
+        - diskSize
+        - memory
+        - issueCount
+      properties:
+        name:
+          type: string
+          description: VirtualMachine name
+        id:
+          type: string
+          description: VirtualMachine ID in vCenter
+        vCenterID:
+          type: string
+          description: Identifier of the vCenter this VirtualMachine belongs to
+        vCenterState:
+          type: string
+          description: vCenter state (e.g., poweredOn, poweredOff, suspended)
+        cluster:
+          type: string
+          description: Cluster name
+        datacenter:
+          type: string
+          description: Datacenter name
+        diskSize:
+          type: integer
+          format: int64
+          description: Total disk size in MB
+        memory:
+          type: integer
+          format: int64
+          description: Memory size in MB
+        issueCount:
+          type: integer
+          description: Number of issues found for this VirtualMachine
+        migratable:
+          type: boolean
+          description: True if the VirtualMachine is migratable for MTV
+        template:
+          type: boolean
+          description: True if the VirtualMachine is a template
+        inspectionStatus:
+          $ref: '#/components/schemas/InspectionStatus'
+        inspectionConcernCount:
+          type: integer
+          description: Number of inspection concerns for the latest persisted result
+        tags:
+          type: array
+          items:
+            type: string
+          description: Tags aggregated from matching groups
+
+    VirtualMachineDetail:
+      type: object
+      required:
+        - id
+        - name
+        - vCenterID
+        - powerState
+        - connectionState
+        - cpuCount
+        - coresPerSocket
+        - memoryMB
+        - disks
+        - nics
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the VirtualMachine in vCenter
+        name:
+          type: string
+          description: Display name of the VirtualMachine
+        vCenterID:
+          type: string
+          description: Identifier of the vCenter this VirtualMachine belongs to
+        uuid:
+          type: string
+          description: Universally unique identifier assigned by vCenter
+        firmware:
+          type: string
+          description: Firmware type (bios or efi)
+        powerState:
+          type: string
+          description: Current power state (poweredOn, poweredOff, suspended)
+        connectionState:
+          type: string
+          description: Connection state (connected, disconnected, orphaned, inaccessible)
+        host:
+          type: string
+          description: ESXi host reference
+        datacenter:
+          type: string
+          description: Datacenter name
+        cluster:
+          type: string
+          description: Cluster name
+        folder:
+          type: string
+          description: Inventory folder reference
+        cpuCount:
+          type: integer
+          format: int32
+          description: Total virtual CPUs
+        coresPerSocket:
+          type: integer
+          format: int32
+          description: CPU cores per virtual socket
+        cpuAffinity:
+          type: array
+          items:
+            type: integer
+            format: int32
+          description: Physical CPU IDs the VirtualMachine is pinned to
+        memoryMB:
+          type: integer
+          format: int32
+          description: Memory in megabytes
+        guestName:
+          type: string
+          description: Guest OS full name
+        guestId:
+          type: string
+          description: VMware guest OS identifier
+        hostName:
+          type: string
+          description: Guest hostname
+        ipAddress:
+          type: string
+          description: Guest primary IP address
+        storageUsed:
+          type: integer
+          format: int64
+          description: Storage consumed in bytes
+        template:
+          type: boolean
+          description: Whether the VirtualMachine is a template
+        migratable:
+          type: boolean
+          description: Whether the VirtualMachine can be migrated
+        faultToleranceEnabled:
+          type: boolean
+          description: Whether Fault Tolerance is enabled
+        nestedHVEnabled:
+          type: boolean
+          description: Whether nested virtualization is enabled
+        toolsStatus:
+          type: string
+          description: VMware Tools installation status
+        toolsRunningStatus:
+          type: string
+          description: Whether VMware Tools is running
+        disks:
+          type: array
+          items:
+            $ref: '#/components/schemas/VirtualMachineDisk'
+        nics:
+          type: array
+          items:
+            $ref: '#/components/schemas/VirtualMachineNIC'
+        devices:
+          type: array
+          items:
+            $ref: '#/components/schemas/VirtualMachineDevice'
+        guestNetworks:
+          type: array
+          items:
+            $ref: '#/components/schemas/GuestNetwork'
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/VirtualMachineIssue'
+        inspection:
+          $ref: '#/components/schemas/VirtualMachineInspectionResults'
+
+    VirtualMachineListResponse:
+      type: object
+      required:
+        - virtualMachines
+        - total
+        - page
+        - pageCount
+      properties:
+        virtualMachines:
+          type: array
+          items:
+            $ref: '#/components/schemas/VirtualMachine'
+        total:
+          type: integer
+          description: Total number of VirtualMachines matching the filter
+        page:
+          type: integer
+          description: Current page number
+        pageCount:
+          type: integer
+          description: Total number of pages
+
+    # ── VirtualMachine Sub-resources ─────────────────────────────────────────────────
+    VirtualMachineDisk:
+      type: object
+      properties:
+        key:
+          type: integer
+          format: int32
+          description: Unique disk key within the VirtualMachine
+        file:
+          type: string
+          description: VMDK file path in the datastore
+        capacity:
+          type: integer
+          format: int64
+          description: Disk capacity in bytes
+        shared:
+          type: boolean
+          description: Whether the disk is shared between multiple VirtualMachines
+        rdm:
+          type: boolean
+          description: Whether this is a Raw Device Mapping
+        bus:
+          type: string
+          description: Bus type (scsi, ide, sata, nvme)
+        mode:
+          type: string
+          description: Disk mode (persistent, independent_persistent, independent_nonpersistent)
+
+    VirtualMachineNIC:
+      type: object
+      properties:
+        mac:
+          type: string
+          description: MAC address
+        network:
+          type: string
+          description: Network reference
+        index:
+          type: integer
+          description: NIC index within the VirtualMachine
+
+    VirtualMachineDevice:
+      type: object
+      properties:
+        kind:
+          type: string
+          description: Device type (cdrom, floppy, usb, serial, parallel)
+
+    GuestNetwork:
+      type: object
+      properties:
+        device:
+          type: string
+          description: Network device name inside the guest
+        mac:
+          type: string
+          description: MAC address as seen by the guest
+        ip:
+          type: string
+          description: IP address
+        prefixLength:
+          type: integer
+          format: int32
+          description: Network prefix length (CIDR)
+        network:
+          type: string
+          description: Network name from the guest
+
+    VirtualMachineIssue:
+      type: object
+      required:
+        - label
+        - category
+        - description
+      properties:
+        label:
+          type: string
+          description: Short label
+        description:
+          type: string
+          description: Detailed description with context and recommendations
+        category:
+          type: string
+          enum:
+            - Critical
+            - Warning
+            - Information
+            - Advisory
+            - Error
+            - Other
+          x-enum-varnames:
+            - VirtualMachineIssueCategoryCritical
+            - VirtualMachineIssueCategoryWarning
+            - VirtualMachineIssueCategoryInformation
+            - VirtualMachineIssueCategoryAdvisory
+            - VirtualMachineIssueCategoryError
+            - VirtualMachineIssueCategoryOther
+
+    # ── Inspection ───────────────────────────────────────────────────────
+    InspectionStatus:
+      type: object
+      required:
+        - state
+      properties:
+        state:
+          type: string
+          enum:
+            - pending
+            - running
+            - completed
+            - canceled
+            - error
+          x-enum-varnames:
+            - InspectionStatusStatePending
+            - InspectionStatusStateRunning
+            - InspectionStatusStateCompleted
+            - InspectionStatusStateCanceled
+            - InspectionStatusStateError
+          description: Current inspection state
+        error:
+          type: string
+          description: Error message when state is error
+
+    VirtualMachineInspectionResults:
+      type: object
+      description: VirtualMachines Inspection results
+      properties:
+        concerns:
+          type: array
+          items:
+            $ref: '#/components/schemas/VirtualMachineInspectionConcern'
+
+    VirtualMachineInspectionConcern:
+      type: object
+      required:
+        - message
+        - category
+        - label
+      properties:
+        label:
+          type: string
+          description: Short label identifying the concern
+        message:
+          type: string
+        category:
+          type: string
+
+    # ── Groups ───────────────────────────────────────────────────────────
+    Group:
+      type: object
+      required:
+        - id
+        - name
+        - filter
+      properties:
+        id:
+          type: string
+          description: Unique group identifier
+        name:
+          type: string
+          description: Group display name
+        description:
+          type: string
+          description: Optional group description
+        filter:
+          type: string
+          description: Filter expression (pkg/filter DSL)
+          example: "memory >= 8GB and cluster = 'prod'"
+        tags:
+          type: array
+          items:
+            type: string
+          description: Tags applied to matching VirtualMachines
+          example: ["production", "critical"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    GroupListResponse:
+      type: object
+      required:
+        - groups
+        - total
+        - page
+        - pageCount
+      properties:
+        groups:
+          type: array
+          items:
+            $ref: '#/components/schemas/Group'
+        total:
+          type: integer
+        page:
+          type: integer
+        pageCount:
+          type: integer
+
+    GroupResponse:
+      type: object
+      required:
+        - group
+        - vms
+        - total
+        - page
+        - pageCount
+      properties:
+        group:
+          $ref: '#/components/schemas/Group'
+        vms:
+          type: array
+          items:
+            $ref: '#/components/schemas/VirtualMachine'
+        total:
+          type: integer
+        page:
+          type: integer
+        pageCount:
+          type: integer
+
+    CreateGroupRequest:
+      type: object
+      required:
+        - name
+        - filter
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          x-oapi-codegen-extra-tags:
+            binding: "required,min=1,max=100"
+        description:
+          type: string
+          maxLength: 500
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty,max=500"
+        filter:
+          type: string
+          minLength: 1
+          x-oapi-codegen-extra-tags:
+            binding: "required,min=1"
+        tags:
+          type: array
+          items:
+            type: string
+            pattern: "^[a-zA-Z0-9_.]+$"
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty,dive,tag_format"
+
+    UpdateGroupRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty,min=1,max=100"
+        description:
+          type: string
+          maxLength: 500
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty,max=500"
+        filter:
+          type: string
+          minLength: 1
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty,min=1"
+        tags:
+          type: array
+          items:
+            type: string
+            pattern: "^[a-zA-Z0-9_.]+$"
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty,dive,tag_format"
+
+    # ── Agent ────────────────────────────────────────────────────────────
+    AgentStatus:
+      type: object
+      required:
+        - mode
+        - consoleConnection
+      properties:
+        mode:
+          type: string
+          enum:
+            - connected
+            - disconnected
+          x-enum-varnames:
+            - AgentStatusModeConnected
+            - AgentStatusModeDisconnected
+          description: Target mode for the agent
+        consoleConnection:
+          type: object
+          required:
+            - status
+          properties:
+            status:
+              type: string
+              enum:
+                - connected
+                - disconnected
+              x-enum-varnames:
+                - ConsoleConnectionStatusConnected
+                - ConsoleConnectionStatusDisconnected
+              description: Current console connection status
+            error:
+              type: string
+              description: Connection error description
+
+    AgentModeRequest:
+      type: object
+      required:
+        - mode
+      properties:
+        mode:
+          type: string
+          enum:
+            - connected
+            - disconnected
+          x-oapi-codegen-extra-tags:
+            binding: "required,oneof=connected disconnected"
+
+    # ── Version ──────────────────────────────────────────────────────────
+    VersionInfo:
+      type: object
+      required:
+        - version
+        - gitCommit
+        - uiGitCommit
+      properties:
+        version:
+          type: string
+          description: Agent version
+        gitCommit:
+          type: string
+          description: Git commit SHA
+        uiGitCommit:
+          type: string
+          description: UI git commit SHA
