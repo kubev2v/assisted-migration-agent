@@ -20,7 +20,7 @@ import (
 var _ = Describe("HTTP Server", func() {
 	var (
 		cfg               *config.Configuration
-		registerHandlerFn func(router *gin.RouterGroup)
+		registerHandlerFn map[string]func(router *gin.RouterGroup)
 		tempDir           string
 		srv               *server.Server
 	)
@@ -42,10 +42,12 @@ var _ = Describe("HTTP Server", func() {
 		err = os.MkdirAll(staticDir, 0o755)
 		Expect(err).ToNot(HaveOccurred())
 
-		registerHandlerFn = func(router *gin.RouterGroup) {
-			router.GET("/health", func(c *gin.Context) {
-				c.JSON(200, gin.H{"status": "ok"})
-			})
+		registerHandlerFn = map[string]func(router *gin.RouterGroup){
+			"/api/v1": func(router *gin.RouterGroup) {
+				router.GET("/health", func(c *gin.Context) {
+					c.JSON(200, gin.H{"status": "ok"})
+				})
+			},
 		}
 	})
 

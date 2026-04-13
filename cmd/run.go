@@ -30,12 +30,16 @@ import (
 
 	v1 "github.com/kubev2v/assisted-migration-agent/api/v1"
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
-	handlers "github.com/kubev2v/assisted-migration-agent/internal/handlers/v1"
+	v1Handlers "github.com/kubev2v/assisted-migration-agent/internal/handlers/v1"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/server"
 	"github.com/kubev2v/assisted-migration-agent/internal/services"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/pkg/console"
+)
+
+const (
+	apiV1 string = "/api/v1"
 )
 
 func NewRunCommand(cfg *config.Configuration) *cobra.Command {
@@ -107,11 +111,11 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 
 			// register custom validators
 			if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
-				handlers.RegisterValidators(v)
+				v1Handlers.RegisterValidators(v)
 			}
 
 			// init handlers
-			h := handlers.NewHandler(*cfg).
+			v1H := v1Handlers.NewHandler(*cfg).
 				WithConsoleService(svcMgr.ConsoleService()).
 				WithCollectorService(svcMgr.CollectorService()).
 				WithInventoryService(svcMgr.InventoryService()).
@@ -120,9 +124,11 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 				WithVddkService(svcMgr.VddkService()).
 				WithGroupService(svcMgr.GroupService())
 
-			srv, err := server.NewServer(cfg, func(router *gin.RouterGroup) {
-				v1.RegisterHandlers(router, h)
-			})
+			srv, err := server.NewServer(cfg, map[string]func(router *gin.RouterGroup){
+				apiV1: func(router *gin.RouterGroup) {
+					v1.RegisterHandlers(router, v1H)
+				}},
+			)
 			if err != nil {
 				zap.S().Errorw("failed to create http server", "error", err)
 				return err

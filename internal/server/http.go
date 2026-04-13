@@ -25,14 +25,13 @@ import (
 const (
 	ProductionServer string = "prod"
 	DevServer        string = "dev"
-	apiV1            string = "/api/v1"
 )
 
 type Server struct {
 	srv *http.Server
 }
 
-func NewServer(cfg *config.Configuration, registerHandlerFn func(router *gin.RouterGroup)) (*Server, error) {
+func NewServer(cfg *config.Configuration, registerHandlerFn map[string]func(router *gin.RouterGroup)) (*Server, error) {
 	gin.SetMode(gin.DebugMode)
 	if cfg.Server.ServerMode == ProductionServer {
 		gin.SetMode(gin.ReleaseMode)
@@ -75,14 +74,16 @@ func NewServer(cfg *config.Configuration, registerHandlerFn func(router *gin.Rou
 		srv.TLSConfig = tlsConfig
 	}
 
-	router := engine.Group(apiV1)
+	for apiVersion, handlersFn := range registerHandlerFn {
+		router := engine.Group(apiVersion)
 
-	router.Use(
-		middlewares.Logger(),
-		ginzap.RecoveryWithZap(zap.S().Desugar(), true),
-	)
+		router.Use(
+			middlewares.Logger(),
+			ginzap.RecoveryWithZap(zap.S().Desugar(), true),
+		)
 
-	registerHandlerFn(router)
+		handlersFn(router)
+	}
 
 	return &Server{srv: srv}, nil
 }
