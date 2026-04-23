@@ -2,8 +2,6 @@ package services
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -20,7 +18,10 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/pkg/scheduler"
 )
 
-const maxBackoffInterval = 60 * time.Second
+const (
+	maxBackoffInterval        = 60 * time.Second
+	initialState       string = "pending"
+)
 
 type Collector interface {
 	GetStatus() models.CollectorStatus
@@ -38,14 +39,15 @@ type Console struct {
 	state               *consoleState
 	mu                  sync.Mutex // protects mode changes to prevent double run()
 	client              *console.Client
+	requestBuilder      *console.RequestBuilder
 	close               chan any
 	collector           Collector
-	inventoryLastHash   string // holds the hash of the last sent inventory
+	eventSrv            *EventService
 	store               *store.Store
 	legacyStatusEnabled bool
 }
 
-func NewConsoleService(cfg config.Agent, client *console.Client, collector Collector, st *store.Store) (*Console, error) {
+func NewConsoleService(cfg config.Agent, client *console.Client, collector Collector, st *store.Store, eventSrv *EventService) (*Console, error) {
 	targetStatus, err := models.ParseConsoleStatusType(cfg.Mode)
 	if err != nil {
 		targetStatus = models.ConsoleStatusDisconnected
@@ -61,7 +63,7 @@ func NewConsoleService(cfg config.Agent, client *console.Client, collector Colle
 		defaultStatus.Target = models.ConsoleStatusType(config.AgentMode)
 	}
 
-	c := newConsoleService(cfg, client, collector, st, defaultStatus)
+	c := newConsoleService(cfg, client, collector, st, eventSrv, defaultStatus)
 
 	if err := c.store.Configuration().Save(context.Background(), &models.Configuration{AgentMode: models.AgentMode(defaultStatus.Target)}); err != nil {
 		return nil, err
@@ -77,19 +79,23 @@ func NewConsoleService(cfg config.Agent, client *console.Client, collector Colle
 	return c, nil
 }
 
-func newConsoleService(cfg config.Agent, client *console.Client, collector Collector, store *store.Store, defaultStatus models.ConsoleStatus) *Console {
+func newConsoleService(cfg config.Agent, client *console.Client, collector Collector, store *store.Store, eventSrv *EventService, defaultStatus models.ConsoleStatus) *Console {
+	agentID := uuid.MustParse(cfg.ID)
+	sourceID := uuid.MustParse(cfg.SourceID)
 	return &Console{
 		updateInterval: cfg.UpdateInterval,
-		agentID:        uuid.MustParse(cfg.ID),
-		sourceID:       uuid.MustParse(cfg.SourceID),
+		agentID:        agentID,
+		sourceID:       sourceID,
 		version:        cfg.Version,
 		state: &consoleState{
 			current: defaultStatus.Current,
 			target:  defaultStatus.Target,
 		},
 		client:              client,
+		requestBuilder:      console.NewRequestBuilder(client, sourceID, agentID),
 		store:               store,
 		collector:           collector,
+		eventSrv:            eventSrv,
 		legacyStatusEnabled: cfg.LegacyStatusEnabled,
 	}
 }
@@ -152,27 +158,27 @@ func (c *Console) Status() models.ConsoleStatus {
 	return c.state.Status()
 }
 
-// run is the main loop that sends status and inventory updates to the console.
+// run is the main loop that delivers status updates and outbox events to the console.
 //
-// It creates a single pipeline and scheduler, reusing them across iterations.
-// Each dispatch is a 2-unit pipeline: status update, then inventory sync.
+// On each tick it creates a fresh pipeline by draining the outbox. The pipeline
+// always starts with a status update unit. If events exist, RequestBuilder maps
+// each one to an API call, and a final cleanup unit deletes the processed events.
+// The scheduler is created once and shared across all pipelines in the loop.
 //
 // Loop structure:
 //
 //  1. Wait for the current interval or close signal.
-//  2. If a restart is pending, start the pipeline. This is the retry point
-//     after both successful and failed dispatches.
-//  3. If the pipeline is still running, skip this tick.
-//  4. Once the pipeline finishes, process the result:
+//  2. If the pipeline is still running, skip this tick.
+//  3. Once the pipeline finishes, process the result:
 //     - Fatal error (4xx from console): stop the loop permanently.
 //     - Transient error: double the interval (up to maxBackoffInterval).
 //     - Success: reset the interval to updateInterval.
-//  5. Mark a restart as pending. The pipeline is NOT started immediately;
-//     the next iteration waits for the (possibly doubled) interval first.
+//  4. Create a new pipeline from the current outbox state and start it.
 //
-// This two-phase approach (process result → wait → restart) ensures that
-// transient error retries respect the backoff interval. The HTTP request
-// fires only after the backoff wait, not before it.
+// This means transient error retries respect the backoff interval — the next
+// pipeline is created and started only after the backoff wait, not before it.
+// Events that failed delivery remain in the outbox and are picked up by the
+// next pipeline.
 //
 // Shutdown:
 //
@@ -188,10 +194,23 @@ func (c *Console) run(closeCh chan any) {
 		c.state.SetError(err)
 		return
 	}
-	pipeline := NewWorkPipeline("pending", sched, c.buildWorkUnits())
+
+	var (
+		pipeline    *WorkPipeline[string, any]
+		errPipeline error
+	)
+
+	pipeline, errPipeline = c.createPipeline(sched)
+	if errPipeline != nil {
+		zap.S().Errorw("failed to create pipeline", "error", errPipeline)
+		c.state.SetError(errPipeline)
+		return
+	}
 
 	defer func() {
-		pipeline.Stop()
+		if pipeline != nil {
+			pipeline.Stop()
+		}
 		sched.Close()
 		c.state.SetCurrent(models.ConsoleStatusDisconnected)
 		zap.S().Named("console_service").Info("service stopped sending requests to console.rh.com")
@@ -199,26 +218,12 @@ func (c *Console) run(closeCh chan any) {
 	}()
 
 	interval := c.updateInterval
-	pendingStart := false
-
-	if err := pipeline.Start(); err != nil {
-		c.state.SetError(err)
-		return
-	}
 
 	for {
 		select {
 		case <-time.After(interval):
 		case <-closeCh:
 			return
-		}
-
-		if pendingStart {
-			if err := pipeline.Start(); err != nil {
-				c.state.SetError(err)
-				return
-			}
-			pendingStart = false
 		}
 
 		if pipeline.IsRunning() {
@@ -240,7 +245,17 @@ func (c *Console) run(closeCh chan any) {
 			interval = c.updateInterval
 		}
 
-		pendingStart = true
+		pipeline, errPipeline = c.createPipeline(sched)
+		if errPipeline != nil {
+			zap.S().Errorw("failed to create pipeline", "error", errPipeline)
+			c.state.SetError(errPipeline)
+			return
+		}
+
+		if err := pipeline.Start(); err != nil {
+			c.state.SetError(err)
+			return
+		}
 	}
 }
 
@@ -261,8 +276,8 @@ func (c *Console) Stop() {
 	c.close = nil
 }
 
-func (c *Console) buildWorkUnits() []consoleWorkUnit {
-	return []consoleWorkUnit{
+func (c *Console) createPipeline(s *scheduler.Scheduler[any]) (*WorkPipeline[string, any], error) {
+	units := []consoleWorkUnit{
 		{
 			Status: func() string { return "status" },
 			Work: func(ctx context.Context, r any) (any, error) {
@@ -277,51 +292,44 @@ func (c *Console) buildWorkUnits() []consoleWorkUnit {
 				}
 				return nil, c.client.UpdateAgentStatus(ctx, c.agentID, c.sourceID, c.version, status, statusInfo)
 			},
-		},
-		{
-			Status: func() string { return "inventory" },
+		}}
+
+	events, err := c.eventSrv.Events(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to read events: %w", err)
+	}
+
+	if len(events) == 0 {
+		return NewWorkPipeline(initialState, s, units), nil
+	}
+
+	lastID := 0
+	for _, e := range events {
+		units = append(units, consoleWorkUnit{
+			Status: func() string { return "event" },
 			Work: func(ctx context.Context, r any) (any, error) {
-				inventory, err := c.store.Inventory().Get(ctx)
+				fn, err := c.requestBuilder.Build(e)
 				if err != nil {
-					if errors.IsResourceNotFoundError(err) {
+					if errors.IsUnknownEventKindError(err) {
+						zap.S().Named("console_service").Warnw("skipping unknown event", "id", e.ID, "kind", e.Kind)
 						return nil, nil
 					}
 					return nil, err
 				}
-
-				changed, err := c.isInventoryChanged(inventory)
-				if err != nil {
-					return nil, err
-				}
-
-				if !changed {
-					return nil, nil
-				}
-
-				if err := c.client.UpdateSourceStatus(ctx, c.sourceID, c.agentID, *inventory); err != nil {
-					return nil, err
-				}
-
-				zap.S().Named("console_service").Debugw("inventory updated", "hash", c.inventoryLastHash)
-				return nil, nil
+				return nil, fn(ctx)
 			},
+		})
+		lastID = e.ID
+	}
+
+	units = append(units, consoleWorkUnit{
+		Status: func() string { return "clear" },
+		Work: func(ctx context.Context, r any) (any, error) {
+			return nil, c.eventSrv.Delete(ctx, lastID)
 		},
-	}
-}
+	})
 
-func (c *Console) isInventoryChanged(inventory *models.Inventory) (bool, error) {
-	data, err := json.Marshal(inventory)
-	if err != nil {
-		return false, fmt.Errorf("failed to marshal inventory: %w", err)
-	}
-
-	hash := fmt.Sprintf("%x", sha256.Sum256(data))
-	if hash == c.inventoryLastHash {
-		return false, nil
-	}
-
-	c.inventoryLastHash = hash
-	return true, nil
+	return NewWorkPipeline(initialState, s, units), nil
 }
 
 // consoleState holds the console status with its own mutex for thread-safe access.

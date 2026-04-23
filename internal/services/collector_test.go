@@ -15,7 +15,7 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/test"
 )
 
-func mockCollectorUnits(st *store.Store, connectErr, collectErr, processErr error) func(models.Credentials) []models.WorkUnit[models.CollectorStatus, models.CollectorResult] {
+func mockCollectorUnits(st *store.Store, eventSrv *services.EventService, connectErr, collectErr, processErr error) func(models.Credentials) []models.WorkUnit[models.CollectorStatus, models.CollectorResult] {
 	return func(_ models.Credentials) []models.WorkUnit[models.CollectorStatus, models.CollectorResult] {
 		return []models.WorkUnit[models.CollectorStatus, models.CollectorResult]{
 			{
@@ -56,7 +56,10 @@ func mockCollectorUnits(st *store.Store, connectErr, collectErr, processErr erro
 				Status: func() models.CollectorStatus {
 					return models.CollectorStatus{State: models.CollectorStateCollected}
 				},
-				Work: func(_ context.Context, r models.CollectorResult) (models.CollectorResult, error) {
+				Work: func(ctx context.Context, r models.CollectorResult) (models.CollectorResult, error) {
+					if err := eventSrv.AddInventoryUpdateEvent(ctx, r.Inventory); err != nil {
+						return r, err
+					}
 					return r, nil
 				},
 			},
@@ -86,10 +89,12 @@ func blockingCollectorUnits(gate chan struct{}) func(models.Credentials) []model
 
 var _ = Describe("CollectorService", func() {
 	var (
-		ctx context.Context
-		db  *sql.DB
-		st  *store.Store
-		srv *services.CollectorService
+		ctx      context.Context
+		db       *sql.DB
+		st       *store.Store
+		srv      *services.CollectorService
+		eventSrv *services.EventService
+		invSrv   *services.InventoryService
 	)
 
 	BeforeEach(func() {
@@ -103,8 +108,10 @@ var _ = Describe("CollectorService", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		st = store.NewStore(db, test.NewMockValidator())
-		srv = services.NewCollectorService(st, "", "").
-			WithWorkUnits(mockCollectorUnits(st, nil, nil, nil))
+		invSrv = services.NewInventoryService(st)
+		eventSrv = services.NewEventService(st)
+		srv = services.NewCollectorService(st, invSrv, eventSrv, "", "").
+			WithWorkUnits(mockCollectorUnits(st, eventSrv, nil, nil, nil))
 	})
 
 	AfterEach(func() {
@@ -183,13 +190,40 @@ var _ = Describe("CollectorService", func() {
 			Expect(inv).ToNot(BeNil())
 		})
 
+		// Given a collector service with mock work units that succeed
+		// When Start is called and collection completes
+		// Then an inventory update event should be written to the outbox
+		It("should write an inventory update event to the outbox on successful collection", func() {
+			// Arrange
+			creds := models.Credentials{
+				URL:      "https://vcenter.example.com",
+				Username: "admin",
+				Password: "secret",
+			}
+
+			// Act
+			err := srv.Start(ctx, creds)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Assert
+			Eventually(func() []models.Event {
+				events, _ := eventSrv.Events(ctx)
+				return events
+			}).Should(HaveLen(1))
+
+			events, err := eventSrv.Events(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(events[0].Kind).To(Equal(models.InventoryUpdateEvent))
+			Expect(events[0].Data).To(MatchJSON(`{"vms":[]}`))
+		})
+
 		// Given a collector service where the connect step fails
 		// When Start is called
 		// Then the state should transition to error with the connect error message
 		It("should set error state when connection fails", func() {
 			// Arrange
-			srv = services.NewCollectorService(st, "", "").
-				WithWorkUnits(mockCollectorUnits(st, errors.New("connection failed"), nil, nil))
+			srv = services.NewCollectorService(st, invSrv, eventSrv, "", "").
+				WithWorkUnits(mockCollectorUnits(st, eventSrv, errors.New("connection failed"), nil, nil))
 			creds := models.Credentials{
 				URL:      "https://vcenter.example.com",
 				Username: "admin",
@@ -215,8 +249,8 @@ var _ = Describe("CollectorService", func() {
 		// Then the state should transition to error with the collection error message
 		It("should set error state when collection fails", func() {
 			// Arrange
-			srv = services.NewCollectorService(st, "", "").
-				WithWorkUnits(mockCollectorUnits(st, nil, errors.New("collection failed"), nil))
+			srv = services.NewCollectorService(st, invSrv, eventSrv, "", "").
+				WithWorkUnits(mockCollectorUnits(st, eventSrv, nil, errors.New("collection failed"), nil))
 			creds := models.Credentials{
 				URL:      "https://vcenter.example.com",
 				Username: "admin",
@@ -242,8 +276,8 @@ var _ = Describe("CollectorService", func() {
 		// Then the state should transition to error with the processing error message
 		It("should set error state when processor fails", func() {
 			// Arrange
-			srv = services.NewCollectorService(st, "", "").
-				WithWorkUnits(mockCollectorUnits(st, nil, nil, errors.New("processing failed")))
+			srv = services.NewCollectorService(st, invSrv, eventSrv, "", "").
+				WithWorkUnits(mockCollectorUnits(st, eventSrv, nil, nil, errors.New("processing failed")))
 			creds := models.Credentials{
 				URL:      "https://vcenter.example.com",
 				Username: "admin",
@@ -272,7 +306,7 @@ var _ = Describe("CollectorService", func() {
 			gate := make(chan struct{})
 			defer close(gate)
 
-			srv = services.NewCollectorService(st, "", "").
+			srv = services.NewCollectorService(st, invSrv, eventSrv, "", "").
 				WithWorkUnits(blockingCollectorUnits(gate))
 			creds := models.Credentials{
 				URL:      "https://vcenter.example.com",
@@ -324,7 +358,7 @@ var _ = Describe("CollectorService", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
-			collectorSrv := services.NewCollectorService(st, "", "")
+			collectorSrv := services.NewCollectorService(st, invSrv, eventSrv, "", "")
 
 			// Assert
 			Expect(collectorSrv.GetStatus().State).To(Equal(models.CollectorStateCollected))
@@ -338,7 +372,7 @@ var _ = Describe("CollectorService", func() {
 		It("should cancel running collection and return to ready", func() {
 			// Arrange
 			gate := make(chan struct{})
-			srv = services.NewCollectorService(st, "", "").
+			srv = services.NewCollectorService(st, invSrv, eventSrv, "", "").
 				WithWorkUnits(blockingCollectorUnits(gate))
 			creds := models.Credentials{
 				URL:      "https://vcenter.example.com",
