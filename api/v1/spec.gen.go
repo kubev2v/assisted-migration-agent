@@ -335,14 +335,6 @@ func (siw *ServerInterfaceWrapper) GetInspectorStatus(c *gin.Context) {
 		return
 	}
 
-	// ------------- Optional query parameter "includeCredentials" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "includeCredentials", c.Request.URL.Query(), &params.IncludeCredentials)
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter includeCredentials: %w", err), http.StatusBadRequest)
-		return
-	}
-
 	for _, middleware := range siw.HandlerMiddlewares {
 		middleware(c)
 		if c.IsAborted() {

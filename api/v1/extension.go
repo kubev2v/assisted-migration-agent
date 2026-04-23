@@ -207,39 +207,13 @@ func NewInspectorStatus(status models.InspectorStatus) *InspectorStatus {
 	var c InspectorStatus
 
 	switch status.State {
-	case models.InspectorStateReady:
-		c.State = InspectorStatusStateReady
-	case models.InspectorStateInitiating:
-		c.State = InspectorStatusStateInitiating
 	case models.InspectorStateRunning:
 		c.State = InspectorStatusStateRunning
-	case models.InspectorStateCanceled:
-		c.State = InspectorStatusStateCanceled
-	case models.InspectorStateCompleted:
-		c.State = InspectorStatusStateCompleted
-	case models.InspectorStateError:
-		c.State = InspectorStatusStateError
 	default:
 		c.State = InspectorStatusStateReady
 	}
 
-	if status.Error != nil {
-		e := status.Error.Error()
-		c.Error = &e
-	}
-
 	return &c
-}
-
-func (s *InspectorStatus) WithCredentials(c *models.Credentials) *InspectorStatus {
-	if c != nil {
-		vc := VcenterCredentials{
-			Url:      c.URL,
-			Username: c.Username,
-		}
-		s.Credentials = &vc
-	}
-	return s
 }
 
 func (s *InspectorStatus) WithVddk(v *models.VddkStatus) *InspectorStatus {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 
@@ -12,105 +13,141 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
+	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 	"github.com/kubev2v/assisted-migration-agent/pkg/scheduler"
 
 	"github.com/kubev2v/vm-migration-detective/pkg/vmdetect"
 )
 
-const (
-	defaultInspectionSchedulerNormalWorkers   = 5
-	defaultInspectionSchedulerReservedWorkers = 0
-)
+type inspectionPipeline = WorkPipeline[models.InspectionStatus, models.InspectionResult]
 
-type (
-	inspectionPipeline    = WorkPipeline[models.InspectionStatus, models.InspectionResult]
-	inspectionWorkBuilder func(id string) []models.WorkUnit[models.InspectionStatus, models.InspectionResult]
-)
-
-// inspectionService owns the scheduler and a map of WorkPipelines keyed by VM ID. InspectorService
-// delegates Start, Stop, Cancel, and status queries here.
-type inspectionService struct {
-	scheduler *scheduler.Scheduler[models.InspectionResult]
-	buildFn   inspectionWorkBuilder
-	pipelines map[string]*inspectionPipeline
-	operator  vmware.VMOperator
-	mu        sync.Mutex
-	detector  *vmdetect.Detector
-	store     *store.Store
+// InspectionWorkUnit is the interface for a single inspection step.
+// inspectionService wraps these into models.WorkUnit with status persistence.
+type InspectionWorkUnit interface {
+	Status() models.InspectionStatus
+	Work(ctx context.Context, result models.InspectionResult) (models.InspectionResult, error)
 }
 
-// newInspectionService returns an idle coordinator with no scheduler until Start.
-func newInspectionService(s *store.Store) *inspectionService {
+type inspectionWorkBuilder = func(id string) []InspectionWorkUnit
+
+// inspectionService is a one time consumable, enforced by the consumed channel.
+// Second Start() call is a no-op
+// InspectorService delegates Start, Stop, Cancel, and status queries here.
+type inspectionService struct {
+	scheduler     *scheduler.Scheduler[models.InspectionResult]
+	buildFn       inspectionWorkBuilder
+	pipelines     map[string]*inspectionPipeline
+	operator      vmware.VMOperator
+	mu            sync.Mutex
+	detector      *vmdetect.Detector
+	store         *store.Store
+	stop          chan struct{}
+	waitCleanupCh chan struct{}
+	consumed      chan struct{}
+	cleanUpFn     func()
+}
+
+func newInspectionService(s *store.Store, scheduler *scheduler.Scheduler[models.InspectionResult], operator *vmware.VMManager, detector *vmdetect.Detector) *inspectionService {
 	return &inspectionService{
 		pipelines: make(map[string]*inspectionPipeline),
+		scheduler: scheduler,
 		store:     s,
+		operator:  operator,
+		detector:  detector,
+		consumed:  make(chan struct{}, 1),
 	}
 }
 
-// Start creates the scheduler, resets the pipeline map, and starts one pipeline per vmID.
-func (i *inspectionService) Start(operator *vmware.VMManager, detector *vmdetect.Detector, vmIDs []string) error {
+func (i *inspectionService) Start(vmIDs []string, cleanupFn func()) error {
 	i.mu.Lock()
 	defer i.mu.Unlock()
-
-	i.operator = operator
-
-	sched, err := scheduler.NewScheduler[models.InspectionResult](defaultInspectionSchedulerNormalWorkers, defaultInspectionSchedulerReservedWorkers)
-	if err != nil {
-		return err
-	}
-	i.scheduler = sched
 
 	if i.buildFn == nil {
 		i.buildFn = i.buildInspectionWorkUnits
 	}
 
-	i.pipelines = make(map[string]*inspectionPipeline)
+	select {
+	case i.consumed <- struct{}{}:
+	default:
+		return nil
+	}
 
-	i.detector = detector
+	i.stop = make(chan struct{}, 1)
+	i.pipelines = make(map[string]*inspectionPipeline)
+	if cleanupFn != nil {
+		i.cleanUpFn = cleanupFn
+	}
 
 	zap.S().Named("inspection_service").Infow("starting VM inspection pipelines", "vmCount", len(vmIDs), "vmIds", vmIDs)
 
 	for _, id := range vmIDs {
-		pipeline := NewWorkPipeline(models.InspectionStatus{State: models.InspectionStatePending}, i.scheduler, i.buildFn(id))
-		_ = pipeline.Start()
+		i.updateStatus(id, models.InspectionStatus{State: models.InspectionStatePending})
+
+		units := i.wrapWorkUnits(id, i.buildFn(id))
+		pipeline := NewWorkPipeline(models.InspectionStatus{State: models.InspectionStatePending}, i.scheduler, units)
+		if err := pipeline.Start(); err != nil {
+			zap.S().Named("inspection_service").Errorw("failed to start VM inspection pipeline", "vmId", id, "error", err)
+			continue
+		}
 		i.pipelines[id] = pipeline
 	}
+
+	go i.run()
 
 	return nil
 }
 
-// Stop stops every pipeline under lock, then closes the scheduler.
 func (i *inspectionService) Stop() {
 	i.mu.Lock()
-	for _, pipeline := range i.pipelines {
-		p := pipeline
-		if p != nil {
-			p.Stop()
-		}
+	if i.stop == nil {
+		i.mu.Unlock()
+		return
 	}
+
+	pipelines := i.pipelines
+	i.waitCleanupCh = make(chan struct{})
+	stopCh := i.stop
 	i.mu.Unlock()
 
-	s := i.scheduler
-	i.scheduler = nil
-	if s != nil {
-		s.Close()
+	for id, pipeline := range pipelines {
+		if pipeline != nil && pipeline.IsRunning() {
+			pipeline.Stop()
+			i.updateStatus(id, models.InspectionStatus{State: models.InspectionStateCanceled})
+		}
 	}
+
+	// if we can fill up the channel here, it means run() is still running.
+	// and we're safe to wait for waitCleanupCh
+	select {
+	case stopCh <- struct{}{}:
+		<-i.waitCleanupCh // wait for run to clean up
+	default:
+	}
+
+	i.stop = nil
 }
 
-// WithWorkUnitsBuilder sets the function that produces work units per VM.
-func (i *inspectionService) WithWorkUnitsBuilder(builder inspectionWorkBuilder) *inspectionService {
+// WithBuilder sets the function that produces work units per VM.
+func (i *inspectionService) WithBuilder(builder inspectionWorkBuilder) *inspectionService {
 	i.buildFn = builder
 	return i
 }
 
-// CancelVmInspection stops the pipeline for id, if present.
-func (i *inspectionService) CancelVmInspection(id string) {
+// Cancel stops the pipeline for id, if present.
+func (i *inspectionService) Cancel(id string) error {
 	i.mu.Lock()
-	defer i.mu.Unlock()
+	pipelines := i.pipelines
+	i.mu.Unlock()
 
-	if p, ok := i.pipelines[id]; ok {
-		p.Stop()
+	p, ok := pipelines[id]
+	if !ok {
+		return srvErrors.NewResourceNotFoundError("vm", id)
 	}
+
+	p.Stop()
+	i.updateStatus(id, models.InspectionStatus{State: models.InspectionStateCanceled})
+
+	return nil
 }
 
 // IsBusy reports whether any registered pipeline is still running.
@@ -127,54 +164,92 @@ func (i *inspectionService) IsBusy() bool {
 	return false
 }
 
-// GetVmStatus returns pull-based status from the VM’s pipeline (completed, running, error, canceled).
-func (i *inspectionService) GetVmStatus(id string) models.InspectionStatus {
-	i.mu.Lock()
-	pipeline, found := i.pipelines[id]
-	i.mu.Unlock()
-
-	if !found {
-		return models.InspectionStatus{State: models.InspectionStateNotStarted}
-	}
-
-	state := pipeline.State()
-	if state.Err != nil {
-		if errors.Is(state.Err, errPipelineStopped) {
-			return models.InspectionStatus{State: models.InspectionStateCanceled, Error: state.Err}
+// wrapWorkUnits wraps []InspectionWorkUnit into []models.WorkUnit with status persistence.
+func (i *inspectionService) wrapWorkUnits(id string, units []InspectionWorkUnit) []models.WorkUnit[models.InspectionStatus, models.InspectionResult] {
+	wrapped := make([]models.WorkUnit[models.InspectionStatus, models.InspectionResult], len(units))
+	for idx, u := range units {
+		u := u
+		wrapped[idx] = models.WorkUnit[models.InspectionStatus, models.InspectionResult]{
+			Status: func() models.InspectionStatus {
+				s := u.Status()
+				i.updateStatus(id, s)
+				return s
+			},
+			Work: func(ctx context.Context, result models.InspectionResult) (models.InspectionResult, error) {
+				r, err := u.Work(ctx, result)
+				if err != nil {
+					i.updateStatus(id, models.InspectionStatus{State: models.InspectionStateError, Error: err})
+				}
+				return r, err
+			},
 		}
-		return models.InspectionStatus{State: models.InspectionStateError, Error: state.Err}
 	}
+	return wrapped
+}
 
-	return state.State
+func (i *inspectionService) run() {
+	ticker := time.NewTicker(5 * time.Second)
+
+	defer func() {
+		ticker.Stop()
+		if i.cleanUpFn != nil {
+			i.cleanUpFn()
+		}
+		if i.waitCleanupCh != nil {
+			close(i.waitCleanupCh)
+		}
+	}()
+
+	for {
+		select {
+		case <-i.stop:
+			return
+		case <-ticker.C:
+			if !i.IsBusy() {
+
+				// try to fill up the channel to be sure
+				// Stop() will not wait on waitCleanupCh while run exit normally
+				select {
+				case i.stop <- struct{}{}:
+				default:
+				}
+				return
+			}
+		}
+	}
+}
+
+// inspectionStep is a concrete InspectionWorkUnit.
+type inspectionStep struct {
+	status models.InspectionStatus
+	work   func(ctx context.Context, result models.InspectionResult) (models.InspectionResult, error)
+}
+
+func (s *inspectionStep) Status() models.InspectionStatus { return s.status }
+func (s *inspectionStep) Work(ctx context.Context, result models.InspectionResult) (models.InspectionResult, error) {
+	return s.work(ctx, result)
 }
 
 // buildInspectionWorkUnits is the default pipeline: validate privileges, snapshot, inspect, save, remove snapshot.
-func (i *inspectionService) buildInspectionWorkUnits(id string) []models.WorkUnit[models.InspectionStatus, models.InspectionResult] {
-	return []models.WorkUnit[models.InspectionStatus, models.InspectionResult]{
-		{
-			Status: func() models.InspectionStatus {
-				return models.InspectionStatus{State: models.InspectionStateRunning}
-			},
-			Work: func(ctx context.Context, result models.InspectionResult) (models.InspectionResult, error) {
-				err := i.validate(ctx, id)
-				return result, err
+func (i *inspectionService) buildInspectionWorkUnits(id string) []InspectionWorkUnit {
+	return []InspectionWorkUnit{
+		&inspectionStep{
+			status: models.InspectionStatus{State: models.InspectionStateRunning},
+			work: func(ctx context.Context, result models.InspectionResult) (models.InspectionResult, error) {
+				return result, i.validate(ctx, id)
 			},
 		},
-		{
-			Status: func() models.InspectionStatus {
-				return models.InspectionStatus{State: models.InspectionStateRunning}
-			},
-			Work: func(ctx context.Context, result models.InspectionResult) (models.InspectionResult, error) {
+		&inspectionStep{
+			status: models.InspectionStatus{State: models.InspectionStateRunning},
+			work: func(ctx context.Context, result models.InspectionResult) (models.InspectionResult, error) {
 				snapId, err := i.createSnapshot(ctx, id)
 				result.SnapshotID = snapId
 				return result, err
 			},
 		},
-		{
-			Status: func() models.InspectionStatus {
-				return models.InspectionStatus{State: models.InspectionStateRunning}
-			},
-			Work: func(ctx context.Context, result models.InspectionResult) (models.InspectionResult, error) {
+		&inspectionStep{
+			status: models.InspectionStatus{State: models.InspectionStateRunning},
+			work: func(ctx context.Context, result models.InspectionResult) (models.InspectionResult, error) {
 				var (
 					concerns []models.VmInspectionConcern
 					err      error
@@ -190,20 +265,15 @@ func (i *inspectionService) buildInspectionWorkUnits(id string) []models.WorkUni
 				return result, err
 			},
 		},
-		{
-			Status: func() models.InspectionStatus {
-				return models.InspectionStatus{State: models.InspectionStateRunning}
-			},
-			Work: func(ctx context.Context, result models.InspectionResult) (models.InspectionResult, error) {
-				err := i.save(ctx, id, result.Concerns)
-				return result, err
+		&inspectionStep{
+			status: models.InspectionStatus{State: models.InspectionStateRunning},
+			work: func(ctx context.Context, result models.InspectionResult) (models.InspectionResult, error) {
+				return result, i.save(ctx, id, result.Concerns)
 			},
 		},
-		{
-			Status: func() models.InspectionStatus {
-				return models.InspectionStatus{State: models.InspectionStateCompleted}
-			},
-			Work: func(ctx context.Context, result models.InspectionResult) (models.InspectionResult, error) {
+		&inspectionStep{
+			status: models.InspectionStatus{State: models.InspectionStateCompleted},
+			work: func(ctx context.Context, result models.InspectionResult) (models.InspectionResult, error) {
 				return result, nil
 			},
 		},
@@ -275,6 +345,12 @@ func (i *inspectionService) inspect(ctx context.Context, vmId, snapId string) ([
 	return out, nil
 }
 
+func (i *inspectionService) updateStatus(id string, status models.InspectionStatus) {
+	if err := i.store.Inspection().Update(context.Background(), id, status); err != nil {
+		zap.S().Named("inspection_service").Errorw("failed to persist inspection status", "vmId", id, "state", status.State, "error", err)
+	}
+}
+
 func (i *inspectionService) save(ctx context.Context, id string, concerns []models.VmInspectionConcern) error {
 	zap.S().Named("inspection_service").Infow("persisting inspection results", "vmId", id, "concernCount", len(concerns))
 	err := i.store.WithTx(ctx, func(txCtx context.Context) error {
@@ -289,7 +365,6 @@ func (i *inspectionService) save(ctx context.Context, id string, concerns []mode
 }
 
 func (i *inspectionService) removeSnapshot(ctx context.Context, vmId, snapId string) error {
-
 	zap.S().Named("inspection_service").Infow("removing VM snapshot", "vmId", vmId)
 
 	removeSnapReq := vmware.RemoveSnapshotRequest{

@@ -72,7 +72,11 @@ func (m *ServiceManager) Initialize() error {
 		m.cfg.Agent.OpaPoliciesFolder,
 	)
 
-	m.inspector = NewInspectorService(m.store, maxVMsPerCycle, m.cfg.Agent.DataFolder)
+	var err error
+	m.inspector, err = NewInspectorService(m.store, maxVMsPerCycle, m.cfg.Agent.DataFolder)
+	if err != nil {
+		return err
+	}
 
 	m.vddk = NewVddkService(m.cfg.Agent.DataFolder, m.store)
 

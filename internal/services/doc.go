@@ -75,67 +75,87 @@
 // # InspectorService
 //
 // InspectorService drives VM inspection against vCenter: privilege validation, snapshot lifecycle,
-// and inspection and persistence steps.
+// disk inspection via VDDK, and result persistence.
 //
-// Per-VM inspection status is held only in memory (inspectionService pipelines).
-// Restarting the agent clears all inspection state.
+// ## Two-layer architecture
 //
-// Internal coordination uses inspectionService (unexported): a shared scheduler and one
-// WorkPipeline per VM. Default work units are validate → create snapshot → inspect → save →
-// remove snapshot; tests may replace the builder via WithInspectionBuilder.
+// InspectorService is split into two layers with distinct responsibilities:
 //
-// inspectionService exists as a separate layer because InspectorService and per-VM pipeline
-// management have different responsibilities and concurrency boundaries. InspectorService
-// owns the service lifecycle — vSphere client, run loop — while inspectionService owns
-// concurrent pipeline coordination: the shared scheduler, the per-VM pipeline map, and its
-// own mutex for short-held map operations. Keeping them apart lets each layer manage its own
-// lock without nesting, and lets inspectionService be tested and reasoned about independently
+//   - InspectorService (exported) — owns the service lifecycle: vCenter credentials,
+//     vSphere client creation/teardown, scheduler, and the public API (Start/Stop/Cancel/GetStatus).
+//     It holds a mutex that protects lifecycle transitions.
+//
+//   - inspectionService (unexported) — owns a single inspection run: the per-VM pipeline map,
+//     the polling loop that detects completion, and the cleanup callback. It is a one-time
+//     consumable, enforced by a buffered consumed channel (cap 1): the first Start() fills
+//     the channel and proceeds; subsequent Start() calls see the channel full and return
+//     immediately as no-ops. It holds its own mutex for short pipeline-map operations.
+//
+// Keeping them apart prevents lock nesting and lets inspectionService be tested independently
 // of vSphere connection handling.
 //
-// State machine (service-level, models.InspectorState — matches HTTP inspector status;
-// there is no per-VM state machine, per-VM status is derived from WorkPipeline state):
+// ## Lifecycle
 //
-//	┌───────┐     ┌────────────┐     ┌─────────┐     ┌───────────┐
-//	│ Ready │────►│ Initiating │────►│ Running │────►│ Completed │
-//	└───────┘     └────────────┘     └─────────┘     └───────────┘
-//	    ▲               │                 │           (terminal; all pipelines finished)
-//	    │               │                 │
-//	    │               │                 └──► Stop() ──► run loop exits ──► Canceled (terminal)
-//	    │               │                 │
-//	    │               │                 └──► per-VM work errors: GetVmStatus shows error; service still reaches Completed
-//	    │               │
-//	    │               │ (vSphere connect or pipeline start failure)
-//	    │               ▼
-//	    │         ┌───────────┐
-//	    └─────────│   Error   │ (terminal; GetStatus().Error set)
-//	              └───────────┘
+// The inspector has two service-level states, determined by whether inspectionSvc is nil:
 //
-// States:
-//   - Ready: Idle, accepts Start
-//   - Initiating: Connecting to vSphere and starting initial pipelines (Start holds lock for this phase)
-//   - Running: Background run loop polls until no pipeline is busy, then exits to Completed, or handles Stop
-//   - Error: Init failed (vSphere connect or inspectionSvc.start); error is stored on InspectorStatus
-//   - Completed: Normal terminal state when all VM pipelines finish without Stop
-//   - Canceled: Terminal state after Stop() once pipelines have stopped (no intermediate “canceling” state in GetStatus)
+//	┌───────┐     ┌─────────┐
+//	│ Ready │────►│ Running │
+//	└───────┘     └─────────┘
+//	    ▲               │
+//	    │               │ (all pipelines finished, or Stop() called)
+//	    └───────────────┘
 //
-// All terminal states (Completed, Canceled, Error) accept a new Start() call (IsBusy returns false).
+// Per-VM status lives on each WorkPipeline (pending, running, completed, error, canceled).
 //
-// Key behaviors:
-//   - Only one inspection run at a time (InspectionInProgressError if already busy)
-//   - Start failure during init sets Error, populates GetStatus().Error, tears down client/pipelines, and returns the error
-//   - Start connects to vCenter, then starts a pipeline per VM ID
-//   - Stop tears down pipelines and signals the run loop, which ends in Canceled. Cancel stops a single VM’s pipeline
-//   - GetStatus reads InspectorState (separate mutex); GetVmStatus reads the corresponding WorkPipeline state
-//   - run uses a ticker to detect when all per-VM pipelines have finished, then logs out the vSphere client
+// A full inspection cycle:
+//
+//  1. (Optional) Caller verifies credentials via Credentials() (preflight check against vCenter).
+//  2. Caller calls Start(ctx, creds, vmIDs).
+//     a. Start acquires the mutex, rejects if already running (InspectionInProgressError).
+//     b. Creates a new vSphere client and vmdetect.Detector.
+//     c. Creates a fresh inspectionService, passing the shared scheduler, operator, and detector.
+//     d. Calls inspectionService.Start(vmIDs, cleanupFn) which:
+//     - Creates one WorkPipeline per VM and starts them on the scheduler.
+//     - Launches a background goroutine (run) that polls IsBusy() every 5s.
+//     e. The cleanup function logs out the vSphere client and nils inspectionSvc
+//     on InspectorService (returning it to Ready).
+//  3. Pipelines execute concurrently via the shared scheduler. Each pipeline runs
+//     its work units sequentially (validate → snapshot → inspect → save → remove snapshot).
+//  4. The run() goroutine detects completion (IsBusy() == false) and calls the cleanup
+//     function, which logs out the vSphere client and transitions the service back to Ready.
+//  5. Alternatively, Stop() can be called at any time:
+//     a. It grabs inspectionSvc under lock, nils the field (immediate Ready transition),
+//     then calls inspectionService.Stop() outside the lock.
+//     b. inspectionService.Stop() cancels all pipelines, signals the run() goroutine
+//     via the stop channel, and waits for cleanup to finish.
+//
+// ## Scheduler lifetime
+//
+// The scheduler is created once in NewInspectorService and shared across inspection runs.
+// It is NOT closed on Stop — only the pipelines are torn down. This allows subsequent
+// Start calls to reuse the same scheduler without recreation.
+//
+// ## Coordination between run() and Stop()
+//
+// inspectionService uses a buffered stop channel (cap 1) as a single-bit flag to coordinate
+// shutdown between run() and Stop(). Because the consumed channel guarantees at most one
+// run() goroutine ever exists, Stop() can never race with itself:
+//
+//   - Stop() sets waitCleanupCh, stops all pipelines, then does a non-blocking send on the
+//     stop channel. If run() is still alive the send succeeds and Stop() waits on waitCleanupCh.
+//   - run() on natural completion fills the stop channel via non-blocking send. If Stop() later
+//     tries to send, the channel is full so the default branch is taken — Stop() skips waiting.
+//   - The cleanup function (vSphere logout + nil inspectionSvc) runs exactly once in run()’s defer.
 //
 // Usage:
 //
-//	inspector := services.NewInspectorService(10)
-//	err := inspector.Start(ctx, []string{"vm-1", "vm-2"}, credentials)
-//	status := inspector.GetStatus()
-//	vmStatus := inspector.GetVmStatus("vm-1")
-//	err = inspector.Cancel("vm-2")    // optional, single VM
-//	err = inspector.Stop()            // cancel entire run
+//	inspector, err := services.NewInspectorService(store, 10, dataDir)
+//	err = inspector.Credentials(ctx, creds) // optional preflight check
+//	err = inspector.Start(ctx, creds, []string{“vm-1”, “vm-2”})
+//	status := inspector.GetStatus()       // Ready or Running
+//	vmStatus := inspector.GetVmStatus(“vm-1”)  // per-VM pipeline state
+//	err = inspector.Cancel(“vm-2”)        // cancel a single VM’s pipeline
+//	err = inspector.Stop()                // cancel entire run, wait for cleanup
 //
 // # Console
 //
@@ -341,11 +361,12 @@
 //   - Thread-safe through underlying store implementation
 //
 // InspectorService:
-//   - sync.Mutex protects Start, Stop, Cancel and shared fields (client, credentials, stop channel lifecycle)
-//   - InspectorState uses its own mutex for GetStatus / state transitions from the run loop
-//   - GetVmStatus delegates to inspectionService without holding the service mutex
+//   - sync.Mutex protects inspectionSvc, credentials, and lifecycle transitions (Start/Stop/Cancel)
+//   - GetStatus and IsBusy read inspectionSvc under lock
+//   - GetVmStatus snapshots inspectionSvc under lock, then delegates without holding it
 //
 // inspectionService (internal):
-//   - sync.Mutex protects the per-VM pipeline map and Stop(); short-held locks around map reads/writes
-//   - Scheduler and pipelines torn down in Stop(); IsBusy inspects pipeline.IsRunning() under lock
+//   - sync.Mutex protects the per-VM pipeline map; short-held locks around map reads/writes
+//   - stop channel (cap 1) coordinates run() and Stop() without additional locks
+//   - Pipelines torn down in Stop(); IsBusy inspects pipeline.IsRunning() under lock
 package services
