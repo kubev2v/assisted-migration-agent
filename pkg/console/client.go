@@ -11,7 +11,6 @@ import (
 	apiAgent "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	agentClient "github.com/kubev2v/migration-planner/pkg/client"
 
-	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	serviceErrs "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
@@ -72,9 +71,9 @@ func (c *Client) UpdateAgentStatus(ctx context.Context, agentID uuid.UUID, sourc
 
 // UpdateSourceStatus sends source inventory to console.redhat.com
 // PUT /api/v1/sources/{id}/status
-func (c *Client) UpdateSourceStatus(ctx context.Context, sourceID, agentID uuid.UUID, inventory models.Inventory) error {
+func (c *Client) UpdateSourceStatus(ctx context.Context, sourceID, agentID uuid.UUID, data []byte) error {
 	inv := externalRef0.Inventory{}
-	if err := json.Unmarshal(inventory.Data, &inv); err != nil {
+	if err := json.Unmarshal(data, &inv); err != nil {
 		return fmt.Errorf("failed to unmarshal inventory: %w", err)
 	}
 

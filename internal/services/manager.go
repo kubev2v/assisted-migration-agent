@@ -23,6 +23,7 @@ type ServiceManager struct {
 	inspector *InspectorService
 	vddk      *VddkService
 	inventory *InventoryService
+	event     *EventService
 	vm        *VMService
 	group     *GroupService
 }
@@ -66,8 +67,13 @@ func (m *ServiceManager) Initialize() error {
 		return errors.New("console client is required")
 	}
 
+	m.inventory = NewInventoryService(m.store)
+	m.event = NewEventService(m.store)
+
 	m.collector = NewCollectorService(
 		m.store,
+		m.inventory,
+		m.event,
 		m.cfg.Agent.DataFolder,
 		m.cfg.Agent.OpaPoliciesFolder,
 	)
@@ -81,6 +87,7 @@ func (m *ServiceManager) Initialize() error {
 		m.consoleClient,
 		m.collector,
 		m.store,
+		m.event,
 	)
 	if err != nil {
 		m.collector.Stop()
@@ -89,7 +96,6 @@ func (m *ServiceManager) Initialize() error {
 	}
 	m.console = consoleSrv
 
-	m.inventory = NewInventoryService(m.store)
 	m.vm = NewVMService(m.store)
 	m.group = NewGroupService(m.store)
 
@@ -110,6 +116,10 @@ func (m *ServiceManager) InspectorService() *InspectorService {
 
 func (m *ServiceManager) VddkService() *VddkService {
 	return m.vddk
+}
+
+func (m *ServiceManager) EventService() *EventService {
+	return m.event
 }
 
 func (m *ServiceManager) InventoryService() *InventoryService {

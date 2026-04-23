@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -59,6 +61,7 @@ var _ = Describe("Console Service", func() {
 		cfg       config.Agent
 		db        *sql.DB
 		st        *store.Store
+		eventSrv  *services.EventService
 	)
 
 	BeforeEach(func() {
@@ -75,6 +78,7 @@ var _ = Describe("Console Service", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		st = store.NewStore(db, test.NewMockValidator())
+		eventSrv = services.NewEventService(st)
 
 		cfg = config.Agent{
 			ID:             agentID,
@@ -105,7 +109,7 @@ var _ = Describe("Console Service", func() {
 			cfg.Mode = "disconnected"
 
 			// Act
-			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
@@ -132,7 +136,7 @@ var _ = Describe("Console Service", func() {
 			cfg.Mode = "disconnected"
 
 			// Act
-			_, err = services.NewConsoleService(cfg, client, collector, st)
+			_, err = services.NewConsoleService(cfg, client, collector, st, eventSrv)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Assert - Wait longer than updateInterval (50ms) to ensure no requests are fired
@@ -161,7 +165,7 @@ var _ = Describe("Console Service", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
-			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
@@ -193,7 +197,7 @@ var _ = Describe("Console Service", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
-			_, err = services.NewConsoleService(cfg, client, collector, st)
+			_, err = services.NewConsoleService(cfg, client, collector, st, eventSrv)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Assert
@@ -219,7 +223,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
@@ -253,7 +257,7 @@ var _ = Describe("Console Service", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
-			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
@@ -278,7 +282,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(consoleSrv).NotTo(BeNil())
 
@@ -307,7 +311,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
@@ -335,7 +339,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
@@ -365,7 +369,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(consoleSrv.SetMode(context.Background(), models.AgentModeConnected)).To(BeNil())
 			Eventually(requestReceived, 500*time.Millisecond).Should(Receive())
@@ -400,7 +404,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(consoleSrv.SetMode(context.Background(), models.AgentModeConnected)).To(BeNil())
@@ -432,7 +436,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
@@ -467,7 +471,7 @@ var _ = Describe("Console Service", func() {
 
 			collector.SetState(models.CollectorStateCollected)
 
-			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(consoleSrv.SetMode(context.Background(), models.AgentModeConnected)).To(BeNil())
 
@@ -502,7 +506,7 @@ var _ = Describe("Console Service", func() {
 
 			collector.SetState(models.CollectorStateCollected)
 
-			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(consoleSrv.SetMode(context.Background(), models.AgentModeConnected)).To(BeNil())
 
@@ -530,7 +534,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
@@ -541,18 +545,15 @@ var _ = Describe("Console Service", func() {
 		})
 	})
 
-	Context("Inventory", func() {
-		// Given a collector in collected state with inventory in store
-		// When the console service is in connected mode
-		// Then it should send the inventory to the server
-		It("should send inventory when collector status is collected", func() {
+	Context("Outbox events", func() {
+		// Given outbox events exist when the console is connected
+		// When the pipeline runs
+		// Then inventory should be sent to the server and events deleted from outbox
+		It("should send outbox events and delete them after success", func() {
 			// Arrange
-			statusReceived := make(chan bool, 10)
 			inventoryReceived := make(chan bool, 10)
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if strings.Contains(r.URL.Path, "agents") {
-					statusReceived <- true
-				} else if strings.Contains(r.URL.Path, "sources") {
+				if strings.Contains(r.URL.Path, "sources") {
 					inventoryReceived <- true
 				}
 				w.WriteHeader(http.StatusOK)
@@ -562,25 +563,69 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			collector.SetState(models.CollectorStateCollected)
-			err = st.Inventory().Save(context.Background(), []byte(`{"vms": [{"name": "vm1"}]}`))
-			Expect(err).NotTo(HaveOccurred())
+			Expect(eventSrv.AddInventoryUpdateEvent(context.Background(), []byte(`{}`))).To(Succeed())
 
-			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
 			Expect(consoleSrv.SetMode(context.Background(), models.AgentModeConnected)).To(BeNil())
 
 			// Assert
-			Eventually(statusReceived, 500*time.Millisecond).Should(Receive())
 			Eventually(inventoryReceived, 500*time.Millisecond).Should(Receive())
+			Eventually(func() int {
+				events, _ := eventSrv.Events(context.Background())
+				return len(events)
+			}, 500*time.Millisecond).Should(Equal(0))
 		})
 
-		// Given a console service in connected mode with no inventory in store
-		// When the update loop runs
-		// Then it should not send inventory requests
-		It("should not send inventory when no inventory exists in store", func() {
+		// Given multiple outbox events exist
+		// When the pipeline runs
+		// Then all events should be sent and deleted
+		It("should send multiple events and delete them", func() {
+			// Arrange
+			var mu sync.Mutex
+			inventoryCount := 0
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if strings.Contains(r.URL.Path, "sources") {
+					mu.Lock()
+					inventoryCount++
+					mu.Unlock()
+				}
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer server.Close()
+
+			client, err := console.NewConsoleClient(server.URL, "")
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(eventSrv.AddInventoryUpdateEvent(context.Background(), []byte(`{}`))).To(Succeed())
+			Expect(eventSrv.AddInventoryUpdateEvent(context.Background(), []byte(`{}`))).To(Succeed())
+			Expect(eventSrv.AddInventoryUpdateEvent(context.Background(), []byte(`{}`))).To(Succeed())
+
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act
+			Expect(consoleSrv.SetMode(context.Background(), models.AgentModeConnected)).To(BeNil())
+
+			// Assert
+			Eventually(func() int {
+				mu.Lock()
+				defer mu.Unlock()
+				return inventoryCount
+			}, 500*time.Millisecond).Should(Equal(3))
+
+			Eventually(func() int {
+				events, _ := eventSrv.Events(context.Background())
+				return len(events)
+			}, 500*time.Millisecond).Should(Equal(0))
+		})
+
+		// Given an empty outbox
+		// When the pipeline runs
+		// Then no inventory requests should be sent
+		It("should not send inventory requests when outbox is empty", func() {
 			// Arrange
 			statusReceived := make(chan bool, 10)
 			inventoryReceived := make(chan bool, 10)
@@ -597,7 +642,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
@@ -608,59 +653,23 @@ var _ = Describe("Console Service", func() {
 			Consistently(inventoryReceived, 300*time.Millisecond).ShouldNot(Receive())
 		})
 
-		// Given inventory that has not changed since last send
-		// When the update loop runs multiple times
-		// Then inventory should only be sent once
-		It("should not resend inventory if unchanged", func() {
+		// Given outbox events and the inventory request fails with a transient error
+		// When the pipeline runs again after backoff
+		// Then events should remain in the outbox and be retried
+		It("should retain events in outbox on transient failure and retry", func() {
 			// Arrange
 			inventoryCount := 0
+			var mu sync.Mutex
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if strings.Contains(r.URL.Path, "sources") {
+					mu.Lock()
 					inventoryCount++
-				}
-				w.WriteHeader(http.StatusOK)
-			}))
-			defer server.Close()
-
-			client, err := console.NewConsoleClient(server.URL, "")
-			Expect(err).NotTo(HaveOccurred())
-
-			collector.SetState(models.CollectorStateCollected)
-			err = st.Inventory().Save(context.Background(), []byte(`{"vms": [{"name": "vm1"}]}`))
-			Expect(err).NotTo(HaveOccurred())
-
-			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
-			Expect(err).NotTo(HaveOccurred())
-
-			// Act
-			Expect(consoleSrv.SetMode(context.Background(), models.AgentModeConnected)).To(BeNil())
-			time.Sleep(300 * time.Millisecond)
-
-			// Assert
-			Expect(inventoryCount).To(Equal(1))
-		})
-
-		// Given a console service that receives 410 Gone after first successful request
-		// When the inventory changes
-		// Then no more inventory requests should be sent
-		It("should not send more inventory after source gone error (410)", func() {
-			// Arrange
-			statusCount := 0
-			inventoryCount := 0
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if strings.Contains(r.URL.Path, "agents") {
-					statusCount++
-					if statusCount == 1 {
-						w.WriteHeader(http.StatusOK)
+					count := inventoryCount
+					mu.Unlock()
+					if count == 1 {
+						w.WriteHeader(http.StatusInternalServerError)
 						return
 					}
-					w.WriteHeader(http.StatusGone)
-					return
-				}
-				if strings.Contains(r.URL.Path, "sources") {
-					inventoryCount++
-					w.WriteHeader(http.StatusOK)
-					return
 				}
 				w.WriteHeader(http.StatusOK)
 			}))
@@ -669,34 +678,33 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			collector.SetState(models.CollectorStateCollected)
-			err = st.Inventory().Save(context.Background(), []byte(`{"vms": [{"name": "vm1"}]}`))
-			Expect(err).NotTo(HaveOccurred())
+			Expect(eventSrv.AddInventoryUpdateEvent(context.Background(), []byte(`{}`))).To(Succeed())
 
-			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
 			Expect(consoleSrv.SetMode(context.Background(), models.AgentModeConnected)).To(BeNil())
-			time.Sleep(300 * time.Millisecond)
-			Expect(inventoryCount).To(Equal(1))
 
-			err = st.Inventory().Save(context.Background(), []byte(`{"vms": [{"name": "vm2"}]}`))
-			Expect(err).NotTo(HaveOccurred())
-			time.Sleep(300 * time.Millisecond)
+			// Assert — event is retried and eventually delivered
+			Eventually(func() int {
+				mu.Lock()
+				defer mu.Unlock()
+				return inventoryCount
+			}, 1*time.Second).Should(BeNumerically(">=", 2))
 
-			// Assert
-			Expect(inventoryCount).To(Equal(1))
-			status := consoleSrv.Status()
-			Expect(status.Error).NotTo(BeNil())
+			Eventually(func() int {
+				events, _ := eventSrv.Events(context.Background())
+				return len(events)
+			}, 1*time.Second).Should(Equal(0))
 		})
 
-		// Given an inventory update that fails with a bad request error
-		// When the error occurs
-		// Then the error should be stored in the service status
-		It("should store error in status when inventory update fails", func() {
+		// Given outbox events and the inventory request fails with a fatal error
+		// When the pipeline stops
+		// Then events should NOT be deleted (clear unit never runs)
+		It("should not delete events when pipeline fails on inventory send", func() {
 			// Arrange
-			inventoryReceived := make(chan bool, 1)
+			inventoryReceived := make(chan bool, 10)
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if strings.Contains(r.URL.Path, "agents") {
 					w.WriteHeader(http.StatusOK)
@@ -714,21 +722,112 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			collector.SetState(models.CollectorStateCollected)
-			err = st.Inventory().Save(context.Background(), []byte(`{"vms": [{"name": "vm1"}]}`))
-			Expect(err).NotTo(HaveOccurred())
+			Expect(eventSrv.AddInventoryUpdateEvent(context.Background(), []byte(`{}`))).To(Succeed())
 
-			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
 			Expect(consoleSrv.SetMode(context.Background(), models.AgentModeConnected)).To(BeNil())
-			Eventually(inventoryReceived, 200*time.Millisecond).Should(Receive())
+			Eventually(inventoryReceived, 500*time.Millisecond).Should(Receive())
 
-			// Assert
+			// Assert — error is recorded
 			Eventually(func() error {
 				return consoleSrv.Status().Error
-			}, 100*time.Millisecond).ShouldNot(BeNil())
+			}, 200*time.Millisecond).ShouldNot(BeNil())
+
+			// Events should still be in the outbox
+			events, err := eventSrv.Events(context.Background())
+			Expect(err).NotTo(HaveOccurred())
+			Expect(events).To(HaveLen(1))
+		})
+
+		// Given event A is in the outbox and being processed
+		// When event B is added to the outbox during pipeline execution
+		// Then event B should survive the delete (lastID scoping)
+		It("should preserve events added after pipeline reads the outbox", func() {
+			// Arrange
+			var deliveryCount int64
+			firstInventorySent := make(chan struct{}, 1)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if strings.Contains(r.URL.Path, "sources") {
+					atomic.AddInt64(&deliveryCount, 1)
+					select {
+					case firstInventorySent <- struct{}{}:
+					default:
+					}
+				}
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer server.Close()
+
+			client, err := console.NewConsoleClient(server.URL, "")
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(eventSrv.AddInventoryUpdateEvent(context.Background(), []byte(`{}`))).To(Succeed())
+
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act
+			Expect(consoleSrv.SetMode(context.Background(), models.AgentModeConnected)).To(BeNil())
+
+			// Wait for the first event to be sent, then insert a new one
+			Eventually(firstInventorySent, 500*time.Millisecond).Should(Receive())
+			Expect(eventSrv.AddInventoryUpdateEvent(context.Background(), []byte(`{}`))).To(Succeed())
+
+			// Assert — both events should be delivered
+			Eventually(func() int64 {
+				return atomic.LoadInt64(&deliveryCount)
+			}, 1*time.Second).Should(BeNumerically(">=", 2))
+
+			Eventually(func() int {
+				events, _ := eventSrv.Events(context.Background())
+				return len(events)
+			}, 1*time.Second).Should(Equal(0))
+		})
+
+		// Given a single outbox event
+		// When sent successfully
+		// Then subsequent pipeline cycles should not send inventory
+		It("should not resend events after they are deleted", func() {
+			// Arrange
+			inventoryCount := 0
+			var mu sync.Mutex
+			statusReceived := make(chan bool, 20)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if strings.Contains(r.URL.Path, "agents") {
+					statusReceived <- true
+				}
+				if strings.Contains(r.URL.Path, "sources") {
+					mu.Lock()
+					inventoryCount++
+					mu.Unlock()
+				}
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer server.Close()
+
+			client, err := console.NewConsoleClient(server.URL, "")
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(eventSrv.AddInventoryUpdateEvent(context.Background(), []byte(`{}`))).To(Succeed())
+
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act
+			Expect(consoleSrv.SetMode(context.Background(), models.AgentModeConnected)).To(BeNil())
+
+			// Wait for at least 3 status cycles to pass after event delivery
+			for i := 0; i < 4; i++ {
+				Eventually(statusReceived, 500*time.Millisecond).Should(Receive())
+			}
+
+			// Assert — inventory sent exactly once
+			mu.Lock()
+			Expect(inventoryCount).To(Equal(1))
+			mu.Unlock()
 		})
 	})
 
@@ -748,7 +847,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
 			Expect(err).NotTo(HaveOccurred())
 			err = consoleSrv.SetMode(context.Background(), models.AgentModeConnected)
 			Expect(err).NotTo(HaveOccurred())
@@ -779,7 +878,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
 			Expect(err).NotTo(HaveOccurred())
 			err = consoleSrv.SetMode(context.Background(), models.AgentModeConnected)
 			Expect(err).NotTo(HaveOccurred())
@@ -819,7 +918,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
@@ -854,7 +953,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
@@ -906,7 +1005,7 @@ var _ = Describe("Console Service", func() {
 			err = st.Inventory().Save(context.Background(), []byte(`{"vms": [{"name": "vm1"}]}`))
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
@@ -938,7 +1037,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
@@ -967,7 +1066,7 @@ var _ = Describe("Console Service", func() {
 			Expect(err).NotTo(HaveOccurred())
 			cfg.Mode = "disconnected"
 
-			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act - set the same mode (disconnected -> disconnected)
@@ -993,7 +1092,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
 			Expect(err).NotTo(HaveOccurred())
 
 			// First connect so that the run loop starts and receives the 410
@@ -1027,7 +1126,7 @@ var _ = Describe("Console Service", func() {
 			Expect(err).NotTo(HaveOccurred())
 			cfg.Mode = "disconnected"
 
-			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
@@ -1051,7 +1150,7 @@ var _ = Describe("Console Service", func() {
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
 			Expect(err).NotTo(HaveOccurred())
 
 			err = consoleSrv.SetMode(context.Background(), models.AgentModeConnected)
@@ -1085,7 +1184,7 @@ var _ = Describe("Console Service", func() {
 			Expect(err).NotTo(HaveOccurred())
 			cfg.LegacyStatusEnabled = true
 
-			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
@@ -1126,7 +1225,7 @@ var _ = Describe("Console Service", func() {
 			collector.SetState(models.CollectorStateError)
 			collector.SetError(errors.New("invalid credentials"))
 
-			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
@@ -1165,7 +1264,7 @@ var _ = Describe("Console Service", func() {
 			collector.SetState(models.CollectorStateError)
 			collector.SetError(errors.New("connection refused"))
 
-			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
@@ -1207,7 +1306,7 @@ var _ = Describe("Console Service", func() {
 			collector.SetState(models.CollectorStateCollected)
 			collector.SetError(nil)
 
-			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st)
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act

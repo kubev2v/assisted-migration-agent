@@ -147,6 +147,26 @@ This works because the database is the authoritative source of "collected", whil
 
 The service does not need to nil the pipeline on natural completion. A completed pipeline can remain attached and be safely ignored once the database answers the terminal question.
 
+## Outbox Pattern
+
+The outbox decouples *what* gets sent to the SaaS console from *how* and *when* it gets sent.
+
+Services that produce data for the console do not send it directly. They write events to the outbox table. The console service drains the outbox and handles delivery, retries, and backoff. Producers only need to know how to write an event; they do not need to know about the console client, connection state, or error handling.
+
+This separation has two benefits:
+
+1. **Producers are decoupled from the console service.** Any service can write events to the outbox without knowing about the console client or its connection state. Adding a new event kind requires only a new case in `RequestBuilder.Build`, which maps each kind to the right API call. The console service itself never changes.
+
+2. **Producers do not need to care about delivery.** A service writes an event and moves on. If the console is disconnected, in backoff, or temporarily failing, the event sits in the outbox until it can be delivered. The producer does not need retry logic or awareness of console state.
+
+The main downside is that producers cannot react to backend responses. The outbox is fire-and-forget by design.
+
+### How it works
+
+Producers write events to the outbox via `EventService`. Each event has a kind and a payload.
+
+The console service reads pending events on each tick. For each event, `RequestBuilder` maps the event kind to a `func(ctx) error` that performs the right API call. The console wraps these into pipeline work units alongside a status update and a cleanup unit. Cleanup deletes only the processed events (scoped by `id <= lastID`), so events added during execution are preserved. If the pipeline fails before reaching cleanup, events remain for retry. If the outbox is empty, only the status update runs.
+
 ## Many-Pipeline Pattern
 
 Some services need many concurrent pipelines that all share one execution budget.

@@ -222,3 +222,21 @@ func IsCredentialsNotSetError(err error) bool {
 	var e *CredentialsNotSetError
 	return errors.As(err, &e)
 }
+
+// UnknownEventKindError indicates an event kind that has no registered handler.
+type UnknownEventKindError struct {
+	Kind string
+}
+
+func NewUnknownEventKindError(kind string) *UnknownEventKindError {
+	return &UnknownEventKindError{Kind: kind}
+}
+
+func (e *UnknownEventKindError) Error() string {
+	return fmt.Sprintf("unknown event kind: %s", e.Kind)
+}
+
+func IsUnknownEventKindError(err error) bool {
+	var e *UnknownEventKindError
+	return errors.As(err, &e)
+}

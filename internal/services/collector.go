@@ -29,9 +29,11 @@ type (
 )
 
 type CollectorService struct {
-	scheduler *scheduler.Scheduler[models.CollectorResult]
-	store     *store.Store
-	pipeline  *collectorPipeline
+	scheduler    *scheduler.Scheduler[models.CollectorResult]
+	pipeline     *collectorPipeline
+	store        *store.Store
+	eventSrv     *EventService
+	inventorySrv *InventoryService
 
 	dataDir        string
 	opaPoliciesDir string
@@ -39,9 +41,11 @@ type CollectorService struct {
 	mu             sync.Mutex
 }
 
-func NewCollectorService(st *store.Store, dataDir, opaPoliciesDir string) *CollectorService {
+func NewCollectorService(st *store.Store, inventorySrv *InventoryService, eventSrv *EventService, dataDir, opaPoliciesDir string) *CollectorService {
 	srv := &CollectorService{
 		store:          st,
+		inventorySrv:   inventorySrv,
+		eventSrv:       eventSrv,
 		dataDir:        dataDir,
 		opaPoliciesDir: opaPoliciesDir,
 	}
@@ -50,7 +54,7 @@ func NewCollectorService(st *store.Store, dataDir, opaPoliciesDir string) *Colle
 }
 
 func (c *CollectorService) GetStatus() models.CollectorStatus {
-	inv, err := c.store.Inventory().Get(context.Background())
+	inv, err := c.inventorySrv.GetInventory(context.Background())
 	if err == nil && inv != nil {
 		return models.CollectorStatus{State: models.CollectorStateCollected}
 	}
@@ -80,7 +84,7 @@ func (c *CollectorService) Start(ctx context.Context, creds models.Credentials) 
 		return srvErrors.NewCollectionInProgressError()
 	}
 
-	inv, err := c.store.Inventory().Get(ctx)
+	inv, err := c.inventorySrv.GetInventory(ctx)
 	if err == nil && inv != nil {
 		return nil
 	}
@@ -178,6 +182,9 @@ func (c *CollectorService) buildWorkUnits(creds models.Credentials) []models.Wor
 				return models.CollectorStatus{State: models.CollectorStateCollected}
 			},
 			Work: func(ctx context.Context, r models.CollectorResult) (models.CollectorResult, error) {
+				if err := c.eventSrv.AddInventoryUpdateEvent(ctx, r.Inventory); err != nil {
+					return r, err
+				}
 				return r, nil
 			},
 		},
