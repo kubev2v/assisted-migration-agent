@@ -12,12 +12,13 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/services"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
+	"github.com/kubev2v/assisted-migration-agent/pkg/work"
 	"github.com/kubev2v/assisted-migration-agent/test"
 )
 
-func mockCollectorBuilder(st *store.Store, eventSrv *services.EventService, connectErr, collectErr, processErr error) func(models.Credentials) models.WorkBuilder[models.CollectorStatus, models.CollectorResult] {
-	return func(_ models.Credentials) models.WorkBuilder[models.CollectorStatus, models.CollectorResult] {
-		return models.NewSliceWorkBuilder([]models.WorkUnit[models.CollectorStatus, models.CollectorResult]{
+func mockCollectorBuilder(st *store.Store, eventSrv *services.EventService, connectErr, collectErr, processErr error) func(models.Credentials) work.WorkBuilder[models.CollectorStatus, models.CollectorResult] {
+	return func(_ models.Credentials) work.WorkBuilder[models.CollectorStatus, models.CollectorResult] {
+		return work.NewSliceWorkBuilder([]work.WorkUnit[models.CollectorStatus, models.CollectorResult]{
 			{
 				Status: func() models.CollectorStatus {
 					return models.CollectorStatus{State: models.CollectorStateConnecting}
@@ -67,9 +68,9 @@ func mockCollectorBuilder(st *store.Store, eventSrv *services.EventService, conn
 	}
 }
 
-func blockingCollectorBuilder(gate chan struct{}) func(models.Credentials) models.WorkBuilder[models.CollectorStatus, models.CollectorResult] {
-	return func(_ models.Credentials) models.WorkBuilder[models.CollectorStatus, models.CollectorResult] {
-		return models.NewSliceWorkBuilder([]models.WorkUnit[models.CollectorStatus, models.CollectorResult]{
+func blockingCollectorBuilder(gate chan struct{}) func(models.Credentials) work.WorkBuilder[models.CollectorStatus, models.CollectorResult] {
+	return func(_ models.Credentials) work.WorkBuilder[models.CollectorStatus, models.CollectorResult] {
+		return work.NewSliceWorkBuilder([]work.WorkUnit[models.CollectorStatus, models.CollectorResult]{
 			{
 				Status: func() models.CollectorStatus {
 					return models.CollectorStatus{State: models.CollectorStateConnecting}
@@ -110,8 +111,7 @@ var _ = Describe("CollectorService", func() {
 		st = store.NewStore(db, test.NewMockValidator())
 		invSrv = services.NewInventoryService(st)
 		eventSrv = services.NewEventService(st)
-		srv = services.NewCollectorService(st, invSrv, eventSrv, "", "").
-			WithWorkBuilder(mockCollectorBuilder(st, eventSrv, nil, nil, nil))
+		srv = services.NewCollectorService(invSrv, mockCollectorBuilder(st, eventSrv, nil, nil, nil))
 	})
 
 	AfterEach(func() {
@@ -222,8 +222,8 @@ var _ = Describe("CollectorService", func() {
 		// Then the state should transition to error with the connect error message
 		It("should set error state when connection fails", func() {
 			// Arrange
-			srv = services.NewCollectorService(st, invSrv, eventSrv, "", "").
-				WithWorkBuilder(mockCollectorBuilder(st, eventSrv, errors.New("connection failed"), nil, nil))
+			srv = services.NewCollectorService(invSrv,
+				mockCollectorBuilder(st, eventSrv, errors.New("connection failed"), nil, nil))
 			creds := models.Credentials{
 				URL:      "https://vcenter.example.com",
 				Username: "admin",
@@ -249,8 +249,8 @@ var _ = Describe("CollectorService", func() {
 		// Then the state should transition to error with the collection error message
 		It("should set error state when collection fails", func() {
 			// Arrange
-			srv = services.NewCollectorService(st, invSrv, eventSrv, "", "").
-				WithWorkBuilder(mockCollectorBuilder(st, eventSrv, nil, errors.New("collection failed"), nil))
+			srv = services.NewCollectorService(invSrv,
+				mockCollectorBuilder(st, eventSrv, nil, errors.New("collection failed"), nil))
 			creds := models.Credentials{
 				URL:      "https://vcenter.example.com",
 				Username: "admin",
@@ -276,8 +276,8 @@ var _ = Describe("CollectorService", func() {
 		// Then the state should transition to error with the processing error message
 		It("should set error state when processor fails", func() {
 			// Arrange
-			srv = services.NewCollectorService(st, invSrv, eventSrv, "", "").
-				WithWorkBuilder(mockCollectorBuilder(st, eventSrv, nil, nil, errors.New("processing failed")))
+			srv = services.NewCollectorService(invSrv,
+				mockCollectorBuilder(st, eventSrv, nil, nil, errors.New("processing failed")))
 			creds := models.Credentials{
 				URL:      "https://vcenter.example.com",
 				Username: "admin",
@@ -306,8 +306,8 @@ var _ = Describe("CollectorService", func() {
 			gate := make(chan struct{})
 			defer close(gate)
 
-			srv = services.NewCollectorService(st, invSrv, eventSrv, "", "").
-				WithWorkBuilder(blockingCollectorBuilder(gate))
+			srv = services.NewCollectorService(invSrv,
+				blockingCollectorBuilder(gate))
 			creds := models.Credentials{
 				URL:      "https://vcenter.example.com",
 				Username: "admin",
@@ -358,7 +358,7 @@ var _ = Describe("CollectorService", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
-			collectorSrv := services.NewCollectorService(st, invSrv, eventSrv, "", "")
+			collectorSrv := services.NewCollectorService(invSrv, nil)
 
 			// Assert
 			Expect(collectorSrv.GetStatus().State).To(Equal(models.CollectorStateCollected))
@@ -372,8 +372,8 @@ var _ = Describe("CollectorService", func() {
 		It("should cancel running collection and return to ready", func() {
 			// Arrange
 			gate := make(chan struct{})
-			srv = services.NewCollectorService(st, invSrv, eventSrv, "", "").
-				WithWorkBuilder(blockingCollectorBuilder(gate))
+			srv = services.NewCollectorService(invSrv,
+				blockingCollectorBuilder(gate))
 			creds := models.Credentials{
 				URL:      "https://vcenter.example.com",
 				Username: "admin",

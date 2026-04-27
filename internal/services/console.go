@@ -16,6 +16,7 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/pkg/console"
 	"github.com/kubev2v/assisted-migration-agent/pkg/errors"
 	"github.com/kubev2v/assisted-migration-agent/pkg/scheduler"
+	"github.com/kubev2v/assisted-migration-agent/pkg/work"
 )
 
 const (
@@ -28,7 +29,7 @@ type Collector interface {
 }
 
 type (
-	consoleWorkUnit = models.WorkUnit[string, any]
+	consoleWorkUnit = work.WorkUnit[string, any]
 )
 
 type Console struct {
@@ -196,7 +197,7 @@ func (c *Console) run(closeCh chan any) {
 	}
 
 	var (
-		pipeline    *WorkPipeline[string, any]
+		pipeline    *work.Pipeline[string, any]
 		errPipeline error
 	)
 
@@ -276,7 +277,7 @@ func (c *Console) Stop() {
 	c.close = nil
 }
 
-func (c *Console) createPipeline(s *scheduler.Scheduler[any]) (*WorkPipeline[string, any], error) {
+func (c *Console) createPipeline(s *scheduler.Scheduler[any]) (*work.Pipeline[string, any], error) {
 	units := []consoleWorkUnit{
 		{
 			Status: func() string { return "status" },
@@ -300,7 +301,7 @@ func (c *Console) createPipeline(s *scheduler.Scheduler[any]) (*WorkPipeline[str
 	}
 
 	if len(events) == 0 {
-		return NewWorkPipeline(initialState, s, models.NewSliceWorkBuilder(units)), nil
+		return work.NewPipeline(initialState, s, work.NewSliceWorkBuilder(units)), nil
 	}
 
 	lastID := 0
@@ -329,7 +330,7 @@ func (c *Console) createPipeline(s *scheduler.Scheduler[any]) (*WorkPipeline[str
 		},
 	})
 
-	return NewWorkPipeline(initialState, s, models.NewSliceWorkBuilder(units)), nil
+	return work.NewPipeline(initialState, s, work.NewSliceWorkBuilder(units)), nil
 }
 
 // consoleState holds the console status with its own mutex for thread-safe access.

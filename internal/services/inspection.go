@@ -13,6 +13,7 @@ import (
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/pkg/scheduler"
+	"github.com/kubev2v/assisted-migration-agent/pkg/work"
 
 	"github.com/kubev2v/vm-migration-detective/pkg/vmdetect"
 )
@@ -23,9 +24,9 @@ const (
 )
 
 type (
-	inspectionPipeline    = WorkPipeline[models.InspectionStatus, models.InspectionResult]
-	inspectionWorkUnit    = models.WorkUnit[models.InspectionStatus, models.InspectionResult]
-	inspectionWorkBuilder func(id string) models.WorkBuilder[models.InspectionStatus, models.InspectionResult]
+	inspectionPipeline    = work.Pipeline[models.InspectionStatus, models.InspectionResult]
+	inspectionWorkUnit    = work.WorkUnit[models.InspectionStatus, models.InspectionResult]
+	inspectionWorkBuilder func(id string) work.WorkBuilder[models.InspectionStatus, models.InspectionResult]
 )
 
 // inspectionService owns the scheduler and a map of WorkPipelines keyed by VM ID. InspectorService
@@ -72,7 +73,7 @@ func (i *inspectionService) Start(operator *vmware.VMManager, detector *vmdetect
 	zap.S().Named("inspection_service").Infow("starting VM inspection pipelines", "vmCount", len(vmIDs), "vmIds", vmIDs)
 
 	for _, id := range vmIDs {
-		pipeline := NewWorkPipeline(models.InspectionStatus{State: models.InspectionStatePending}, i.scheduler, i.buildFn(id))
+		pipeline := work.NewPipeline(models.InspectionStatus{State: models.InspectionStatePending}, i.scheduler, i.buildFn(id))
 		_ = pipeline.Start()
 		i.pipelines[id] = pipeline
 	}
@@ -140,7 +141,7 @@ func (i *inspectionService) GetVmStatus(id string) models.InspectionStatus {
 
 	state := pipeline.State()
 	if state.Err != nil {
-		if errors.Is(state.Err, errPipelineStopped) {
+		if errors.Is(state.Err, work.ErrStopped) {
 			return models.InspectionStatus{State: models.InspectionStateCanceled, Error: state.Err}
 		}
 		return models.InspectionStatus{State: models.InspectionStateError, Error: state.Err}
@@ -150,8 +151,8 @@ func (i *inspectionService) GetVmStatus(id string) models.InspectionStatus {
 }
 
 // buildInspectionWorkUnits is the default pipeline: validate privileges, snapshot, inspect, save, remove snapshot.
-func (i *inspectionService) buildInspectionWorkUnits(id string) models.WorkBuilder[models.InspectionStatus, models.InspectionResult] {
-	return models.NewSliceWorkBuilder([]inspectionWorkUnit{
+func (i *inspectionService) buildInspectionWorkUnits(id string) work.WorkBuilder[models.InspectionStatus, models.InspectionResult] {
+	return work.NewSliceWorkBuilder([]inspectionWorkUnit{
 		{
 			Status: func() models.InspectionStatus {
 				return models.InspectionStatus{State: models.InspectionStateRunning}
