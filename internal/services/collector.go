@@ -25,7 +25,8 @@ import (
 
 type (
 	collectorPipeline        = WorkPipeline[models.CollectorStatus, models.CollectorResult]
-	collectorWorkUnitBuilder func(creds models.Credentials) []models.WorkUnit[models.CollectorStatus, models.CollectorResult]
+	collectorWorkUnit        = models.WorkUnit[models.CollectorStatus, models.CollectorResult]
+	collectorWorkBuilderFunc func(creds models.Credentials) models.WorkBuilder[models.CollectorStatus, models.CollectorResult]
 )
 
 type CollectorService struct {
@@ -37,7 +38,7 @@ type CollectorService struct {
 
 	dataDir        string
 	opaPoliciesDir string
-	buildFn        collectorWorkUnitBuilder
+	buildFn        collectorWorkBuilderFunc
 	mu             sync.Mutex
 }
 
@@ -99,7 +100,7 @@ func (c *CollectorService) Start(ctx context.Context, creds models.Credentials) 
 	}
 	c.scheduler = sched
 
-	buildFn := c.buildWorkUnits
+	buildFn := c.buildWorkBuilder
 	if c.buildFn != nil {
 		buildFn = c.buildFn
 	}
@@ -134,14 +135,14 @@ func (c *CollectorService) Stop() {
 	}
 }
 
-// WithWorkUnits overrides the default work unit builder. Intended for testing.
-func (c *CollectorService) WithWorkUnits(fn collectorWorkUnitBuilder) *CollectorService {
+// WithWorkBuilder overrides the default work builder. Intended for testing.
+func (c *CollectorService) WithWorkBuilder(fn collectorWorkBuilderFunc) *CollectorService {
 	c.buildFn = fn
 	return c
 }
 
-func (c *CollectorService) buildWorkUnits(creds models.Credentials) []models.WorkUnit[models.CollectorStatus, models.CollectorResult] {
-	return []models.WorkUnit[models.CollectorStatus, models.CollectorResult]{
+func (c *CollectorService) buildWorkBuilder(creds models.Credentials) models.WorkBuilder[models.CollectorStatus, models.CollectorResult] {
+	return models.NewSliceWorkBuilder([]collectorWorkUnit{
 		{
 			Status: func() models.CollectorStatus {
 				return models.CollectorStatus{State: models.CollectorStateConnecting}
@@ -188,7 +189,7 @@ func (c *CollectorService) buildWorkUnits(creds models.Credentials) []models.Wor
 				return r, nil
 			},
 		},
-	}
+	})
 }
 
 func (c *CollectorService) verifyCredentials(ctx context.Context, cred models.Credentials) error {

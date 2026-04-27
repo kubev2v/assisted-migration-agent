@@ -20,8 +20,8 @@ var _ = Describe("inspectionService", func() {
 		})
 
 		It("returns pipeline state after Start", func() {
-			svc := newInspectionService(nil).WithWorkUnitsBuilder(func(id string) []models.WorkUnit[models.InspectionStatus, models.InspectionResult] {
-				return []models.WorkUnit[models.InspectionStatus, models.InspectionResult]{
+			svc := newInspectionService(nil).WithWorkUnitsBuilder(func(id string) models.WorkBuilder[models.InspectionStatus, models.InspectionResult] {
+				return models.NewSliceWorkBuilder([]models.WorkUnit[models.InspectionStatus, models.InspectionResult]{
 					{
 						Status: func() models.InspectionStatus {
 							return models.InspectionStatus{State: models.InspectionStateRunning}
@@ -38,7 +38,7 @@ var _ = Describe("inspectionService", func() {
 							return result, nil
 						},
 					},
-				}
+				})
 			})
 
 			err := svc.Start(nil, nil, []string{"vm-1"})
@@ -55,8 +55,8 @@ var _ = Describe("inspectionService", func() {
 		It("stops specified pipelines", func() {
 			var block sync.WaitGroup
 			block.Add(1)
-			svc := newInspectionService(nil).WithWorkUnitsBuilder(func(id string) []models.WorkUnit[models.InspectionStatus, models.InspectionResult] {
-				return []models.WorkUnit[models.InspectionStatus, models.InspectionResult]{
+			svc := newInspectionService(nil).WithWorkUnitsBuilder(func(id string) models.WorkBuilder[models.InspectionStatus, models.InspectionResult] {
+				return models.NewSliceWorkBuilder([]models.WorkUnit[models.InspectionStatus, models.InspectionResult]{
 					{
 						Status: func() models.InspectionStatus {
 							return models.InspectionStatus{State: models.InspectionStateRunning}
@@ -74,7 +74,7 @@ var _ = Describe("inspectionService", func() {
 							return result, nil
 						},
 					},
-				}
+				})
 			})
 
 			err := svc.Start(nil, nil, []string{"vm-1", "vm-2"})
@@ -99,8 +99,8 @@ var _ = Describe("inspectionService", func() {
 
 	Describe("Start", func() {
 		It("stores operator and creates pipelines for given IDs", func() {
-			svc := newInspectionService(nil).WithWorkUnitsBuilder(func(id string) []models.WorkUnit[models.InspectionStatus, models.InspectionResult] {
-				return []models.WorkUnit[models.InspectionStatus, models.InspectionResult]{
+			svc := newInspectionService(nil).WithWorkUnitsBuilder(func(id string) models.WorkBuilder[models.InspectionStatus, models.InspectionResult] {
+				return models.NewSliceWorkBuilder([]models.WorkUnit[models.InspectionStatus, models.InspectionResult]{
 					{
 						Status: func() models.InspectionStatus {
 							return models.InspectionStatus{State: models.InspectionStateRunning}
@@ -117,7 +117,7 @@ var _ = Describe("inspectionService", func() {
 							return result, nil
 						},
 					},
-				}
+				})
 			})
 
 			err := svc.Start((*vmware.VMManager)(nil), nil, []string{"vm-a", "vm-b"})

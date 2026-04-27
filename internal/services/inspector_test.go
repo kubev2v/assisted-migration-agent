@@ -64,9 +64,9 @@ func (m *mockInspectionBuilder) getInspectedVMs() []string {
 	return append([]string(nil), m.inspected...)
 }
 
-func (m *mockInspectionBuilder) builder() func(id string) []models.WorkUnit[models.InspectionStatus, models.InspectionResult] {
-	return func(id string) []models.WorkUnit[models.InspectionStatus, models.InspectionResult] {
-		return []models.WorkUnit[models.InspectionStatus, models.InspectionResult]{
+func (m *mockInspectionBuilder) builder() func(id string) models.WorkBuilder[models.InspectionStatus, models.InspectionResult] {
+	return func(id string) models.WorkBuilder[models.InspectionStatus, models.InspectionResult] {
+		return models.NewSliceWorkBuilder([]models.WorkUnit[models.InspectionStatus, models.InspectionResult]{
 			{
 				Status: func() models.InspectionStatus {
 					return models.InspectionStatus{State: models.InspectionStateRunning}
@@ -106,7 +106,7 @@ func (m *mockInspectionBuilder) builder() func(id string) []models.WorkUnit[mode
 					return result, nil
 				},
 			},
-		}
+		})
 	}
 }
 

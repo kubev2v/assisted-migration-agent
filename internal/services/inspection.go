@@ -24,7 +24,8 @@ const (
 
 type (
 	inspectionPipeline    = WorkPipeline[models.InspectionStatus, models.InspectionResult]
-	inspectionWorkBuilder func(id string) []models.WorkUnit[models.InspectionStatus, models.InspectionResult]
+	inspectionWorkUnit    = models.WorkUnit[models.InspectionStatus, models.InspectionResult]
+	inspectionWorkBuilder func(id string) models.WorkBuilder[models.InspectionStatus, models.InspectionResult]
 )
 
 // inspectionService owns the scheduler and a map of WorkPipelines keyed by VM ID. InspectorService
@@ -149,8 +150,8 @@ func (i *inspectionService) GetVmStatus(id string) models.InspectionStatus {
 }
 
 // buildInspectionWorkUnits is the default pipeline: validate privileges, snapshot, inspect, save, remove snapshot.
-func (i *inspectionService) buildInspectionWorkUnits(id string) []models.WorkUnit[models.InspectionStatus, models.InspectionResult] {
-	return []models.WorkUnit[models.InspectionStatus, models.InspectionResult]{
+func (i *inspectionService) buildInspectionWorkUnits(id string) models.WorkBuilder[models.InspectionStatus, models.InspectionResult] {
+	return models.NewSliceWorkBuilder([]inspectionWorkUnit{
 		{
 			Status: func() models.InspectionStatus {
 				return models.InspectionStatus{State: models.InspectionStateRunning}
@@ -207,7 +208,7 @@ func (i *inspectionService) buildInspectionWorkUnits(id string) []models.WorkUni
 				return result, nil
 			},
 		},
-	}
+	})
 }
 
 func (i *inspectionService) validate(ctx context.Context, id string) error {

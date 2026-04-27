@@ -57,23 +57,23 @@ type WorkPipelineStatus[S any, R any] struct {
 }
 
 type WorkPipeline[S any, R any] struct {
-	mu    sync.Mutex
-	sched *scheduler.Scheduler[R]
-	stop  chan struct{}
-	done  chan struct{}
-	units []models.WorkUnit[S, R]
-	state WorkPipelineStatus[S, R]
+	mu          sync.Mutex
+	sched       *scheduler.Scheduler[R]
+	stop        chan struct{}
+	done        chan struct{}
+	workBuilder models.WorkBuilder[S, R]
+	state       WorkPipelineStatus[S, R]
 }
 
 func NewWorkPipeline[S any, R any](
 	initialState S,
 	sched *scheduler.Scheduler[R],
-	units []models.WorkUnit[S, R],
+	builder models.WorkBuilder[S, R],
 ) *WorkPipeline[S, R] {
 	return &WorkPipeline[S, R]{
-		sched: sched,
-		units: units,
-		state: WorkPipelineStatus[S, R]{State: initialState},
+		sched:       sched,
+		workBuilder: builder,
+		state:       WorkPipelineStatus[S, R]{State: initialState},
 	}
 }
 
@@ -84,7 +84,7 @@ func (p *WorkPipeline[S, R]) Start() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	if len(p.units) == 0 {
+	if p.workBuilder == nil {
 		return nil
 	}
 
@@ -102,7 +102,7 @@ func (p *WorkPipeline[S, R]) Start() error {
 	p.done = done
 	p.state.Err = nil
 
-	go func(units []models.WorkUnit[S, R], stop, done chan struct{}) {
+	go func(builder models.WorkBuilder[S, R], stop, done chan struct{}) {
 		var (
 			result R
 			err    error
@@ -118,7 +118,8 @@ func (p *WorkPipeline[S, R]) Start() error {
 			close(done)
 		}()
 
-		for _, unit := range units {
+		for unit, hasMore := builder.Next(); hasMore; unit, hasMore = builder.Next() {
+
 			select {
 			case <-stop:
 				err = errPipelineStopped
@@ -145,7 +146,7 @@ func (p *WorkPipeline[S, R]) Start() error {
 				result = res.Data
 			}
 		}
-	}(p.units, stop, done)
+	}(p.workBuilder, stop, done)
 
 	return nil
 }

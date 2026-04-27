@@ -15,9 +15,9 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/test"
 )
 
-func mockCollectorUnits(st *store.Store, eventSrv *services.EventService, connectErr, collectErr, processErr error) func(models.Credentials) []models.WorkUnit[models.CollectorStatus, models.CollectorResult] {
-	return func(_ models.Credentials) []models.WorkUnit[models.CollectorStatus, models.CollectorResult] {
-		return []models.WorkUnit[models.CollectorStatus, models.CollectorResult]{
+func mockCollectorBuilder(st *store.Store, eventSrv *services.EventService, connectErr, collectErr, processErr error) func(models.Credentials) models.WorkBuilder[models.CollectorStatus, models.CollectorResult] {
+	return func(_ models.Credentials) models.WorkBuilder[models.CollectorStatus, models.CollectorResult] {
+		return models.NewSliceWorkBuilder([]models.WorkUnit[models.CollectorStatus, models.CollectorResult]{
 			{
 				Status: func() models.CollectorStatus {
 					return models.CollectorStatus{State: models.CollectorStateConnecting}
@@ -63,13 +63,13 @@ func mockCollectorUnits(st *store.Store, eventSrv *services.EventService, connec
 					return r, nil
 				},
 			},
-		}
+		})
 	}
 }
 
-func blockingCollectorUnits(gate chan struct{}) func(models.Credentials) []models.WorkUnit[models.CollectorStatus, models.CollectorResult] {
-	return func(_ models.Credentials) []models.WorkUnit[models.CollectorStatus, models.CollectorResult] {
-		return []models.WorkUnit[models.CollectorStatus, models.CollectorResult]{
+func blockingCollectorBuilder(gate chan struct{}) func(models.Credentials) models.WorkBuilder[models.CollectorStatus, models.CollectorResult] {
+	return func(_ models.Credentials) models.WorkBuilder[models.CollectorStatus, models.CollectorResult] {
+		return models.NewSliceWorkBuilder([]models.WorkUnit[models.CollectorStatus, models.CollectorResult]{
 			{
 				Status: func() models.CollectorStatus {
 					return models.CollectorStatus{State: models.CollectorStateConnecting}
@@ -83,7 +83,7 @@ func blockingCollectorUnits(gate chan struct{}) func(models.Credentials) []model
 					}
 				},
 			},
-		}
+		})
 	}
 }
 
@@ -111,7 +111,7 @@ var _ = Describe("CollectorService", func() {
 		invSrv = services.NewInventoryService(st)
 		eventSrv = services.NewEventService(st)
 		srv = services.NewCollectorService(st, invSrv, eventSrv, "", "").
-			WithWorkUnits(mockCollectorUnits(st, eventSrv, nil, nil, nil))
+			WithWorkBuilder(mockCollectorBuilder(st, eventSrv, nil, nil, nil))
 	})
 
 	AfterEach(func() {
@@ -223,7 +223,7 @@ var _ = Describe("CollectorService", func() {
 		It("should set error state when connection fails", func() {
 			// Arrange
 			srv = services.NewCollectorService(st, invSrv, eventSrv, "", "").
-				WithWorkUnits(mockCollectorUnits(st, eventSrv, errors.New("connection failed"), nil, nil))
+				WithWorkBuilder(mockCollectorBuilder(st, eventSrv, errors.New("connection failed"), nil, nil))
 			creds := models.Credentials{
 				URL:      "https://vcenter.example.com",
 				Username: "admin",
@@ -250,7 +250,7 @@ var _ = Describe("CollectorService", func() {
 		It("should set error state when collection fails", func() {
 			// Arrange
 			srv = services.NewCollectorService(st, invSrv, eventSrv, "", "").
-				WithWorkUnits(mockCollectorUnits(st, eventSrv, nil, errors.New("collection failed"), nil))
+				WithWorkBuilder(mockCollectorBuilder(st, eventSrv, nil, errors.New("collection failed"), nil))
 			creds := models.Credentials{
 				URL:      "https://vcenter.example.com",
 				Username: "admin",
@@ -277,7 +277,7 @@ var _ = Describe("CollectorService", func() {
 		It("should set error state when processor fails", func() {
 			// Arrange
 			srv = services.NewCollectorService(st, invSrv, eventSrv, "", "").
-				WithWorkUnits(mockCollectorUnits(st, eventSrv, nil, nil, errors.New("processing failed")))
+				WithWorkBuilder(mockCollectorBuilder(st, eventSrv, nil, nil, errors.New("processing failed")))
 			creds := models.Credentials{
 				URL:      "https://vcenter.example.com",
 				Username: "admin",
@@ -307,7 +307,7 @@ var _ = Describe("CollectorService", func() {
 			defer close(gate)
 
 			srv = services.NewCollectorService(st, invSrv, eventSrv, "", "").
-				WithWorkUnits(blockingCollectorUnits(gate))
+				WithWorkBuilder(blockingCollectorBuilder(gate))
 			creds := models.Credentials{
 				URL:      "https://vcenter.example.com",
 				Username: "admin",
@@ -373,7 +373,7 @@ var _ = Describe("CollectorService", func() {
 			// Arrange
 			gate := make(chan struct{})
 			srv = services.NewCollectorService(st, invSrv, eventSrv, "", "").
-				WithWorkUnits(blockingCollectorUnits(gate))
+				WithWorkBuilder(blockingCollectorBuilder(gate))
 			creds := models.Credentials{
 				URL:      "https://vcenter.example.com",
 				Username: "admin",

@@ -22,6 +22,10 @@ func unit(status string, fn func(ctx context.Context, r int) (int, error)) model
 	}
 }
 
+func wb(units ...models.WorkUnit[string, int]) models.WorkBuilder[string, int] {
+	return models.NewSliceWorkBuilder(units)
+}
+
 var _ = Describe("WorkPipeline", func() {
 	var sched *scheduler.Scheduler[int]
 
@@ -67,7 +71,7 @@ var _ = Describe("WorkPipeline", func() {
 			units := []models.WorkUnit[string, int]{
 				unit("step", func(_ context.Context, r int) (int, error) { return r, nil }),
 			}
-			p := services.NewWorkPipeline[string, int]("pending", nil, units)
+			p := services.NewWorkPipeline[string, int]("pending", nil, wb(units...))
 
 			// Act
 			err := p.Start()
@@ -92,7 +96,7 @@ var _ = Describe("WorkPipeline", func() {
 				}),
 			}
 
-			p := services.NewWorkPipeline("pending", sched, units)
+			p := services.NewWorkPipeline("pending", sched, wb(units...))
 			Expect(p.Start()).To(Succeed())
 
 			// Act
@@ -118,7 +122,7 @@ var _ = Describe("WorkPipeline", func() {
 				unit("mul-2", func(_ context.Context, r int) (int, error) { return r * 2, nil }),
 			}
 
-			p := services.NewWorkPipeline("pending", sched, units)
+			p := services.NewWorkPipeline("pending", sched, wb(units...))
 
 			// Act
 			Expect(p.Start()).To(Succeed())
@@ -149,7 +153,7 @@ var _ = Describe("WorkPipeline", func() {
 				unit("second", func(_ context.Context, r int) (int, error) { return r + 1, nil }),
 			}
 
-			p := services.NewWorkPipeline("pending", sched, units)
+			p := services.NewWorkPipeline("pending", sched, wb(units...))
 
 			// Act
 			Expect(p.Start()).To(Succeed())
@@ -190,7 +194,7 @@ var _ = Describe("WorkPipeline", func() {
 				}),
 			}
 
-			p := services.NewWorkPipeline("pending", sched, units)
+			p := services.NewWorkPipeline("pending", sched, wb(units...))
 
 			// Act
 			Expect(p.Start()).To(Succeed())
@@ -213,7 +217,7 @@ var _ = Describe("WorkPipeline", func() {
 				},
 			}
 
-			p := services.NewWorkPipeline("pending", sched, units)
+			p := services.NewWorkPipeline("pending", sched, wb(units...))
 
 			// Act
 			Expect(p.Start()).To(Succeed())
@@ -235,7 +239,7 @@ var _ = Describe("WorkPipeline", func() {
 			units := []models.WorkUnit[string, int]{
 				unit("s", func(_ context.Context, r int) (int, error) { return r, nil }),
 			}
-			p := services.NewWorkPipeline("pending", sched, units)
+			p := services.NewWorkPipeline("pending", sched, wb(units...))
 
 			// Act & Assert
 			Expect(func() { p.Stop() }).NotTo(Panic())
@@ -261,7 +265,7 @@ var _ = Describe("WorkPipeline", func() {
 				}),
 			}
 
-			p := services.NewWorkPipeline("pending", sched, units)
+			p := services.NewWorkPipeline("pending", sched, wb(units...))
 			Expect(p.Start()).To(Succeed())
 			Expect(p.IsRunning()).To(BeTrue())
 
@@ -292,12 +296,12 @@ var _ = Describe("WorkPipeline", func() {
 				}
 			}
 
-			p1 := services.NewWorkPipeline("pending", sched, makeUnits())
+			p1 := services.NewWorkPipeline("pending", sched, wb(makeUnits()...))
 			Expect(p1.Start()).To(Succeed())
 			p1.Stop()
 			Expect(p1.IsRunning()).To(BeFalse())
 
-			p2 := services.NewWorkPipeline("pending", sched, makeUnits())
+			p2 := services.NewWorkPipeline("pending", sched, wb(makeUnits()...))
 
 			// Act
 			Expect(p2.Start()).To(Succeed())
@@ -318,7 +322,7 @@ var _ = Describe("WorkPipeline", func() {
 				unit("fast", func(_ context.Context, r int) (int, error) { return r + 1, nil }),
 			}
 
-			p := services.NewWorkPipeline("pending", sched, units)
+			p := services.NewWorkPipeline("pending", sched, wb(units...))
 			Expect(p.Start()).To(Succeed())
 			time.Sleep(5 * time.Millisecond)
 
@@ -356,7 +360,7 @@ var _ = Describe("WorkPipeline", func() {
 					unit("step-b", func(_ context.Context, r int) (int, error) { return r + 1, nil }),
 				}
 
-				pipelines[i] = services.NewWorkPipeline("pending", multiSched, units)
+				pipelines[i] = services.NewWorkPipeline("pending", multiSched, wb(units...))
 
 				go func(p *services.WorkPipeline[string, int]) {
 					defer wg.Done()
@@ -400,8 +404,8 @@ var _ = Describe("WorkPipeline", func() {
 				unit("fast-b", func(_ context.Context, r int) (int, error) { return r + 20, nil }),
 			}
 
-			pSlow := services.NewWorkPipeline("pending", multiSched, slowUnits)
-			pFast := services.NewWorkPipeline("pending", multiSched, fastUnits)
+			pSlow := services.NewWorkPipeline("pending", multiSched, wb(slowUnits...))
+			pFast := services.NewWorkPipeline("pending", multiSched, wb(fastUnits...))
 
 			Expect(pSlow.Start()).To(Succeed())
 			Expect(pFast.Start()).To(Succeed())
@@ -434,8 +438,8 @@ var _ = Describe("WorkPipeline", func() {
 				unit("ok", func(_ context.Context, r int) (int, error) { return r + 42, nil }),
 			}
 
-			pFail := services.NewWorkPipeline("pending", multiSched, failUnits)
-			pOk := services.NewWorkPipeline("pending", multiSched, okUnits)
+			pFail := services.NewWorkPipeline("pending", multiSched, wb(failUnits...))
+			pOk := services.NewWorkPipeline("pending", multiSched, wb(okUnits...))
 
 			// Act
 			Expect(pFail.Start()).To(Succeed())
@@ -481,7 +485,7 @@ var _ = Describe("WorkPipeline", func() {
 						}),
 					}
 
-					p := services.NewWorkPipeline("pending", stressSched, units)
+					p := services.NewWorkPipeline("pending", stressSched, wb(units...))
 
 					Expect(p.Start()).To(Succeed())
 					p.Stop()
@@ -519,7 +523,7 @@ var _ = Describe("WorkPipeline", func() {
 				}),
 			}
 
-			p := services.NewWorkPipeline("pending", stressSched, units)
+			p := services.NewWorkPipeline("pending", stressSched, wb(units...))
 			Expect(p.Start()).To(Succeed())
 
 			const n = 10
@@ -571,7 +575,7 @@ var _ = Describe("WorkPipeline", func() {
 						unit("step-b", func(_ context.Context, r int) (int, error) { return r + 1, nil }),
 					}
 
-					pipelines[idx] = services.NewWorkPipeline("pending", stressSched, units)
+					pipelines[idx] = services.NewWorkPipeline("pending", stressSched, wb(units...))
 					Expect(pipelines[idx].Start()).To(Succeed())
 				}(i)
 			}

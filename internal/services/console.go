@@ -300,7 +300,7 @@ func (c *Console) createPipeline(s *scheduler.Scheduler[any]) (*WorkPipeline[str
 	}
 
 	if len(events) == 0 {
-		return NewWorkPipeline(initialState, s, units), nil
+		return NewWorkPipeline(initialState, s, models.NewSliceWorkBuilder(units)), nil
 	}
 
 	lastID := 0
@@ -329,7 +329,7 @@ func (c *Console) createPipeline(s *scheduler.Scheduler[any]) (*WorkPipeline[str
 		},
 	})
 
-	return NewWorkPipeline(initialState, s, units), nil
+	return NewWorkPipeline(initialState, s, models.NewSliceWorkBuilder(units)), nil
 }
 
 // consoleState holds the console status with its own mutex for thread-safe access.
