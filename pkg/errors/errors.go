@@ -6,6 +6,22 @@ import (
 	"strings"
 )
 
+// ServiceAlreadyStartedError indicates that a work service or pool has already been started.
+type ServiceAlreadyStartedError struct{}
+
+func NewServiceAlreadyStartedError() *ServiceAlreadyStartedError {
+	return &ServiceAlreadyStartedError{}
+}
+
+func (e *ServiceAlreadyStartedError) Error() string {
+	return "service already started"
+}
+
+func IsServiceAlreadyStartedError(err error) bool {
+	var e *ServiceAlreadyStartedError
+	return errors.As(err, &e)
+}
+
 // ResourceNotFoundError indicates a resource was not found.
 type ResourceNotFoundError struct {
 	Kind string

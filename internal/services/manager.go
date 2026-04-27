@@ -70,13 +70,8 @@ func (m *ServiceManager) Initialize() error {
 	m.inventory = NewInventoryService(m.store)
 	m.event = NewEventService(m.store)
 
-	m.collector = NewCollectorService(
-		m.store,
-		m.inventory,
-		m.event,
-		m.cfg.Agent.DataFolder,
-		m.cfg.Agent.OpaPoliciesFolder,
-	)
+	factory := newCollectorWorkFactory(m.store, m.event, m.cfg.Agent.DataFolder, m.cfg.Agent.OpaPoliciesFolder)
+	m.collector = NewCollectorService(m.inventory, factory.Build)
 
 	m.inspector = NewInspectorService(m.store, maxVMsPerCycle, m.cfg.Agent.DataFolder)
 

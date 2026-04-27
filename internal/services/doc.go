@@ -10,7 +10,7 @@
 //   - Interface-based dependencies for testability
 //   - Mutex-protected state for thread safety
 //   - Channel-based signaling for goroutine coordination
-//   - Async work execution through WorkPipeline and Scheduler
+//   - Async work execution through work.Pipeline and Scheduler
 //
 // # Service Dependency Graph
 //
@@ -18,17 +18,87 @@
 //	    │
 //	    ▼
 //	Services Layer
-//	    ├── CollectorService ──► Store, WorkPipeline (owns its own Scheduler[CollectorResult])
-//	    ├── InspectorService ──► inspectionService (Scheduler[InspectionResult], one WorkPipeline per VM; in-memory only, no Store)
-//	    ├── Console ──────────► Store, WorkPipeline (creates Scheduler[any] per run loop), Console Client, Collector
+//	    ├── CollectorService ──► InventoryService, work.Service[CollectorStatus, CollectorResult]
+//	    ├── InspectorService ──► inspectionService (Scheduler[InspectionResult], one work.Pipeline per VM; in-memory only, no Store)
+//	    ├── Console ──────────► Store, work.Pipeline (creates Scheduler[any] per run loop), Console Client, Collector
 //	    ├── InventoryService ─► Store
 //	    ├── VMService ────────► Store
 //	    └── GroupService ─────► Store
+//
+// # work.Service and work.Pool
+//
+// work.Service and work.Pool are one-time consumable executors that own a Scheduler
+// and one or more work.Pipelines for their entire lifecycle. They eliminate the
+// boilerplate of scheduler creation, pipeline wiring, start/stop coordination, and
+// state exposure that every async service would otherwise repeat.
+//
+// Both are disposable: create → start → read state → discard. The coordinator
+// (e.g. CollectorService) creates a new instance for each run. There is no restart.
+//
+// work.Service[S, R] — single builder, single pipeline, 1 worker:
+//
+//	srv := work.NewService(initialState, builder)
+//	err := srv.Start()
+//	state := srv.State()   // always valid after Start
+//	srv.IsRunning()        // true while pipeline goroutine is active
+//	srv.Stop()             // cancels; state persists (result/error readable)
+//
+// work.Pool[S, R] — multiple builders keyed by string, shared scheduler, N workers:
+//
+//	pool := work.NewPool(workers, entries)
+//	err := pool.Start()
+//	state, err := pool.State("key")  // per-key; error if key unknown
+//	pool.IsRunning()                 // true if any pipeline is active
+//	pool.Cancel("key")              // stops a single pipeline
+//	pool.Stop()                     // stops all; state persists per key
+//
+// Creating a new async service:
+//
+// 1. Define your status type S and result type R.
+//
+//  2. Build a WorkBuilder[S, R] that produces WorkUnit steps — typically via
+//     a factory struct that holds domain dependencies (store, credentials, etc.).
+//     The factory is created by the ServiceManager and injected into the coordinator.
+//
+// 3. Write a coordinator service (like CollectorService) that:
+//
+//   - Holds precondition logic (e.g. "don't start if inventory exists")
+//
+//   - Creates a new work.Service or work.Pool for each run
+//
+//   - Exposes domain-specific GetStatus by reading the executor's State()
+//
+//   - Translates generic errors (ServiceAlreadyStartedError) to domain errors
+//
+//     4. Wire it in ServiceManager.Initialize: create the factory, pass its Build
+//     method to the coordinator constructor.
+//
+// Example (single-pipeline coordinator):
+//
+//	type MyService struct {
+//	    mu      sync.Mutex
+//	    workSrv *work.Service[MyStatus, MyResult]
+//	    buildFn func(params Params) work.WorkBuilder[MyStatus, MyResult]
+//	}
+//
+//	func (s *MyService) Start(params Params) error {
+//	    s.mu.Lock()
+//	    defer s.mu.Unlock()
+//	    if s.workSrv != nil && s.workSrv.IsRunning() {
+//	        return ErrAlreadyRunning
+//	    }
+//	    s.workSrv = work.NewService(initialState, s.buildFn(params))
+//	    return s.workSrv.Start()
+//	}
 //
 // # CollectorService
 //
 // CollectorService manages VM inventory collection from vCenter, handling state
 // transitions and asynchronous work execution.
+//
+// It is a coordinator over disposable work.Service instances. The domain logic
+// (vCenter connection, collection, parsing) lives in a collectorWorkFactory that
+// is created by ServiceManager and injected as a builder function.
 //
 // State Machine:
 //
@@ -58,19 +128,20 @@
 //   - Only one collection can be in progress at a time (returns CollectionInProgressError otherwise)
 //   - Once inventory is collected, the Collected state is terminal - subsequent Start calls are no-ops
 //   - Collection can be cancelled mid-execution via Stop, returning to Ready state
-//   - Work units are executed sequentially via a callback-free WorkPipeline (see pipeline.go)
-//   - The pipeline is pull-based: GetStatus reads pipeline.State() rather than receiving callbacks
-//   - The collector tolerates a stale pipeline — completed pipelines remain attached until
-//     replaced by a new Start() or detached by Stop()
+//   - Each Start creates a new work.Service; the coordinator checks preconditions before creating it
 //   - GetStatus checks the database for inventory first (authoritative for Collected),
-//     then falls back to the pipeline state, then Ready
+//     then falls back to the work.Service state, then Ready
 //
 // Usage:
 //
-//	collector := services.NewCollectorService(store, dataDir, opaPoliciesDir)
+//	// In ServiceManager.Initialize:
+//	factory := newCollectorWorkFactory(store, eventSrv, dataDir, opaPoliciesDir)
+//	collector := NewCollectorService(inventorySrv, factory.Build)
+//
+//	// At runtime:
 //	err := collector.Start(ctx, credentials)
 //	status := collector.GetStatus()
-//	collector.Stop() // Cancel if needed
+//	collector.Stop()
 //
 // # InspectorService
 //
@@ -81,7 +152,7 @@
 // Restarting the agent clears all inspection state.
 //
 // Internal coordination uses inspectionService (unexported): a shared scheduler and one
-// WorkPipeline per VM. Default work units are validate → create snapshot → inspect → save →
+// work.Pipeline per VM. Default work units are validate → create snapshot → inspect → save →
 // remove snapshot; tests may replace the builder via WithInspectionBuilder.
 //
 // inspectionService exists as a separate layer because InspectorService and per-VM pipeline
@@ -93,7 +164,7 @@
 // of vSphere connection handling.
 //
 // State machine (service-level, models.InspectorState — matches HTTP inspector status;
-// there is no per-VM state machine, per-VM status is derived from WorkPipeline state):
+// there is no per-VM state machine, per-VM status is derived from work.Pipeline state):
 //
 //	┌───────┐     ┌────────────┐     ┌─────────┐     ┌───────────┐
 //	│ Ready │────►│ Initiating │────►│ Running │────►│ Completed │
@@ -116,7 +187,7 @@
 //   - Running: Background run loop polls until no pipeline is busy, then exits to Completed, or handles Stop
 //   - Error: Init failed (vSphere connect or inspectionSvc.start); error is stored on InspectorStatus
 //   - Completed: Normal terminal state when all VM pipelines finish without Stop
-//   - Canceled: Terminal state after Stop() once pipelines have stopped (no intermediate “canceling” state in GetStatus)
+//   - Canceled: Terminal state after Stop() once pipelines have stopped (no intermediate "canceling" state in GetStatus)
 //
 // All terminal states (Completed, Canceled, Error) accept a new Start() call (IsBusy returns false).
 //
@@ -124,8 +195,8 @@
 //   - Only one inspection run at a time (InspectionInProgressError if already busy)
 //   - Start failure during init sets Error, populates GetStatus().Error, tears down client/pipelines, and returns the error
 //   - Start connects to vCenter, then starts a pipeline per VM ID
-//   - Stop tears down pipelines and signals the run loop, which ends in Canceled. Cancel stops a single VM’s pipeline
-//   - GetStatus reads InspectorState (separate mutex); GetVmStatus reads the corresponding WorkPipeline state
+//   - Stop tears down pipelines and signals the run loop, which ends in Canceled. Cancel stops a single VM's pipeline
+//   - GetStatus reads InspectorState (separate mutex); GetVmStatus reads the corresponding work.Pipeline state
 //   - run uses a ticker to detect when all per-VM pipelines have finished, then logs out the vSphere client
 //
 // Usage:
@@ -168,7 +239,7 @@
 // The mode is persisted to the database so it survives agent restarts.
 //
 // The service implements:
-//   - Periodic status and inventory dispatching via a reusable WorkPipeline
+//   - Periodic status and inventory dispatching via a reusable work.Pipeline
 //   - SHA256 hash-based deduplication to avoid sending unchanged inventory
 //   - Two-phase run loop: process result → wait (with backoff) → restart pipeline.
 //     Retries fire after the backoff interval, not before it.
@@ -326,9 +397,9 @@
 // # Thread Safety
 //
 // CollectorService:
-//   - Pipeline and scheduler lifecycle protected by sync.Mutex
-//   - Pipeline state is pull-based (no callbacks crossing lock boundaries)
-//   - Single pipeline at a time; stale completed pipelines tolerated
+//   - Coordinates disposable work.Service instances under sync.Mutex
+//   - Each work.Service owns its own pipeline and scheduler lifecycle
+//   - GetStatus reads work.Service.State() which delegates to the pipeline
 //
 // Console:
 //   - Mode changes protected by sync.Mutex (prevents double run loop)

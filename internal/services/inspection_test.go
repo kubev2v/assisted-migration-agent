@@ -9,6 +9,7 @@ import (
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/pkg/vmware"
+	"github.com/kubev2v/assisted-migration-agent/pkg/work"
 )
 
 var _ = Describe("inspectionService", func() {
@@ -20,8 +21,8 @@ var _ = Describe("inspectionService", func() {
 		})
 
 		It("returns pipeline state after Start", func() {
-			svc := newInspectionService(nil).WithWorkUnitsBuilder(func(id string) models.WorkBuilder[models.InspectionStatus, models.InspectionResult] {
-				return models.NewSliceWorkBuilder([]models.WorkUnit[models.InspectionStatus, models.InspectionResult]{
+			svc := newInspectionService(nil).WithWorkUnitsBuilder(func(id string) work.WorkBuilder[models.InspectionStatus, models.InspectionResult] {
+				return work.NewSliceWorkBuilder([]work.WorkUnit[models.InspectionStatus, models.InspectionResult]{
 					{
 						Status: func() models.InspectionStatus {
 							return models.InspectionStatus{State: models.InspectionStateRunning}
@@ -55,8 +56,8 @@ var _ = Describe("inspectionService", func() {
 		It("stops specified pipelines", func() {
 			var block sync.WaitGroup
 			block.Add(1)
-			svc := newInspectionService(nil).WithWorkUnitsBuilder(func(id string) models.WorkBuilder[models.InspectionStatus, models.InspectionResult] {
-				return models.NewSliceWorkBuilder([]models.WorkUnit[models.InspectionStatus, models.InspectionResult]{
+			svc := newInspectionService(nil).WithWorkUnitsBuilder(func(id string) work.WorkBuilder[models.InspectionStatus, models.InspectionResult] {
+				return work.NewSliceWorkBuilder([]work.WorkUnit[models.InspectionStatus, models.InspectionResult]{
 					{
 						Status: func() models.InspectionStatus {
 							return models.InspectionStatus{State: models.InspectionStateRunning}
@@ -99,8 +100,8 @@ var _ = Describe("inspectionService", func() {
 
 	Describe("Start", func() {
 		It("stores operator and creates pipelines for given IDs", func() {
-			svc := newInspectionService(nil).WithWorkUnitsBuilder(func(id string) models.WorkBuilder[models.InspectionStatus, models.InspectionResult] {
-				return models.NewSliceWorkBuilder([]models.WorkUnit[models.InspectionStatus, models.InspectionResult]{
+			svc := newInspectionService(nil).WithWorkUnitsBuilder(func(id string) work.WorkBuilder[models.InspectionStatus, models.InspectionResult] {
+				return work.NewSliceWorkBuilder([]work.WorkUnit[models.InspectionStatus, models.InspectionResult]{
 					{
 						Status: func() models.InspectionStatus {
 							return models.InspectionStatus{State: models.InspectionStateRunning}

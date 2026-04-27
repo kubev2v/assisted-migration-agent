@@ -15,6 +15,7 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
+	"github.com/kubev2v/assisted-migration-agent/pkg/work"
 	"github.com/kubev2v/assisted-migration-agent/test"
 )
 
@@ -64,9 +65,9 @@ func (m *mockInspectionBuilder) getInspectedVMs() []string {
 	return append([]string(nil), m.inspected...)
 }
 
-func (m *mockInspectionBuilder) builder() func(id string) models.WorkBuilder[models.InspectionStatus, models.InspectionResult] {
-	return func(id string) models.WorkBuilder[models.InspectionStatus, models.InspectionResult] {
-		return models.NewSliceWorkBuilder([]models.WorkUnit[models.InspectionStatus, models.InspectionResult]{
+func (m *mockInspectionBuilder) builder() func(id string) work.WorkBuilder[models.InspectionStatus, models.InspectionResult] {
+	return func(id string) work.WorkBuilder[models.InspectionStatus, models.InspectionResult] {
+		return work.NewSliceWorkBuilder([]work.WorkUnit[models.InspectionStatus, models.InspectionResult]{
 			{
 				Status: func() models.InspectionStatus {
 					return models.InspectionStatus{State: models.InspectionStateRunning}
