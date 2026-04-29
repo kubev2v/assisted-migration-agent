@@ -77,12 +77,15 @@ func (m *MockConsoleService) SetMode(ctx context.Context, mode models.AgentMode)
 
 // MockVMService is a mock implementation of VMService.
 type MockVMService struct {
-	ListResult     []models.VirtualMachineSummary
-	ListTotal      int
-	ListError      error
-	GetResult      *models.VM
-	GetError       error
-	LastListParams services.VMListParams
+	ListResult                    []models.VirtualMachineSummary
+	ListTotal                     int
+	ListError                     error
+	GetResult                     *models.VM
+	GetError                      error
+	UpdateMigrationExcludedError  error
+	LastListParams                services.VMListParams
+	LastUpdateMigrationExcludedID string
+	UpdateMigrationExcludedValue  bool
 }
 
 func (m *MockVMService) List(ctx context.Context, params services.VMListParams) ([]models.VirtualMachineSummary, int, error) {
@@ -92,6 +95,12 @@ func (m *MockVMService) List(ctx context.Context, params services.VMListParams) 
 
 func (m *MockVMService) Get(ctx context.Context, id string) (*models.VM, error) {
 	return m.GetResult, m.GetError
+}
+
+func (m *MockVMService) UpdateMigrationExcluded(ctx context.Context, id string, excluded bool) error {
+	m.LastUpdateMigrationExcludedID = id
+	m.UpdateMigrationExcludedValue = excluded
+	return m.UpdateMigrationExcludedError
 }
 
 // MockInspectorService is a mock implementation of InspectorService.

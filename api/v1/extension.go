@@ -24,16 +24,17 @@ func (a *AgentStatus) FromModel(m models.AgentStatus) {
 // NewVirtualMachineFromSummary converts a models.VirtualMachineSummary to an API VirtualMachine.
 func NewVirtualMachineFromSummary(vm models.VirtualMachineSummary) VirtualMachine {
 	result := VirtualMachine{
-		Id:           vm.ID,
-		Name:         vm.Name,
-		Cluster:      vm.Cluster,
-		Datacenter:   vm.Datacenter,
-		DiskSize:     vm.DiskSize,
-		Memory:       int64(vm.Memory),
-		VCenterState: vm.PowerState,
-		IssueCount:   vm.IssueCount,
-		Migratable:   &vm.IsMigratable,
-		Template:     &vm.IsTemplate,
+		Id:                vm.ID,
+		Name:              vm.Name,
+		Cluster:           vm.Cluster,
+		Datacenter:        vm.Datacenter,
+		DiskSize:          vm.DiskSize,
+		Memory:            int64(vm.Memory),
+		VCenterState:      vm.PowerState,
+		IssueCount:        vm.IssueCount,
+		Migratable:        &vm.IsMigratable,
+		Template:          &vm.IsTemplate,
+		MigrationExcluded: &vm.MigrationExcluded,
 	}
 	if len(vm.Tags) > 0 {
 		result.Tags = &vm.Tags
@@ -153,6 +154,7 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 
 	details.Template = &vm.IsTemplate
 	details.Migratable = &vm.IsMigratable
+	details.MigrationExcluded = &vm.MigrationExcluded
 	details.FaultToleranceEnabled = &vm.FaultToleranceEnabled
 	details.NestedHVEnabled = &vm.NestedHVEnabled
 

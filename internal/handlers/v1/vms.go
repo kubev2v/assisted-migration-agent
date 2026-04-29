@@ -135,3 +135,27 @@ func (h *Handler) RemoveVMFromInspection(c *gin.Context, id string) {
 
 	c.JSON(http.StatusOK, v1.NewInspectionStatus(h.inspectorSrv.GetVmStatus(id)))
 }
+
+// UpdateVM updates VM properties
+// (PATCH /vms/{id})
+func (h *Handler) UpdateVM(c *gin.Context, id string) {
+	var req v1.VirtualMachineUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Only migrationExcluded is supported for now
+	if req.MigrationExcluded != nil {
+		if err := h.vmSrv.UpdateMigrationExcluded(c.Request.Context(), id, *req.MigrationExcluded); err != nil {
+			if srvErrors.IsResourceNotFoundError(err) {
+				c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
+	c.Status(http.StatusOK)
+}

@@ -186,6 +186,31 @@ paths:
           description: VirtualMachine not found
         '500':
           description: Internal server error
+    patch:
+      summary: Update VM properties
+      operationId: updateVM
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: VirtualMachine id
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VirtualMachineUpdateRequest'
+      responses:
+        '200':
+          description: VM updated successfully
+        '400':
+          description: Invalid request
+        '404':
+          description: VM not found
+        '500':
+          description: Internal server error
 
   /vms/{id}/inspection:
     delete:
@@ -713,6 +738,10 @@ components:
         template:
           type: boolean
           description: True if the vm is a template. False otherwise
+        migrationExcluded:
+          type: boolean
+          description: Whether this VM is excluded from migration
+          default: false
         inspectionStatus:
           $ref: '#/components/schemas/VmInspectionStatus'
         inspectionConcernCount:
@@ -807,6 +836,10 @@ components:
         migratable:
           type: boolean
           description: Whether the VirtualMachine can be migrated (true if no critical issues)
+        migrationExcluded:
+          type: boolean
+          description: Whether this VM is excluded from migration
+          default: false
         faultToleranceEnabled:
           type: boolean
           description: Whether VMware Fault Tolerance is enabled, which maintains a live shadow VirtualMachine for instant failover
@@ -1169,3 +1202,13 @@ components:
           description: Tags to apply to matching VMs (only alphanumeric, underscore, and dot allowed)
           x-oapi-codegen-extra-tags:
             binding: "omitempty,dive,tag_format"
+
+    VirtualMachineUpdateRequest:
+      type: object
+      properties:
+        migrationExcluded:
+          type: boolean
+          description: Whether to exclude this VM from migration
+          example: true
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty"

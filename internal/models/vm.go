@@ -15,6 +15,7 @@ type VirtualMachineSummary struct {
 	InspectionStatus       InspectionStatus
 	InspectionConcernCount int
 	Tags                   []string
+	MigrationExcluded      bool
 }
 
 type VM struct {
@@ -44,6 +45,7 @@ type VM struct {
 
 	IsTemplate            bool
 	IsMigratable          bool
+	MigrationExcluded     bool
 	FaultToleranceEnabled bool
 	NestedHVEnabled       bool
 
@@ -101,4 +103,10 @@ type GuestNetwork struct {
 type Folder struct {
 	ID   string
 	Name string
+}
+
+// VMUserInfo represents user-specific data for a VM stored in vm_user_info table.
+type VMUserInfo struct {
+	VMID              string
+	MigrationExcluded bool
 }

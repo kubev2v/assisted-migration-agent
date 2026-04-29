@@ -31,6 +31,7 @@ type ConsoleService interface {
 type VMService interface {
 	List(ctx context.Context, params services.VMListParams) ([]models.VirtualMachineSummary, int, error)
 	Get(ctx context.Context, id string) (*models.VM, error)
+	UpdateMigrationExcluded(ctx context.Context, id string, excluded bool) error
 }
 
 // InspectorService defines the interface for deep inspector operations.
