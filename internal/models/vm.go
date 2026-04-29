@@ -19,6 +19,7 @@ type VirtualMachineSummary struct {
 	UtilizationMemP95      *float64 // Memory utilization at p95 (%); nil when no utilization data
 	UtilizationDisk        *float64 // Disk utilization (%); nil when no utilization data
 	UtilizationConfidence  *float64 // Data confidence (%); nil when no utilization data
+	MigrationExcluded      bool
 }
 
 type VM struct {
@@ -48,6 +49,7 @@ type VM struct {
 
 	IsTemplate            bool
 	IsMigratable          bool
+	MigrationExcluded     bool
 	FaultToleranceEnabled bool
 	NestedHVEnabled       bool
 

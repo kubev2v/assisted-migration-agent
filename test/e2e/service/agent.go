@@ -319,6 +319,44 @@ func (a *AgentSvc) GetVM(id string) (*v1.VirtualMachineDetail, error) {
 	return &vm, nil
 }
 
+// UpdateVMMigrationExclusion updates the migration exclusion status for a VM
+func (a *AgentSvc) UpdateVMMigrationExclusion(vmID string, excluded bool) error {
+	if vmID == "" {
+		return fmt.Errorf("vmID cannot be empty")
+	}
+
+	reqBody := map[string]bool{
+		"migrationExcluded": excluded,
+	}
+	data, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("marshaling request: %w", err)
+	}
+
+	req, err := http.NewRequest(
+		http.MethodPatch,
+		a.baseURL+"/api/v1/vms/"+url.PathEscape(vmID),
+		bytes.NewReader(data),
+	)
+	if err != nil {
+		return fmt.Errorf("creating request: %w", err)
+	}
+
+	resp, err := a.request(NewAgentRequest(req).withHeader("Content-Type", "application/json"))
+	if err != nil {
+		return fmt.Errorf("sending request: %w", err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
 // GroupGetParams holds parameters for getting a group's VMs.
 type GroupGetParams struct {
 	Sort     []string

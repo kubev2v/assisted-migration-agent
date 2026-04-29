@@ -45,6 +45,7 @@ func (s *VMService) Get(ctx context.Context, id string) (*models.VM, error) {
 	}
 
 	vm.InspectionConcerns = results[0].Concerns
+
 	return vm, nil
 }
 
@@ -95,4 +96,15 @@ func (s *VMService) buildListOptions(params VMListParams) ([]sq.Sqlizer, []store
 	}
 
 	return filters, opts
+}
+
+// UpdateMigrationExcluded updates the migration exclusion status for a VM.
+func (s *VMService) UpdateMigrationExcluded(ctx context.Context, id string, excluded bool) error {
+	// Verify VM exists first
+	_, err := s.store.VM().Get(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	return s.store.VM().UpdateMigrationExcluded(ctx, id, excluded)
 }

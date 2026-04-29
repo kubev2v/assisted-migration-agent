@@ -77,6 +77,7 @@ func (s *VMStore) List(ctx context.Context, filters []sq.Sqlizer, opts ...ListOp
 		var sqlErr string
 		var inspectionConcernCount int
 		var tags StringArray
+		var migrationExcluded bool
 		err := rows.Scan(
 			&vm.ID,
 			&vm.Name,
@@ -92,6 +93,7 @@ func (s *VMStore) List(ctx context.Context, filters []sq.Sqlizer, opts ...ListOp
 			&sqlErr,
 			&inspectionConcernCount,
 			&tags,
+			&migrationExcluded,
 			&vm.UtilizationCpuP95,
 			&vm.UtilizationMemP95,
 			&vm.UtilizationDisk,
@@ -105,6 +107,7 @@ func (s *VMStore) List(ctx context.Context, filters []sq.Sqlizer, opts ...ListOp
 		}
 		vm.InspectionConcernCount = inspectionConcernCount
 		vm.Tags = tags
+		vm.MigrationExcluded = migrationExcluded
 		vms = append(vms, vm)
 	}
 
@@ -173,6 +176,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 		&pvm.ChangeTrackingEnabled, &pvm.DiskEnableUuid, &pvm.Datacenter,
 		&pvm.Cluster, &pvm.HWVersion, &pvm.TotalDiskCapacityMiB,
 		&pvm.ProvisionedMiB, &pvm.ResourcePool, &pvm.OsDiskComplexity,
+		&pvm.MigrationExcluded,
 		&pvm.CpuHotAddEnabled, &pvm.CpuHotRemoveEnabled, &pvm.CpuSockets,
 		&pvm.CoresPerSocket, &pvm.MemoryHotAddEnabled, &pvm.BalloonedMemory,
 		&pvm.Disks, &pvm.NICs, &pvm.Networks, &pvm.Concerns,
@@ -296,6 +300,7 @@ func fromDB(pvm duckdb_models.VM) models.VM {
 		StorageUsed:           int64(pvm.StorageUsed),
 		IsTemplate:            pvm.IsTemplate,
 		IsMigratable:          criticalCount == 0,
+		MigrationExcluded:     pvm.MigrationExcluded,
 		FaultToleranceEnabled: pvm.FaultToleranceEnabled,
 		Disks:                 disks,
 		NICs:                  nics,
@@ -318,7 +323,10 @@ func ByFilter(expr string) sq.Sqlizer {
 	if expr == "" {
 		return nil
 	}
-	sqlizer, _ := filter.ParseWithDefaultMap([]byte(expr))
+	sqlizer, err := filter.ParseWithDefaultMap([]byte(expr))
+	if err != nil {
+		zap.S().Named("vm_store").Warnw("failed to parse filter expression", "expression", expr, "error", err)
+	}
 	return sqlizer
 }
 
@@ -413,4 +421,27 @@ func (s *VMStore) GetFolders(ctx context.Context) ([]models.Folder, error) {
 	}
 
 	return folders, rows.Err()
+}
+
+// UpdateMigrationExcluded sets the migration_excluded flag for a VM in vinfo table.
+func (s *VMStore) UpdateMigrationExcluded(ctx context.Context, vmID string, excluded bool) error {
+	query, args, err := sq.Update("vinfo").
+		Set(`"migration_excluded"`, excluded).
+		Where(sq.Eq{`"VM ID"`: vmID}).
+		ToSql()
+	if err != nil {
+		return err
+	}
+	result, err := s.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return fmt.Errorf("VM not found: %s", vmID)
+	}
+	return nil
 }

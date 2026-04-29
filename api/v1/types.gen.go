@@ -677,6 +677,9 @@ type VirtualMachine struct {
 	// Migratable True if the vm is migratable for MTV. False otherwise
 	Migratable *bool `json:"migratable,omitempty"`
 
+	// MigrationExcluded Whether this VM is excluded from migration
+	MigrationExcluded *bool `json:"migrationExcluded,omitempty"`
+
 	// Name VirtualMachine name
 	Name string `json:"name"`
 
@@ -770,6 +773,9 @@ type VirtualMachineDetail struct {
 	// Migratable Whether the VirtualMachine can be migrated (true if no critical issues)
 	Migratable *bool `json:"migratable,omitempty"`
 
+	// MigrationExcluded Whether this VM is excluded from migration
+	MigrationExcluded *bool `json:"migrationExcluded,omitempty"`
+
 	// Name Display name of the VirtualMachine
 	Name string `json:"name"`
 
@@ -810,6 +816,12 @@ type VirtualMachineListResponse struct {
 	// Total Total number of VMs matching the filter
 	Total int              `json:"total"`
 	Vms   []VirtualMachine `json:"vms"`
+}
+
+// VirtualMachineUpdateRequest defines model for VirtualMachineUpdateRequest.
+type VirtualMachineUpdateRequest struct {
+	// MigrationExcluded Whether to exclude this VM from migration
+	MigrationExcluded *bool `binding:"omitempty" json:"migrationExcluded,omitempty"`
 }
 
 // VmInspectionConcern Represents the structure of vm-migration-detective library inspection concerns
@@ -998,3 +1010,6 @@ type PutInspectorVddkMultipartRequestBody PutInspectorVddkMultipartBody
 
 // TriggerRightsizingCollectionJSONRequestBody defines body for TriggerRightsizingCollection for application/json ContentType.
 type TriggerRightsizingCollectionJSONRequestBody = RightsizingCollectRequest
+
+// UpdateVMJSONRequestBody defines body for UpdateVM for application/json ContentType.
+type UpdateVMJSONRequestBody = VirtualMachineUpdateRequest

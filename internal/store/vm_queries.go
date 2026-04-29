@@ -86,6 +86,7 @@ SELECT
     COALESCE(i."Provisioned MiB", 0) AS "ProvisionedMiB",
     COALESCE(i."Resource pool", '') AS "ResourcePool",
     COALESCE(i."OsDiskComplexity", 0) AS "OsDiskComplexity",
+    COALESCE(i."migration_excluded", false) AS "MigrationExcluded",
     COALESCE(c."Hot Add", false) AS "CpuHotAddEnabled",
     COALESCE(c."Hot Remove", false) AS "CpuHotRemoveEnabled",
     COALESCE(c."Sockets", 0) AS "CpuSockets",
@@ -148,6 +149,7 @@ var vmOutputQuery = sq.Select(
 	`COALESCE(i.error, '') AS error`,
 	`COALESCE((SELECT COUNT(*)::BIGINT FROM vm_inspection_concerns ic WHERE ic."VM ID" = v."VM ID" AND ic.inspection_id = (SELECT MAX(inspection_id) FROM vm_inspection_concerns imx WHERE imx."VM ID" = v."VM ID")), 0) AS inspection_concern_count`,
 	`COALESCE(t.tags, [])::VARCHAR[] AS tags`,
+	`v."migration_excluded" AS migration_excluded`,
 ).From("vinfo v").
 	LeftJoin(`(SELECT "VM_ID", COUNT(*) AS issues_count FROM concerns GROUP BY "VM_ID") c ON v."VM ID" = c."VM_ID"`).
 	LeftJoin(`(SELECT "VM_ID", COUNT(*) AS critical_count FROM concerns WHERE "Category" = 'Critical' GROUP BY "VM_ID") crit ON v."VM ID" = crit."VM_ID"`).
