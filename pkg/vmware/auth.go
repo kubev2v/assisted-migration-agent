@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/vmware/govmomi"
@@ -68,9 +69,7 @@ func VerifyCredentials(ctx context.Context, creds *models.Credentials, resourceN
 	if err != nil {
 		return err
 	}
-	if u.Path == "" || u.Path == "/" {
-		u.Path = "/sdk"
-	}
+
 	u.User = url.UserPassword(creds.Username, creds.Password)
 
 	verifyCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -96,4 +95,20 @@ func VerifyCredentials(ctx context.Context, creds *models.Credentials, resourceN
 
 	zap.S().Named(resourceName).Info("vCenter credentials verified successfully")
 	return nil
+}
+
+func EnsureSdkSuffix(vUrl string) (string, error) {
+	u, err := url.Parse(vUrl)
+	if err != nil {
+		return "", err
+	}
+
+	path := strings.TrimRight(u.Path, "/")
+
+	if !strings.HasSuffix(path, "/sdk") {
+		path += "/sdk"
+	}
+
+	u.Path = path
+	return u.String(), nil
 }

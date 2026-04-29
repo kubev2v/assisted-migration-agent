@@ -126,6 +126,12 @@ func (i *InspectorService) Start(ctx context.Context, vmIDs []string) error {
 }
 
 func (i *InspectorService) Credentials(ctx context.Context, credentials models.Credentials) error {
+	url, err := vmware.EnsureSdkSuffix(credentials.URL)
+	if err != nil {
+		return err
+	}
+	credentials.URL = url
+
 	if err := vmware.VerifyCredentials(ctx, &credentials, "inspector"); err != nil {
 		return srvErrors.NewVCenterError(err)
 	}

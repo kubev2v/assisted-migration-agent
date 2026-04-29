@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"github.com/kubev2v/assisted-migration-agent/pkg/vmware"
 	"sync"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
@@ -64,6 +65,12 @@ func (c *CollectorService) Start(ctx context.Context, creds models.Credentials) 
 	if err == nil && inv != nil {
 		return nil
 	}
+
+	url, err := vmware.EnsureSdkSuffix(creds.URL)
+	if err != nil {
+		return err
+	}
+	creds.URL = url
 
 	srv := work.NewService(models.CollectorStatus{State: models.CollectorStateConnecting}, c.buildFn(creds))
 	if err := srv.Start(); err != nil {
