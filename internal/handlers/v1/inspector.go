@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -105,8 +107,14 @@ func (h *Handler) PutInspectorCredentials(c *gin.Context) {
 		return
 	}
 
+	u, err := ensureSDKPath(req.Url)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid URL"})
+		return
+	}
+
 	creds := models.Credentials{
-		URL:      req.Url,
+		URL:      u,
 		Username: req.Username,
 		Password: req.Password,
 	}
@@ -184,4 +192,17 @@ func (h *Handler) GetInspectorVddkStatus(c *gin.Context) {
 		Version: s.Version,
 		Md5:     s.Md5,
 	})
+}
+
+func ensureSDKPath(raw string) (string, error) {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "", err
+	}
+
+	if !strings.HasSuffix(u.Path, "/sdk") {
+		u.Path = strings.TrimRight(u.Path, "/") + "/sdk"
+	}
+
+	return u.String(), nil
 }
