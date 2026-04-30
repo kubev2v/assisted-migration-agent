@@ -78,6 +78,7 @@ type Handler struct {
 	vmSrv          VMService
 	groupSrv       GroupService
 	rightsizingSrv RightsizingService
+	forecasterSrv  ForecasterService
 }
 
 func NewHandler(cfg config.Configuration) *Handler {
@@ -121,5 +122,10 @@ func (h *Handler) WithGroupService(srv GroupService) *Handler {
 
 func (h *Handler) WithRightsizingService(srv RightsizingService) *Handler {
 	h.rightsizingSrv = srv
+	return h
+}
+
+func (h *Handler) WithForecasterService(srv ForecasterService) *Handler {
+	h.forecasterSrv = srv
 	return h
 }

@@ -80,6 +80,29 @@ bin/agent run \
 
 ## Development
 
+### Local Setup
+
+Before running the agent locally, set up the required dependencies:
+
+```bash
+# Download OPA policies (required for VM validation)
+make setup-opa-policies
+
+# Build the Alpine filler image (required for forecaster benchmarks)
+# Prerequisites: qemu-img, curl, guestfish, genisoimage
+make build-filler-image
+```
+
+When running locally, point the agent to the filler image assets:
+
+```bash
+AGENT_ASSETS_DIR=pkg/vmware/assets make run
+```
+
+> Both of these are handled automatically during container builds (see Containerfile).
+
+### Tests
+
 Run tests:
 
 ```bash

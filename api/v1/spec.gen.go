@@ -28,6 +28,36 @@ type ServerInterface interface {
 	// Start inventory collection
 	// (POST /collector)
 	StartCollector(c *gin.Context)
+	// Cancel benchmark
+	// (DELETE /forecaster)
+	StopForecaster(c *gin.Context)
+	// Poll forecaster status
+	// (GET /forecaster)
+	GetForecasterStatus(c *gin.Context)
+	// Start benchmark
+	// (POST /forecaster)
+	StartForecaster(c *gin.Context)
+	// Compute pair capabilities
+	// (POST /forecaster/capabilities)
+	PostForecasterPairCapabilities(c *gin.Context)
+	// Verify vCenter credentials and permissions
+	// (PUT /forecaster/credentials)
+	PutForecasterCredentials(c *gin.Context)
+	// List available datastores
+	// (POST /forecaster/datastores)
+	GetForecasterDatastores(c *gin.Context)
+	// Cancel a single pair
+	// (DELETE /forecaster/pairs/{name})
+	StopForecasterPair(c *gin.Context, name string)
+	// List benchmark runs
+	// (GET /forecaster/runs)
+	GetForecasterRuns(c *gin.Context, params GetForecasterRunsParams)
+	// Delete a benchmark run
+	// (DELETE /forecaster/runs/{id})
+	DeleteForecasterRun(c *gin.Context, id int64)
+	// Get throughput statistics
+	// (GET /forecaster/stats)
+	GetForecasterStats(c *gin.Context, params GetForecasterStatsParams)
 	// List all groups
 	// (GET /groups)
 	ListGroups(c *gin.Context, params ListGroupsParams)
@@ -162,6 +192,191 @@ func (siw *ServerInterfaceWrapper) StartCollector(c *gin.Context) {
 	}
 
 	siw.Handler.StartCollector(c)
+}
+
+// StopForecaster operation middleware
+func (siw *ServerInterfaceWrapper) StopForecaster(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.StopForecaster(c)
+}
+
+// GetForecasterStatus operation middleware
+func (siw *ServerInterfaceWrapper) GetForecasterStatus(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetForecasterStatus(c)
+}
+
+// StartForecaster operation middleware
+func (siw *ServerInterfaceWrapper) StartForecaster(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.StartForecaster(c)
+}
+
+// PostForecasterPairCapabilities operation middleware
+func (siw *ServerInterfaceWrapper) PostForecasterPairCapabilities(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.PostForecasterPairCapabilities(c)
+}
+
+// PutForecasterCredentials operation middleware
+func (siw *ServerInterfaceWrapper) PutForecasterCredentials(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.PutForecasterCredentials(c)
+}
+
+// GetForecasterDatastores operation middleware
+func (siw *ServerInterfaceWrapper) GetForecasterDatastores(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetForecasterDatastores(c)
+}
+
+// StopForecasterPair operation middleware
+func (siw *ServerInterfaceWrapper) StopForecasterPair(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "name" -------------
+	var name string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", c.Param("name"), &name, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter name: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.StopForecasterPair(c, name)
+}
+
+// GetForecasterRuns operation middleware
+func (siw *ServerInterfaceWrapper) GetForecasterRuns(c *gin.Context) {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetForecasterRunsParams
+
+	// ------------- Optional query parameter "pairName" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "pairName", c.Request.URL.Query(), &params.PairName)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter pairName: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetForecasterRuns(c, params)
+}
+
+// DeleteForecasterRun operation middleware
+func (siw *ServerInterfaceWrapper) DeleteForecasterRun(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id int64
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.DeleteForecasterRun(c, id)
+}
+
+// GetForecasterStats operation middleware
+func (siw *ServerInterfaceWrapper) GetForecasterStats(c *gin.Context) {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetForecasterStatsParams
+
+	// ------------- Required query parameter "pairName" -------------
+
+	if paramValue := c.Query("pairName"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandler(c, fmt.Errorf("Query argument pairName is required, but not found"), http.StatusBadRequest)
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "pairName", c.Request.URL.Query(), &params.PairName)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter pairName: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetForecasterStats(c, params)
 }
 
 // ListGroups operation middleware
@@ -668,6 +883,16 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.DELETE(options.BaseURL+"/collector", wrapper.StopCollector)
 	router.GET(options.BaseURL+"/collector", wrapper.GetCollectorStatus)
 	router.POST(options.BaseURL+"/collector", wrapper.StartCollector)
+	router.DELETE(options.BaseURL+"/forecaster", wrapper.StopForecaster)
+	router.GET(options.BaseURL+"/forecaster", wrapper.GetForecasterStatus)
+	router.POST(options.BaseURL+"/forecaster", wrapper.StartForecaster)
+	router.POST(options.BaseURL+"/forecaster/capabilities", wrapper.PostForecasterPairCapabilities)
+	router.PUT(options.BaseURL+"/forecaster/credentials", wrapper.PutForecasterCredentials)
+	router.POST(options.BaseURL+"/forecaster/datastores", wrapper.GetForecasterDatastores)
+	router.DELETE(options.BaseURL+"/forecaster/pairs/:name", wrapper.StopForecasterPair)
+	router.GET(options.BaseURL+"/forecaster/runs", wrapper.GetForecasterRuns)
+	router.DELETE(options.BaseURL+"/forecaster/runs/:id", wrapper.DeleteForecasterRun)
+	router.GET(options.BaseURL+"/forecaster/stats", wrapper.GetForecasterStats)
 	router.GET(options.BaseURL+"/groups", wrapper.ListGroups)
 	router.POST(options.BaseURL+"/groups", wrapper.CreateGroup)
 	router.DELETE(options.BaseURL+"/groups/:id", wrapper.DeleteGroup)

@@ -227,6 +227,88 @@ func IsInspectionLimitReachedError(err error) bool {
 	return errors.As(err, &e)
 }
 
+// InsufficientPrivilegesError indicates the user lacks required vSphere privileges.
+type InsufficientPrivilegesError struct {
+	Missing []string
+}
+
+func NewInsufficientPrivilegesError(missing []string) *InsufficientPrivilegesError {
+	return &InsufficientPrivilegesError{Missing: missing}
+}
+
+func (e *InsufficientPrivilegesError) Error() string {
+	return fmt.Sprintf("insufficient vSphere privileges, missing: %v", e.Missing)
+}
+
+func IsInsufficientPrivilegesError(err error) bool {
+	var e *InsufficientPrivilegesError
+	return errors.As(err, &e)
+}
+
+func GetInsufficientPrivilegesError(err error) *InsufficientPrivilegesError {
+	var e *InsufficientPrivilegesError
+	if errors.As(err, &e) {
+		return e
+	}
+	return nil
+}
+
+// ForecasterNotRunningError indicates the forecaster is not currently running.
+type ForecasterNotRunningError struct{}
+
+func NewForecasterNotRunningError() *ForecasterNotRunningError {
+	return &ForecasterNotRunningError{}
+}
+
+func (e *ForecasterNotRunningError) Error() string {
+	return "forecaster not running"
+}
+
+func IsForecasterNotRunningError(err error) bool {
+	var e *ForecasterNotRunningError
+	return errors.As(err, &e)
+}
+
+// ForecasterLimitReachedError indicates the per-run pair limit was exceeded.
+type ForecasterLimitReachedError struct {
+	Limit int
+}
+
+func NewForecasterLimitReachedError(limit int) *ForecasterLimitReachedError {
+	return &ForecasterLimitReachedError{Limit: limit}
+}
+
+func (e *ForecasterLimitReachedError) Error() string {
+	return fmt.Sprintf("forecaster pair limit reached (%d pairs per run)", e.Limit)
+}
+
+func IsForecasterLimitReachedError(err error) bool {
+	var e *ForecasterLimitReachedError
+	return errors.As(err, &e)
+}
+
+func NewForecasterInProgressError() *OperationInProgressError {
+	return NewOperationInProgressError("forecast")
+}
+
+// ValidationError indicates invalid input.
+type ValidationError struct {
+	Message string
+}
+
+func NewValidationError(msg string) *ValidationError {
+	return &ValidationError{Message: msg}
+}
+
+func (e *ValidationError) Error() string {
+	return e.Message
+}
+
+func IsValidationError(err error) bool {
+	var e *ValidationError
+	return errors.As(err, &e)
+}
+
 // CredentialsNotSetError indicates that required credentials were not set
 type CredentialsNotSetError struct{}
 

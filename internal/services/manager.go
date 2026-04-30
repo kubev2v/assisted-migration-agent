@@ -11,6 +11,7 @@ import (
 
 const (
 	maxVMsPerCycle = 10
+	maxPairsPerRun = 10
 )
 
 type ServiceManager struct {
@@ -21,6 +22,7 @@ type ServiceManager struct {
 	console     *Console
 	collector   *CollectorService
 	inspector   *InspectorService
+	forecaster  *ForecasterService
 	vddk        *VddkService
 	inventory   *InventoryService
 	event       *EventService
@@ -75,6 +77,8 @@ func (m *ServiceManager) Initialize() error {
 	m.collector = NewCollectorService(m.inventory, factory.Build)
 
 	m.inspector = NewInspectorService(m.store, maxVMsPerCycle, m.cfg.Agent.DataFolder)
+
+	m.forecaster = NewForecasterService(m.store, maxPairsPerRun)
 
 	m.vddk = NewVddkService(m.cfg.Agent.DataFolder, m.store)
 
@@ -135,9 +139,14 @@ func (m *ServiceManager) RightsizingService() *RightsizingService {
 	return m.rightsizing
 }
 
+func (m *ServiceManager) ForecasterService() *ForecasterService {
+	return m.forecaster
+}
+
 func (m *ServiceManager) Stop(ctx context.Context) {
 	m.console.Stop()
 	m.collector.Stop()
 	_ = m.inspector.Stop()
 	m.rightsizing.Stop()
+	_ = m.forecaster.Stop()
 }
