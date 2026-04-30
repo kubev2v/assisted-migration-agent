@@ -1,4 +1,4 @@
-.PHONY: generate generate.proto build build.e2e e2e e2e.container e2e.vm e2e.container.clean run container.run container.stop help tidy tidy-check clean lint format check-format check-generate validate-all image setup-opa-policies clean-opa-policies test test.fuzz
+.PHONY: generate generate.proto build build.e2e e2e e2e.container e2e.vm e2e.container.clean run container.run container.stop help tidy tidy-check clean lint format check-format check-generate validate-all image setup-opa-policies clean-opa-policies build-filler-image test test.fuzz
 
 PODMAN ?= podman
 PLANNER_AGENT_GIT_COMMIT ?= $(shell git rev-list -1 HEAD --abbrev-commit)
@@ -50,6 +50,7 @@ help:
 	@echo "    test.fuzz:       run fuzz tests (default 30s, override with FUZZ_TIME=1m)"
 	@echo "    setup-opa-policies: download OPA policies from Forklift project"
 	@echo "    clean-opa-policies: clean OPA policies directory"
+	@echo "    build-filler-image: build Alpine filler image for forecaster (requires qemu-img, guestfish)"
 
 # Build the application
 UI_GIT_COMMIT ?= unknown
@@ -319,6 +320,15 @@ clean-opa-policies:
 	@rm -rf $(OPA_POLICIES_FOLDER)
 	@echo "OPA policies cleaned."
 ##################### OPA Policies support end   ##########################
+
+##################### Forecaster filler image start ########################
+FILLER_ASSETS_DIR ?= $(CURDIR)/pkg/vmware/assets
+
+build-filler-image:
+	@echo "Building Alpine filler image for forecaster..."
+	@FILLER_OUTPUT_DIR="$(FILLER_ASSETS_DIR)" bash scripts/build-filler-image.sh
+	@echo "Filler image ready in $(FILLER_ASSETS_DIR)"
+##################### Forecaster filler image end   ########################
 
 ################################################################################
 # Emoji Legend for Makefile Targets

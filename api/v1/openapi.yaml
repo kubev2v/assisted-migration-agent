@@ -594,6 +594,242 @@ paths:
         '500':
           description: Internal server error
 
+  /forecaster:
+    post:
+      summary: Start benchmark
+      operationId: startForecaster
+      description: Starts async benchmarking for one or more datastore pairs. Credentials can be passed inline or omitted if previously provided in an earlier request.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForecasterStartRequest'
+      responses:
+        '202':
+          description: Benchmark started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForecasterStatus'
+        '400':
+          description: Invalid credentials, validation error, or pair limit exceeded
+        '409':
+          description: Another benchmark is already running
+        '500':
+          description: Internal server error
+    get:
+      summary: Poll forecaster status
+      operationId: getForecasterStatus
+      description: Returns current service state with per-pair progress details.
+      responses:
+        '200':
+          description: Current forecaster status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForecasterStatus'
+    delete:
+      summary: Cancel benchmark
+      operationId: stopForecaster
+      description: Stops the running benchmark. Already-completed runs are preserved in the database.
+      responses:
+        '202':
+          description: Benchmark canceled, service returned to ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForecasterStatus'
+        '404':
+          description: No benchmark is running
+        '500':
+          description: Internal server error
+
+  /forecaster/pairs/{name}:
+    delete:
+      summary: Cancel a single pair
+      operationId: stopForecasterPair
+      description: Cancels the benchmark for a specific pair by name. The forecaster continues running if other pairs are still active.
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Pair name as specified in the start request
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Pair canceled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pairName:
+                    type: string
+                  state:
+                    type: string
+                    enum: [canceled]
+        '404':
+          description: No benchmark running, or pair not found / already finished
+        '500':
+          description: Internal server error
+
+  /forecaster/credentials:
+    put:
+      summary: Verify vCenter credentials and permissions
+      operationId: putForecasterCredentials
+      description: >-
+        Validates vCenter connectivity and verifies the user has the required
+        vSphere privileges for forecaster operations (datastore file management,
+        VM provisioning, disk cloning). Verification only — credentials are not saved.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VcenterCredentials'
+      responses:
+        '200':
+          description: Credentials valid and all required privileges are granted
+        '400':
+          description: Invalid credentials or unreachable vCenter
+        '403':
+          description: Authentication succeeded but user lacks required privileges
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "insufficient vSphere privileges, missing: [Datastore.AllocateSpace VirtualMachine.Inventory.Create]"
+                  missingPrivileges:
+                    type: array
+                    items:
+                      type: string
+                    example: ["Datastore.AllocateSpace", "VirtualMachine.Inventory.Create"]
+        '500':
+          description: Internal server error
+
+  /forecaster/datastores:
+    post:
+      summary: List available datastores
+      operationId: getForecasterDatastores
+      description: Returns datastores from the forklift-collected inventory with storage vendor and capability information derived from NAA device identifiers. No vSphere credentials are required.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForecasterDatastoresRequest'
+      responses:
+        '200':
+          description: List of datastores
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DatastoreDetail'
+        '500':
+          description: Internal server error
+
+  /forecaster/capabilities:
+    post:
+      summary: Compute pair capabilities
+      operationId: postForecasterPairCapabilities
+      description: Computes which offload methods are feasible for specific source-target datastore pairs based on vendor support and storage array topology derived from the forklift-collected inventory. No vSphere credentials are required.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PairCapabilityRequest'
+      responses:
+        '200':
+          description: Capabilities per pair
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PairCapability'
+        '400':
+          description: Datastore not found
+        '500':
+          description: Internal server error
+
+  /forecaster/runs:
+    get:
+      summary: List benchmark runs
+      operationId: getForecasterRuns
+      description: Returns individual benchmark iterations. Optionally filtered by pair name.
+      parameters:
+        - name: pairName
+          in: query
+          required: false
+          description: Filter runs by pair name
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of benchmark runs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BenchmarkRun'
+        '500':
+          description: Internal server error
+
+  /forecaster/runs/{id}:
+    delete:
+      summary: Delete a benchmark run
+      operationId: deleteForecasterRun
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Run ID
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Run deleted
+        '400':
+          description: Invalid run ID
+        '404':
+          description: Run not found
+        '500':
+          description: Internal server error
+
+  /forecaster/stats:
+    get:
+      summary: Get throughput statistics
+      operationId: getForecasterStats
+      description: Returns computed statistics for a datastore pair's benchmark results. Primary endpoint for the UI to display migration time estimates.
+      parameters:
+        - name: pairName
+          in: query
+          required: true
+          description: Pair name to get statistics for
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Throughput statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForecastStats'
+        '400':
+          description: Missing pairName parameter
+        '500':
+          description: Internal server error
+
 components:
   schemas:
     VddkProperties:
@@ -1495,3 +1731,311 @@ components:
           type: number
           format: double
           description: Data confidence — sample_count / expected_sample_count × 100
+
+    # --- Forecaster schemas ---
+
+    ForecasterStartRequest:
+      type: object
+      required:
+        - pairs
+      properties:
+        credentials:
+          description: vCenter credentials. Optional if previously provided in an earlier request.
+          $ref: '#/components/schemas/VcenterCredentials'
+        pairs:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/DatastorePair'
+        diskSizeGb:
+          type: integer
+          description: Disk size in GB for benchmark (default 10)
+        iterations:
+          type: integer
+          description: Number of benchmark iterations per pair (default 5)
+        concurrency:
+          type: integer
+          description: Max parallel pairs (default 1, sequential)
+
+    DatastorePair:
+      type: object
+      required:
+        - name
+        - sourceDatastore
+        - targetDatastore
+      properties:
+        name:
+          type: string
+          description: User-defined name for this pair
+        sourceDatastore:
+          type: string
+          description: Source datastore name
+        targetDatastore:
+          type: string
+          description: Target datastore name
+        host:
+          type: string
+          description: Optional ESXi host name to pin the benchmark to. If omitted, a host common to both datastores is selected automatically.
+
+    ForecasterStatus:
+      type: object
+      required:
+        - state
+      properties:
+        state:
+          type: string
+          enum:
+            - ready
+            - running
+          x-enum-varnames:
+            - ForecasterStatusStateReady
+            - ForecasterStatusStateRunning
+          description: Service-level state. Only two states exist — ready (idle) or running (benchmark in progress). When a benchmark finishes or is canceled, the service returns to ready.
+        pairs:
+          type: array
+          items:
+            $ref: '#/components/schemas/ForecasterPairStatus'
+          description: Per-pair progress (present only when running)
+
+    ForecasterPairStatus:
+      type: object
+      required:
+        - pairName
+        - sourceDatastore
+        - targetDatastore
+        - state
+        - completedRuns
+        - totalRuns
+      properties:
+        pairName:
+          type: string
+        sourceDatastore:
+          type: string
+        targetDatastore:
+          type: string
+        host:
+          type: string
+          description: ESXi host used for the benchmark (user-specified or auto-selected)
+        state:
+          type: string
+          enum:
+            - pending
+            - preparing
+            - running
+            - completed
+            - error
+            - canceled
+          x-enum-varnames:
+            - ForecasterPairStatusStatePending
+            - ForecasterPairStatusStatePreparing
+            - ForecasterPairStatusStateRunning
+            - ForecasterPairStatusStateCompleted
+            - ForecasterPairStatusStateError
+            - ForecasterPairStatusStateCanceled
+          description: Per-pair state within a benchmark run
+        error:
+          type: string
+          description: Error message when pair state is error
+        completedRuns:
+          type: integer
+          description: Number of completed iterations
+        totalRuns:
+          type: integer
+          description: Total iterations planned
+        prepBytesTotal:
+          type: integer
+          format: int64
+          description: Total bytes to upload during preparation (present during preparing state)
+        prepBytesUploaded:
+          type: integer
+          format: int64
+          description: Bytes uploaded so far during preparation
+
+    BenchmarkRun:
+      type: object
+      required:
+        - id
+        - sessionId
+        - pairName
+        - sourceDatastore
+        - targetDatastore
+        - iteration
+        - diskSizeGb
+        - durationSec
+        - throughputMbps
+        - createdAt
+      properties:
+        id:
+          type: integer
+          format: int64
+        sessionId:
+          type: integer
+          format: int64
+        pairName:
+          type: string
+        sourceDatastore:
+          type: string
+        targetDatastore:
+          type: string
+        iteration:
+          type: integer
+        diskSizeGb:
+          type: integer
+        prepDurationSec:
+          type: number
+          format: double
+          description: Time spent on disk creation and random fill (iteration 1 only)
+        durationSec:
+          type: number
+          format: double
+        throughputMbps:
+          type: number
+          format: double
+        method:
+          type: string
+          description: Benchmark method used (e.g., vm_native)
+        error:
+          type: string
+          description: Error message if this iteration failed
+        createdAt:
+          type: string
+          format: date-time
+
+    ForecastStats:
+      type: object
+      required:
+        - pairName
+        - sampleCount
+      properties:
+        pairName:
+          type: string
+        sampleCount:
+          type: integer
+        meanMbps:
+          type: number
+          format: double
+        medianMbps:
+          type: number
+          format: double
+        minMbps:
+          type: number
+          format: double
+        maxMbps:
+          type: number
+          format: double
+        stddevMbps:
+          type: number
+          format: double
+        ci95LowerMbps:
+          type: number
+          format: double
+          description: Lower bound of 95% confidence interval
+        ci95UpperMbps:
+          type: number
+          format: double
+          description: Upper bound of 95% confidence interval
+        estimatePer1TB:
+          $ref: '#/components/schemas/EstimateRange'
+
+    EstimateRange:
+      type: object
+      description: Time estimates for migrating 1TB of data
+      properties:
+        bestCase:
+          type: string
+          description: Duration string (e.g., "25m40s")
+        expected:
+          type: string
+          description: Duration string (e.g., "26m49s")
+        worstCase:
+          type: string
+          description: Duration string (e.g., "29m12s")
+
+    ForecasterDatastoresRequest:
+      type: object
+      properties:
+        credentials:
+          description: vCenter credentials. Optional if previously provided in an earlier request.
+          $ref: '#/components/schemas/VcenterCredentials'
+
+    DatastoreDetail:
+      type: object
+      required:
+        - name
+        - type
+        - capacityGb
+        - freeGb
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          description: Datastore type (VMFS, NFS, VVol, OTHER)
+        capacityGb:
+          type: number
+          format: double
+        freeGb:
+          type: number
+          format: double
+        storageVendor:
+          type: string
+          description: SCSI vendor string (e.g., NETAPP, PURE, DGC)
+        storageModel:
+          type: string
+        storageArrayId:
+          type: string
+          description: Derived from NAA device ID prefix. Same value means same physical storage array. Absent for NFS and local datastores.
+        naaDevices:
+          type: array
+          items:
+            type: string
+          description: NAA device identifiers for the datastore's backing LUNs
+        capabilities:
+          type: array
+          items:
+            type: string
+            enum:
+              - copy-offload
+              - xcopy
+              - rdm
+              - vvol
+          description: Intrinsic offload capabilities of this datastore based on vendor support
+
+    PairCapabilityRequest:
+      type: object
+      required:
+        - pairs
+      properties:
+        credentials:
+          description: vCenter credentials. Optional if previously provided in an earlier request.
+          $ref: '#/components/schemas/VcenterCredentials'
+        pairs:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/DatastorePair'
+
+    PairCapability:
+      type: object
+      required:
+        - pairName
+        - sourceDatastore
+        - targetDatastore
+        - capabilities
+      properties:
+        pairName:
+          type: string
+        sourceDatastore:
+          type: string
+        targetDatastore:
+          type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+            enum:
+              - copy-offload
+              - xcopy
+              - rdm
+              - vvol
+          description: Feasible offload methods for this source-target pair

@@ -31,6 +31,17 @@ go.work.sum
 .env
 bin/
 
+# Forecaster demo/test logs and credentials
+forecaster-demo-*.log
+.vcenter-creds
+
+# Forecaster filler image assets (built by scripts/build-filler-image.sh)
+pkg/vmware/assets/alpine-filler.raw.gz
+pkg/vmware/assets/seed.iso.gz
+
+# OPA policies (downloaded by make setup-opa-policies)
+policies/
+
 # Editor/IDE
 # .idea/
 # .vscode/

@@ -68,7 +68,24 @@ RUN mkdir -p /app/policies /app/forklift && \
 
 
 # =============================================================================
-# Stage 5: Download DuckDB extensions (for air-gapped environments)
+# Stage 5: Build Alpine filler image for forecaster benchmarks
+# =============================================================================
+FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/ubi AS filler-builder
+
+RUN echo -e '[centos-stream-baseos]\nname=CentOS Stream 9 - BaseOS\nbaseurl=https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/\ngpgcheck=0\nenabled=1' > /etc/yum.repos.d/centos-stream-baseos.repo && \
+    echo -e '[centos-stream-appstream]\nname=CentOS Stream 9 - AppStream\nbaseurl=https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/\ngpgcheck=0\nenabled=1' > /etc/yum.repos.d/centos-stream-appstream.repo
+
+RUN dnf install -y --allowerasing qemu-img libguestfs-tools genisoimage && \
+    dnf clean all
+
+ENV LIBGUESTFS_BACKEND=direct
+
+COPY scripts/build-filler-image.sh /tmp/
+RUN FILLER_OUTPUT_DIR=/tmp/filler-assets SKIP_BOOT_TEST=1 bash /tmp/build-filler-image.sh
+
+
+# =============================================================================
+# Stage 6: Download DuckDB extensions (for air-gapped environments)
 # =============================================================================
 FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/ubi-minimal AS duckdb-extensions
 
@@ -83,7 +100,7 @@ RUN wget -q "https://extensions.duckdb.org/${DUCKDB_VERSION}/linux_amd64/sqlite_
     gunzip sqlite_scanner.duckdb_extension.gz
 
 # =============================================================================
-# Stage 6: Final runtime image
+# Stage 7: Final runtime image
 # =============================================================================
 FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/ubi
 
@@ -108,6 +125,10 @@ WORKDIR /app
 # Copy the binary from backend builder
 COPY --from=backend-builder /tmp/agent /app/agent
 
+# Copy filler image assets (Alpine boot image + seed ISO for forecaster)
+COPY --from=filler-builder /tmp/filler-assets/alpine-filler.raw.gz /app/assets/
+COPY --from=filler-builder /tmp/filler-assets/seed.iso.gz /app/assets/
+
 # Copy UI static files from ui builder
 COPY --from=ui-builder /apps/agent-ui/dist /app/static
 
@@ -119,7 +140,7 @@ COPY --from=duckdb-extensions /extensions /app/extensions
 
 # Create data directory (mounted via AGENT_DATA_FOLDER)
 RUN mkdir -p /var/lib/agent /app/.cache/libvirt && \
-    chown -R 1001:0 /app/static /app/policies /app/extensions /var/lib/agent /app/.cache/libvirt
+    chown -R 1001:0 /app/static /app/policies /app/extensions /app/assets /var/lib/agent /app/.cache/libvirt
 
 ENV LIBGUESTFS_BACKEND=direct
 

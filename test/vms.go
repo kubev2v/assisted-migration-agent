@@ -92,14 +92,15 @@ type Memory struct {
 }
 
 type Datastore struct {
-	Name        string
-	Hosts       string
-	Address     string
-	ObjectID    string
-	FreeMiB     int64
-	MHA         bool
-	CapacityMiB int64
-	Type        string
+	Name           string
+	Hosts          string
+	Address        string
+	ObjectID       string
+	FreeMiB        int64
+	MHA            bool
+	CapacityMiB    int64
+	Type           string
+	BackingDevices string // JSON array of NAA device IDs, e.g. '["naa.600a..."]'
 }
 
 type Inspection struct {
@@ -115,7 +116,7 @@ var Memories = []Memory{
 }
 
 var Datastores = []Datastore{
-	{"datastore1", "esxi-01.local", "10.0.0.1", "datastore-001", 524288, false, 1048576, "VMFS"},
+	{"datastore1", "esxi-01.local", "10.0.0.1", "datastore-001", 524288, false, 1048576, "VMFS", `["naa.600a098038313954492458313031344c"]`},
 }
 
 var Inspections = []Inspection{
@@ -212,9 +213,9 @@ func InsertVMMemory(ctx context.Context, db *sql.DB) error {
 func InsertVMDatastores(ctx context.Context, db *sql.DB) error {
 	for _, ds := range Datastores {
 		_, err := db.ExecContext(ctx, `
-			INSERT INTO vdatastore ("Name", "Hosts", "Address", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type")
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-		`, ds.Name, ds.Hosts, ds.Address, ds.ObjectID, ds.FreeMiB, ds.MHA, ds.CapacityMiB, ds.Type)
+			INSERT INTO vdatastore ("Name", "Hosts", "Address", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type", "Backing Devices")
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, ds.Name, ds.Hosts, ds.Address, ds.ObjectID, ds.FreeMiB, ds.MHA, ds.CapacityMiB, ds.Type, ds.BackingDevices)
 		if err != nil {
 			return err
 		}

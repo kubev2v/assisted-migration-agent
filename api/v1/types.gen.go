@@ -37,6 +37,30 @@ const (
 	CollectorStatusStatusReady      CollectorStatusStatus = "ready"
 )
 
+// Defines values for DatastoreDetailCapabilities.
+const (
+	DatastoreDetailCapabilitiesCopyOffload DatastoreDetailCapabilities = "copy-offload"
+	DatastoreDetailCapabilitiesRdm         DatastoreDetailCapabilities = "rdm"
+	DatastoreDetailCapabilitiesVvol        DatastoreDetailCapabilities = "vvol"
+	DatastoreDetailCapabilitiesXcopy       DatastoreDetailCapabilities = "xcopy"
+)
+
+// Defines values for ForecasterPairStatusState.
+const (
+	ForecasterPairStatusStateCanceled  ForecasterPairStatusState = "canceled"
+	ForecasterPairStatusStateCompleted ForecasterPairStatusState = "completed"
+	ForecasterPairStatusStateError     ForecasterPairStatusState = "error"
+	ForecasterPairStatusStatePending   ForecasterPairStatusState = "pending"
+	ForecasterPairStatusStatePreparing ForecasterPairStatusState = "preparing"
+	ForecasterPairStatusStateRunning   ForecasterPairStatusState = "running"
+)
+
+// Defines values for ForecasterStatusState.
+const (
+	ForecasterStatusStateReady   ForecasterStatusState = "ready"
+	ForecasterStatusStateRunning ForecasterStatusState = "running"
+)
+
 // Defines values for InspectorStatusState.
 const (
 	InspectorStatusStateCanceled   InspectorStatusState = "canceled"
@@ -45,6 +69,14 @@ const (
 	InspectorStatusStateInitiating InspectorStatusState = "Initiating"
 	InspectorStatusStateReady      InspectorStatusState = "ready"
 	InspectorStatusStateRunning    InspectorStatusState = "running"
+)
+
+// Defines values for PairCapabilityCapabilities.
+const (
+	PairCapabilityCapabilitiesCopyOffload PairCapabilityCapabilities = "copy-offload"
+	PairCapabilityCapabilitiesRdm         PairCapabilityCapabilities = "rdm"
+	PairCapabilityCapabilitiesVvol        PairCapabilityCapabilities = "vvol"
+	PairCapabilityCapabilitiesXcopy       PairCapabilityCapabilities = "xcopy"
 )
 
 // Defines values for VMIssueCategory.
@@ -92,6 +124,29 @@ type AgentStatusConsoleConnection string
 // AgentStatusMode Target mode for the agent
 type AgentStatusMode string
 
+// BenchmarkRun defines model for BenchmarkRun.
+type BenchmarkRun struct {
+	CreatedAt   time.Time `json:"createdAt"`
+	DiskSizeGb  int       `json:"diskSizeGb"`
+	DurationSec float64   `json:"durationSec"`
+
+	// Error Error message if this iteration failed
+	Error     *string `json:"error,omitempty"`
+	Id        int64   `json:"id"`
+	Iteration int     `json:"iteration"`
+
+	// Method Benchmark method used (e.g., vm_native)
+	Method   *string `json:"method,omitempty"`
+	PairName string  `json:"pairName"`
+
+	// PrepDurationSec Time spent on disk creation and random fill (iteration 1 only)
+	PrepDurationSec *float64 `json:"prepDurationSec,omitempty"`
+	SessionId       int64    `json:"sessionId"`
+	SourceDatastore string   `json:"sourceDatastore"`
+	TargetDatastore string   `json:"targetDatastore"`
+	ThroughputMbps  float64  `json:"throughputMbps"`
+}
+
 // CollectorStartRequest defines model for CollectorStartRequest.
 type CollectorStartRequest = VcenterCredentials
 
@@ -119,6 +174,138 @@ type CreateGroupRequest struct {
 	// Tags Tags to apply to matching VMs (only alphanumeric, underscore, and dot allowed)
 	Tags *[]string `binding:"omitempty,dive,tag_format" json:"tags,omitempty"`
 }
+
+// DatastoreDetail defines model for DatastoreDetail.
+type DatastoreDetail struct {
+	// Capabilities Intrinsic offload capabilities of this datastore based on vendor support
+	Capabilities *[]DatastoreDetailCapabilities `json:"capabilities,omitempty"`
+	CapacityGb   float64                        `json:"capacityGb"`
+	FreeGb       float64                        `json:"freeGb"`
+
+	// NaaDevices NAA device identifiers for the datastore's backing LUNs
+	NaaDevices *[]string `json:"naaDevices,omitempty"`
+	Name       string    `json:"name"`
+
+	// StorageArrayId Derived from NAA device ID prefix. Same value means same physical storage array. Absent for NFS and local datastores.
+	StorageArrayId *string `json:"storageArrayId,omitempty"`
+	StorageModel   *string `json:"storageModel,omitempty"`
+
+	// StorageVendor SCSI vendor string (e.g., NETAPP, PURE, DGC)
+	StorageVendor *string `json:"storageVendor,omitempty"`
+
+	// Type Datastore type (VMFS, NFS, VVol, OTHER)
+	Type string `json:"type"`
+}
+
+// DatastoreDetailCapabilities defines model for DatastoreDetail.Capabilities.
+type DatastoreDetailCapabilities string
+
+// DatastorePair defines model for DatastorePair.
+type DatastorePair struct {
+	// Host Optional ESXi host name to pin the benchmark to. If omitted, a host common to both datastores is selected automatically.
+	Host *string `json:"host,omitempty"`
+
+	// Name User-defined name for this pair
+	Name string `json:"name"`
+
+	// SourceDatastore Source datastore name
+	SourceDatastore string `json:"sourceDatastore"`
+
+	// TargetDatastore Target datastore name
+	TargetDatastore string `json:"targetDatastore"`
+}
+
+// EstimateRange Time estimates for migrating 1TB of data
+type EstimateRange struct {
+	// BestCase Duration string (e.g., "25m40s")
+	BestCase *string `json:"bestCase,omitempty"`
+
+	// Expected Duration string (e.g., "26m49s")
+	Expected *string `json:"expected,omitempty"`
+
+	// WorstCase Duration string (e.g., "29m12s")
+	WorstCase *string `json:"worstCase,omitempty"`
+}
+
+// ForecastStats defines model for ForecastStats.
+type ForecastStats struct {
+	// Ci95LowerMbps Lower bound of 95% confidence interval
+	Ci95LowerMbps *float64 `json:"ci95LowerMbps,omitempty"`
+
+	// Ci95UpperMbps Upper bound of 95% confidence interval
+	Ci95UpperMbps *float64 `json:"ci95UpperMbps,omitempty"`
+
+	// EstimatePer1TB Time estimates for migrating 1TB of data
+	EstimatePer1TB *EstimateRange `json:"estimatePer1TB,omitempty"`
+	MaxMbps        *float64       `json:"maxMbps,omitempty"`
+	MeanMbps       *float64       `json:"meanMbps,omitempty"`
+	MedianMbps     *float64       `json:"medianMbps,omitempty"`
+	MinMbps        *float64       `json:"minMbps,omitempty"`
+	PairName       string         `json:"pairName"`
+	SampleCount    int            `json:"sampleCount"`
+	StddevMbps     *float64       `json:"stddevMbps,omitempty"`
+}
+
+// ForecasterDatastoresRequest defines model for ForecasterDatastoresRequest.
+type ForecasterDatastoresRequest struct {
+	Credentials *VcenterCredentials `json:"credentials,omitempty"`
+}
+
+// ForecasterPairStatus defines model for ForecasterPairStatus.
+type ForecasterPairStatus struct {
+	// CompletedRuns Number of completed iterations
+	CompletedRuns int `json:"completedRuns"`
+
+	// Error Error message when pair state is error
+	Error *string `json:"error,omitempty"`
+
+	// Host ESXi host used for the benchmark (user-specified or auto-selected)
+	Host     *string `json:"host,omitempty"`
+	PairName string  `json:"pairName"`
+
+	// PrepBytesTotal Total bytes to upload during preparation (present during preparing state)
+	PrepBytesTotal *int64 `json:"prepBytesTotal,omitempty"`
+
+	// PrepBytesUploaded Bytes uploaded so far during preparation
+	PrepBytesUploaded *int64 `json:"prepBytesUploaded,omitempty"`
+	SourceDatastore   string `json:"sourceDatastore"`
+
+	// State Per-pair state within a benchmark run
+	State           ForecasterPairStatusState `json:"state"`
+	TargetDatastore string                    `json:"targetDatastore"`
+
+	// TotalRuns Total iterations planned
+	TotalRuns int `json:"totalRuns"`
+}
+
+// ForecasterPairStatusState Per-pair state within a benchmark run
+type ForecasterPairStatusState string
+
+// ForecasterStartRequest defines model for ForecasterStartRequest.
+type ForecasterStartRequest struct {
+	// Concurrency Max parallel pairs (default 1, sequential)
+	Concurrency *int                `json:"concurrency,omitempty"`
+	Credentials *VcenterCredentials `json:"credentials,omitempty"`
+
+	// DiskSizeGb Disk size in GB for benchmark (default 10)
+	DiskSizeGb *int `json:"diskSizeGb,omitempty"`
+
+	// Iterations Number of benchmark iterations per pair (default 5)
+	Iterations *int            `json:"iterations,omitempty"`
+	Pairs      []DatastorePair `json:"pairs"`
+}
+
+// ForecasterStatus defines model for ForecasterStatus.
+type ForecasterStatus struct {
+	// Pairs Per-pair progress (present only when running)
+	Pairs *[]ForecasterPairStatus `json:"pairs,omitempty"`
+
+	// State Service-level state. Only two states exist — ready (idle) or running (benchmark in progress). When a benchmark finishes or is canceled, the service returns to ready.
+	State ForecasterStatusState `json:"state"`
+}
+
+// ForecasterStatusState Service-level state. Only two states exist — ready (idle) or running (benchmark in progress). When a benchmark finishes or is canceled, the service returns to ready.
+type ForecasterStatusState string
 
 // Group defines model for Group.
 type Group struct {
@@ -205,6 +392,24 @@ type InspectorStatus struct {
 
 // InspectorStatusState Inspector state
 type InspectorStatusState string
+
+// PairCapability defines model for PairCapability.
+type PairCapability struct {
+	// Capabilities Feasible offload methods for this source-target pair
+	Capabilities    []PairCapabilityCapabilities `json:"capabilities"`
+	PairName        string                       `json:"pairName"`
+	SourceDatastore string                       `json:"sourceDatastore"`
+	TargetDatastore string                       `json:"targetDatastore"`
+}
+
+// PairCapabilityCapabilities defines model for PairCapability.Capabilities.
+type PairCapabilityCapabilities string
+
+// PairCapabilityRequest defines model for PairCapabilityRequest.
+type PairCapabilityRequest struct {
+	Credentials *VcenterCredentials `json:"credentials,omitempty"`
+	Pairs       []DatastorePair     `json:"pairs"`
+}
 
 // RightsizingCollectRequest defines model for RightsizingCollectRequest.
 type RightsizingCollectRequest struct {
@@ -614,6 +819,18 @@ type VmUtilizationDetails struct {
 	VmName    string  `json:"vm_name"`
 }
 
+// GetForecasterRunsParams defines parameters for GetForecasterRuns.
+type GetForecasterRunsParams struct {
+	// PairName Filter runs by pair name
+	PairName *string `form:"pairName,omitempty" json:"pairName,omitempty"`
+}
+
+// GetForecasterStatsParams defines parameters for GetForecasterStats.
+type GetForecasterStatsParams struct {
+	// PairName Pair name to get statistics for
+	PairName string `form:"pairName" json:"pairName"`
+}
+
 // ListGroupsParams defines parameters for ListGroups.
 type ListGroupsParams struct {
 	// ByName Filter groups by name (case-insensitive substring match)
@@ -687,6 +904,18 @@ type SetAgentModeJSONRequestBody = AgentModeRequest
 
 // StartCollectorJSONRequestBody defines body for StartCollector for application/json ContentType.
 type StartCollectorJSONRequestBody = CollectorStartRequest
+
+// StartForecasterJSONRequestBody defines body for StartForecaster for application/json ContentType.
+type StartForecasterJSONRequestBody = ForecasterStartRequest
+
+// PostForecasterPairCapabilitiesJSONRequestBody defines body for PostForecasterPairCapabilities for application/json ContentType.
+type PostForecasterPairCapabilitiesJSONRequestBody = PairCapabilityRequest
+
+// PutForecasterCredentialsJSONRequestBody defines body for PutForecasterCredentials for application/json ContentType.
+type PutForecasterCredentialsJSONRequestBody = VcenterCredentials
+
+// GetForecasterDatastoresJSONRequestBody defines body for GetForecasterDatastores for application/json ContentType.
+type GetForecasterDatastoresJSONRequestBody = ForecasterDatastoresRequest
 
 // CreateGroupJSONRequestBody defines body for CreateGroup for application/json ContentType.
 type CreateGroupJSONRequestBody = CreateGroupRequest
