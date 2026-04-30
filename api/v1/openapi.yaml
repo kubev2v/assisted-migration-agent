@@ -211,6 +211,29 @@ paths:
         '500':
           description: Internal server error
 
+  /vms/{id}/utilization:
+    get:
+      summary: Get utilization breakdown for a specific VM
+      operationId: getVMUtilization
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: VirtualMachine MoRef ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: VM utilization details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VmUtilizationDetails'
+        '404':
+          description: No utilization data found for this VM
+        '500':
+          description: Internal server error
+
   /inspector:
     get:
       summary: Get inspector status
@@ -514,6 +537,63 @@ paths:
         '500':
           description: Internal server error
 
+  /rightsizing:
+    post:
+      summary: Trigger rightsizing metrics collection
+      operationId: triggerRightsizingCollection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RightsizingCollectRequest'
+      responses:
+        '202':
+          description: Collection triggered; returns report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RightsizingReportSummary'
+        '400':
+          description: Invalid request
+        '500':
+          description: Internal server error
+    get:
+      summary: List all rightsizing reports
+      operationId: listRightsizingReports
+      responses:
+        '200':
+          description: List of rightsizing reports
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RightsizingReportListResponse'
+        '500':
+          description: Internal server error
+
+  /rightsizing/{id}:
+    get:
+      summary: Get a specific rightsizing report with full VM metrics
+      operationId: getRightsizingReport
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Report UUID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Rightsizing report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RightsizingReport'
+        '404':
+          description: Report not found
+        '500':
+          description: Internal server error
+
 components:
   schemas:
     VddkProperties:
@@ -723,6 +803,22 @@ components:
           items:
             type: string
           description: Tags aggregated from matching groups
+        utilization_cpu_p95:
+          type: number
+          format: double
+          description: CPU utilization at p95 (%); absent when no utilization data
+        utilization_mem_p95:
+          type: number
+          format: double
+          description: Memory utilization at p95 (%); absent when no utilization data
+        utilization_disk:
+          type: number
+          format: double
+          description: Disk utilization (%); absent when no utilization data
+        utilization_confidence:
+          type: number
+          format: double
+          description: Data confidence — sample_count / expected_sample_count × 100
 
     VirtualMachineDetail:
       type: object
@@ -1169,3 +1265,233 @@ components:
           description: Tags to apply to matching VMs (only alphanumeric, underscore, and dot allowed)
           x-oapi-codegen-extra-tags:
             binding: "omitempty,dive,tag_format"
+
+    RightsizingCollectRequest:
+      type: object
+      required:
+        - credentials
+      properties:
+        credentials:
+          $ref: '#/components/schemas/VcenterCredentials'
+        lookback_hours:
+          type: integer
+          description: Lookback window in hours (default 720 = 30 days)
+          default: 720
+        interval_id:
+          type: integer
+          description: vSphere historical interval ID in seconds (300=day, 1800=week, 7200=month)
+          default: 7200
+        name_filter:
+          type: string
+          description: Filter VMs by name substring
+        cluster_id:
+          type: string
+          description: MoRef value of a ClusterComputeResource to scope discovery (e.g. domain-c123)
+        batch_size:
+          type: integer
+          description: Number of VMs per QueryPerf round-trip
+          default: 64
+        discover_vms:
+          type: boolean
+          description: >
+            If true, discover VMs live from vSphere.
+            If false (default), use the VMs already stored in the local inventory.
+          default: false
+
+    RightsizingMetricStats:
+      type: object
+      required:
+        - sample_count
+        - average
+        - p95
+        - p99
+        - max
+        - latest
+      properties:
+        sample_count:
+          type: integer
+        average:
+          type: number
+          format: double
+        p95:
+          type: number
+          format: double
+        p99:
+          type: number
+          format: double
+        max:
+          type: number
+          format: double
+        latest:
+          type: number
+          format: double
+
+    RightsizingVMReport:
+      type: object
+      required:
+        - name
+        - moid
+        - metrics
+        - warnings
+      properties:
+        name:
+          type: string
+        moid:
+          type: string
+        metrics:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/RightsizingMetricStats'
+        warnings:
+          type: array
+          description: Non-empty when the VM was queried but had no historical metrics data.
+          items:
+            type: string
+
+    RightsizingReport:
+      type: object
+      required:
+        - id
+        - vcenter
+        - cluster_id
+        - window_start
+        - window_end
+        - interval_id
+        - expected_sample_count
+        - vms
+        - created_at
+      properties:
+        id:
+          type: string
+          description: UUID of the report
+        vcenter:
+          type: string
+          description: vCenter URL used for this collection
+        cluster_id:
+          type: string
+          description: MoRef of the ClusterComputeResource scoped for this collection (empty = all clusters)
+        window_start:
+          type: string
+          format: date-time
+        window_end:
+          type: string
+          format: date-time
+        interval_id:
+          type: integer
+        expected_sample_count:
+          type: integer
+          description: Theoretical maximum samples for the window (lookback / interval)
+        vms:
+          type: array
+          items:
+            $ref: '#/components/schemas/RightsizingVMReport'
+        created_at:
+          type: string
+          format: date-time
+
+    RightsizingReportSummary:
+      type: object
+      description: Rightsizing report metadata without VM metrics. Use GET /rightsizing/{id} to retrieve the full report including metrics.
+      required:
+        - id
+        - vcenter
+        - cluster_id
+        - window_start
+        - window_end
+        - interval_id
+        - expected_sample_count
+        - created_at
+      properties:
+        id:
+          type: string
+          description: UUID of the report
+        vcenter:
+          type: string
+          description: vCenter URL used for this collection
+        cluster_id:
+          type: string
+          description: MoRef of the ClusterComputeResource scoped for this collection (empty = all clusters)
+        window_start:
+          type: string
+          format: date-time
+        window_end:
+          type: string
+          format: date-time
+        interval_id:
+          type: integer
+        expected_sample_count:
+          type: integer
+          description: Theoretical maximum samples for the window (lookback / interval)
+        created_at:
+          type: string
+          format: date-time
+
+    RightsizingReportListResponse:
+      type: object
+      required:
+        - reports
+        - total
+      properties:
+        reports:
+          type: array
+          description: List of report summaries. Use GET /rightsizing/{id} for full VM metrics.
+          items:
+            $ref: '#/components/schemas/RightsizingReportSummary'
+        total:
+          type: integer
+          description: Total number of stored reports
+
+    VmUtilizationDetails:
+      type: object
+      required:
+        - moid
+        - vm_name
+        - cpu_avg
+        - cpu_p95
+        - cpu_max
+        - cpu_latest
+        - mem_avg
+        - mem_p95
+        - mem_max
+        - mem_latest
+        - disk
+        - confidence
+      properties:
+        moid:
+          type: string
+        vm_name:
+          type: string
+        cpu_avg:
+          type: number
+          format: double
+          description: CPU utilization average (%)
+        cpu_p95:
+          type: number
+          format: double
+        cpu_max:
+          type: number
+          format: double
+        cpu_latest:
+          type: number
+          format: double
+        mem_avg:
+          type: number
+          format: double
+          description: Memory utilization average (%)
+        mem_p95:
+          type: number
+          format: double
+        mem_max:
+          type: number
+          format: double
+        mem_latest:
+          type: number
+          format: double
+        disk:
+          type: number
+          format: double
+          description: Disk utilization (%)
+        confidence:
+          type: number
+          format: double
+          description: Data confidence — sample_count / expected_sample_count × 100

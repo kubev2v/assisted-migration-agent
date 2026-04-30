@@ -122,7 +122,8 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 				WithVMService(svcMgr.VirtualMachineService()).
 				WithInspectorService(svcMgr.InspectorService()).
 				WithVddkService(svcMgr.VddkService()).
-				WithGroupService(svcMgr.GroupService())
+				WithGroupService(svcMgr.GroupService()).
+				WithRightsizingService(svcMgr.RightsizingService())
 
 			srv, err := server.NewServer(cfg, map[string]func(router *gin.RouterGroup){
 				apiV1: func(router *gin.RouterGroup) {

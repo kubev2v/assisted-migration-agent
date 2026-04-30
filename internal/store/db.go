@@ -102,9 +102,11 @@ func NewDB(loader *ExtensionLoader, path string) (*sql.DB, error) {
 		return nil, fmt.Errorf("setting extension directory: %w", err)
 	}
 
-	if err := loader.Load(conn, extDir); err != nil {
-		_ = conn.Close()
-		return nil, err
+	if loader != nil {
+		if err := loader.Load(conn, extDir); err != nil {
+			_ = conn.Close()
+			return nil, err
+		}
 	}
 
 	return conn, nil

@@ -15,6 +15,10 @@ type VirtualMachineSummary struct {
 	InspectionStatus       InspectionStatus
 	InspectionConcernCount int
 	Tags                   []string
+	UtilizationCpuP95      *float64 // CPU utilization at p95 (%); nil when no utilization data
+	UtilizationMemP95      *float64 // Memory utilization at p95 (%); nil when no utilization data
+	UtilizationDisk        *float64 // Disk utilization (%); nil when no utilization data
+	UtilizationConfidence  *float64 // Data confidence (%); nil when no utilization data
 }
 
 type VM struct {

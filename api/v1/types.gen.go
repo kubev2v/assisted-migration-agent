@@ -206,6 +206,96 @@ type InspectorStatus struct {
 // InspectorStatusState Inspector state
 type InspectorStatusState string
 
+// RightsizingCollectRequest defines model for RightsizingCollectRequest.
+type RightsizingCollectRequest struct {
+	// BatchSize Number of VMs per QueryPerf round-trip
+	BatchSize *int `json:"batch_size,omitempty"`
+
+	// ClusterId MoRef value of a ClusterComputeResource to scope discovery (e.g. domain-c123)
+	ClusterId   *string            `json:"cluster_id,omitempty"`
+	Credentials VcenterCredentials `json:"credentials"`
+
+	// DiscoverVms If true, discover VMs live from vSphere. If false (default), use the VMs already stored in the local inventory.
+	DiscoverVms *bool `json:"discover_vms,omitempty"`
+
+	// IntervalId vSphere historical interval ID in seconds (300=day, 1800=week, 7200=month)
+	IntervalId *int `json:"interval_id,omitempty"`
+
+	// LookbackHours Lookback window in hours (default 720 = 30 days)
+	LookbackHours *int `json:"lookback_hours,omitempty"`
+
+	// NameFilter Filter VMs by name substring
+	NameFilter *string `json:"name_filter,omitempty"`
+}
+
+// RightsizingMetricStats defines model for RightsizingMetricStats.
+type RightsizingMetricStats struct {
+	Average     float64 `json:"average"`
+	Latest      float64 `json:"latest"`
+	Max         float64 `json:"max"`
+	P95         float64 `json:"p95"`
+	P99         float64 `json:"p99"`
+	SampleCount int     `json:"sample_count"`
+}
+
+// RightsizingReport defines model for RightsizingReport.
+type RightsizingReport struct {
+	// ClusterId MoRef of the ClusterComputeResource scoped for this collection (empty = all clusters)
+	ClusterId string    `json:"cluster_id"`
+	CreatedAt time.Time `json:"created_at"`
+
+	// ExpectedSampleCount Theoretical maximum samples for the window (lookback / interval)
+	ExpectedSampleCount int `json:"expected_sample_count"`
+
+	// Id UUID of the report
+	Id         string `json:"id"`
+	IntervalId int    `json:"interval_id"`
+
+	// Vcenter vCenter URL used for this collection
+	Vcenter     string                `json:"vcenter"`
+	Vms         []RightsizingVMReport `json:"vms"`
+	WindowEnd   time.Time             `json:"window_end"`
+	WindowStart time.Time             `json:"window_start"`
+}
+
+// RightsizingReportListResponse defines model for RightsizingReportListResponse.
+type RightsizingReportListResponse struct {
+	// Reports List of report summaries. Use GET /rightsizing/{id} for full VM metrics.
+	Reports []RightsizingReportSummary `json:"reports"`
+
+	// Total Total number of stored reports
+	Total int `json:"total"`
+}
+
+// RightsizingReportSummary Rightsizing report metadata without VM metrics. Use GET /rightsizing/{id} to retrieve the full report including metrics.
+type RightsizingReportSummary struct {
+	// ClusterId MoRef of the ClusterComputeResource scoped for this collection (empty = all clusters)
+	ClusterId string    `json:"cluster_id"`
+	CreatedAt time.Time `json:"created_at"`
+
+	// ExpectedSampleCount Theoretical maximum samples for the window (lookback / interval)
+	ExpectedSampleCount int `json:"expected_sample_count"`
+
+	// Id UUID of the report
+	Id         string `json:"id"`
+	IntervalId int    `json:"interval_id"`
+
+	// Vcenter vCenter URL used for this collection
+	Vcenter     string    `json:"vcenter"`
+	WindowEnd   time.Time `json:"window_end"`
+	WindowStart time.Time `json:"window_start"`
+}
+
+// RightsizingVMReport defines model for RightsizingVMReport.
+type RightsizingVMReport struct {
+	Metrics map[string]RightsizingMetricStats `json:"metrics"`
+	Moid    string                            `json:"moid"`
+	Name    string                            `json:"name"`
+
+	// Warnings Non-empty when the VM was queried but had no historical metrics data.
+	Warnings []string `json:"warnings"`
+}
+
 // UpdateGroupRequest defines model for UpdateGroupRequest.
 type UpdateGroupRequest struct {
 	// Description Optional group description
@@ -346,6 +436,18 @@ type VirtualMachine struct {
 
 	// Template True if the vm is a template. False otherwise
 	Template *bool `json:"template,omitempty"`
+
+	// UtilizationConfidence Data confidence — sample_count / expected_sample_count × 100
+	UtilizationConfidence *float64 `json:"utilization_confidence,omitempty"`
+
+	// UtilizationCpuP95 CPU utilization at p95 (%); absent when no utilization data
+	UtilizationCpuP95 *float64 `json:"utilization_cpu_p95,omitempty"`
+
+	// UtilizationDisk Disk utilization (%); absent when no utilization data
+	UtilizationDisk *float64 `json:"utilization_disk,omitempty"`
+
+	// UtilizationMemP95 Memory utilization at p95 (%); absent when no utilization data
+	UtilizationMemP95 *float64 `json:"utilization_mem_p95,omitempty"`
 
 	// VCenterState vCenter state (e.g., poweredOn, poweredOff, suspended)
 	VCenterState string `json:"vCenterState"`
@@ -489,6 +591,29 @@ type VmInspectionStatus struct {
 // VmInspectionStatusState Current inspection state
 type VmInspectionStatusState string
 
+// VmUtilizationDetails defines model for VmUtilizationDetails.
+type VmUtilizationDetails struct {
+	// Confidence Data confidence — sample_count / expected_sample_count × 100
+	Confidence float64 `json:"confidence"`
+
+	// CpuAvg CPU utilization average (%)
+	CpuAvg    float64 `json:"cpu_avg"`
+	CpuLatest float64 `json:"cpu_latest"`
+	CpuMax    float64 `json:"cpu_max"`
+	CpuP95    float64 `json:"cpu_p95"`
+
+	// Disk Disk utilization (%)
+	Disk float64 `json:"disk"`
+
+	// MemAvg Memory utilization average (%)
+	MemAvg    float64 `json:"mem_avg"`
+	MemLatest float64 `json:"mem_latest"`
+	MemMax    float64 `json:"mem_max"`
+	MemP95    float64 `json:"mem_p95"`
+	Moid      string  `json:"moid"`
+	VmName    string  `json:"vm_name"`
+}
+
 // ListGroupsParams defines parameters for ListGroups.
 type ListGroupsParams struct {
 	// ByName Filter groups by name (case-insensitive substring match)
@@ -577,3 +702,6 @@ type PutInspectorCredentialsJSONRequestBody = VcenterCredentials
 
 // PutInspectorVddkMultipartRequestBody defines body for PutInspectorVddk for multipart/form-data ContentType.
 type PutInspectorVddkMultipartRequestBody PutInspectorVddkMultipartBody
+
+// TriggerRightsizingCollectionJSONRequestBody defines body for TriggerRightsizingCollection for application/json ContentType.
+type TriggerRightsizingCollectionJSONRequestBody = RightsizingCollectRequest

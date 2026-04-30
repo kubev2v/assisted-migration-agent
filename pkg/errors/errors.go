@@ -95,6 +95,10 @@ func NewCollectionInProgressError() *OperationInProgressError {
 	return NewOperationInProgressError("collection")
 }
 
+func NewRightsizingCollectionInProgressError() *OperationInProgressError {
+	return NewOperationInProgressError("rightsizing collection")
+}
+
 func NewVddkUploadInProgressError() *OperationInProgressError {
 	return NewOperationInProgressError("vddk upload")
 }

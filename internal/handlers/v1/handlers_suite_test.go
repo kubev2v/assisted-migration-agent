@@ -216,3 +216,42 @@ func (m *MockGroupService) Delete(ctx context.Context, id int) error {
 	m.LastDeleteID = id
 	return m.DeleteError
 }
+
+// MockRightsizingService is a mock implementation of RightsizingService.
+type MockRightsizingService struct {
+	TriggerResult     *models.RightsizingReportSummary
+	TriggerError      error
+	TriggerCallCount  int
+	LastTriggerParams models.RightsizingParams
+
+	ListResult []models.RightsizingReportSummary
+	ListError  error
+
+	GetResult *models.RightsizingReport
+	GetError  error
+	LastGetID string
+
+	GetUtilizationResult *models.VmUtilizationDetails
+	GetUtilizationError  error
+	LastUtilizationVMID  string
+}
+
+func (m *MockRightsizingService) TriggerCollection(ctx context.Context, params models.RightsizingParams) (*models.RightsizingReportSummary, error) {
+	m.TriggerCallCount++
+	m.LastTriggerParams = params
+	return m.TriggerResult, m.TriggerError
+}
+
+func (m *MockRightsizingService) ListReports(ctx context.Context) ([]models.RightsizingReportSummary, error) {
+	return m.ListResult, m.ListError
+}
+
+func (m *MockRightsizingService) GetReport(ctx context.Context, id string) (*models.RightsizingReport, error) {
+	m.LastGetID = id
+	return m.GetResult, m.GetError
+}
+
+func (m *MockRightsizingService) GetVMUtilization(ctx context.Context, vmID string) (*models.VmUtilizationDetails, error) {
+	m.LastUtilizationVMID = vmID
+	return m.GetUtilizationResult, m.GetUtilizationError
+}

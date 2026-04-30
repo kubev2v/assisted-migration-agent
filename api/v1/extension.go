@@ -47,6 +47,11 @@ func NewVirtualMachineFromSummary(vm models.VirtualMachineSummary) VirtualMachin
 		result.InspectionConcernCount = &vm.InspectionConcernCount
 	}
 
+	result.UtilizationCpuP95 = vm.UtilizationCpuP95
+	result.UtilizationMemP95 = vm.UtilizationMemP95
+	result.UtilizationDisk = vm.UtilizationDisk
+	result.UtilizationConfidence = vm.UtilizationConfidence
+
 	return result
 }
 
@@ -300,4 +305,85 @@ func NewGroupFromModel(g models.Group) Group {
 		group.Tags = &g.Tags
 	}
 	return group
+}
+
+// NewRightsizingMetricStatsFromModel converts a models.RightsizingMetricStats to the API type.
+func NewRightsizingMetricStatsFromModel(s models.RightsizingMetricStats) RightsizingMetricStats {
+	return RightsizingMetricStats{
+		SampleCount: s.SampleCount,
+		Average:     s.Average,
+		P95:         s.P95,
+		P99:         s.P99,
+		Max:         s.Max,
+		Latest:      s.Latest,
+	}
+}
+
+// NewRightsizingVMReportFromModel converts a models.RightsizingVMReport to the API type.
+func NewRightsizingVMReportFromModel(vm models.RightsizingVMReport) RightsizingVMReport {
+	metrics := make(map[string]RightsizingMetricStats, len(vm.Metrics))
+	for k, v := range vm.Metrics {
+		metrics[k] = NewRightsizingMetricStatsFromModel(v)
+	}
+	warnings := vm.Warnings
+	if warnings == nil {
+		warnings = []string{}
+	}
+	return RightsizingVMReport{
+		Name:     vm.Name,
+		Moid:     vm.MOID,
+		Metrics:  metrics,
+		Warnings: warnings,
+	}
+}
+
+// NewRightsizingReportSummaryFromModel converts a models.RightsizingReportSummary to the API type.
+func NewRightsizingReportSummaryFromModel(r models.RightsizingReportSummary) RightsizingReportSummary {
+	return RightsizingReportSummary{
+		Id:                  r.ID,
+		Vcenter:             r.VCenter,
+		ClusterId:           r.ClusterID,
+		WindowStart:         r.WindowStart,
+		WindowEnd:           r.WindowEnd,
+		IntervalId:          r.IntervalID,
+		ExpectedSampleCount: r.ExpectedSampleCount,
+		CreatedAt:           r.CreatedAt,
+	}
+}
+
+// NewRightsizingReportFromModel converts a models.RightsizingReport to the API type.
+func NewRightsizingReportFromModel(r models.RightsizingReport) RightsizingReport {
+	vms := make([]RightsizingVMReport, 0, len(r.VMs))
+	for _, vm := range r.VMs {
+		vms = append(vms, NewRightsizingVMReportFromModel(vm))
+	}
+	return RightsizingReport{
+		Id:                  r.ID,
+		Vcenter:             r.VCenter,
+		ClusterId:           r.ClusterID,
+		WindowStart:         r.WindowStart,
+		WindowEnd:           r.WindowEnd,
+		IntervalId:          r.IntervalID,
+		ExpectedSampleCount: r.ExpectedSampleCount,
+		Vms:                 vms,
+		CreatedAt:           r.CreatedAt,
+	}
+}
+
+// NewVmUtilizationDetailsFromModel converts a models.VmUtilizationDetails to the API type.
+func NewVmUtilizationDetailsFromModel(d models.VmUtilizationDetails) VmUtilizationDetails {
+	return VmUtilizationDetails{
+		Moid:       d.MOID,
+		VmName:     d.VMName,
+		CpuAvg:     d.CpuAvg,
+		CpuP95:     d.CpuP95,
+		CpuMax:     d.CpuMax,
+		CpuLatest:  d.CpuLatest,
+		MemAvg:     d.MemAvg,
+		MemP95:     d.MemP95,
+		MemMax:     d.MemMax,
+		MemLatest:  d.MemLatest,
+		Disk:       d.Disk,
+		Confidence: d.Confidence,
+	}
 }

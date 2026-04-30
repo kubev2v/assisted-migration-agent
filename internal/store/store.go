@@ -19,6 +19,7 @@ type Store struct {
 	group         *GroupStore
 	vddk          *VddkStore
 	outbox        *OutboxStore
+	rightsizing   *RightSizingStore
 	transactor    *DBTransactor
 }
 
@@ -35,6 +36,7 @@ func NewStore(db *sql.DB, validator duckdb_parser.Validator) *Store {
 		group:         NewGroupStore(qi),
 		vddk:          NewVddkStore(qi),
 		outbox:        NewOutboxStore(qi),
+		rightsizing:   NewRightSizingStore(qi),
 		transactor:    newTransactor(db),
 	}
 }
@@ -81,6 +83,10 @@ func (s *Store) Vddk() *VddkStore {
 
 func (s *Store) Outbox() *OutboxStore {
 	return s.outbox
+}
+
+func (s *Store) RightSizing() *RightSizingStore {
+	return s.rightsizing
 }
 
 func (s *Store) WithTx(ctx context.Context, fn func(ctx context.Context) error) error {

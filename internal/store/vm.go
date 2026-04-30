@@ -30,7 +30,16 @@ type FilterOption = sq.Sqlizer
 
 // List returns VM summaries with filters, sorting, and pagination.
 func (s *VMStore) List(ctx context.Context, filters []sq.Sqlizer, opts ...ListOption) ([]models.VirtualMachineSummary, error) {
-	builder := vmOutputQuery
+	builder := vmOutputQuery.
+		Columns(
+			`u.cpu_p95_pct AS cpu_p95_pct`,
+			`u.mem_p95_pct AS mem_p95_pct`,
+			`u.disk_pct    AS disk_pct`,
+			`u.confidence_pct AS confidence_pct`,
+		).
+		LeftJoin(`rightsizing_vm_utilization u ON u.moid = v."VM ID" AND u.report_id = (` +
+			`SELECT id FROM rightsizing_reports WHERE written_batch_count > 0 ORDER BY created_at DESC LIMIT 1` +
+			`)`)
 
 	// Apply external filters via subquery (filters reference table aliases in vmFilterSubquery)
 	if len(filters) > 0 {
@@ -84,6 +93,10 @@ func (s *VMStore) List(ctx context.Context, filters []sq.Sqlizer, opts ...ListOp
 			&sqlErr,
 			&inspectionConcernCount,
 			&tags,
+			&vm.UtilizationCpuP95,
+			&vm.UtilizationMemP95,
+			&vm.UtilizationDisk,
+			&vm.UtilizationConfidence,
 		)
 		if err != nil {
 			return nil, err
