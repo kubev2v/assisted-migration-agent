@@ -69,6 +69,7 @@ func (s *VMStore) List(ctx context.Context, filters []sq.Sqlizer, opts ...ListOp
 		var sqlErr string
 		var inspectionConcernCount int
 		var tags StringArray
+		var migrationExcluded bool
 		err := rows.Scan(
 			&vm.ID,
 			&vm.Name,
@@ -84,6 +85,7 @@ func (s *VMStore) List(ctx context.Context, filters []sq.Sqlizer, opts ...ListOp
 			&sqlErr,
 			&inspectionConcernCount,
 			&tags,
+			&migrationExcluded,
 		)
 		if err != nil {
 			return nil, err
@@ -93,6 +95,7 @@ func (s *VMStore) List(ctx context.Context, filters []sq.Sqlizer, opts ...ListOp
 		}
 		vm.InspectionConcernCount = inspectionConcernCount
 		vm.Tags = tags
+		vm.MigrationExcluded = migrationExcluded
 		vms = append(vms, vm)
 	}
 
@@ -341,4 +344,39 @@ func (s *VMStore) GetFolders(ctx context.Context) ([]models.Folder, error) {
 	}
 
 	return folders, rows.Err()
+}
+
+// GetUserInfo returns the vm_user_info record for a VM.
+// Returns default values if no entry exists in vm_user_info.
+func (s *VMStore) GetUserInfo(ctx context.Context, vmID string) (*models.VMUserInfo, error) {
+	query := `SELECT
+		COALESCE((SELECT migration_excluded FROM vm_user_info WHERE "VM ID" = ?), FALSE) as migration_excluded`
+
+	userInfo := &models.VMUserInfo{
+		VMID: vmID,
+	}
+
+	err := s.db.QueryRowContext(ctx, query, vmID).Scan(&userInfo.MigrationExcluded)
+	if err != nil {
+		return nil, err
+	}
+
+	return userInfo, nil
+}
+
+// UpdateMigrationExcluded sets the migration_excluded flag for a VM.
+// Uses UPSERT pattern to handle both insert and update.
+func (s *VMStore) UpdateMigrationExcluded(ctx context.Context, vmID string, excluded bool) error {
+	query, args, err := sq.Insert("vm_user_info").
+		Columns(`"VM ID"`, "migration_excluded", "updated_at").
+		Values(vmID, excluded, sq.Expr("now()")).
+		Suffix(`ON CONFLICT ("VM ID") DO UPDATE SET
+			migration_excluded = EXCLUDED.migration_excluded,
+			updated_at = now()`).
+		ToSql()
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, query, args...)
+	return err
 }

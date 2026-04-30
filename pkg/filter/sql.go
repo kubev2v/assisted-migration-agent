@@ -78,6 +78,8 @@ var defaultMapFn MapFunc = func(name string) (string, FieldType, error) {
 		return `v."EnableUUID"`, BooleanField, nil
 	case "migratable":
 		return `(COALESCE(crit.critical_count, 0) = 0)`, BooleanField, nil
+	case "migration_excluded":
+		return `COALESCE(vui.migration_excluded, FALSE)`, BooleanField, nil
 
 	// vdisk (dk) — disk.* prefix
 	case "disk.path":

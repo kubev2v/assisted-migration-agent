@@ -19,11 +19,13 @@ var vmOutputQuery = sq.Select(
 	`COALESCE(i.error, '') AS error`,
 	`COALESCE((SELECT COUNT(*)::BIGINT FROM vm_inspection_concerns ic WHERE ic."VM ID" = v."VM ID" AND ic.inspection_id = (SELECT MAX(inspection_id) FROM vm_inspection_concerns imx WHERE imx."VM ID" = v."VM ID")), 0) AS inspection_concern_count`,
 	`COALESCE(t.tags, [])::VARCHAR[] AS tags`,
+	`COALESCE(vui.migration_excluded, FALSE) AS migration_excluded`,
 ).From("vinfo v").
 	LeftJoin(`(SELECT "VM_ID", COUNT(*) AS issues_count FROM concerns GROUP BY "VM_ID") c ON v."VM ID" = c."VM_ID"`).
 	LeftJoin(`(SELECT "VM_ID", COUNT(*) AS critical_count FROM concerns WHERE "Category" = 'Critical' GROUP BY "VM_ID") crit ON v."VM ID" = crit."VM_ID"`).
 	LeftJoin(`(SELECT "VM ID", SUM("Capacity MiB") AS total_disk FROM vdisk GROUP BY "VM ID") d ON v."VM ID" = d."VM ID"`).
 	LeftJoin(`vm_inspection_status i ON v."VM ID" = i."VM ID"`).
+	LeftJoin(`vm_user_info vui ON v."VM ID" = vui."VM ID"`).
 	LeftJoin(`(
 		SELECT u.vm_id, list_distinct(flatten(list(g.tags))) AS tags
 		FROM group_matches gm
@@ -41,6 +43,7 @@ var vmFilterSubquery = sq.Select(`DISTINCT v."VM ID"`).
 	LeftJoin(`vdisk dk ON v."VM ID" = dk."VM ID"`).
 	LeftJoin(`concerns c ON v."VM ID" = c."VM_ID"`).
 	LeftJoin(`vm_inspection_status i ON v."VM ID" = i."VM ID"`).
+	LeftJoin(`vm_user_info vui ON v."VM ID" = vui."VM ID"`).
 	LeftJoin(`vcpu cpu ON v."VM ID" = cpu."VM ID"`).
 	LeftJoin(`vmemory mem ON v."VM ID" = mem."VM ID"`).
 	LeftJoin(`vnetwork net ON v."VM ID" = net."VM ID"`).

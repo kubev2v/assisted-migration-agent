@@ -73,6 +73,9 @@ type ServerInterface interface {
 	// Get details about a vm
 	// (GET /vms/{id})
 	GetVM(c *gin.Context, id string)
+	// Update VM properties
+	// (PATCH /vms/{id})
+	UpdateVM(c *gin.Context, id string)
 	// Remove VirtualMachine from inspection queue
 	// (DELETE /vms/{id}/inspection)
 	RemoveVMFromInspection(c *gin.Context, id string)
@@ -526,6 +529,30 @@ func (siw *ServerInterfaceWrapper) GetVM(c *gin.Context) {
 	siw.Handler.GetVM(c, id)
 }
 
+// UpdateVM operation middleware
+func (siw *ServerInterfaceWrapper) UpdateVM(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.UpdateVM(c, id)
+}
+
 // RemoveVMFromInspection operation middleware
 func (siw *ServerInterfaceWrapper) RemoveVMFromInspection(c *gin.Context) {
 
@@ -597,5 +624,6 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.GET(options.BaseURL+"/version", wrapper.GetVersion)
 	router.GET(options.BaseURL+"/vms", wrapper.GetVMs)
 	router.GET(options.BaseURL+"/vms/:id", wrapper.GetVM)
+	router.PATCH(options.BaseURL+"/vms/:id", wrapper.UpdateVM)
 	router.DELETE(options.BaseURL+"/vms/:id/inspection", wrapper.RemoveVMFromInspection)
 }

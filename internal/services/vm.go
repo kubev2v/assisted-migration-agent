@@ -4,6 +4,7 @@ import (
 	"context"
 
 	sq "github.com/Masterminds/squirrel"
+	"go.uber.org/zap"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
@@ -35,6 +36,15 @@ func (s *VMService) Get(ctx context.Context, id string) (*models.VM, error) {
 		return nil, err
 	}
 
+	// Query user info from vm_user_info
+	userInfo, err := s.store.VM().GetUserInfo(ctx, id)
+	if err != nil {
+		// Log warning but don't fail - default to empty user info
+		zap.S().Named("vm_service").Warnw("failed to query user info", "vmID", id, "error", err)
+	} else {
+		vm.MigrationExcluded = userInfo.MigrationExcluded
+	}
+
 	results, err := s.store.Inspection().ListResults(ctx, id)
 	if err != nil {
 		return nil, err
@@ -45,6 +55,7 @@ func (s *VMService) Get(ctx context.Context, id string) (*models.VM, error) {
 	}
 
 	vm.InspectionConcerns = results[0].Concerns
+
 	return vm, nil
 }
 
@@ -95,4 +106,15 @@ func (s *VMService) buildListOptions(params VMListParams) ([]sq.Sqlizer, []store
 	}
 
 	return filters, opts
+}
+
+// UpdateMigrationExcluded updates the migration exclusion status for a VM.
+func (s *VMService) UpdateMigrationExcluded(ctx context.Context, id string, excluded bool) error {
+	// Verify VM exists first
+	_, err := s.store.VM().Get(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	return s.store.VM().UpdateMigrationExcluded(ctx, id, excluded)
 }
