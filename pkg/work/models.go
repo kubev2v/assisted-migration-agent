@@ -6,6 +6,11 @@ type WorkBuilder[S any, R any] interface {
 	Next() (WorkUnit[S, R], bool)
 }
 
+type WorkBuilder2[S any, R any] interface {
+	Next() (WorkUnit[S, R], bool)
+	Finalize(ctx context.Context, result R) error
+}
+
 // SliceWorkBuilder is a WorkBuilder backed by a fixed slice of work units.
 type SliceWorkBuilder[S any, R any] struct {
 	units []WorkUnit[S, R]

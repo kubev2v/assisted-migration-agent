@@ -275,11 +275,13 @@ test: $(GINKGO) vcsim test.fuzz
 test.fuzz:
 	@echo "🧪 Running fuzz tests ($(FUZZ_TIME) each)..."
 	@echo "  → FuzzParse"
-	@go test ./pkg/filter/ -fuzz='^FuzzParse$$' -fuzztime=$(FUZZ_TIME)
+	@go test -race ./pkg/filter/ -fuzz='^FuzzParse$$' -fuzztime=$(FUZZ_TIME)
 	@echo "  → FuzzParseSecurityProperties"
-	@go test ./pkg/filter/ -fuzz='^FuzzParseSecurityProperties$$' -fuzztime=$(FUZZ_TIME)
+	@go test -race ./pkg/filter/ -fuzz='^FuzzParseSecurityProperties$$' -fuzztime=$(FUZZ_TIME)
 	@echo "  → FuzzIdentifierWhitelist"
-	@go test ./pkg/filter/ -fuzz='^FuzzIdentifierWhitelist$$' -fuzztime=$(FUZZ_TIME)
+	@go test -race ./pkg/filter/ -fuzz='^FuzzIdentifierWhitelist$$' -fuzztime=$(FUZZ_TIME)
+	@echo "  → FuzzPool2"
+	@go test -race ./pkg/work/ -fuzz='^FuzzPool2$$' -fuzztime=$(FUZZ_TIME)
 	@echo "✅ All fuzz tests passed."
 
 # Start vcsim container for testing

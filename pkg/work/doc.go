@@ -1,9 +1,18 @@
-// Package work provides three execution abstractions for sequencing async
-// work through a typed scheduler.
+// Package work provides execution abstractions for sequencing async work
+// through a typed scheduler.
 //
 // # Core Concepts
 //
-// There are three types, each built on the one below it:
+// There are two families of abstractions:
+//
+// Pull-based (Pipeline, Service, Pool) — the caller starts pipelines and
+// polls for state. Cleanup is the caller's responsibility.
+//
+// Push-based (Pipeline2, Pool2) — the pool actively drives pipeline
+// progression, pushes status events to the caller, and owns the cleanup
+// process end-to-end.
+//
+// Pull-based types:
 //
 //   - Pipeline — a reusable, sequential executor that can be restarted after
 //     each run completes. It is the low-level building block.
@@ -71,11 +80,43 @@
 // pipeline. State(key) returns the per-key status or an error if the key does
 // not exist. IsRunning() returns true if any pipeline is still active.
 //
+// # Pipeline2
+//
+// Pipeline2 is functionally equivalent to Pipeline but designed for the
+// push-based model. It streams Status events on the channel returned by
+// Start() rather than requiring the caller to poll State(). The caller
+// reads from the channel to observe progress. When the channel closes,
+// the pipeline has completed.
+//
+// # Pool2
+//
+// Pool2 wraps multiple Pipeline2 instances sharing one Scheduler. Unlike
+// Pool, it takes an active role: a central run loop reads status events
+// from all pipelines and maintains per-pipeline state. Finalization is
+// built into the contract via WorkBuilder2:
+//
+//   - Per-pipeline finalize: each builder implements Finalize(ctx, result)
+//     which runs as priority work after that pipeline completes. The final
+//     result is passed in so cleanup can act on what was produced. Errors
+//     are surfaced via State(key).Err.
+//
+//   - Pool-level finalize: an optional function set via WithFinalizer runs
+//     as priority work after all pipelines have finished. Its error is
+//     returned by Stop().
+//
+//   - Stop() blocks until all pipelines and all finalization have fully
+//     terminated, then returns the pool-level finalize error (if any).
+//
+// This stronger contract means the caller never has to coordinate cleanup
+// ordering or wonder whether background work is still running.
+//
 // # Lifecycle Summary
 //
-//	Pipeline: NewPipeline(state, sched, builder) → Start() → State() / Stop()  (restartable after completion)
-//	Service:  NewService(state, builder)         → Start() → State() / Stop()  (single-start, then discard)
-//	Pool:     NewPool(workers, entries)          → Start() → State(key) / Cancel(key) / Stop()  (single-start, then discard)
+//	Pipeline:  NewPipeline(state, sched, builder) → Start() → State() / Stop()  (restartable after completion)
+//	Service:   NewService(state, builder)         → Start() → State() / Stop()  (single-start, then discard)
+//	Pool:      NewPool(workers, entries)          → Start() → State(key) / Cancel(key) / Stop()  (single-start, then discard)
+//	Pipeline2: NewPipeline2(sched, builder)       → Start() → <-chan / Stop()   (single-start)
+//	Pool2:     NewPool2(builders).WithFinalizer(fn) → Start() → State(key) / Cancel(key) / Stop()  (single-start, Stop blocks)
 //
 // After Start():
 //   - State() is always valid and returns the current or final status.
@@ -84,4 +125,5 @@
 //   - After completion or Stop(), result and error persist on the instance.
 //   - For Service and Pool, the instance is never reused. Create a new one for the next run.
 //   - For Pipeline, a new run can be started after the previous one completes.
+//   - For Pool2, Stop() blocks until all pipelines and finalization complete, returning the pool-level finalize error.
 package work
