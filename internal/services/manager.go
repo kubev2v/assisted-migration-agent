@@ -3,16 +3,14 @@ package services
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
-	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/pkg/console"
-	"github.com/kubev2v/assisted-migration-agent/pkg/work"
 )
 
 const (
+	maxVMsPerCycle = 10
 	maxPairsPerRun = 10
 )
 
@@ -78,30 +76,7 @@ func (m *ServiceManager) Initialize() error {
 	factory := newCollectorWorkFactory(m.store, m.event, m.cfg.Agent.DataFolder, m.cfg.Agent.OpaPoliciesFolder)
 	m.collector = NewCollectorService(m.inventory, factory.Build)
 
-	m.inspector = NewInspectorService(m.store, 10, m.cfg.Agent.DataFolder).
-		WithInspectionBuilder(
-			func(id string) work.WorkBuilder[models.InspectionStatus, models.InspectionResult] {
-				return work.NewSliceWorkBuilder([]work.WorkUnit[models.InspectionStatus, models.InspectionResult]{
-					{
-						Status: func() models.InspectionStatus {
-							return models.InspectionStatus{State: models.InspectionStateRunning}
-						},
-						Work: func(ctx context.Context, result models.InspectionResult) (models.InspectionResult, error) {
-							time.Sleep(5 * time.Second)
-							return result, nil
-						},
-					},
-					{
-						Status: func() models.InspectionStatus {
-							return models.InspectionStatus{State: models.InspectionStateCompleted}
-						},
-						Work: func(ctx context.Context, result models.InspectionResult) (models.InspectionResult, error) {
-							return result, nil
-						},
-					},
-				})
-			},
-		)
+	m.inspector = NewInspectorService(m.store, maxVMsPerCycle, m.cfg.Agent.DataFolder)
 
 	m.forecaster = NewForecasterService(m.store, maxPairsPerRun)
 
