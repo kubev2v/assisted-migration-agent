@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"regexp"
@@ -104,16 +105,32 @@ func (f *collectorWorkFactory) verifyCredentials(ctx context.Context, cred model
 func (f *collectorWorkFactory) collect(ctx context.Context, creds models.Credentials) (string, error) {
 	dbPath := path.Join(f.dataDir, fmt.Sprintf("%s.db", uuid.New()))
 	vc := collector.NewVSphereCollector(dbPath)
-	defer vc.Close()
 
 	zap.S().Named("collector_service").Info("starting vSphere inventory collection")
 	if err := vc.Collect(ctx, &creds); err != nil {
+		vc.Close()
 		zap.S().Named("collector_service").Errorw("vSphere collection failed", "error", err)
 		return "", err
 	}
 	zap.S().Named("collector_service").Info("vSphere inventory collection completed")
 
-	return dbPath, nil
+	if _, err := vc.DB().Execute("PRAGMA wal_checkpoint(TRUNCATE)"); err != nil {
+		vc.Close()
+		return "", fmt.Errorf("WAL checkpoint failed: %w", err)
+	}
+
+	copyPath := path.Join(f.dataDir, fmt.Sprintf("%s.db", uuid.New()))
+	if err := copyFile(dbPath, copyPath); err != nil {
+		vc.Close()
+		return "", fmt.Errorf("copying sqlite db: %w", err)
+	}
+
+	vc.Close()
+	_ = os.Remove(dbPath)
+	_ = os.Remove(dbPath + "-shm")
+	_ = os.Remove(dbPath + "-wal")
+
+	return copyPath, nil
 }
 
 func (f *collectorWorkFactory) process(ctx context.Context, sqlitePath string) ([]byte, error) {
@@ -217,4 +234,21 @@ var tagSanitizer = regexp.MustCompile(`[^a-zA-Z0-9_.]`)
 func sanitizeTag(name string) string {
 	tag := strings.ReplaceAll(name, " ", "_")
 	return tagSanitizer.ReplaceAllString(tag, "")
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = in.Close() }()
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = out.Close() }()
+	if _, err := io.Copy(out, in); err != nil {
+		return err
+	}
+	return out.Sync()
 }
