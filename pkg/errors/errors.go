@@ -150,14 +150,18 @@ func IsModeConflictError(err error) bool {
 }
 
 func NewVCenterError(err error) *VCenterError {
-	vErr := &VCenterError{msg: "unknown error"}
-	if strings.Contains(err.Error(), "Login failure") ||
-		(strings.Contains(err.Error(), "incorrect") && strings.Contains(err.Error(), "password")) {
-		vErr.msg = "invalid credentials"
-	} else {
-		vErr.msg = err.Error()
+	errMsg := err.Error()
+
+	if strings.Contains(errMsg, "Login failure") ||
+		(strings.Contains(errMsg, "incorrect") && strings.Contains(errMsg, "password")) {
+		return &VCenterError{msg: "invalid credentials"}
 	}
-	return vErr
+
+	if errMsg == "" {
+		return &VCenterError{msg: "unknown error"}
+	}
+
+	return &VCenterError{msg: errMsg}
 }
 
 // VCenterError indicates the provided credentials are invalid.

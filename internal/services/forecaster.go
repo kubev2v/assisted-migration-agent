@@ -5,9 +5,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"net/url"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/vmware/govmomi"
+	"github.com/vmware/govmomi/find"
+	"github.com/vmware/govmomi/session"
+	"github.com/vmware/govmomi/vim25"
+	"github.com/vmware/govmomi/vim25/soap"
 
 	"go.uber.org/zap"
 
@@ -158,7 +165,13 @@ func (f *ForecasterService) Start(ctx context.Context, req models.ForecastReques
 // VerifyCredentials validates vCenter credentials and required privileges
 // without saving them. Used as a preflight check (PUT /forecaster/credentials).
 func (f *ForecasterService) VerifyCredentials(ctx context.Context, credentials models.Credentials) error {
-	if err := vmware.VerifyCredentialsAndPrivileges(ctx, &credentials, models.ForecasterRequiredPrivileges, "forecaster"); err != nil {
+	u, err := vmware.NormalizeAndValidateURL(credentials.URL)
+	if err != nil {
+		return err
+	}
+	credentials.URL = u
+
+	if err := f.verifyCredentialsAndPrivileges(ctx, &credentials, models.ForecasterRequiredPrivileges); err != nil {
 		return err
 	}
 
@@ -166,12 +179,74 @@ func (f *ForecasterService) VerifyCredentials(ctx context.Context, credentials m
 	return nil
 }
 
+// verifyCredentialsAndPrivileges checks both authentication and vSphere privileges.
+// It connects, verifies login, then checks the given privileges on the default VM folder.
+func (f *ForecasterService) verifyCredentialsAndPrivileges(ctx context.Context, creds *models.Credentials, requiredPrivileges []string) error {
+	u, err := url.ParseRequestURI(creds.URL)
+	if err != nil {
+		return err
+	}
+	u.User = url.UserPassword(creds.Username, creds.Password)
+
+	verifyCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	vimClient, err := vim25.NewClient(verifyCtx, soap.NewClient(u, true))
+	if err != nil {
+		return err
+	}
+
+	client := &govmomi.Client{
+		SessionManager: session.NewManager(vimClient),
+		Client:         vimClient,
+	}
+
+	zap.S().Named("forecaster_service").Info("verifying vCenter credentials")
+	if err := client.Login(verifyCtx, u.User); err != nil {
+		return srvErrors.NewVCenterError(err)
+	}
+	defer func() {
+		logoutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_ = client.Logout(logoutCtx)
+		client.CloseIdleConnections()
+	}()
+
+	zap.S().Named("forecaster_service").Info("vCenter credentials verified, checking privileges")
+
+	// Check privileges on the default VM folder (under the datacenter), since
+	// vSphere privileges are typically granted at this level rather than root.
+	finder := find.NewFinder(vimClient, true)
+	dc, err := finder.DefaultDatacenter(verifyCtx)
+	if err != nil {
+		return srvErrors.NewVCenterError(fmt.Errorf("failed to find datacenter: %w", err))
+	}
+	finder.SetDatacenter(dc)
+	vmFolder, err := finder.DefaultFolder(verifyCtx)
+	if err != nil {
+		return srvErrors.NewVCenterError(fmt.Errorf("failed to find VM folder: %w", err))
+	}
+
+	if err := vmware.ValidateUserPrivilegesOnEntity(verifyCtx, vimClient, vmFolder.Reference(), requiredPrivileges, creds.Username); err != nil {
+		return err
+	}
+
+	zap.S().Named("forecaster_service").Info("vCenter credentials and privileges verified successfully")
+	return nil
+}
+
 // resolveCredentials returns inline credentials if provided (after verifying
 // privileges and saving them), otherwise falls back to previously verified
 // saved credentials, or returns CredentialsNotSetError.
 func (f *ForecasterService) resolveCredentials(ctx context.Context, creds models.Credentials) (models.Credentials, error) {
+	u, err := vmware.NormalizeAndValidateURL(creds.URL)
+	if err != nil {
+		return models.Credentials{}, err
+	}
+	creds.URL = u
+
 	if creds.URL != "" {
-		if err := vmware.VerifyCredentialsAndPrivileges(ctx, &creds, models.ForecasterRequiredPrivileges, "forecaster"); err != nil {
+		if err := f.verifyCredentialsAndPrivileges(ctx, &creds, models.ForecasterRequiredPrivileges); err != nil {
 			return models.Credentials{}, err
 		}
 		f.mu.Lock()
