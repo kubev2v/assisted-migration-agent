@@ -450,6 +450,8 @@ var _ = Describe("VMs Handlers Integration", func() {
 		err = test.InsertVMs(ctx, db)
 		Expect(err).NotTo(HaveOccurred())
 
+		Expect(st.VM().RebuildFilterTable(ctx)).To(Succeed())
+
 		vmSrv = services.NewVMService(st)
 		mockInspector = &MockInspectorService{
 			GetVmStatusResult: models.InspectionStatus{State: models.InspectionStateNotStarted},

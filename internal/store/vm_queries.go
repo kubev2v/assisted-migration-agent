@@ -163,53 +163,6 @@ var vmOutputQuery = sq.Select( //nolint
 		GROUP BY u.vm_id
 	) t ON v."VM ID" = t.vm_id`)
 
-<<<<<<< HEAD
-// vmFilterSubquery is the base flat JOIN query for filtering.
-// It joins all tables so WHERE clauses can reference any raw column.
-// Filters should be applied via Where clauses, then use the result to get DISTINCT VM IDs.
-var vmFilterSubquery = sq.Select(`DISTINCT v."VM ID"`).
-	From("vinfo v").
-	LeftJoin(`vdisk dk ON v."VM ID" = dk."VM ID"`).
-	LeftJoin(`concerns c ON v."VM ID" = c."VM_ID"`).
-	LeftJoin(`vm_inspection_status i ON v."VM ID" = i."VM ID"`).
-	LeftJoin(`vcpu cpu ON v."VM ID" = cpu."VM ID"`).
-	LeftJoin(`vmemory mem ON v."VM ID" = mem."VM ID"`).
-	LeftJoin(`vnetwork net ON v."VM ID" = net."VM ID"`).
-	LeftJoin(`(SELECT "VM_ID", COUNT(*) AS issues_count FROM concerns GROUP BY "VM_ID") cc ON v."VM ID" = cc."VM_ID"`).
-	LeftJoin(`(SELECT "VM_ID", COUNT(*) AS critical_count FROM concerns WHERE "Category" = 'Critical' GROUP BY "VM_ID") crit ON v."VM ID" = crit."VM_ID"`).
-	LeftJoin(`(SELECT "VM ID", SUM("Capacity MiB") AS total_disk FROM vdisk GROUP BY "VM ID") d ON v."VM ID" = d."VM ID"`).
-	LeftJoin(`vdatastore ds ON ds."Name" = regexp_extract(COALESCE(dk."Path", dk."Disk Path"), '\[([^\]]+)\]', 1)`).
-	LeftJoin(`vm_inspection_concerns ic ON v."VM ID" = ic."VM ID" AND ic.inspection_id = (SELECT MAX(inspection_id) FROM vm_inspection_concerns imx WHERE imx."VM ID" = v."VM ID")`).
-	LeftJoin(`(
-SELECT moid, vm_name,
-       provisioned_cpus, provisioned_memory_mb, provisioned_disk_kb,
-       cpu_avg_pct, cpu_p95_pct, cpu_max_pct, cpu_latest_pct,
-       mem_avg_pct, mem_p95_pct, mem_max_pct, mem_latest_pct,
-       disk_pct, confidence_pct
-FROM rightsizing_vm_utilization
-WHERE report_id = (
-      SELECT id FROM rightsizing_reports
-      WHERE written_batch_count > 0
-      ORDER BY created_at DESC LIMIT 1
-  )) as utilization ON v."VM ID" = utilization.moid`)
-||||||| parent of 4cc9c9e (NO-JIRA | perf: materialize vm_filter table for filter queries)
-// vmFilterSubquery is the base flat JOIN query for filtering.
-// It joins all tables so WHERE clauses can reference any raw column.
-// Filters should be applied via Where clauses, then use the result to get DISTINCT VM IDs.
-var vmFilterSubquery = sq.Select(`DISTINCT v."VM ID"`).
-	From("vinfo v").
-	LeftJoin(`vdisk dk ON v."VM ID" = dk."VM ID"`).
-	LeftJoin(`concerns c ON v."VM ID" = c."VM_ID"`).
-	LeftJoin(`vm_inspection_status i ON v."VM ID" = i."VM ID"`).
-	LeftJoin(`vcpu cpu ON v."VM ID" = cpu."VM ID"`).
-	LeftJoin(`vmemory mem ON v."VM ID" = mem."VM ID"`).
-	LeftJoin(`vnetwork net ON v."VM ID" = net."VM ID"`).
-	LeftJoin(`(SELECT "VM_ID", COUNT(*) AS issues_count FROM concerns GROUP BY "VM_ID") cc ON v."VM ID" = cc."VM_ID"`).
-	LeftJoin(`(SELECT "VM_ID", COUNT(*) AS critical_count FROM concerns WHERE "Category" = 'Critical' GROUP BY "VM_ID") crit ON v."VM ID" = crit."VM_ID"`).
-	LeftJoin(`(SELECT "VM ID", SUM("Capacity MiB") AS total_disk FROM vdisk GROUP BY "VM ID") d ON v."VM ID" = d."VM ID"`).
-	LeftJoin(`vdatastore ds ON ds."Name" = regexp_extract(COALESCE(dk."Path", dk."Disk Path"), '\[([^\]]+)\]', 1)`).
-	LeftJoin(`vm_inspection_concerns ic ON v."VM ID" = ic."VM ID" AND ic.inspection_id = (SELECT MAX(inspection_id) FROM vm_inspection_concerns imx WHERE imx."VM ID" = v."VM ID")`)
-=======
 // vmListQuery selects VM summaries directly from vm_filter in a single scan.
 var vmListQuery = sq.Select(
 	`DISTINCT ON(v_vm_id) v_vm_id AS id`,
@@ -358,4 +311,3 @@ LEFT JOIN vdatastore ds ON ds."Name" = regexp_extract(COALESCE(dk."Path", dk."Di
 LEFT JOIN vm_inspection_concerns ic ON v."VM ID" = ic."VM ID" AND ic.inspection_id = (SELECT MAX(inspection_id) FROM vm_inspection_concerns imx WHERE imx."VM ID" = v."VM ID")
 LEFT JOIN rightsizing_vm_utilization u ON u.moid = v."VM ID" AND u.report_id = (SELECT id FROM rightsizing_reports WHERE written_batch_count > 0 ORDER BY created_at DESC LIMIT 1)
 `
->>>>>>> 4cc9c9e (NO-JIRA | perf: materialize vm_filter table for filter queries)

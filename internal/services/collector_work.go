@@ -94,14 +94,24 @@ func (f *collectorWorkFactory) Build(creds models.Credentials) work.WorkBuilder[
 				return models.CollectorStatus{State: models.CollectorStateParsing}
 			},
 			Work: func(ctx context.Context, r models.CollectorResult) (models.CollectorResult, error) {
-				if err := f.store.Inventory().Save(ctx, r.Inventory); err != nil {
+				if err := f.store.WithTx(ctx, func(ctx context.Context) error {
+					if err := f.store.VM().RebuildFilterTable(ctx); err != nil {
+						return fmt.Errorf("rebuilding vm_filter: %w", err)
+					}
+
+					if err := f.createFolderGroups(ctx); err != nil {
+						zap.S().Named("collector_service").Warnw("failed to create folder groups", "error", err)
+					}
+
+					if err := f.store.Inventory().Save(ctx, r.Inventory); err != nil {
+						return err
+					}
+
+					zap.S().Named("inventory").Info("successfully created inventory with clusters")
+
+					return nil
+				}); err != nil {
 					return r, err
-				}
-
-				zap.S().Named("inventory").Info("successfully created inventory with clusters")
-
-				if err := f.createFolderGroups(ctx); err != nil {
-					zap.S().Named("collector_service").Warnw("failed to create folder groups", "error", err)
 				}
 
 				return r, nil
@@ -196,6 +206,8 @@ func (f *collectorWorkFactory) process(ctx context.Context, sqlitePath string) (
 		return nil, fmt.Errorf("failed to marshal the inventory: %w", err)
 	}
 
+	zap.S().Named("inventory").Info("successfully created inventory with clusters")
+
 	return inventory, nil
 }
 
@@ -205,37 +217,32 @@ func (f *collectorWorkFactory) createFolderGroups(ctx context.Context) error {
 		return fmt.Errorf("getting folders: %w", err)
 	}
 
-	if err := f.store.WithTx(ctx, func(txCtx context.Context) error {
-		for _, folder := range folders {
-			group := models.Group{
-				Name:        folder.Name,
-				Description: fmt.Sprintf("VMs in folder: %s", folder.Name),
-				Filter:      fmt.Sprintf("folder = '%s'", strings.ReplaceAll(folder.Name, `'`, `\'`)),
-				Tags:        []string{sanitizeTag(folder.Name)},
-			}
-			if _, err := f.store.Group().Create(txCtx, group); err != nil {
-				zap.S().Named("collector_service").Warnw("failed to create folder group",
-					"folder", folder.Name, "error", err)
-			}
+	for _, folder := range folders {
+		group := models.Group{
+			Name:        folder.Name,
+			Description: fmt.Sprintf("VMs in folder: %s", folder.Name),
+			Filter:      fmt.Sprintf("folder = '%s'", strings.ReplaceAll(folder.Name, `'`, `\'`)),
+			Tags:        []string{sanitizeTag(folder.Name)},
 		}
+		if _, err := f.store.Group().Create(ctx, group); err != nil {
+			zap.S().Named("collector_service").Warnw("failed to create folder group",
+				"folder", folder.Name, "error", err)
+		}
+	}
 
-		noFolderGroup := models.Group{
-			Name:        "No Folder",
-			Description: "VMs not organized in any folder",
-			Filter:      "folder = ''",
-			Tags:        []string{},
-		}
-		if _, err := f.store.Group().Create(txCtx, noFolderGroup); err != nil {
-			zap.S().Named("collector_service").Warnw("failed to create no-folder group", "error", err)
-		}
-
-		return f.store.Group().RefreshMatches(txCtx)
-	}); err != nil {
-		return fmt.Errorf("creating folder groups: %w", err)
+	noFolderGroup := models.Group{
+		Name:        "No Folder",
+		Description: "VMs not organized in any folder",
+		Filter:      "folder = ''",
+		Tags:        []string{},
+	}
+	if _, err := f.store.Group().Create(ctx, noFolderGroup); err != nil {
+		zap.S().Named("collector_service").Warnw("failed to create no-folder group", "error", err)
 	}
 
 	zap.S().Named("collector_service").Infow("folder groups created", "count", len(folders)+1)
-	return nil
+
+	return f.store.Group().RefreshMatches(ctx)
 }
 
 var tagSanitizer = regexp.MustCompile(`[^a-zA-Z0-9_.]`)

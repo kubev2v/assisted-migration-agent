@@ -3,8 +3,6 @@ package services
 import (
 	"context"
 
-	sq "github.com/Masterminds/squirrel"
-
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 )
@@ -49,21 +47,14 @@ func (s *VMService) Get(ctx context.Context, id string) (*models.VM, error) {
 }
 
 func (s *VMService) List(ctx context.Context, params VMListParams) ([]models.VirtualMachineSummary, int, error) {
-	filters, opts := s.buildListOptions(params)
+	filter := store.ByFilter(params.Expression)
 
-	if len(params.Sort) == 0 {
-		opts = append(opts, store.WithDefaultSort())
-	}
-
-	vms, err := s.store.VM().List(ctx, filters, opts...)
+	vms, err := s.store.VM().List(ctx, filter, s.buildListOptions(params)...)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	countFilters, _ := s.buildListOptions(VMListParams{
-		Expression: params.Expression,
-	})
-	total, err := s.store.VM().Count(ctx, countFilters...)
+	total, err := s.store.VM().Count(ctx, filter)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -71,13 +62,8 @@ func (s *VMService) List(ctx context.Context, params VMListParams) ([]models.Vir
 	return vms, total, nil
 }
 
-func (s *VMService) buildListOptions(params VMListParams) ([]sq.Sqlizer, []store.ListOption) {
-	var filters []sq.Sqlizer
+func (s *VMService) buildListOptions(params VMListParams) []store.ListOption {
 	var opts []store.ListOption
-
-	if params.Expression != "" {
-		filters = append(filters, store.ByFilter(params.Expression))
-	}
 
 	if len(params.Sort) > 0 {
 		sortParams := make([]store.SortParam, len(params.Sort))
@@ -85,6 +71,8 @@ func (s *VMService) buildListOptions(params VMListParams) ([]sq.Sqlizer, []store
 			sortParams[i] = store.SortParam{Field: s.Field, Desc: s.Desc}
 		}
 		opts = append(opts, store.WithSort(sortParams))
+	} else {
+		opts = append(opts, store.WithDefaultSort())
 	}
 
 	if params.Limit > 0 {
@@ -94,5 +82,5 @@ func (s *VMService) buildListOptions(params VMListParams) ([]sq.Sqlizer, []store
 		opts = append(opts, store.WithOffset(params.Offset))
 	}
 
-	return filters, opts
+	return opts
 }

@@ -32,6 +32,7 @@ var _ = Describe("VMService", func() {
 		st = store.NewStore(db, test.NewMockValidator())
 		Expect(st.Migrate(ctx)).To(Succeed())
 		Expect(test.InsertVMs(ctx, db)).To(Succeed())
+		Expect(st.VM().RebuildFilterTable(ctx)).To(Succeed())
 
 		srv = services.NewVMService(st)
 	})

@@ -371,6 +371,7 @@ var _ = Describe("GroupService", func() {
 	Context("ListVirtualMachines", func() {
 		BeforeEach(func() {
 			Expect(test.InsertVMs(ctx, db)).To(Succeed())
+			Expect(st.VM().RebuildFilterTable(ctx)).To(Succeed())
 		})
 
 		// Given a group with filter "cluster = 'production'" and VMs in production

@@ -24,36 +24,14 @@ func NewVMStore(db QueryInterceptor) *VMStore {
 	return &VMStore{db: db}
 }
 
-// FilterOption is a SQL WHERE condition for filtering VMs in the flat filter subquery.
-type FilterOption = sq.Sqlizer
-
 // List returns VM summaries with filters, sorting, and pagination.
-func (s *VMStore) List(ctx context.Context, filters []sq.Sqlizer, opts ...ListOption) ([]models.VirtualMachineSummary, error) {
-	builder := vmOutputQuery.
-		Columns(
-			`u.cpu_p95_pct AS cpu_p95_pct`,
-			`u.mem_p95_pct AS mem_p95_pct`,
-			`u.disk_pct    AS disk_pct`,
-			`u.confidence_pct AS confidence_pct`,
-		).
-		LeftJoin(`rightsizing_vm_utilization u ON u.moid = v."VM ID" AND u.report_id = (` +
-			`SELECT id FROM rightsizing_reports WHERE written_batch_count > 0 ORDER BY created_at DESC LIMIT 1` +
-			`)`)
+func (s *VMStore) List(ctx context.Context, filter sq.Sqlizer, opts ...ListOption) ([]models.VirtualMachineSummary, error) {
+	builder := vmListQuery
 
-	// Apply external filters via subquery (filters reference table aliases in vmFilterSubquery)
-	if len(filters) > 0 {
-		subquery := vmFilterSubquery
-		for _, f := range filters {
-			subquery = subquery.Where(f)
-		}
-		subSQL, subArgs, err := subquery.ToSql()
-		if err != nil {
-			return nil, err
-		}
-		builder = builder.Where(sq.Expr(fmt.Sprintf(`v."VM ID" IN (%s)`, subSQL), subArgs...))
+	if filter != nil {
+		builder = builder.Where(filter)
 	}
 
-	// Apply options (sort, limit, offset)
 	for _, opt := range opts {
 		builder = opt(builder)
 	}
@@ -75,8 +53,6 @@ func (s *VMStore) List(ctx context.Context, filters []sq.Sqlizer, opts ...ListOp
 	for rows.Next() {
 		var vm models.VirtualMachineSummary
 		var sqlErr string
-		var inspectionConcernCount int
-		var tags StringArray
 		err := rows.Scan(
 			&vm.ID,
 			&vm.Name,
@@ -90,8 +66,7 @@ func (s *VMStore) List(ctx context.Context, filters []sq.Sqlizer, opts ...ListOp
 			&vm.IsTemplate,
 			&vm.IsMigratable,
 			&sqlErr,
-			&inspectionConcernCount,
-			&tags,
+			&vm.InspectionConcernCount,
 			&vm.UtilizationCpuP95,
 			&vm.UtilizationMemP95,
 			&vm.UtilizationDisk,
@@ -103,28 +78,18 @@ func (s *VMStore) List(ctx context.Context, filters []sq.Sqlizer, opts ...ListOp
 		if sqlErr != "" {
 			vm.InspectionStatus.Error = errors.New(sqlErr)
 		}
-		vm.InspectionConcernCount = inspectionConcernCount
-		vm.Tags = tags
 		vms = append(vms, vm)
 	}
 
 	return vms, rows.Err()
 }
 
-// Count returns the total number of VMs matching the filters.
-func (s *VMStore) Count(ctx context.Context, filters ...sq.Sqlizer) (int, error) {
-	builder := sq.Select("COUNT(*)").From("vinfo v")
+// Count returns the total number of VMs matching the filter.
+func (s *VMStore) Count(ctx context.Context, filter sq.Sqlizer) (int, error) {
+	builder := sq.Select("COUNT(DISTINCT v_vm_id)").From("vm_filter")
 
-	if len(filters) > 0 {
-		subquery := vmFilterSubquery
-		for _, f := range filters {
-			subquery = subquery.Where(f)
-		}
-		subSQL, subArgs, err := subquery.ToSql()
-		if err != nil {
-			return 0, err
-		}
-		builder = builder.Where(sq.Expr(fmt.Sprintf(`v."VM ID" IN (%s)`, subSQL), subArgs...))
+	if filter != nil {
+		builder = builder.Where(filter)
 	}
 
 	query, args, err := builder.ToSql()
@@ -211,6 +176,58 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 	}
 
 	return &result, nil
+}
+
+// GetFolders returns a list of distinct folders from the vinfo table.
+func (s *VMStore) GetFolders(ctx context.Context) ([]models.Folder, error) {
+	builder := sq.Select(
+		`COALESCE("Folder ID", '') AS id`,
+		`COALESCE("Folder", '') AS name`,
+	).Distinct().
+		From("vinfo").
+		Where(`COALESCE("Folder ID", "Folder", '') != ''`).
+		OrderBy("name")
+
+	query, args, err := builder.ToSql()
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	var folders []models.Folder
+	for rows.Next() {
+		var folder models.Folder
+		if err := rows.Scan(&folder.ID, &folder.Name); err != nil {
+			return nil, err
+		}
+		folders = append(folders, folder)
+	}
+
+	return folders, rows.Err()
+}
+
+// RebuildFilterTable repopulates the vm_filter materialized table by
+// joining all source tables. Callers should invoke this after any write
+// to vinfo, concerns, vm_inspection_*, or rightsizing_vm_utilization.
+func (s *VMStore) RebuildFilterTable(ctx context.Context) error {
+	zap.S().Named("vm_store").Debug("rebuilding vm_filter table")
+
+	if _, err := s.db.ExecContext(ctx, "DELETE FROM vm_filter"); err != nil {
+		return fmt.Errorf("clearing vm_filter: %w", err)
+	}
+
+	if _, err := s.db.ExecContext(ctx, vmFilterInsertQuery); err != nil {
+		return fmt.Errorf("populating vm_filter: %w", err)
+	}
+
+	return nil
 }
 
 // normalizeCategory validates and normalizes an issue category (case-insensitive).
@@ -326,7 +343,7 @@ func ByFilter(expr string) sq.Sqlizer {
 // This bypasses the filter subquery, using pre-computed group match results.
 func WithVMIDs(ids []string) ListOption {
 	return func(b sq.SelectBuilder) sq.SelectBuilder {
-		return b.Where(sq.Eq{`v."VM ID"`: ids})
+		return b.Where(sq.Eq{`v_vm_id`: ids})
 	}
 }
 
@@ -378,39 +395,4 @@ func WithSort(sorts []SortParam) ListOption {
 		orderClauses = append(orderClauses, "id")
 		return b.OrderBy(orderClauses...)
 	}
-}
-
-// GetFolders returns a list of distinct folders from the vinfo table.
-func (s *VMStore) GetFolders(ctx context.Context) ([]models.Folder, error) {
-	builder := sq.Select(
-		`COALESCE("Folder ID", '') AS id`,
-		`COALESCE("Folder", '') AS name`,
-	).Distinct().
-		From("vinfo").
-		Where(`COALESCE("Folder ID", "Folder", '') != ''`).
-		OrderBy("name")
-
-	query, args, err := builder.ToSql()
-	if err != nil {
-		return nil, err
-	}
-
-	rows, err := s.db.QueryContext(ctx, query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_ = rows.Close()
-	}()
-
-	var folders []models.Folder
-	for rows.Next() {
-		var folder models.Folder
-		if err := rows.Scan(&folder.ID, &folder.Name); err != nil {
-			return nil, err
-		}
-		folders = append(folders, folder)
-	}
-
-	return folders, rows.Err()
 }

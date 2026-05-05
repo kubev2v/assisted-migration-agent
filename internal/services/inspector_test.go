@@ -556,6 +556,8 @@ var _ = Describe("InspectorService", func() {
 			Expect(results[0].Concerns).To(HaveLen(3))
 			Expect(results[1].Concerns).To(HaveLen(1))
 
+			Expect(st.VM().RebuildFilterTable(ctx)).To(Succeed())
+
 			vms, err := st.VM().List(ctx, nil, store.WithDefaultSort())
 			Expect(err).NotTo(HaveOccurred())
 

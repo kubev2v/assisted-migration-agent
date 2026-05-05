@@ -385,6 +385,8 @@ var _ = Describe("GroupStore", func() {
 			insertVM("vm-2", "db-server", "production")
 			insertVM("vm-3", "staging-app", "staging")
 			insertVM("vm-4", "dev-server", "development")
+
+			Expect(s.VM().RebuildFilterTable(ctx)).To(Succeed())
 		})
 
 		It("should do nothing when no groups exist", func() {

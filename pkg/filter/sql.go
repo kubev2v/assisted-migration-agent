@@ -15,195 +15,191 @@ type MapFunc func(name string) (string, FieldType, error)
 
 var defaultMapFn MapFunc = func(name string) (string, FieldType, error) {
 	switch strings.ToLower(name) {
-	// vinfo (v) — string fields
+	// vinfo (v_)
 	case "id":
-		return `v."VM ID"`, StringField, nil
+		return `v_vm_id`, StringField, nil
 	case "name":
-		return `v."VM"`, StringField, nil
+		return `v_vm`, StringField, nil
 	case "folder_id":
-		return `v."Folder ID"`, StringField, nil
+		return `v_folder_id`, StringField, nil
 	case "folder":
-		return `v."Folder"`, StringField, nil
+		return `v_folder`, StringField, nil
 	case "host":
-		return `v."Host"`, StringField, nil
+		return `v_host`, StringField, nil
 	case "smbios_uuid":
-		return `v."SMBIOS UUID"`, StringField, nil
+		return `v_smbios_uuid`, StringField, nil
 	case "vm_uuid":
-		return `v."VM UUID"`, StringField, nil
+		return `v_vm_uuid`, StringField, nil
 	case "firmware":
-		return `v."Firmware"`, StringField, nil
+		return `v_firmware`, StringField, nil
 	case "powerstate", "status":
-		return `v."Powerstate"`, StringField, nil
+		return `v_powerstate`, StringField, nil
 	case "connection_state":
-		return `v."Connection state"`, StringField, nil
+		return `v_connection_state`, StringField, nil
 	case "ft_state":
-		return `v."FT State"`, StringField, nil
+		return `v_ft_state`, StringField, nil
 	case "os_config":
-		return `v."OS according to the configuration file"`, StringField, nil
+		return `v_os_config`, StringField, nil
 	case "os_tools":
-		return `v."OS according to the VMware Tools"`, StringField, nil
+		return `v_os_tools`, StringField, nil
 	case "dns_name":
-		return `v."DNS Name"`, StringField, nil
+		return `v_dns_name`, StringField, nil
 	case "ip_address":
-		return `v."Primary IP Address"`, StringField, nil
+		return `v_ip_address`, StringField, nil
 	case "hw_version":
-		return `v."HW version"`, StringField, nil
+		return `v_hw_version`, StringField, nil
 	case "resource_pool":
-		return `v."Resource pool"`, StringField, nil
+		return `v_resource_pool`, StringField, nil
 	case "datacenter":
-		return `v."Datacenter"`, StringField, nil
+		return `v_datacenter`, StringField, nil
 	case "cluster":
-		return `v."Cluster"`, StringField, nil
-
-	// vinfo (v) — numeric fields
+		return `v_cluster`, StringField, nil
 	case "cpus":
-		return `v."CPUs"`, NumericField, nil
+		return `v_cpus`, NumericField, nil
 	case "memory":
-		return `v."Memory"`, NumericField, nil
+		return `v_memory`, NumericField, nil
 	case "storage_used":
-		return `v."In Use MiB"`, NumericField, nil
-	case "total_disk_capacity":
-		return `d.total_disk`, NumericField, nil
+		return `v_in_use_mib`, NumericField, nil
 	case "provisioned":
-		return `v."Provisioned MiB"`, NumericField, nil
-	case "issues_count":
-		return `cc."issues_count"`, NumericField, nil
-
-	// vinfo (v) — boolean fields
+		return `v_provisioned_mib`, NumericField, nil
 	case "template":
-		return `v."Template"`, BooleanField, nil
+		return `v_template`, BooleanField, nil
 	case "cbt":
-		return `v."CBT"`, BooleanField, nil
+		return `v_cbt`, BooleanField, nil
 	case "enable_uuid":
-		return `v."EnableUUID"`, BooleanField, nil
+		return `v_enable_uuid`, BooleanField, nil
+
+	// computed aggregates
+	case "total_disk_capacity":
+		return `total_disk`, NumericField, nil
+	case "issues_count":
+		return `issues_count`, NumericField, nil
 	case "migratable":
-		return `(COALESCE(crit.critical_count, 0) = 0)`, BooleanField, nil
+		return `migratable`, BooleanField, nil
 
-	// vdisk (dk) — disk.* prefix
+	// vdisk (dk_)
 	case "disk.path":
-		return `dk."Disk Path"`, StringField, nil
+		return `dk_disk_path`, StringField, nil
 	case "disk.sharing":
-		return `dk."Sharing mode"`, StringField, nil
+		return `dk_sharing_mode`, StringField, nil
 	case "disk.shared_bus":
-		return `dk."Shared Bus"`, StringField, nil
+		return `dk_shared_bus`, StringField, nil
 	case "disk.mode":
-		return `dk."Disk Mode"`, StringField, nil
+		return `dk_disk_mode`, StringField, nil
 	case "disk.controller":
-		return `dk."Controller"`, StringField, nil
+		return `dk_controller`, StringField, nil
 	case "disk.label":
-		return `dk."Label"`, StringField, nil
+		return `dk_label`, StringField, nil
 	case "disk.key":
-		return `dk."Disk Key"`, NumericField, nil
+		return `dk_disk_key`, NumericField, nil
 	case "disk.capacity":
-		return `dk."Capacity MiB"`, NumericField, nil
+		return `dk_capacity_mib`, NumericField, nil
 	case "disk.raw":
-		return `dk."Raw"`, BooleanField, nil
+		return `dk_raw`, BooleanField, nil
 	case "disk.thin":
-		return `dk."Thin"`, BooleanField, nil
+		return `dk_thin`, BooleanField, nil
 
-	// concerns (c) — concern.* prefix
+	// concerns (c_)
 	case "concern.label":
-		return `c."Label"`, StringField, nil
+		return `c_label`, StringField, nil
 	case "concern.category":
-		return `c."Category"`, StringField, nil
+		return `c_category`, StringField, nil
 	case "concern.assessment":
-		return `c."Assessment"`, StringField, nil
+		return `c_assessment`, StringField, nil
 
-	// vm_inspection_status (i) — inspection.* prefix
+	// vm_inspection_status (inspection_)
 	case "inspection.status":
-		return `i.status`, StringField, nil
+		return `inspection_status`, StringField, nil
 	case "inspection.error":
-		return `i.error`, StringField, nil
+		return `inspection_error`, StringField, nil
 
-	// vm_inspection_concerns (ic) — inspection_concern.* prefix
+	// vm_inspection_concerns (ic_)
 	case "inspection_concern.label":
-		return `ic.label`, StringField, nil
+		return `ic_label`, StringField, nil
 	case "inspection_concern.category":
-		return `ic.category`, StringField, nil
+		return `ic_category`, StringField, nil
 	case "inspection_concern.msg":
-		return `ic.msg`, StringField, nil
+		return `ic_msg`, StringField, nil
 
-	// vcpu (cpu) — cpu.* prefix
+	// vcpu (cpu_)
 	case "cpu.sockets":
-		return `cpu."Sockets"`, NumericField, nil
+		return `cpu_sockets`, NumericField, nil
 	case "cpu.cores_per_socket":
-		return `cpu."Cores p/s"`, NumericField, nil
+		return `cpu_cores_ps`, NumericField, nil
 	case "cpu.hot_add":
-		return `cpu."Hot Add"`, BooleanField, nil
+		return `cpu_hot_add`, BooleanField, nil
 	case "cpu.hot_remove":
-		return `cpu."Hot Remove"`, BooleanField, nil
+		return `cpu_hot_remove`, BooleanField, nil
 
-	// vmemory (mem) — mem.* prefix
+	// vmemory (mem_)
 	case "mem.ballooned":
-		return `mem."Ballooned"`, NumericField, nil
+		return `mem_ballooned`, NumericField, nil
 	case "mem.hot_add":
-		return `mem."Hot Add"`, BooleanField, nil
+		return `mem_hot_add`, BooleanField, nil
 
-	// vnetwork (net) — net.* prefix
+	// vnetwork (net_)
 	case "net.network":
-		return `net."Network"`, StringField, nil
+		return `net_network`, StringField, nil
 	case "net.mac":
-		return `net."Mac Address"`, StringField, nil
+		return `net_mac_address`, StringField, nil
 	case "net.nic_label":
-		return `net."NIC label"`, StringField, nil
+		return `net_nic_label`, StringField, nil
 	case "net.adapter":
-		return `net."Adapter"`, StringField, nil
+		return `net_adapter`, StringField, nil
 	case "net.switch":
-		return `net."Switch"`, StringField, nil
+		return `net_switch`, StringField, nil
 	case "net.type":
-		return `net."Type"`, StringField, nil
+		return `net_type`, StringField, nil
 	case "net.ipv4":
-		return `net."IPv4 Address"`, StringField, nil
+		return `net_ipv4_address`, StringField, nil
 	case "net.ipv6":
-		return `net."IPv6 Address"`, StringField, nil
+		return `net_ipv6_address`, StringField, nil
 	case "net.cluster":
-		return `net."Cluster"`, StringField, nil
+		return `net_cluster`, StringField, nil
 	case "net.connected":
-		return `net."Connected"`, BooleanField, nil
+		return `net_connected`, BooleanField, nil
 	case "net.starts_connected":
-		return `net."Starts Connected"`, BooleanField, nil
+		return `net_starts_connected`, BooleanField, nil
 
-	// vdatastore (ds) — datastore.* prefix
+	// vdatastore (ds_)
 	case "datastore.name":
-		return `ds."Name"`, StringField, nil
+		return `ds_name`, StringField, nil
 	case "datastore.address":
-		return `ds."Address"`, StringField, nil
+		return `ds_address`, StringField, nil
 	case "datastore.object_id":
-		return `ds."Object ID"`, StringField, nil
+		return `ds_object_id`, StringField, nil
 	case "datastore.mha":
-		return `ds."MHA"`, StringField, nil
+		return `ds_mha`, BooleanField, nil
 	case "datastore.type":
-		return `ds."Type"`, StringField, nil
+		return `ds_type`, StringField, nil
 	case "datastore.hosts":
-		return `ds."Hosts"`, NumericField, nil
+		return `ds_hosts`, StringField, nil
 	case "datastore.free":
-		return `ds."Free MiB"`, NumericField, nil
+		return `ds_free_mib`, NumericField, nil
 	case "datastore.capacity":
-		return `ds."Capacity MiB"`, NumericField, nil
+		return `ds_capacity_mib`, NumericField, nil
 
-	// rightsizing_vm_utilization (utilization) — utilization.* prefix
-	case "utilization.provisioned_cpus":
-		return "utilization.provisioned_cpus", NumericField, nil
-	case "utilization.provisioned_memory":
-		return "utilization.provisioned_memory_mb", NumericField, nil
-	case "utilization.provisioned_disk":
-		return "utilization.provisioned_disk_kb", NumericField, nil
+	// utilization (u_)
 	case "utilization.cpu_avg":
-		return "utilization.cpu_avg_pct", NumericField, nil
+		return `u_cpu_avg_pct`, NumericField, nil
+	case "utilization.cpu_p95":
+		return `u_cpu_p95_pct`, NumericField, nil
 	case "utilization.cpu_max":
-		return "utilization.cpu_max_pct", NumericField, nil
+		return `u_cpu_max_pct`, NumericField, nil
 	case "utilization.cpu_latest":
-		return "utilization.cpu_latest_pct", NumericField, nil
+		return `u_cpu_latest_pct`, NumericField, nil
 	case "utilization.mem_avg":
-		return "utilization.mem_avg_pct", NumericField, nil
+		return `u_mem_avg_pct`, NumericField, nil
+	case "utilization.mem_p95":
+		return `u_mem_p95_pct`, NumericField, nil
 	case "utilization.mem_max":
-		return "utilization.mem_max_pct", NumericField, nil
+		return `u_mem_max_pct`, NumericField, nil
 	case "utilization.mem_latest":
-		return "utilization.mem_latest_pct", NumericField, nil
+		return `u_mem_latest_pct`, NumericField, nil
 	case "utilization.disk":
-		return "utilization.disk_pct", NumericField, nil
+		return `u_disk_pct`, NumericField, nil
 	case "utilization.confidence":
-		return "utilization.confidence_pct", NumericField, nil
+		return `u_confidence_pct`, NumericField, nil
 
 	default:
 		return "", 0, fmt.Errorf("unknown filter field: %s", name)

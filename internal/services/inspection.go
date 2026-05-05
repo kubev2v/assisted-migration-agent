@@ -197,8 +197,21 @@ func (i *inspectionService) buildInspectionWorkUnits(id string) work.WorkBuilder
 				return models.InspectionStatus{State: models.InspectionStateRunning}
 			},
 			Work: func(ctx context.Context, result models.InspectionResult) (models.InspectionResult, error) {
-				err := i.save(ctx, id, result.Concerns)
-				return result, err
+				if err := i.store.WithTx(ctx, func(ctx context.Context) error {
+					if err := i.save(ctx, id, result.Concerns); err != nil {
+						return err
+					}
+
+					if err := i.store.VM().RebuildFilterTable(ctx); err != nil {
+						return err
+					}
+
+					return nil
+				}); err != nil {
+					return result, err
+				}
+
+				return result, nil
 			},
 		},
 		{
@@ -279,14 +292,13 @@ func (i *inspectionService) inspect(ctx context.Context, vmId, snapId string) ([
 
 func (i *inspectionService) save(ctx context.Context, id string, concerns []models.VmInspectionConcern) error {
 	zap.S().Named("inspection_service").Infow("persisting inspection results", "vmId", id, "concernCount", len(concerns))
-	err := i.store.WithTx(ctx, func(txCtx context.Context) error {
-		return i.store.Inspection().InsertResult(txCtx, id, concerns)
-	})
-	if err != nil {
-		zap.S().Named("inspection_service").Errorw("failed to persist inspection results", "vmId", id, "error", err)
+
+	if err := i.store.Inspection().InsertResult(ctx, id, concerns); err != nil {
 		return err
 	}
+
 	zap.S().Named("inspection_service").Infow("inspection results persisted", "vmId", id)
+
 	return nil
 }
 
