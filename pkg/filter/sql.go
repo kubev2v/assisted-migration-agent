@@ -181,6 +181,30 @@ var defaultMapFn MapFunc = func(name string) (string, FieldType, error) {
 	case "datastore.capacity":
 		return `ds."Capacity MiB"`, NumericField, nil
 
+	// rightsizing_vm_utilization (utilization) — utilization.* prefix
+	case "utilization.provisioned_cpus":
+		return "utilization.provisioned_cpus", NumericField, nil
+	case "utilization.provisioned_memory":
+		return "utilization.provisioned_memory_mb", NumericField, nil
+	case "utilization.provisioned_disk":
+		return "utilization.provisioned_disk_kb", NumericField, nil
+	case "utilization.cpu_avg":
+		return "utilization.cpu_avg_pct", NumericField, nil
+	case "utilization.cpu_max":
+		return "utilization.cpu_max_pct", NumericField, nil
+	case "utilization.cpu_latest":
+		return "utilization.cpu_latest_pct", NumericField, nil
+	case "utilization.mem_avg":
+		return "utilization.mem_avg_pct", NumericField, nil
+	case "utilization.mem_max":
+		return "utilization.mem_max_pct", NumericField, nil
+	case "utilization.mem_latest":
+		return "utilization.mem_latest_pct", NumericField, nil
+	case "utilization.disk":
+		return "utilization.disk_pct", NumericField, nil
+	case "utilization.confidence":
+		return "utilization.confidence_pct", NumericField, nil
+
 	default:
 		return "", 0, fmt.Errorf("unknown filter field: %s", name)
 	}

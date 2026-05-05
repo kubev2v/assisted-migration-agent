@@ -88,6 +88,7 @@ func (c *VSphereCollector) Close() {
 	if c.db != nil {
 		_ = c.db.Close(false)
 	}
+	<-time.After(5 * time.Second)
 }
 
 // createProvider creates a forklift Provider object from credentials.

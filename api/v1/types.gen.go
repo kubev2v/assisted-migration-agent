@@ -797,7 +797,8 @@ type VirtualMachineDetail struct {
 	ToolsRunningStatus *string `json:"toolsRunningStatus,omitempty"`
 
 	// ToolsStatus Installation status of VMware Tools (toolsNotInstalled, toolsNotRunning, toolsOld, toolsOk)
-	ToolsStatus *string `json:"toolsStatus,omitempty"`
+	ToolsStatus *string               `json:"toolsStatus,omitempty"`
+	Utilization *VmUtilizationDetails `json:"utilization,omitempty"`
 
 	// Uuid Universally unique identifier assigned by vCenter
 	Uuid *string `json:"uuid,omitempty"`

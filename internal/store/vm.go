@@ -2,12 +2,12 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
 	duckdb_models "github.com/kubev2v/migration-planner/pkg/duckdb_parser/models"
 	"go.uber.org/zap"
 
@@ -17,12 +17,11 @@ import (
 )
 
 type VMStore struct {
-	db     QueryInterceptor
-	parser *duckdb_parser.Parser
+	db QueryInterceptor
 }
 
-func NewVMStore(db QueryInterceptor, parser *duckdb_parser.Parser) *VMStore {
-	return &VMStore{db: db, parser: parser}
+func NewVMStore(db QueryInterceptor) *VMStore {
+	return &VMStore{db: db}
 }
 
 // FilterOption is a SQL WHERE condition for filtering VMs in the flat filter subquery.
@@ -138,18 +137,78 @@ func (s *VMStore) Count(ctx context.Context, filters ...sq.Sqlizer) (int, error)
 	return count, err
 }
 
-// Get returns full VM details by ID using the parser.
+// Get returns full VM details by ID, including utilization data from the latest rightsizing report.
 func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
-	vms, err := s.parser.VMs(ctx, duckdb_parser.Filters{VmId: id}, duckdb_parser.Options{})
+	rows, err := s.db.QueryContext(ctx, vmGetQuery, id)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("querying VM %s: %w", id, err)
 	}
+	defer func() { _ = rows.Close() }()
 
-	if len(vms) == 0 {
+	if !rows.Next() {
+		if err := rows.Err(); err != nil {
+			return nil, err
+		}
 		return nil, srvErrors.NewResourceNotFoundError("vm", id)
 	}
 
-	result := fromDB(vms[0])
+	var pvm duckdb_models.VM
+	var (
+		uMoid                                 sql.NullString
+		uVmName                               sql.NullString
+		uProvCpus                             sql.NullInt64
+		uProvMemMb                            sql.NullInt64
+		uProvDiskKb                           sql.NullFloat64
+		uCpuAvg, uCpuP95, uCpuMax, uCpuLatest sql.NullFloat64
+		uMemAvg, uMemP95, uMemMax, uMemLatest sql.NullFloat64
+		uDisk, uConfidence                    sql.NullFloat64
+	)
+
+	if err := rows.Scan(
+		&pvm.ID, &pvm.Name, &pvm.Folder, &pvm.Host, &pvm.UUID,
+		&pvm.Firmware, &pvm.PowerState, &pvm.ConnectionState,
+		&pvm.FaultToleranceEnabled, &pvm.CpuCount, &pvm.MemoryMB,
+		&pvm.GuestName, &pvm.GuestNameFromVmwareTools, &pvm.HostName,
+		&pvm.IpAddress, &pvm.StorageUsed, &pvm.IsTemplate,
+		&pvm.ChangeTrackingEnabled, &pvm.DiskEnableUuid, &pvm.Datacenter,
+		&pvm.Cluster, &pvm.HWVersion, &pvm.TotalDiskCapacityMiB,
+		&pvm.ProvisionedMiB, &pvm.ResourcePool, &pvm.OsDiskComplexity,
+		&pvm.CpuHotAddEnabled, &pvm.CpuHotRemoveEnabled, &pvm.CpuSockets,
+		&pvm.CoresPerSocket, &pvm.MemoryHotAddEnabled, &pvm.BalloonedMemory,
+		&pvm.Disks, &pvm.NICs, &pvm.Networks, &pvm.Concerns,
+		&uMoid, &uVmName, &uProvCpus, &uProvMemMb, &uProvDiskKb,
+		&uCpuAvg, &uCpuP95, &uCpuMax, &uCpuLatest,
+		&uMemAvg, &uMemP95, &uMemMax, &uMemLatest,
+		&uDisk, &uConfidence,
+	); err != nil {
+		return nil, fmt.Errorf("scanning VM %s: %w", id, err)
+	}
+
+	for i := range pvm.Disks {
+		pvm.Disks[i].ChangeTrackingEnabled = pvm.ChangeTrackingEnabled
+	}
+
+	result := fromDB(pvm)
+
+	if uMoid.Valid {
+		result.Utilization = &models.VmUtilizationDetails{
+			MOID:                uMoid.String,
+			VMName:              uVmName.String,
+			ProvisionedCpus:     int(uProvCpus.Int64),
+			ProvisionedMemoryMb: int(uProvMemMb.Int64),
+			ProvisionedDiskKb:   uProvDiskKb.Float64,
+			CpuAvg:              uCpuAvg.Float64,
+			CpuP95:              uCpuP95.Float64,
+			CpuMax:              uCpuMax.Float64,
+			CpuLatest:           uCpuLatest.Float64,
+			MemAvg:              uMemAvg.Float64,
+			MemP95:              uMemP95.Float64,
+			MemMax:              uMemMax.Float64,
+			MemLatest:           uMemLatest.Float64,
+			Disk:                uDisk.Float64,
+			Confidence:          uConfidence.Float64,
+		}
+	}
 
 	return &result, nil
 }

@@ -1217,6 +1217,8 @@ components:
           description: List of issues affecting this VirtualMachine
         inspection:
           $ref: '#/components/schemas/VmInspectionResults'
+        utilization:
+          $ref: '#/components/schemas/VmUtilizationDetails'
 
     VMDisk:
       type: object

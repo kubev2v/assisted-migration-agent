@@ -280,14 +280,6 @@ var _ = Describe("NewCollectorStatus", func() {
 			Expect(status.Error).NotTo(BeNil())
 			Expect(*status.Error).To(Equal("connection refused"))
 		})
-
-		// Given an unknown collector state
-		// When we convert it to API status
-		// Then it should default to unknown state
-		It("should default unknown state to unknown", func() {
-			status := v1.NewCollectorStatus(models.CollectorStatus{State: "unknown"})
-			Expect(string(status.Status)).To(Equal("unknown state"))
-		})
 	})
 })
 

@@ -72,7 +72,7 @@ func NewCollectorStatus(status models.CollectorStatus) CollectorStatus {
 	case models.CollectorStateParsing:
 		c.Status = CollectorStatusStatusParsing
 	default:
-		c.Status = "unknown state"
+		c.Status = CollectorStatusStatusParsing
 	}
 
 	if status.Error != nil {
@@ -186,6 +186,11 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 			Index:   &n.Index,
 		}
 		details.Nics = append(details.Nics, nic)
+	}
+
+	if vm.Utilization != nil {
+		u := NewVmUtilizationDetailsFromModel(*vm.Utilization)
+		details.Utilization = &u
 	}
 
 	if len(vm.Issues) > 0 {

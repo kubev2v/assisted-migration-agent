@@ -61,6 +61,8 @@ type VM struct {
 
 	Issues []Issue
 
+	Utilization *VmUtilizationDetails
+
 	InspectionState    string
 	InspectionError    string
 	InspectionConcerns []VmInspectionConcern

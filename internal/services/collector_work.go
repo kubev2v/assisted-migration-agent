@@ -88,17 +88,37 @@ func (f *collectorWorkFactory) Build(creds models.Credentials) work.WorkBuilder[
 		units = append(units, f.postCollectionBuilder(creds)...)
 	}
 
-	units = append(units, collectorWorkUnit{
-		Status: func() models.CollectorStatus {
-			return models.CollectorStatus{State: models.CollectorStateCollected}
+	units = append(units, []collectorWorkUnit{
+		{
+			Status: func() models.CollectorStatus {
+				return models.CollectorStatus{State: models.CollectorStateParsing}
+			},
+			Work: func(ctx context.Context, r models.CollectorResult) (models.CollectorResult, error) {
+				if err := f.store.Inventory().Save(ctx, r.Inventory); err != nil {
+					return r, err
+				}
+
+				zap.S().Named("inventory").Info("successfully created inventory with clusters")
+
+				if err := f.createFolderGroups(ctx); err != nil {
+					zap.S().Named("collector_service").Warnw("failed to create folder groups", "error", err)
+				}
+
+				return r, nil
+			},
 		},
-		Work: func(ctx context.Context, r models.CollectorResult) (models.CollectorResult, error) {
-			if err := f.eventSrv.AddInventoryUpdateEvent(ctx, r.Inventory); err != nil {
-				return r, err
-			}
-			return r, nil
+		{
+			Status: func() models.CollectorStatus {
+				return models.CollectorStatus{State: models.CollectorStateCollected}
+			},
+			Work: func(ctx context.Context, r models.CollectorResult) (models.CollectorResult, error) {
+				if err := f.eventSrv.AddInventoryUpdateEvent(ctx, r.Inventory); err != nil {
+					return r, err
+				}
+				return r, nil
+			},
 		},
-	})
+	}...)
 
 	return work.NewSliceWorkBuilder(units)
 }
@@ -174,16 +194,6 @@ func (f *collectorWorkFactory) process(ctx context.Context, sqlitePath string) (
 	inventory, err := json.Marshal(converters.ToAPI(inv))
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal the inventory: %w", err)
-	}
-
-	if err := f.store.Inventory().Save(ctx, inventory); err != nil {
-		return nil, err
-	}
-
-	zap.S().Named("inventory").Info("successfully created inventory with clusters")
-
-	if err := f.createFolderGroups(ctx); err != nil {
-		zap.S().Named("collector_service").Warnw("failed to create folder groups", "error", err)
 	}
 
 	return inventory, nil

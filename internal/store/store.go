@@ -32,7 +32,7 @@ func NewStore(db *sql.DB, validator duckdb_parser.Validator) *Store {
 		parser:        parser,
 		configuration: NewConfigurationStore(qi),
 		inventory:     NewInventoryStore(qi),
-		vm:            NewVMStore(qi, parser),
+		vm:            NewVMStore(qi),
 		inspection:    NewInspectionStore(qi),
 		group:         NewGroupStore(qi),
 		vddk:          NewVddkStore(qi),

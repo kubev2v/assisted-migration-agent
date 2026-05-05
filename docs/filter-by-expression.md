@@ -81,9 +81,9 @@ Size/capacity fields support unit suffixes. The expression parser normalizes all
 |-------------|---------------|
 | `memory`, `total_disk_capacity`, `disk.capacity`, `storage_used`, `provisioned`, `datastore.free`, `datastore.capacity`, `mem.ballooned` | Use units for clarity (e.g., `8GB`, `500GB`). Without units, value is in MB. |
 
-| Count fields (no units needed) |
-|--------------------------------|
-| `cpus`, `issues_count`, `cpu.sockets`, `cpu.cores_per_socket`, `disk.key` |
+| Count / percentage fields (no units needed) |
+|----------------------------------------------|
+| `cpus`, `issues_count`, `cpu.sockets`, `cpu.cores_per_socket`, `disk.key`, `utilization.*` (all utilization fields are raw numbers — percentages or counts) |
 
 **Examples:**
 ```text
@@ -176,6 +176,27 @@ curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=datast
 
 # VMs on NFS datastores
 curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=datastore.type = 'NFS'"
+```
+
+### Filter by utilization
+
+Utilization fields are either percentages (0–100) or raw counts depending on the metric — see the field table below. Notably, `utilization.provisioned_cpus` is a vCPU count, `utilization.provisioned_memory` is in MB, and `utilization.provisioned_disk` is in KB. No unit suffix needed.
+
+```bash
+# VMs with CPU max utilization above 80%
+curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=utilization.cpu_max > 80"
+
+# VMs with low memory utilization (potential rightsizing candidates)
+curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=utilization.mem_avg < 20"
+
+# VMs with high confidence data and high CPU usage
+curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=utilization.confidence >= 80 and utilization.cpu_max > 70"
+
+# VMs with disk utilization above 90%
+curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=utilization.disk > 90"
+
+# Over-provisioned VMs: many CPUs but low utilization
+curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=cpus >= 8 and utilization.cpu_avg < 10"
 ```
 
 ### Combined filters with sorting and pagination
@@ -324,6 +345,24 @@ Rows from the latest inspection run per VM (`vm_inspection_concerns` joined at m
 | `datastore.mha`      | string  | MHA                         |
 | `datastore.capacity` | integer | Capacity (MiB)              |
 | `datastore.type`     | string  | Type                        |
+
+### rightsizing_vm_utilization (utilization.*) — utilization metrics
+
+Utilization data comes from the latest completed rightsizing report. Most values are percentages (0–100), but `provisioned_cpus` (vCPU count), `provisioned_memory` (MB), and `provisioned_disk` (KB) are raw counts. If no rightsizing data has been collected, these fields will be NULL and comparisons against them will not match any VMs.
+
+| Identifier                      | Type    | Description                              |
+|---------------------------------|---------|------------------------------------------|
+| `utilization.provisioned_cpus`  | numeric | Provisioned vCPU count                   |
+| `utilization.provisioned_memory`| numeric | Provisioned memory (MB)                  |
+| `utilization.provisioned_disk`  | numeric | Provisioned disk (KB)                    |
+| `utilization.cpu_avg`           | numeric | CPU utilization average (%)              |
+| `utilization.cpu_max`           | numeric | CPU utilization maximum (%)              |
+| `utilization.cpu_latest`        | numeric | CPU utilization latest sample (%)        |
+| `utilization.mem_avg`           | numeric | Memory utilization average (%)           |
+| `utilization.mem_max`           | numeric | Memory utilization maximum (%)           |
+| `utilization.mem_latest`        | numeric | Memory utilization latest sample (%)     |
+| `utilization.disk`              | numeric | Disk utilization (%)                     |
+| `utilization.confidence`        | numeric | Data confidence (sample_count / expected × 100) |
 
 ---
 
