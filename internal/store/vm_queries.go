@@ -133,7 +133,8 @@ WHERE i."VM ID" = ?;
 
 // vmOutputQuery is the base aggregated output query that produces one row per VM.
 // Filters should be applied via Where clauses on the VM ID.
-var vmOutputQuery = sq.Select(
+// OBSOLETE. keep it here for reference
+var vmOutputQuery = sq.Select( //nolint
 	`v."VM ID" AS id`,
 	`v."VM" AS name`,
 	`v."Powerstate" AS power_state`,
@@ -162,6 +163,7 @@ var vmOutputQuery = sq.Select(
 		GROUP BY u.vm_id
 	) t ON v."VM ID" = t.vm_id`)
 
+<<<<<<< HEAD
 // vmFilterSubquery is the base flat JOIN query for filtering.
 // It joins all tables so WHERE clauses can reference any raw column.
 // Filters should be applied via Where clauses, then use the result to get DISTINCT VM IDs.
@@ -190,3 +192,170 @@ WHERE report_id = (
       WHERE written_batch_count > 0
       ORDER BY created_at DESC LIMIT 1
   )) as utilization ON v."VM ID" = utilization.moid`)
+||||||| parent of 4cc9c9e (NO-JIRA | perf: materialize vm_filter table for filter queries)
+// vmFilterSubquery is the base flat JOIN query for filtering.
+// It joins all tables so WHERE clauses can reference any raw column.
+// Filters should be applied via Where clauses, then use the result to get DISTINCT VM IDs.
+var vmFilterSubquery = sq.Select(`DISTINCT v."VM ID"`).
+	From("vinfo v").
+	LeftJoin(`vdisk dk ON v."VM ID" = dk."VM ID"`).
+	LeftJoin(`concerns c ON v."VM ID" = c."VM_ID"`).
+	LeftJoin(`vm_inspection_status i ON v."VM ID" = i."VM ID"`).
+	LeftJoin(`vcpu cpu ON v."VM ID" = cpu."VM ID"`).
+	LeftJoin(`vmemory mem ON v."VM ID" = mem."VM ID"`).
+	LeftJoin(`vnetwork net ON v."VM ID" = net."VM ID"`).
+	LeftJoin(`(SELECT "VM_ID", COUNT(*) AS issues_count FROM concerns GROUP BY "VM_ID") cc ON v."VM ID" = cc."VM_ID"`).
+	LeftJoin(`(SELECT "VM_ID", COUNT(*) AS critical_count FROM concerns WHERE "Category" = 'Critical' GROUP BY "VM_ID") crit ON v."VM ID" = crit."VM_ID"`).
+	LeftJoin(`(SELECT "VM ID", SUM("Capacity MiB") AS total_disk FROM vdisk GROUP BY "VM ID") d ON v."VM ID" = d."VM ID"`).
+	LeftJoin(`vdatastore ds ON ds."Name" = regexp_extract(COALESCE(dk."Path", dk."Disk Path"), '\[([^\]]+)\]', 1)`).
+	LeftJoin(`vm_inspection_concerns ic ON v."VM ID" = ic."VM ID" AND ic.inspection_id = (SELECT MAX(inspection_id) FROM vm_inspection_concerns imx WHERE imx."VM ID" = v."VM ID")`)
+=======
+// vmListQuery selects VM summaries directly from vm_filter in a single scan.
+var vmListQuery = sq.Select(
+	`DISTINCT ON(v_vm_id) v_vm_id AS id`,
+	`v_vm AS name`,
+	`v_powerstate AS power_state`,
+	`COALESCE(v_cluster, '') AS cluster`,
+	`COALESCE(v_datacenter, '') AS datacenter`,
+	`v_memory AS memory`,
+	`total_disk AS disk_size`,
+	`issues_count AS issue_count`,
+	`COALESCE(inspection_status, 'not_started') AS status`,
+	`v_template AS template`,
+	`migratable`,
+	`COALESCE(inspection_error, '') AS error`,
+	`(SELECT COUNT(*)::BIGINT FROM vm_inspection_concerns ic WHERE ic."VM ID" = v_vm_id AND ic.inspection_id = (SELECT MAX(inspection_id) FROM vm_inspection_concerns imx WHERE imx."VM ID" = v_vm_id)) AS inspection_concern_count`,
+	`u_cpu_p95_pct AS cpu_p95_pct`,
+	`u_mem_p95_pct AS mem_p95_pct`,
+	`u_disk_pct AS disk_pct`,
+	`u_confidence_pct AS confidence_pct`,
+).From("vm_filter")
+
+// vmFilterInsertQuery populates vm_filter by joining all source tables.
+// Called by VMStore.RebuildFilterTable after any data change.
+const vmFilterInsertQuery = `
+INSERT INTO vm_filter
+SELECT
+    -- vinfo (v_)
+    v."VM ID"                                  AS v_vm_id,
+    v."VM"                                     AS v_vm,
+    v."Folder ID"                              AS v_folder_id,
+    v."Folder"                                 AS v_folder,
+    v."Host"                                   AS v_host,
+    v."SMBIOS UUID"                            AS v_smbios_uuid,
+    v."VM UUID"                                AS v_vm_uuid,
+    v."Firmware"                               AS v_firmware,
+    v."Powerstate"                             AS v_powerstate,
+    v."Connection state"                       AS v_connection_state,
+    v."FT State"                               AS v_ft_state,
+    v."OS according to the configuration file" AS v_os_config,
+    v."OS according to the VMware Tools"       AS v_os_tools,
+    v."DNS Name"                               AS v_dns_name,
+    v."Primary IP Address"                     AS v_ip_address,
+    v."HW version"                             AS v_hw_version,
+    v."Resource pool"                          AS v_resource_pool,
+    v."Datacenter"                             AS v_datacenter,
+    v."Cluster"                                AS v_cluster,
+    v."CPUs"                                   AS v_cpus,
+    v."Memory"                                 AS v_memory,
+    v."In Use MiB"                             AS v_in_use_mib,
+    v."Provisioned MiB"                        AS v_provisioned_mib,
+    v."Template"                               AS v_template,
+    v."CBT"                                    AS v_cbt,
+    v."EnableUUID"                             AS v_enable_uuid,
+
+    -- vdisk (dk_)
+    dk."Disk Path"                             AS dk_disk_path,
+    dk."Sharing mode"                          AS dk_sharing_mode,
+    dk."Shared Bus"                            AS dk_shared_bus,
+    dk."Disk Mode"                             AS dk_disk_mode,
+    dk."Controller"                            AS dk_controller,
+    dk."Label"                                 AS dk_label,
+    dk."Disk Key"                              AS dk_disk_key,
+    dk."Capacity MiB"                          AS dk_capacity_mib,
+    dk."Raw"                                   AS dk_raw,
+    dk."Thin"                                  AS dk_thin,
+
+    -- concerns (c_)
+    c."Label"                                  AS c_label,
+    c."Category"                               AS c_category,
+    c."Assessment"                             AS c_assessment,
+
+    -- vm_inspection_status (inspection_)
+    i.status                                   AS inspection_status,
+    i.error                                    AS inspection_error,
+
+    -- vcpu (cpu_)
+    cpu."Sockets"                              AS cpu_sockets,
+    cpu."Cores p/s"                            AS cpu_cores_ps,
+    cpu."Hot Add"                              AS cpu_hot_add,
+    cpu."Hot Remove"                           AS cpu_hot_remove,
+
+    -- vmemory (mem_)
+    mem."Ballooned"                            AS mem_ballooned,
+    mem."Hot Add"                              AS mem_hot_add,
+
+    -- vnetwork (net_)
+    net."Network"                              AS net_network,
+    net."Mac Address"                          AS net_mac_address,
+    net."NIC label"                            AS net_nic_label,
+    net."Adapter"                              AS net_adapter,
+    net."Switch"                               AS net_switch,
+    net."Type"                                 AS net_type,
+    net."IPv4 Address"                         AS net_ipv4_address,
+    net."IPv6 Address"                         AS net_ipv6_address,
+    net."Cluster"                              AS net_cluster,
+    net."Connected"                            AS net_connected,
+    net."Starts Connected"                     AS net_starts_connected,
+
+    -- vdatastore (ds_)
+    ds."Name"                                  AS ds_name,
+    ds."Address"                               AS ds_address,
+    ds."Object ID"                             AS ds_object_id,
+    ds."MHA"                                   AS ds_mha,
+    ds."Type"                                  AS ds_type,
+    ds."Hosts"                                 AS ds_hosts,
+    ds."Free MiB"                              AS ds_free_mib,
+    ds."Capacity MiB"                          AS ds_capacity_mib,
+
+    -- vm_inspection_concerns (ic_)
+    ic.label                                   AS ic_label,
+    ic.category                                AS ic_category,
+    ic.msg                                     AS ic_msg,
+
+    -- computed aggregates
+    COALESCE(cc.issues_count, 0)               AS issues_count,
+    COALESCE(crit.critical_count, 0)           AS critical_count,
+    COALESCE(d.total_disk, 0)                  AS total_disk,
+    (COALESCE(crit.critical_count, 0) = 0)     AS migratable,
+
+    -- utilization (u_)
+    u.provisioned_cpus                         AS u_provisioned_cpus,
+    u.provisioned_memory_mb                    AS u_provisioned_memory_mb,
+    u.provisioned_disk_kb                      AS u_provisioned_disk_kb,
+    u.cpu_avg_pct                              AS u_cpu_avg_pct,
+    u.cpu_p95_pct                              AS u_cpu_p95_pct,
+    u.cpu_max_pct                              AS u_cpu_max_pct,
+    u.cpu_latest_pct                           AS u_cpu_latest_pct,
+    u.mem_avg_pct                              AS u_mem_avg_pct,
+    u.mem_p95_pct                              AS u_mem_p95_pct,
+    u.mem_max_pct                              AS u_mem_max_pct,
+    u.mem_latest_pct                           AS u_mem_latest_pct,
+    u.disk_pct                                 AS u_disk_pct,
+    u.confidence_pct                           AS u_confidence_pct
+
+FROM vinfo v
+LEFT JOIN vdisk dk ON v."VM ID" = dk."VM ID"
+LEFT JOIN concerns c ON v."VM ID" = c."VM_ID"
+LEFT JOIN vm_inspection_status i ON v."VM ID" = i."VM ID"
+LEFT JOIN vcpu cpu ON v."VM ID" = cpu."VM ID"
+LEFT JOIN vmemory mem ON v."VM ID" = mem."VM ID"
+LEFT JOIN vnetwork net ON v."VM ID" = net."VM ID"
+LEFT JOIN (SELECT "VM_ID", COUNT(*) AS issues_count FROM concerns GROUP BY "VM_ID") cc ON v."VM ID" = cc."VM_ID"
+LEFT JOIN (SELECT "VM_ID", COUNT(*) AS critical_count FROM concerns WHERE "Category" = 'Critical' GROUP BY "VM_ID") crit ON v."VM ID" = crit."VM_ID"
+LEFT JOIN (SELECT "VM ID", SUM("Capacity MiB") AS total_disk FROM vdisk GROUP BY "VM ID") d ON v."VM ID" = d."VM ID"
+LEFT JOIN vdatastore ds ON ds."Name" = regexp_extract(COALESCE(dk."Path", dk."Disk Path"), '\[([^\]]+)\]', 1)
+LEFT JOIN vm_inspection_concerns ic ON v."VM ID" = ic."VM ID" AND ic.inspection_id = (SELECT MAX(inspection_id) FROM vm_inspection_concerns imx WHERE imx."VM ID" = v."VM ID")
+LEFT JOIN rightsizing_vm_utilization u ON u.moid = v."VM ID" AND u.report_id = (SELECT id FROM rightsizing_reports WHERE written_batch_count > 0 ORDER BY created_at DESC LIMIT 1)
+`
+>>>>>>> 4cc9c9e (NO-JIRA | perf: materialize vm_filter table for filter queries)
