@@ -77,15 +77,27 @@ func (m *MockConsoleService) SetMode(ctx context.Context, mode models.AgentMode)
 
 // MockVMService is a mock implementation of VMService.
 type MockVMService struct {
-	ListResult                    []models.VirtualMachineSummary
-	ListTotal                     int
-	ListError                     error
-	GetResult                     *models.VM
-	GetError                      error
-	UpdateMigrationExcludedError  error
-	LastListParams                services.VMListParams
-	LastUpdateMigrationExcludedID string
-	UpdateMigrationExcludedValue  bool
+	ListResult                     []models.VirtualMachineSummary
+	ListTotal                      int
+	ListError                      error
+	GetResult                      *models.VM
+	GetError                       error
+	UpdateMigrationExcludedError   error
+	LastListParams                 services.VMListParams
+	LastUpdateMigrationExcludedID  string
+	UpdateMigrationExcludedValue   bool
+	UpdateLabelsError              error
+	LastUpdateLabelsID             string
+	LastUpdateLabelsValue          []string
+	GetAllLabelsResult             []string
+	GetAllLabelsError              error
+	RemoveLabelFromAllVMsResult    int
+	RemoveLabelFromAllVMsError     error
+	LastRemoveLabelFromAllVMsLabel string
+	UpdateLabelVMsError            error
+	LastUpdateLabelVMsAdd          []string
+	LastUpdateLabelVMsRem          []string
+	LastUpdateLabelVMsLabel        string
 }
 
 func (m *MockVMService) List(ctx context.Context, params services.VMListParams) ([]models.VirtualMachineSummary, int, error) {
@@ -101,6 +113,28 @@ func (m *MockVMService) UpdateMigrationExcluded(ctx context.Context, id string, 
 	m.LastUpdateMigrationExcludedID = id
 	m.UpdateMigrationExcludedValue = excluded
 	return m.UpdateMigrationExcludedError
+}
+
+func (m *MockVMService) UpdateLabels(ctx context.Context, id string, labels []string) error {
+	m.LastUpdateLabelsID = id
+	m.LastUpdateLabelsValue = labels
+	return m.UpdateLabelsError
+}
+
+func (m *MockVMService) GetAllLabels(ctx context.Context) ([]string, error) {
+	return m.GetAllLabelsResult, m.GetAllLabelsError
+}
+
+func (m *MockVMService) RemoveLabelFromAllVMs(ctx context.Context, label string) (int, error) {
+	m.LastRemoveLabelFromAllVMsLabel = label
+	return m.RemoveLabelFromAllVMsResult, m.RemoveLabelFromAllVMsError
+}
+
+func (m *MockVMService) UpdateLabelVMs(ctx context.Context, addVMIDs, removeVMIDs []string, label string) error {
+	m.LastUpdateLabelVMsAdd = addVMIDs
+	m.LastUpdateLabelVMsRem = removeVMIDs
+	m.LastUpdateLabelVMsLabel = label
+	return m.UpdateLabelVMsError
 }
 
 // MockInspectorService is a mock implementation of InspectorService.

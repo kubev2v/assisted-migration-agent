@@ -259,6 +259,74 @@ paths:
         '500':
           description: Internal server error
 
+  /vms/labels:
+    get:
+      summary: Get all distinct labels in use across VMs
+      operationId: getVMLabels
+      responses:
+        '200':
+          description: List of distinct labels
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VMLabelsResponse'
+        '500':
+          description: Internal server error
+
+  /vms/labels/{label}:
+    patch:
+      summary: Modify label VM membership (add/remove label to/from VMs)
+      operationId: updateLabelVMs
+      parameters:
+        - name: label
+          in: path
+          required: true
+          description: The label to modify
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+            pattern: '\S'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLabelVMsRequest'
+      responses:
+        '200':
+          description: Label operation completed successfully (all VMs updated atomically)
+        '400':
+          description: Invalid request
+        '404':
+          description: One or more VMs not found (no changes made)
+        '500':
+          description: Internal server error
+    delete:
+      summary: Delete label from all VMs
+      operationId: deleteLabelGlobally
+      parameters:
+        - name: label
+          in: path
+          required: true
+          description: The label to remove from all VMs
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+            pattern: '\S'
+      responses:
+        '200':
+          description: Label removed globally
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteLabelGloballyResponse'
+        '400':
+          description: Invalid label parameter
+        '500':
+          description: Internal server error
+
   /inspector:
     get:
       summary: Get inspector status
@@ -1177,6 +1245,16 @@ components:
           items:
             type: string
           description: Tags aggregated from matching groups
+        labels:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 100
+            pattern: '\S'
+          description: User-defined labels for this VM
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty,dive,min=1,max=100"
         utilization_cpu_p95:
           type: number
           format: double
@@ -1281,6 +1359,16 @@ components:
           type: boolean
           description: Whether this VM is excluded from migration
           default: false
+        labels:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 100
+            pattern: '\S'
+          description: User-defined labels for this VM
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty,dive,min=1,max=100"
         faultToleranceEnabled:
           type: boolean
           description: Whether VMware Fault Tolerance is enabled, which maintains a live shadow VirtualMachine for instant failover
@@ -1985,6 +2073,63 @@ components:
           example: true
           x-oapi-codegen-extra-tags:
             binding: "omitempty"
+        labels:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 100
+            pattern: '\S'
+          description: User-defined labels (replaces existing labels)
+          example: ["production", "critical"]
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty,dive,notblank,min=1,max=100"
+
+    VMLabelsResponse:
+      type: object
+      required:
+        - labels
+      properties:
+        labels:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 100
+            pattern: '\S'
+          description: Distinct labels currently in use
+          example: ["production", "staging", "critical"]
+
+    UpdateLabelVMsRequest:
+      type: object
+      properties:
+        add:
+          type: array
+          items:
+            type: string
+          description: VMs to add the label to
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty,dive,required"
+        remove:
+          type: array
+          items:
+            type: string
+          description: VMs to remove the label from
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty,dive,required"
+
+    DeleteLabelGloballyResponse:
+      type: object
+      required:
+        - affected
+        - label
+      properties:
+        affected:
+          type: integer
+          description: Number of VMs that had the label removed
+        label:
+          type: string
+          description: The label that was removed
 
     # --- Forecaster schemas ---
 

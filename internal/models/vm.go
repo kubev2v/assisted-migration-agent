@@ -20,6 +20,7 @@ type VirtualMachineSummary struct {
 	UtilizationDisk        *float64 // Disk utilization (%); nil when no utilization data
 	UtilizationConfidence  *float64 // Data confidence (%); nil when no utilization data
 	MigrationExcluded      bool
+	Labels                 []string
 }
 
 type VM struct {
@@ -68,6 +69,8 @@ type VM struct {
 	InspectionState    string
 	InspectionError    string
 	InspectionConcerns []VmInspectionConcern
+
+	Labels []string
 }
 
 type Issue struct {
@@ -109,4 +112,48 @@ type GuestNetwork struct {
 type Folder struct {
 	ID   string
 	Name string
+}
+
+// BatchOperationResult represents the result of a batch operation on VMs.
+type BatchOperationResult struct {
+	Results []OperationResult
+}
+
+// OperationResult represents the result of an operation on a single VM.
+type OperationResult struct {
+	VMID  string
+	Error error
+}
+
+// Succeeded returns the count of successful operations.
+func (r *BatchOperationResult) Succeeded() int {
+	count := 0
+	for _, result := range r.Results {
+		if result.Error == nil {
+			count++
+		}
+	}
+	return count
+}
+
+// Failed returns the count of failed operations.
+func (r *BatchOperationResult) Failed() int {
+	count := 0
+	for _, result := range r.Results {
+		if result.Error != nil {
+			count++
+		}
+	}
+	return count
+}
+
+// Failures returns only the failed operation results.
+func (r *BatchOperationResult) Failures() []OperationResult {
+	var failures []OperationResult
+	for _, result := range r.Results {
+		if result.Error != nil {
+			failures = append(failures, result)
+		}
+	}
+	return failures
 }

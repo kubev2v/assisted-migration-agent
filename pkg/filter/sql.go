@@ -81,6 +81,10 @@ var defaultMapFn MapFunc = func(name string) (string, FieldType, error) {
 	case "migration_excluded":
 		return `v."migration_excluded"`, BooleanField, nil
 
+	// vinfo (v) — array fields
+	case "labels":
+		return `v."labels"`, ArrayField, nil
+
 	// vdisk (dk) — disk.* prefix
 	case "disk.path":
 		return `dk."Disk Path"`, StringField, nil
@@ -329,6 +333,20 @@ func toSql(expr Expression, mf MapFunc) (sq.Sqlizer, error) {
 			return sq.NotEq{col: e.Values}, nil
 		}
 		return sq.Eq{col: e.Values}, nil
+	case *containsExpression:
+		col, ft, err := mf(strings.ToLower(e.Left.(*varExpression).Name))
+		if err != nil {
+			return nil, err
+		}
+		if ft != ArrayField && ft != AnyField {
+			return nil, fmt.Errorf("field %q is %s, but contains/!contains requires an array field", e.Left.(*varExpression).Name, ft)
+		}
+		// Cast VARCHAR to VARCHAR[] for DuckDB's list_contains function
+		castedCol := fmt.Sprintf("CAST(%s AS VARCHAR[])", col)
+		if e.Negated {
+			return sq.Expr(fmt.Sprintf("NOT list_contains(%s, ?)", castedCol), e.Value), nil
+		}
+		return sq.Expr(fmt.Sprintf("list_contains(%s, ?)", castedCol), e.Value), nil
 	default:
 		return nil, fmt.Errorf("unknown expression type: %T", expr)
 	}
@@ -343,6 +361,7 @@ const (
 	StringField
 	NumericField
 	BooleanField
+	ArrayField
 )
 
 func (f FieldType) String() string {
@@ -355,6 +374,8 @@ func (f FieldType) String() string {
 		return "numeric"
 	case BooleanField:
 		return "boolean"
+	case ArrayField:
+		return "array"
 	default:
 		return "unknown"
 	}

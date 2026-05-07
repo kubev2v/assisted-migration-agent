@@ -12,7 +12,9 @@
 //	equality    : IDENTIFIER ( "=" | "!=" | "<" | "<=" | ">" | ">=" ) value
 //	            | IDENTIFIER ( "~" | "!~" ) REGEX_LITERAL
 //	            | IDENTIFIER "in" "[" STRING ( "," STRING )* "]"
-//	            | IDENTIFIER "not" "in" "[" STRING ( "," STRING )* "]" ;
+//	            | IDENTIFIER "not" "in" "[" STRING ( "," STRING )* "]"
+//	            | IDENTIFIER "contains" STRING
+//	            | IDENTIFIER "not" "contains" STRING ;
 //	value       : STRING | QUANTITY | BOOLEAN ;
 //
 //	IDENTIFIER    : [a-zA-Z_][a-zA-Z0-9_.]* ;
@@ -23,18 +25,20 @@
 //
 // # Operators
 //
-//	=    Equal
-//	!=   Not equal
-//	>    Greater than
-//	>=   Greater than or equal
-//	<    Less than
-//	<=   Less than or equal
-//	~      Regex match (uses regexp_matches)
-//	!~     Regex not match
-//	in     Membership test (SQL IN clause)
-//	not in Exclusion test (SQL NOT IN clause)
-//	and    Logical AND (higher precedence than OR)
-//	or     Logical OR
+//	=           Equal
+//	!=          Not equal
+//	>           Greater than
+//	>=          Greater than or equal
+//	<           Less than
+//	<=          Less than or equal
+//	~           Regex match (uses regexp_matches)
+//	!~          Regex not match
+//	in          Membership test (SQL IN clause)
+//	not in      Exclusion test (SQL NOT IN clause)
+//	contains    Array contains element (for label arrays)
+//	not contains Array does not contain element
+//	and         Logical AND (higher precedence than OR)
+//	or          Logical OR
 //
 // # Value Types
 //
@@ -73,6 +77,13 @@
 //	cluster in ['prod', 'staging']
 //	status not in ['deleted', 'archived']
 //	name not in ['test-vm', 'dev-vm']
+//
+// Label Arrays: The CONTAINS and NOT CONTAINS operators test for element membership in array fields.
+//
+//	labels contains 'production'
+//	labels contains 'critical'
+//	labels not contains 'test'
+//	labels contains 'wave-1' and labels not contains 'excluded'
 //
 // # Identifiers
 //
@@ -148,7 +159,7 @@
 //	powerstate (alias: status), connection_state, ft_state, cpus, memory,
 //	os_config, os_tools, dns_name, ip_address, storage_used, template,
 //	cbt, enable_uuid, datacenter, cluster, hw_version, total_disk_capacity,
-//	provisioned, resource_pool
+//	provisioned, resource_pool, labels
 //
 // vdisk (dk) — disk.* prefix:
 //
@@ -235,6 +246,12 @@
 //
 //	cluster in ['prod', 'staging']
 //	concern.category not in ['Information']
+//
+// Label filtering with CONTAINS:
+//
+//	labels contains 'production'
+//	labels not contains 'test'
+//	labels contains 'critical' and labels not contains 'excluded'
 //
 // Combined filters:
 //

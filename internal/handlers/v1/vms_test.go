@@ -5,8 +5,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	. "github.com/onsi/ginkgo/v2"
@@ -380,6 +382,229 @@ var _ = Describe("VMs Handlers", func() {
 			var body map[string]any
 			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
 			Expect(body["error"]).To(Equal("inspector not running"))
+		})
+	})
+
+	Context("Label Operations", func() {
+		BeforeEach(func() {
+			// Setup routes for label operations
+			router.PATCH("/vms/:id", func(c *gin.Context) {
+				handler.UpdateVM(c, c.Param("id"))
+			})
+			router.GET("/vms/labels", func(c *gin.Context) {
+				handler.GetVMLabels(c)
+			})
+			router.PATCH("/vms/labels/:label", func(c *gin.Context) {
+				handler.UpdateLabelVMs(c, c.Param("label"))
+			})
+			router.DELETE("/vms/labels/:label", func(c *gin.Context) {
+				handler.DeleteLabelGlobally(c, c.Param("label"))
+			})
+		})
+
+		Context("UpdateVM with labels", func() {
+			It("should accept valid labels", func() {
+				// Arrange
+				body := `{"labels": ["production", "critical"]}`
+				req := httptest.NewRequest(http.MethodPatch, "/vms/vm-1", strings.NewReader(body))
+				req.Header.Set("Content-Type", "application/json")
+				w := httptest.NewRecorder()
+
+				// Act
+				router.ServeHTTP(w, req)
+
+				// Assert
+				Expect(w.Code).To(Equal(http.StatusOK))
+			})
+
+			It("should reject labels with empty strings", func() {
+				// Arrange
+				body := `{"labels": ["valid", ""]}`
+				req := httptest.NewRequest(http.MethodPatch, "/vms/vm-1", strings.NewReader(body))
+				req.Header.Set("Content-Type", "application/json")
+				w := httptest.NewRecorder()
+
+				// Act
+				router.ServeHTTP(w, req)
+
+				// Assert
+				Expect(w.Code).To(Equal(http.StatusBadRequest))
+			})
+
+			It("should reject labels exceeding 100 characters", func() {
+				// Arrange
+				longLabel := strings.Repeat("a", 101)
+				body := fmt.Sprintf(`{"labels": ["%s"]}`, longLabel)
+				req := httptest.NewRequest(http.MethodPatch, "/vms/vm-1", strings.NewReader(body))
+				req.Header.Set("Content-Type", "application/json")
+				w := httptest.NewRecorder()
+
+				// Act
+				router.ServeHTTP(w, req)
+
+				// Assert
+				Expect(w.Code).To(Equal(http.StatusBadRequest))
+			})
+		})
+
+		Context("GetVMLabels", func() {
+			It("should return all labels", func() {
+				// Arrange
+				mockVM.GetAllLabelsResult = []string{"production", "staging", "critical"}
+				req := httptest.NewRequest(http.MethodGet, "/vms/labels", nil)
+				w := httptest.NewRecorder()
+
+				// Act
+				router.ServeHTTP(w, req)
+
+				// Assert
+				Expect(w.Code).To(Equal(http.StatusOK))
+				var response v1.VMLabelsResponse
+				err := json.Unmarshal(w.Body.Bytes(), &response)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(response.Labels).To(ConsistOf("production", "staging", "critical"))
+			})
+		})
+
+		Context("UpdateLabelVMs", func() {
+			It("should accept valid label parameter and execute atomically", func() {
+				// Arrange
+				mockVM.UpdateLabelVMsError = nil
+				body := `{"add": ["vm-1", "vm-2"]}`
+				req := httptest.NewRequest(http.MethodPatch, "/vms/labels/production", strings.NewReader(body))
+				req.Header.Set("Content-Type", "application/json")
+				w := httptest.NewRecorder()
+
+				// Act
+				router.ServeHTTP(w, req)
+
+				// Assert
+				Expect(w.Code).To(Equal(http.StatusOK))
+				Expect(mockVM.LastUpdateLabelVMsAdd).To(Equal([]string{"vm-1", "vm-2"}))
+				Expect(mockVM.LastUpdateLabelVMsRem).To(BeEmpty())
+				Expect(mockVM.LastUpdateLabelVMsLabel).To(Equal("production"))
+			})
+
+			It("should reject empty label parameter", func() {
+				// Arrange
+				body := `{"add": ["vm-1"]}`
+				req := httptest.NewRequest(http.MethodPatch, "/vms/labels/%20", strings.NewReader(body))
+				req.Header.Set("Content-Type", "application/json")
+				w := httptest.NewRecorder()
+
+				// Act
+				router.ServeHTTP(w, req)
+
+				// Assert
+				Expect(w.Code).To(Equal(http.StatusBadRequest))
+				Expect(w.Body.String()).To(ContainSubstring("label cannot be empty"))
+			})
+
+			It("should reject whitespace-only label parameter", func() {
+				// Arrange
+				body := `{"add": ["vm-1"]}`
+				req := httptest.NewRequest(http.MethodPatch, "/vms/labels/%20%20%20", strings.NewReader(body))
+				req.Header.Set("Content-Type", "application/json")
+				w := httptest.NewRecorder()
+
+				// Act
+				router.ServeHTTP(w, req)
+
+				// Assert
+				Expect(w.Code).To(Equal(http.StatusBadRequest))
+				Expect(w.Body.String()).To(ContainSubstring("label cannot be empty"))
+			})
+
+			It("should reject label parameter exceeding 100 characters", func() {
+				// Arrange
+				longLabel := strings.Repeat("a", 101)
+				body := `{"add": ["vm-1"]}`
+				req := httptest.NewRequest(http.MethodPatch, "/vms/labels/"+longLabel, strings.NewReader(body))
+				req.Header.Set("Content-Type", "application/json")
+				w := httptest.NewRecorder()
+
+				// Act
+				router.ServeHTTP(w, req)
+
+				// Assert
+				Expect(w.Code).To(Equal(http.StatusBadRequest))
+				Expect(w.Body.String()).To(ContainSubstring("exceeds maximum length"))
+			})
+
+			It("should reject request with neither add nor remove", func() {
+				// Arrange
+				body := `{}`
+				req := httptest.NewRequest(http.MethodPatch, "/vms/labels/production", strings.NewReader(body))
+				req.Header.Set("Content-Type", "application/json")
+				w := httptest.NewRecorder()
+
+				// Act
+				router.ServeHTTP(w, req)
+
+				// Assert
+				Expect(w.Code).To(Equal(http.StatusBadRequest))
+				Expect(w.Body.String()).To(ContainSubstring("at least one"))
+			})
+		})
+
+		Context("DeleteLabelGlobally", func() {
+			It("should accept valid label parameter", func() {
+				// Arrange
+				mockVM.RemoveLabelFromAllVMsResult = 5
+				req := httptest.NewRequest(http.MethodDelete, "/vms/labels/production", nil)
+				w := httptest.NewRecorder()
+
+				// Act
+				router.ServeHTTP(w, req)
+
+				// Assert
+				Expect(w.Code).To(Equal(http.StatusOK))
+				var response v1.DeleteLabelGloballyResponse
+				err := json.Unmarshal(w.Body.Bytes(), &response)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(response.Affected).To(Equal(5))
+				Expect(response.Label).To(Equal("production"))
+			})
+
+			It("should reject empty label parameter", func() {
+				// Arrange
+				req := httptest.NewRequest(http.MethodDelete, "/vms/labels/%20", nil)
+				w := httptest.NewRecorder()
+
+				// Act
+				router.ServeHTTP(w, req)
+
+				// Assert
+				Expect(w.Code).To(Equal(http.StatusBadRequest))
+				Expect(w.Body.String()).To(ContainSubstring("label cannot be empty"))
+			})
+
+			It("should reject whitespace-only label parameter", func() {
+				// Arrange
+				req := httptest.NewRequest(http.MethodDelete, "/vms/labels/%20%20%20", nil)
+				w := httptest.NewRecorder()
+
+				// Act
+				router.ServeHTTP(w, req)
+
+				// Assert
+				Expect(w.Code).To(Equal(http.StatusBadRequest))
+				Expect(w.Body.String()).To(ContainSubstring("label cannot be empty"))
+			})
+
+			It("should reject label parameter exceeding 100 characters", func() {
+				// Arrange
+				longLabel := strings.Repeat("a", 101)
+				req := httptest.NewRequest(http.MethodDelete, "/vms/labels/"+longLabel, nil)
+				w := httptest.NewRecorder()
+
+				// Act
+				router.ServeHTTP(w, req)
+
+				// Assert
+				Expect(w.Code).To(Equal(http.StatusBadRequest))
+				Expect(w.Body.String()).To(ContainSubstring("exceeds maximum length"))
+			})
 		})
 	})
 })

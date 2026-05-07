@@ -46,6 +46,8 @@ func formatFieldError(fe validator.FieldError) string {
 		return "at least one field must be provided"
 	case "tag_format":
 		return fmt.Sprintf("%s must contain only alphanumeric characters, underscores, and dots", field)
+	case "notblank":
+		return fmt.Sprintf("%s must not be empty or whitespace-only", field)
 	default:
 		return fmt.Sprintf("%s failed validation: %s", field, fe.Tag())
 	}
@@ -55,6 +57,7 @@ func formatFieldError(fe validator.FieldError) string {
 // the given validator instance. Called once during application startup.
 func RegisterValidators(v *validator.Validate) {
 	_ = v.RegisterValidation("tag_format", validateTagFormat)
+	_ = v.RegisterValidation("notblank", validateNotBlank)
 	v.RegisterStructValidation(validateUpdateGroupAtLeastOneField, v1.UpdateGroupRequest{})
 }
 
@@ -62,6 +65,12 @@ func RegisterValidators(v *validator.Validate) {
 func validateTagFormat(fl validator.FieldLevel) bool {
 	tag := fl.Field().String()
 	return tagFormatRegex.MatchString(tag)
+}
+
+// validateNotBlank checks that a string is not empty or whitespace-only.
+func validateNotBlank(fl validator.FieldLevel) bool {
+	value := fl.Field().String()
+	return strings.TrimSpace(value) != ""
 }
 
 func validateUpdateGroupAtLeastOneField(sl validator.StructLevel) {

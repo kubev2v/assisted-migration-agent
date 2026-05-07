@@ -197,7 +197,7 @@ var _ = Describe("VMStore Migration Exclusion", func() {
 
 			// Assert
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("VM not found"))
+			Expect(err.Error()).To(ContainSubstring("not found"))
 		})
 	})
 

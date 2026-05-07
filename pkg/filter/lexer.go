@@ -58,6 +58,8 @@ func (l *lexer) Scan() (int, Token, string) {
 			tok = not
 		case "in":
 			tok = in
+		case "contains":
+			tok = contains
 		case "true", "false":
 			tok = boolean
 			val = name

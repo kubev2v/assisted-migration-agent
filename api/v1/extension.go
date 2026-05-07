@@ -39,6 +39,9 @@ func NewVirtualMachineFromSummary(vm models.VirtualMachineSummary) VirtualMachin
 	if len(vm.Tags) > 0 {
 		result.Tags = &vm.Tags
 	}
+	if len(vm.Labels) > 0 {
+		result.Labels = &vm.Labels
+	}
 
 	if vm.InspectionStatus.State != models.InspectionStateNotStarted {
 		s := NewInspectionStatus(vm.InspectionStatus)
@@ -162,6 +165,9 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 	details.MigrationExcluded = &vm.MigrationExcluded
 	details.FaultToleranceEnabled = &vm.FaultToleranceEnabled
 	details.NestedHVEnabled = &vm.NestedHVEnabled
+	if len(vm.Labels) > 0 {
+		details.Labels = &vm.Labels
+	}
 
 	for _, d := range vm.Disks {
 		// Convert MiB to bytes (parser returns capacity in MiB)

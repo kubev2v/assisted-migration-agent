@@ -186,7 +186,7 @@ func (f *collectorWorkFactory) process(ctx context.Context, sqlitePath string) (
 		zap.S().Named("collector_service").Warnw("failed to remove sqlite file", "path", sqlitePath, "error", err)
 	}
 
-	inv, err := f.store.Parser().BuildInventory(ctx)
+	inv, err := f.store.Parser().BuildInventory(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error building inventory: %w", err)
 	}

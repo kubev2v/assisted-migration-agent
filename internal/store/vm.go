@@ -77,6 +77,7 @@ func (s *VMStore) List(ctx context.Context, filter sq.Sqlizer, opts ...ListOptio
 		var inspectionConcernCount int
 		var tags StringArray
 		var migrationExcluded bool
+		var labels StringArray
 		err := rows.Scan(
 			&vm.ID,
 			&vm.Name,
@@ -93,6 +94,7 @@ func (s *VMStore) List(ctx context.Context, filter sq.Sqlizer, opts ...ListOptio
 			&inspectionConcernCount,
 			&tags,
 			&migrationExcluded,
+			&labels,
 			&vm.UtilizationCpuP95,
 			&vm.UtilizationMemP95,
 			&vm.UtilizationDisk,
@@ -107,6 +109,7 @@ func (s *VMStore) List(ctx context.Context, filter sq.Sqlizer, opts ...ListOptio
 		vm.InspectionConcernCount = inspectionConcernCount
 		vm.Tags = tags
 		vm.MigrationExcluded = migrationExcluded
+		vm.Labels = labels
 		vms = append(vms, vm)
 	}
 
@@ -172,7 +175,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 		&pvm.ChangeTrackingEnabled, &pvm.DiskEnableUuid, &pvm.Datacenter,
 		&pvm.Cluster, &pvm.HWVersion, &pvm.TotalDiskCapacityMiB,
 		&pvm.ProvisionedMiB, &pvm.ResourcePool, &pvm.OsDiskComplexity,
-		&pvm.MigrationExcluded,
+		&pvm.MigrationExcluded, &pvm.Labels,
 		&pvm.CpuHotAddEnabled, &pvm.CpuHotRemoveEnabled, &pvm.CpuSockets,
 		&pvm.CoresPerSocket, &pvm.MemoryHotAddEnabled, &pvm.BalloonedMemory,
 		&pvm.Disks, &pvm.NICs, &pvm.Networks, &pvm.Concerns,
@@ -301,6 +304,7 @@ func fromDB(pvm duckdb_models.VM) models.VM {
 		Disks:                 disks,
 		NICs:                  nics,
 		Issues:                issues,
+		Labels:                pvm.Labels,
 	}
 }
 
@@ -437,7 +441,287 @@ func (s *VMStore) UpdateMigrationExcluded(ctx context.Context, vmID string, excl
 		return err
 	}
 	if rows == 0 {
-		return fmt.Errorf("VM not found: %s", vmID)
+		return srvErrors.NewResourceNotFoundError("VM", vmID)
 	}
+	return nil
+}
+
+// UpdateLabels sets the labels array for a VM in vinfo table.
+func (s *VMStore) UpdateLabels(ctx context.Context, vmID string, labels []string) error {
+	if labels == nil {
+		labels = []string{}
+	}
+
+	// Build JSON array: ['label1', 'label2']
+	labelsJSON := "[]"
+	if len(labels) > 0 {
+		escaped := make([]string, len(labels))
+		for i, l := range labels {
+			escaped[i] = fmt.Sprintf("'%s'", strings.ReplaceAll(l, "'", "''"))
+		}
+		labelsJSON = "[" + strings.Join(escaped, ",") + "]"
+	}
+
+	query, args, err := sq.Update("vinfo").
+		Set(`"labels"`, sq.Expr(labelsJSON)).
+		Where(sq.Eq{`"VM ID"`: vmID}).
+		ToSql()
+	if err != nil {
+		return err
+	}
+
+	result, err := s.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return srvErrors.NewResourceNotFoundError("VM", vmID)
+	}
+
+	return nil
+}
+
+// GetAllLabels returns all distinct labels in use across VMs.
+func (s *VMStore) GetAllLabels(ctx context.Context) ([]string, error) {
+	// Build subquery for unnesting labels
+	subquery := sq.Select(`unnest(CAST(v."labels" AS VARCHAR[])) AS label`).
+		From("vinfo v").
+		Where(sq.NotEq{`v."labels"`: "[]"})
+
+	// Build main query
+	query, args, err := sq.Select("DISTINCT label").
+		FromSelect(subquery, "labels_unnested").
+		Where(sq.NotEq{"label": ""}).
+		OrderBy("label ASC").
+		ToSql()
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	var labels []string
+	for rows.Next() {
+		var label string
+		if err := rows.Scan(&label); err != nil {
+			return nil, err
+		}
+		labels = append(labels, label)
+	}
+
+	return labels, rows.Err()
+}
+
+// AddLabel adds a label to a VM's labels array (idempotent - no duplicates).
+func (s *VMStore) AddLabel(ctx context.Context, vmID string, label string) error {
+	// Use DuckDB's list functions to add label without creating duplicates
+	// list_append adds the element, list_distinct removes duplicates
+	query, args, err := sq.Update("vinfo").
+		Set(`"labels"`, sq.Expr("list_distinct(list_append(CAST(\"labels\" AS VARCHAR[]), ?))", label)).
+		Where(sq.Eq{`"VM ID"`: vmID}).
+		ToSql()
+	if err != nil {
+		return err
+	}
+
+	result, err := s.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return srvErrors.NewResourceNotFoundError("VM", vmID)
+	}
+
+	return nil
+}
+
+// RemoveLabel removes a label from a VM's labels array (idempotent).
+func (s *VMStore) RemoveLabel(ctx context.Context, vmID string, label string) error {
+	// Use DuckDB's list_filter with lambda to remove the specific label
+	// If label doesn't exist, this is a no-op (idempotent)
+	query, args, err := sq.Update("vinfo").
+		Set(`"labels"`, sq.Expr("list_filter(CAST(\"labels\" AS VARCHAR[]), x -> x != ?)", label)).
+		Where(sq.Eq{`"VM ID"`: vmID}).
+		ToSql()
+	if err != nil {
+		return err
+	}
+
+	result, err := s.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return srvErrors.NewResourceNotFoundError("VM", vmID)
+	}
+
+	return nil
+}
+
+// RemoveLabelGlobally removes a label from all VMs that have it.
+func (s *VMStore) RemoveLabelGlobally(ctx context.Context, label string) (int, error) {
+	// Update all VMs that have the label
+	// WHERE clause with list_contains optimizes to only update relevant VMs
+	query, args, err := sq.Update("vinfo").
+		Set(`"labels"`, sq.Expr("list_filter(CAST(\"labels\" AS VARCHAR[]), x -> x != ?)", label)).
+		Where(sq.Expr("list_contains(CAST(\"labels\" AS VARCHAR[]), ?)", label)).
+		ToSql()
+	if err != nil {
+		return 0, err
+	}
+
+	result, err := s.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return 0, err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+
+	return int(rows), nil
+}
+
+// validateVMsExist checks if all provided VM IDs exist in the database.
+// Returns the list of missing VM IDs. If all exist, returns an empty slice.
+func (s *VMStore) validateVMsExist(ctx context.Context, vmIDs []string) ([]string, error) {
+	if len(vmIDs) == 0 {
+		return nil, nil
+	}
+
+	// Use unnest in a FROM clause to create a derived table
+	query := `
+		SELECT t.id
+		FROM (SELECT unnest(?) AS id) AS t
+		WHERE t.id NOT IN (SELECT "VM ID" FROM vinfo)
+	`
+
+	rows, err := s.db.QueryContext(ctx, query, vmIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	var missing []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		missing = append(missing, id)
+	}
+
+	return missing, rows.Err()
+}
+
+// AddLabelBatch adds a label to multiple VMs in a single UPDATE statement.
+// Validates all VMs exist only on failure (lazy validation for performance).
+// Returns an error if any VM is not found.
+func (s *VMStore) AddLabelBatch(ctx context.Context, vmIDs []string, label string) error {
+	if len(vmIDs) == 0 {
+		return nil
+	}
+
+	query, args, err := sq.Update("vinfo").
+		Set(`"labels"`, sq.Expr("list_distinct(list_append(CAST(\"labels\" AS VARCHAR[]), ?))", label)).
+		Where(sq.Expr(`"VM ID" IN (SELECT unnest(?))`, vmIDs)).
+		ToSql()
+	if err != nil {
+		return err
+	}
+
+	result, err := s.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	// Verify all VMs were updated
+	if int(rowsAffected) != len(vmIDs) {
+		// Only query for missing VMs when we detect a mismatch
+		missing, err := s.validateVMsExist(ctx, vmIDs)
+		if err != nil {
+			return err
+		}
+		if len(missing) > 0 {
+			return srvErrors.NewResourceNotFoundError("VM", missing[0])
+		}
+		// Edge case: rows affected doesn't match but no VMs are missing
+		// This could happen due to concurrent deletion or other race conditions
+		return fmt.Errorf("expected to update %d VMs but only updated %d", len(vmIDs), rowsAffected)
+	}
+
+	return nil
+}
+
+// RemoveLabelBatch removes a label from multiple VMs in a single UPDATE statement.
+// Validates all VMs exist only on failure (lazy validation for performance).
+// Returns an error if any VM is not found.
+func (s *VMStore) RemoveLabelBatch(ctx context.Context, vmIDs []string, label string) error {
+	if len(vmIDs) == 0 {
+		return nil
+	}
+
+	query, args, err := sq.Update("vinfo").
+		Set(`"labels"`, sq.Expr("list_filter(CAST(\"labels\" AS VARCHAR[]), x -> x != ?)", label)).
+		Where(sq.Expr(`"VM ID" IN (SELECT unnest(?))`, vmIDs)).
+		ToSql()
+	if err != nil {
+		return err
+	}
+
+	result, err := s.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	// Verify all VMs were updated
+	if int(rowsAffected) != len(vmIDs) {
+		// Only query for missing VMs when we detect a mismatch
+		missing, err := s.validateVMsExist(ctx, vmIDs)
+		if err != nil {
+			return err
+		}
+		if len(missing) > 0 {
+			return srvErrors.NewResourceNotFoundError("VM", missing[0])
+		}
+		// Edge case: rows affected doesn't match but no VMs are missing
+		// This could happen due to concurrent deletion or other race conditions
+		return fmt.Errorf("expected to update %d VMs but only updated %d", len(vmIDs), rowsAffected)
+	}
+
 	return nil
 }

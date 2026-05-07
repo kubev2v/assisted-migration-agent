@@ -357,6 +357,153 @@ func (a *AgentSvc) UpdateVMMigrationExclusion(vmID string, excluded bool) error 
 	return nil
 }
 
+// UpdateVMLabels updates the labels for a VM
+func (a *AgentSvc) UpdateVMLabels(vmID string, labels []string) error {
+	if vmID == "" {
+		return fmt.Errorf("vmID cannot be empty")
+	}
+
+	reqBody := map[string][]string{
+		"labels": labels,
+	}
+	data, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("marshaling request: %w", err)
+	}
+
+	req, err := http.NewRequest(
+		http.MethodPatch,
+		a.baseURL+"/api/v1/vms/"+url.PathEscape(vmID),
+		bytes.NewReader(data),
+	)
+	if err != nil {
+		return fmt.Errorf("creating request: %w", err)
+	}
+
+	resp, err := a.request(NewAgentRequest(req).withHeader("Content-Type", "application/json"))
+	if err != nil {
+		return fmt.Errorf("sending request: %w", err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return fmt.Errorf("VM not found: %s (404)", vmID)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	return nil
+}
+
+// GetVMLabels retrieves all distinct labels across all VMs
+func (a *AgentSvc) GetVMLabels() (*v1.VMLabelsResponse, error) {
+	req, err := http.NewRequest(http.MethodGet, a.baseURL+"/api/v1/vms/labels", nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	resp, err := a.request(NewAgentRequest(req))
+	if err != nil {
+		return nil, fmt.Errorf("sending request: %w", err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var result v1.VMLabelsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+
+	return &result, nil
+}
+
+// UpdateLabelVMs modifies label VM membership (add/remove label to/from VMs)
+// All operations succeed or fail atomically - returns nil on success, error on failure.
+func (a *AgentSvc) UpdateLabelVMs(label string, add []string, remove []string) error {
+	if label == "" {
+		return fmt.Errorf("label cannot be empty")
+	}
+
+	reqBody := v1.UpdateLabelVMsRequest{
+		Add:    &add,
+		Remove: &remove,
+	}
+	data, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("marshaling request: %w", err)
+	}
+
+	req, err := http.NewRequest(
+		http.MethodPatch,
+		a.baseURL+"/api/v1/vms/labels/"+url.PathEscape(label),
+		bytes.NewReader(data),
+	)
+	if err != nil {
+		return fmt.Errorf("creating request: %w", err)
+	}
+
+	resp, err := a.request(NewAgentRequest(req).withHeader("Content-Type", "application/json"))
+	if err != nil {
+		return fmt.Errorf("sending request: %w", err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	return nil
+}
+
+// DeleteLabelGlobally removes a label from all VMs in the system
+func (a *AgentSvc) DeleteLabelGlobally(label string) (*v1.DeleteLabelGloballyResponse, error) {
+	if label == "" {
+		return nil, fmt.Errorf("label cannot be empty")
+	}
+
+	req, err := http.NewRequest(
+		http.MethodDelete,
+		a.baseURL+"/api/v1/vms/labels/"+url.PathEscape(label),
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	resp, err := a.request(NewAgentRequest(req))
+	if err != nil {
+		return nil, fmt.Errorf("sending request: %w", err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var result v1.DeleteLabelGloballyResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+
+	return &result, nil
+}
+
 // GroupGetParams holds parameters for getting a group's VMs.
 type GroupGetParams struct {
 	Sort     []string

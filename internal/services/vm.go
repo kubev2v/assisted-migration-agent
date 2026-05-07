@@ -98,3 +98,41 @@ func (s *VMService) UpdateMigrationExcluded(ctx context.Context, id string, excl
 
 	return s.store.VM().UpdateMigrationExcluded(ctx, id, excluded)
 }
+
+// UpdateLabels updates the labels for a VM.
+func (s *VMService) UpdateLabels(ctx context.Context, id string, labels []string) error {
+	return s.store.VM().UpdateLabels(ctx, id, labels)
+}
+
+// GetAllLabels returns all distinct labels in use across VMs.
+func (s *VMService) GetAllLabels(ctx context.Context) ([]string, error) {
+	return s.store.VM().GetAllLabels(ctx)
+}
+
+// RemoveLabelFromAllVMs removes a label from all VMs in the system.
+func (s *VMService) RemoveLabelFromAllVMs(ctx context.Context, label string) (int, error) {
+	return s.store.VM().RemoveLabelGlobally(ctx, label)
+}
+
+// UpdateLabelVMs adds and/or removes a label from multiple VMs atomically.
+// All operations succeed or fail together - if any VM is not found or any
+// operation fails, the entire transaction is rolled back and no changes are made.
+func (s *VMService) UpdateLabelVMs(ctx context.Context, addVMIDs, removeVMIDs []string, label string) error {
+	return s.store.WithTx(ctx, func(txCtx context.Context) error {
+		// Perform batch add operation (validates VMs exist internally)
+		if len(addVMIDs) > 0 {
+			if err := s.store.VM().AddLabelBatch(txCtx, addVMIDs, label); err != nil {
+				return err
+			}
+		}
+
+		// Perform batch remove operation (validates VMs exist internally)
+		if len(removeVMIDs) > 0 {
+			if err := s.store.VM().RemoveLabelBatch(txCtx, removeVMIDs, label); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}

@@ -166,3 +166,20 @@ func (e *inExpression) String() string {
 }
 
 func (e *inExpression) Type() string { return "in" }
+
+// containsExpression is an expression like "labels contains 'production'" or "labels not contains 'test'".
+type containsExpression struct {
+	Left    Expression
+	Value   string
+	Negated bool
+}
+
+func (e *containsExpression) String() string {
+	op := "CONTAINS"
+	if e.Negated {
+		op = "NOT CONTAINS"
+	}
+	return fmt.Sprintf("(%s %s %s)", e.Left.String(), op, strconv.Quote(e.Value))
+}
+
+func (e *containsExpression) Type() string { return "contains" }

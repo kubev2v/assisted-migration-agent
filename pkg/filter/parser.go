@@ -126,6 +126,9 @@ func (p *parser) factor() Expression {
 //
 // IDENTIFIER ( "=" | "!=" | "<" | "<=" | ">" | ">=" | "~" | "!~" ) value
 // IDENTIFIER "in" "[" STRING ( "," STRING )* "]"
+// IDENTIFIER "not" "in" "[" STRING ( "," STRING )* "]"
+// IDENTIFIER "contains" STRING
+// IDENTIFIER "not" "contains" STRING
 func (p *parser) equality() Expression {
 	p.expect(identifier)
 	left := &varExpression{Name: p.val}
@@ -139,10 +142,28 @@ func (p *parser) equality() Expression {
 	}
 	if p.tok == not {
 		p.next()
-		p.expect(in)
+		if p.tok == in {
+			p.next()
+			values := p.list()
+			return &inExpression{Left: left, Values: values, Negated: true}
+		}
+		if p.tok == contains {
+			p.next()
+			p.expect(stringLit)
+			value := p.val
+			p.next()
+			return &containsExpression{Left: left, Value: value, Negated: true}
+		}
+		panic(p.errorf(p.pos, "expected 'in' or 'contains' after 'not'"))
+	}
+
+	// Handle CONTAINS operator
+	if p.tok == contains {
 		p.next()
-		values := p.list()
-		return &inExpression{Left: left, Values: values, Negated: true}
+		p.expect(stringLit)
+		value := p.val
+		p.next()
+		return &containsExpression{Left: left, Value: value, Negated: false}
 	}
 
 	var op Token

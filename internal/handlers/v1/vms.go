@@ -143,7 +143,7 @@ func (h *Handler) RemoveVMFromInspection(c *gin.Context, id string) {
 func (h *Handler) UpdateVM(c *gin.Context, id string) {
 	var req v1.VirtualMachineUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": validationErrorMessage(err)})
 		return
 	}
 
@@ -159,5 +159,117 @@ func (h *Handler) UpdateVM(c *gin.Context, id string) {
 		}
 	}
 
+	// Handle labels updates
+	if req.Labels != nil {
+		if err := h.vmSrv.UpdateLabels(c.Request.Context(), id, *req.Labels); err != nil {
+			if srvErrors.IsResourceNotFoundError(err) {
+				c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+				return
+			}
+			if srvErrors.IsValidationError(err) {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
 	c.Status(http.StatusOK)
+}
+
+// GetVMLabels returns all distinct labels in use across VMs
+// (GET /vms/labels)
+func (h *Handler) GetVMLabels(c *gin.Context) {
+	labels, err := h.vmSrv.GetAllLabels(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to get labels: %v", err)})
+		return
+	}
+
+	c.JSON(http.StatusOK, v1.VMLabelsResponse{
+		Labels: labels,
+	})
+}
+
+// UpdateLabelVMs modifies label VM membership (add/remove label to/from VMs)
+// (PATCH /vms/labels/{label})
+func (h *Handler) UpdateLabelVMs(c *gin.Context, label string) {
+	// Validate label parameter
+	if strings.TrimSpace(label) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "label cannot be empty or whitespace-only"})
+		return
+	}
+	if len(label) > 100 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "label exceeds maximum length of 100 characters"})
+		return
+	}
+
+	var req v1.UpdateLabelVMsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": validationErrorMessage(err)})
+		return
+	}
+
+	// At least one of 'add' or 'remove' must be present
+	if (req.Add == nil || len(*req.Add) == 0) && (req.Remove == nil || len(*req.Remove) == 0) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "at least one of 'add' or 'remove' must be provided with VM IDs"})
+		return
+	}
+
+	// Prepare VM ID lists
+	var addVMIDs, removeVMIDs []string
+	if req.Add != nil {
+		addVMIDs = *req.Add
+	}
+	if req.Remove != nil {
+		removeVMIDs = *req.Remove
+	}
+
+	// Execute atomic update (all-or-nothing)
+	err := h.vmSrv.UpdateLabelVMs(c.Request.Context(), addVMIDs, removeVMIDs, label)
+	if err != nil {
+		if srvErrors.IsResourceNotFoundError(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		if srvErrors.IsValidationError(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Success - all operations completed atomically
+	c.Status(http.StatusOK)
+}
+
+// DeleteLabelGlobally removes a label from all VMs in the system
+// (DELETE /vms/labels/{label})
+func (h *Handler) DeleteLabelGlobally(c *gin.Context, label string) {
+	// Validate label parameter
+	if strings.TrimSpace(label) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "label cannot be empty or whitespace-only"})
+		return
+	}
+	if len(label) > 100 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "label exceeds maximum length of 100 characters"})
+		return
+	}
+
+	affected, err := h.vmSrv.RemoveLabelFromAllVMs(c.Request.Context(), label)
+	if err != nil {
+		if srvErrors.IsValidationError(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, v1.DeleteLabelGloballyResponse{
+		Affected: affected,
+		Label:    label,
+	})
 }

@@ -121,6 +121,15 @@ type ServerInterface interface {
 	// Get list of VMs with filtering and pagination
 	// (GET /vms)
 	GetVMs(c *gin.Context, params GetVMsParams)
+	// Get all distinct labels in use across VMs
+	// (GET /vms/labels)
+	GetVMLabels(c *gin.Context)
+	// Delete label from all VMs
+	// (DELETE /vms/labels/{label})
+	DeleteLabelGlobally(c *gin.Context, label string)
+	// Modify label VM membership (add/remove label to/from VMs)
+	// (PATCH /vms/labels/{label})
+	UpdateLabelVMs(c *gin.Context, label string)
 	// Get details about a vm
 	// (GET /vms/{id})
 	GetVM(c *gin.Context, id string)
@@ -915,6 +924,67 @@ func (siw *ServerInterfaceWrapper) GetVMs(c *gin.Context) {
 	siw.Handler.GetVMs(c, params)
 }
 
+// GetVMLabels operation middleware
+func (siw *ServerInterfaceWrapper) GetVMLabels(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetVMLabels(c)
+}
+
+// DeleteLabelGlobally operation middleware
+func (siw *ServerInterfaceWrapper) DeleteLabelGlobally(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "label" -------------
+	var label string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "label", c.Param("label"), &label, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter label: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.DeleteLabelGlobally(c, label)
+}
+
+// UpdateLabelVMs operation middleware
+func (siw *ServerInterfaceWrapper) UpdateLabelVMs(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "label" -------------
+	var label string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "label", c.Param("label"), &label, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter label: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.UpdateLabelVMs(c, label)
+}
+
 // GetVM operation middleware
 func (siw *ServerInterfaceWrapper) GetVM(c *gin.Context) {
 
@@ -1074,6 +1144,9 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	router.GET(options.BaseURL+"/rightsizing/:report_id/clusters/:cluster_id", wrapper.GetRightsizingReportCluster)
 	router.GET(options.BaseURL+"/version", wrapper.GetVersion)
 	router.GET(options.BaseURL+"/vms", wrapper.GetVMs)
+	router.GET(options.BaseURL+"/vms/labels", wrapper.GetVMLabels)
+	router.DELETE(options.BaseURL+"/vms/labels/:label", wrapper.DeleteLabelGlobally)
+	router.PATCH(options.BaseURL+"/vms/labels/:label", wrapper.UpdateLabelVMs)
 	router.GET(options.BaseURL+"/vms/:id", wrapper.GetVM)
 	router.PATCH(options.BaseURL+"/vms/:id", wrapper.UpdateVM)
 	router.DELETE(options.BaseURL+"/vms/:id/inspection", wrapper.RemoveVMFromInspection)

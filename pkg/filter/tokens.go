@@ -28,6 +28,7 @@ const (
 	lSquareBracket
 	rSquareBracket
 	like2
+	contains
 )
 
 var tokenNames = map[Token]string{
@@ -56,6 +57,7 @@ var tokenNames = map[Token]string{
 	lSquareBracket: "[",
 	rSquareBracket: "]",
 	like2:          "like2",
+	contains:       "contains",
 }
 
 func (t Token) String() string {

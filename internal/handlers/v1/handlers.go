@@ -32,6 +32,10 @@ type VMService interface {
 	List(ctx context.Context, params services.VMListParams) ([]models.VirtualMachineSummary, int, error)
 	Get(ctx context.Context, id string) (*models.VM, error)
 	UpdateMigrationExcluded(ctx context.Context, id string, excluded bool) error
+	UpdateLabels(ctx context.Context, id string, labels []string) error
+	GetAllLabels(ctx context.Context) ([]string, error)
+	RemoveLabelFromAllVMs(ctx context.Context, label string) (int, error)
+	UpdateLabelVMs(ctx context.Context, addVMIDs, removeVMIDs []string, label string) error
 }
 
 // InspectorService defines the interface for deep inspector operations.

@@ -17,7 +17,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jzelinskie/cobrautil/v2 v2.0.0-20240819150235-f7fe73942d0f
 	github.com/kubev2v/forklift v0.0.0-20260219185807-1d0663a6ca52
-	github.com/kubev2v/migration-planner v0.13.3-0.20260511120016-437bc5d28d15
+	github.com/kubev2v/migration-planner v0.13.3-0.20260517134209-733723b1ebc3
 	github.com/kubev2v/vm-migration-detective v0.0.0-20260329082930-1ddc8baf4483
 	github.com/oapi-codegen/runtime v1.1.2
 	github.com/onsi/ginkgo/v2 v2.27.2
@@ -196,7 +196,7 @@ require (
 	github.com/openshift/custom-resource-status v1.1.2 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/perimeterx/marshmallow v1.1.5 // indirect
-	github.com/pierrec/lz4/v4 v4.1.25 // indirect
+	github.com/pierrec/lz4/v4 v4.1.26 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pkg/sftp v1.13.9 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect

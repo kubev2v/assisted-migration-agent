@@ -211,6 +211,15 @@ type DatastorePair struct {
 	TargetDatastore string `json:"targetDatastore"`
 }
 
+// DeleteLabelGloballyResponse defines model for DeleteLabelGloballyResponse.
+type DeleteLabelGloballyResponse struct {
+	// Affected Number of VMs that had the label removed
+	Affected int `json:"affected"`
+
+	// Label The label that was removed
+	Label string `json:"label"`
+}
+
 // EstimateRange Time estimates for migrating 1TB of data
 type EstimateRange struct {
 	// BestCase Duration string (e.g., "25m40s")
@@ -568,6 +577,15 @@ type UpdateGroupRequest struct {
 	Tags *[]string `binding:"omitempty,dive,tag_format" json:"tags,omitempty"`
 }
 
+// UpdateLabelVMsRequest defines model for UpdateLabelVMsRequest.
+type UpdateLabelVMsRequest struct {
+	// Add VMs to add the label to
+	Add *[]string `binding:"omitempty,dive,required" json:"add,omitempty"`
+
+	// Remove VMs to remove the label from
+	Remove *[]string `binding:"omitempty,dive,required" json:"remove,omitempty"`
+}
+
 // VMDevice defines model for VMDevice.
 type VMDevice struct {
 	// Kind Type of virtual device (e.g., cdrom, floppy, usb, serial, parallel)
@@ -612,6 +630,12 @@ type VMIssue struct {
 
 // VMIssueCategory Severity category of the issue. Unknown categories are mapped to 'Other'.
 type VMIssueCategory string
+
+// VMLabelsResponse defines model for VMLabelsResponse.
+type VMLabelsResponse struct {
+	// Labels Distinct labels currently in use
+	Labels []string `json:"labels"`
+}
 
 // VMNIC defines model for VMNIC.
 type VMNIC struct {
@@ -678,6 +702,9 @@ type VirtualMachine struct {
 
 	// IssueCount Number of issues found for this VirtualMachine
 	IssueCount int `json:"issueCount"`
+
+	// Labels User-defined labels for this VM
+	Labels *[]string `binding:"omitempty,dive,min=1,max=100" json:"labels,omitempty"`
 
 	// Memory Memory size in MB
 	Memory int64 `json:"memory"`
@@ -775,6 +802,9 @@ type VirtualMachineDetail struct {
 	// Issues List of issues affecting this VirtualMachine
 	Issues *[]VMIssue `json:"issues,omitempty"`
 
+	// Labels User-defined labels for this VM
+	Labels *[]string `binding:"omitempty,dive,min=1,max=100" json:"labels,omitempty"`
+
 	// MemoryMB Amount of memory allocated to the VirtualMachine in megabytes
 	MemoryMB int32 `json:"memoryMB"`
 
@@ -828,6 +858,9 @@ type VirtualMachineListResponse struct {
 
 // VirtualMachineUpdateRequest defines model for VirtualMachineUpdateRequest.
 type VirtualMachineUpdateRequest struct {
+	// Labels User-defined labels (replaces existing labels)
+	Labels *[]string `binding:"omitempty,dive,notblank,min=1,max=100" json:"labels,omitempty"`
+
 	// MigrationExcluded Whether to exclude this VM from migration
 	MigrationExcluded *bool `binding:"omitempty" json:"migrationExcluded,omitempty"`
 }
@@ -1024,6 +1057,9 @@ type PutInspectorVddkMultipartRequestBody PutInspectorVddkMultipartBody
 
 // TriggerRightsizingCollectionJSONRequestBody defines body for TriggerRightsizingCollection for application/json ContentType.
 type TriggerRightsizingCollectionJSONRequestBody = RightsizingCollectRequest
+
+// UpdateLabelVMsJSONRequestBody defines body for UpdateLabelVMs for application/json ContentType.
+type UpdateLabelVMsJSONRequestBody = UpdateLabelVMsRequest
 
 // UpdateVMJSONRequestBody defines body for UpdateVM for application/json ContentType.
 type UpdateVMJSONRequestBody = VirtualMachineUpdateRequest
