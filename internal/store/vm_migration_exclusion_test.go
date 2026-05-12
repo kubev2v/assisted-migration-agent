@@ -60,7 +60,7 @@ var _ = Describe("VMStore Migration Exclusion", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{sq.Eq{`v."VM ID"`: "vm-1"}})
+			vms, err := s.VM().List(ctx, sq.Eq{`v."VM ID"`: "vm-1"})
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
@@ -78,7 +78,7 @@ var _ = Describe("VMStore Migration Exclusion", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{sq.Eq{`v."VM ID"`: "vm-2"}})
+			vms, err := s.VM().List(ctx, sq.Eq{`v."VM ID"`: "vm-2"})
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
@@ -94,7 +94,7 @@ var _ = Describe("VMStore Migration Exclusion", func() {
 			insertVM("vm-3", "Test VM 3", "cluster-a")
 
 			// Act
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{sq.Eq{`v."VM ID"`: "vm-3"}})
+			vms, err := s.VM().List(ctx, sq.Eq{`v."VM ID"`: "vm-3"})
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
@@ -263,7 +263,7 @@ var _ = Describe("VMStore Migration Exclusion", func() {
 			filter := sq.Eq{`v.migration_excluded`: true}
 
 			// Act
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{filter})
+			vms, err := s.VM().List(ctx, filter)
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
@@ -283,7 +283,7 @@ var _ = Describe("VMStore Migration Exclusion", func() {
 			filter := sq.Eq{`v.migration_excluded`: false}
 
 			// Act
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{filter})
+			vms, err := s.VM().List(ctx, filter)
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
@@ -304,7 +304,7 @@ var _ = Describe("VMStore Migration Exclusion", func() {
 			excludedFilter := sq.Eq{`v.migration_excluded`: false}
 
 			// Act
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{clusterFilter, excludedFilter})
+			vms, err := s.VM().List(ctx, sq.And{clusterFilter, excludedFilter})
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())

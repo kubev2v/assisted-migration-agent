@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"sort"
 
-	sq "github.com/Masterminds/squirrel"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -65,7 +64,7 @@ var _ = Describe("VMStore cross-table filters", func() {
 	Context("vinfo columns", func() {
 		It("should filter by firmware", func() {
 			f := store.ByFilter("firmware = 'efi'")
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{f}, store.WithDefaultSort())
+			vms, err := s.VM().List(ctx, f, store.WithDefaultSort())
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vmIDs(vms)).To(Equal([]string{"vm-003", "vm-004"}))
@@ -73,7 +72,7 @@ var _ = Describe("VMStore cross-table filters", func() {
 
 		It("should filter by host", func() {
 			f := store.ByFilter("host = 'esxi-01.local'")
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{f}, store.WithDefaultSort())
+			vms, err := s.VM().List(ctx, f, store.WithDefaultSort())
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vmIDs(vms)).To(Equal([]string{"vm-001", "vm-002"}))
@@ -81,7 +80,7 @@ var _ = Describe("VMStore cross-table filters", func() {
 
 		It("should filter by cpus with comparison", func() {
 			f := store.ByFilter("cpus >= 4")
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{f}, store.WithDefaultSort())
+			vms, err := s.VM().List(ctx, f, store.WithDefaultSort())
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vmIDs(vms)).To(Equal([]string{"vm-003", "vm-004", "vm-005", "vm-006"}))
@@ -89,7 +88,7 @@ var _ = Describe("VMStore cross-table filters", func() {
 
 		It("should filter by dns_name regex", func() {
 			f := store.ByFilter("dns_name ~ /db/")
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{f}, store.WithDefaultSort())
+			vms, err := s.VM().List(ctx, f, store.WithDefaultSort())
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vmIDs(vms)).To(Equal([]string{"vm-003", "vm-004"}))
@@ -99,7 +98,7 @@ var _ = Describe("VMStore cross-table filters", func() {
 	Context("vdisk columns (disk.* prefix)", func() {
 		It("should filter by individual disk capacity", func() {
 			f := store.ByFilter("disk.capacity >= 500")
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{f}, store.WithDefaultSort())
+			vms, err := s.VM().List(ctx, f, store.WithDefaultSort())
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vmIDs(vms)).To(Equal([]string{"vm-003", "vm-004"}))
@@ -107,7 +106,7 @@ var _ = Describe("VMStore cross-table filters", func() {
 
 		It("should filter by disk mode", func() {
 			f := store.ByFilter("disk.mode = 'independent_persistent'")
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{f}, store.WithDefaultSort())
+			vms, err := s.VM().List(ctx, f, store.WithDefaultSort())
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vmIDs(vms)).To(Equal([]string{"vm-007"}))
@@ -115,7 +114,7 @@ var _ = Describe("VMStore cross-table filters", func() {
 
 		It("should filter by RDM disk", func() {
 			f := store.ByFilter("disk.raw = true")
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{f}, store.WithDefaultSort())
+			vms, err := s.VM().List(ctx, f, store.WithDefaultSort())
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vmIDs(vms)).To(Equal([]string{"vm-007"}))
@@ -123,7 +122,7 @@ var _ = Describe("VMStore cross-table filters", func() {
 
 		It("should filter by disk controller", func() {
 			f := store.ByFilter("disk.controller = 'NVME'")
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{f}, store.WithDefaultSort())
+			vms, err := s.VM().List(ctx, f, store.WithDefaultSort())
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vmIDs(vms)).To(Equal([]string{"vm-008", "vm-009"}))
@@ -133,7 +132,7 @@ var _ = Describe("VMStore cross-table filters", func() {
 	Context("concerns columns (concern.* prefix)", func() {
 		It("should filter by critical category", func() {
 			f := store.ByFilter("concern.category = 'Critical'")
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{f}, store.WithDefaultSort())
+			vms, err := s.VM().List(ctx, f, store.WithDefaultSort())
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vmIDs(vms)).To(Equal([]string{"vm-007"}))
@@ -141,7 +140,7 @@ var _ = Describe("VMStore cross-table filters", func() {
 
 		It("should filter by concern label regex", func() {
 			f := store.ByFilter("concern.label ~ /RDM/")
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{f}, store.WithDefaultSort())
+			vms, err := s.VM().List(ctx, f, store.WithDefaultSort())
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vmIDs(vms)).To(Equal([]string{"vm-007"}))
@@ -149,7 +148,7 @@ var _ = Describe("VMStore cross-table filters", func() {
 
 		It("should filter by warning category", func() {
 			f := store.ByFilter("concern.category = 'Warning'")
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{f}, store.WithDefaultSort())
+			vms, err := s.VM().List(ctx, f, store.WithDefaultSort())
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vmIDs(vms)).To(Equal([]string{"vm-003", "vm-004", "vm-007"}))
@@ -159,7 +158,7 @@ var _ = Describe("VMStore cross-table filters", func() {
 	Context("migratable filter", func() {
 		It("should filter migratable VMs (no critical concerns)", func() {
 			f := store.ByFilter("migratable = true")
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{f}, store.WithDefaultSort())
+			vms, err := s.VM().List(ctx, f, store.WithDefaultSort())
 
 			Expect(err).NotTo(HaveOccurred())
 			// vm-007 has critical concerns, so it should NOT be in the result
@@ -170,7 +169,7 @@ var _ = Describe("VMStore cross-table filters", func() {
 
 		It("should filter non-migratable VMs (has critical concerns)", func() {
 			f := store.ByFilter("migratable = false")
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{f}, store.WithDefaultSort())
+			vms, err := s.VM().List(ctx, f, store.WithDefaultSort())
 
 			Expect(err).NotTo(HaveOccurred())
 			// Only vm-007 has critical concerns
@@ -181,7 +180,7 @@ var _ = Describe("VMStore cross-table filters", func() {
 	Context("vcpu columns (cpu.* prefix)", func() {
 		It("should filter by cores per socket", func() {
 			f := store.ByFilter("cpu.cores_per_socket >= 4")
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{f}, store.WithDefaultSort())
+			vms, err := s.VM().List(ctx, f, store.WithDefaultSort())
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vmIDs(vms)).To(Equal([]string{"vm-003", "vm-004", "vm-005", "vm-006"}))
@@ -191,7 +190,7 @@ var _ = Describe("VMStore cross-table filters", func() {
 	Context("vmemory columns (mem.* prefix)", func() {
 		It("should filter by hot add enabled", func() {
 			f := store.ByFilter("mem.hot_add = true")
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{f}, store.WithDefaultSort())
+			vms, err := s.VM().List(ctx, f, store.WithDefaultSort())
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vmIDs(vms)).To(Equal([]string{"vm-003", "vm-005"}))
@@ -199,7 +198,7 @@ var _ = Describe("VMStore cross-table filters", func() {
 
 		It("should filter by ballooned memory", func() {
 			f := store.ByFilter("mem.ballooned > 0")
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{f}, store.WithDefaultSort())
+			vms, err := s.VM().List(ctx, f, store.WithDefaultSort())
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vmIDs(vms)).To(Equal([]string{"vm-003", "vm-008"}))
@@ -209,7 +208,7 @@ var _ = Describe("VMStore cross-table filters", func() {
 	Context("vnetwork columns (net.* prefix)", func() {
 		It("should filter by production network", func() {
 			f := store.ByFilter("net.network = 'Production'")
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{f}, store.WithDefaultSort())
+			vms, err := s.VM().List(ctx, f, store.WithDefaultSort())
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vmIDs(vms)).To(Equal([]string{"vm-003"}))
@@ -217,7 +216,7 @@ var _ = Describe("VMStore cross-table filters", func() {
 
 		It("should filter by VM Network", func() {
 			f := store.ByFilter("net.network = 'VM Network'")
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{f}, store.WithDefaultSort())
+			vms, err := s.VM().List(ctx, f, store.WithDefaultSort())
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vmIDs(vms)).To(Equal([]string{"vm-001", "vm-002"}))
@@ -227,7 +226,7 @@ var _ = Describe("VMStore cross-table filters", func() {
 	Context("vdatastore columns (datastore.* prefix)", func() {
 		It("should filter by datastore type", func() {
 			f := store.ByFilter("datastore.type = 'VMFS'")
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{f}, store.WithDefaultSort())
+			vms, err := s.VM().List(ctx, f, store.WithDefaultSort())
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vms).To(HaveLen(10))
@@ -235,7 +234,7 @@ var _ = Describe("VMStore cross-table filters", func() {
 
 		It("should return empty for non-existent datastore type", func() {
 			f := store.ByFilter("datastore.type = 'NFS'")
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{f}, store.WithDefaultSort())
+			vms, err := s.VM().List(ctx, f, store.WithDefaultSort())
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vms).To(BeEmpty())
@@ -243,7 +242,7 @@ var _ = Describe("VMStore cross-table filters", func() {
 
 		It("should filter by datastore capacity", func() {
 			f := store.ByFilter("datastore.capacity >= 1048576")
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{f}, store.WithDefaultSort())
+			vms, err := s.VM().List(ctx, f, store.WithDefaultSort())
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vms).To(HaveLen(10))
@@ -253,7 +252,7 @@ var _ = Describe("VMStore cross-table filters", func() {
 	Context("combined cross-table filters", func() {
 		It("should combine vinfo and vdisk filters", func() {
 			f := store.ByFilter("firmware = 'efi' and disk.capacity >= 500")
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{f}, store.WithDefaultSort())
+			vms, err := s.VM().List(ctx, f, store.WithDefaultSort())
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vmIDs(vms)).To(Equal([]string{"vm-003", "vm-004"}))
@@ -261,7 +260,7 @@ var _ = Describe("VMStore cross-table filters", func() {
 
 		It("should combine concern and network filters", func() {
 			f := store.ByFilter("concern.category = 'Critical' and net.network = 'Staging'")
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{f}, store.WithDefaultSort())
+			vms, err := s.VM().List(ctx, f, store.WithDefaultSort())
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vmIDs(vms)).To(Equal([]string{"vm-007"}))
@@ -269,7 +268,7 @@ var _ = Describe("VMStore cross-table filters", func() {
 
 		It("should combine cpu and cluster filters", func() {
 			f := store.ByFilter("cpu.cores_per_socket >= 4 and cluster = 'staging'")
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{f}, store.WithDefaultSort())
+			vms, err := s.VM().List(ctx, f, store.WithDefaultSort())
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vmIDs(vms)).To(Equal([]string{"vm-005", "vm-006"}))
@@ -277,7 +276,7 @@ var _ = Describe("VMStore cross-table filters", func() {
 
 		It("should combine disk controller and powerstate filters", func() {
 			f := store.ByFilter("disk.controller = 'NVME' and powerstate = 'poweredOn'")
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{f}, store.WithDefaultSort())
+			vms, err := s.VM().List(ctx, f, store.WithDefaultSort())
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vmIDs(vms)).To(Equal([]string{"vm-008"}))
@@ -285,7 +284,7 @@ var _ = Describe("VMStore cross-table filters", func() {
 
 		It("should combine memory and vmemory filters", func() {
 			f := store.ByFilter("mem.hot_add = true and memory >= 8192")
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{f}, store.WithDefaultSort())
+			vms, err := s.VM().List(ctx, f, store.WithDefaultSort())
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vmIDs(vms)).To(Equal([]string{"vm-003", "vm-005"}))
@@ -295,7 +294,7 @@ var _ = Describe("VMStore cross-table filters", func() {
 	Context("DISTINCT correctness", func() {
 		It("should return each VM once even with multiple disks", func() {
 			f := store.ByFilter("disk.capacity > 0")
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{f}, store.WithDefaultSort())
+			vms, err := s.VM().List(ctx, f, store.WithDefaultSort())
 
 			Expect(err).NotTo(HaveOccurred())
 			ids := vmIDs(vms)
@@ -310,7 +309,7 @@ var _ = Describe("VMStore cross-table filters", func() {
 
 		It("should return each VM once even with multiple concerns", func() {
 			f := store.ByFilter("concern.category = 'Warning'")
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{f}, store.WithDefaultSort())
+			vms, err := s.VM().List(ctx, f, store.WithDefaultSort())
 
 			Expect(err).NotTo(HaveOccurred())
 			ids := vmIDs(vms)
@@ -325,7 +324,7 @@ var _ = Describe("VMStore cross-table filters", func() {
 		It("should have List count match Count for multi-row JOINs", func() {
 			f := store.ByFilter("disk.capacity > 0")
 
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{f}, store.WithDefaultSort())
+			vms, err := s.VM().List(ctx, f, store.WithDefaultSort())
 			Expect(err).NotTo(HaveOccurred())
 
 			count, err := s.VM().Count(ctx, f)
@@ -337,7 +336,7 @@ var _ = Describe("VMStore cross-table filters", func() {
 		It("should have List count match Count for concern filters", func() {
 			f := store.ByFilter("concern.category = 'Warning'")
 
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{f}, store.WithDefaultSort())
+			vms, err := s.VM().List(ctx, f, store.WithDefaultSort())
 			Expect(err).NotTo(HaveOccurred())
 
 			count, err := s.VM().Count(ctx, f)
@@ -348,15 +347,8 @@ var _ = Describe("VMStore cross-table filters", func() {
 	})
 
 	Context("nil/empty filter edge cases", func() {
-		It("should return all VMs with nil filters", func() {
+		It("should return all VMs with nil filter", func() {
 			vms, err := s.VM().List(ctx, nil, store.WithDefaultSort())
-
-			Expect(err).NotTo(HaveOccurred())
-			Expect(vms).To(HaveLen(10))
-		})
-
-		It("should return all VMs with empty filter slice", func() {
-			vms, err := s.VM().List(ctx, []sq.Sqlizer{}, store.WithDefaultSort())
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vms).To(HaveLen(10))

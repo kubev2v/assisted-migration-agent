@@ -28,7 +28,7 @@ func NewVMStore(db QueryInterceptor) *VMStore {
 type FilterOption = sq.Sqlizer
 
 // List returns VM summaries with filters, sorting, and pagination.
-func (s *VMStore) List(ctx context.Context, filters []sq.Sqlizer, opts ...ListOption) ([]models.VirtualMachineSummary, error) {
+func (s *VMStore) List(ctx context.Context, filter sq.Sqlizer, opts ...ListOption) ([]models.VirtualMachineSummary, error) {
 	builder := vmOutputQuery.
 		Columns(
 			`u.cpu_p95_pct AS cpu_p95_pct`,
@@ -41,15 +41,14 @@ func (s *VMStore) List(ctx context.Context, filters []sq.Sqlizer, opts ...ListOp
 			`)`)
 
 	// Apply external filters via subquery (filters reference table aliases in vmFilterSubquery)
-	if len(filters) > 0 {
-		subquery := vmFilterSubquery
-		for _, f := range filters {
-			subquery = subquery.Where(f)
-		}
+	if filter != nil {
+		subquery := vmFilterSubquery.Where(filter)
+
 		subSQL, subArgs, err := subquery.ToSql()
 		if err != nil {
 			return nil, err
 		}
+
 		builder = builder.Where(sq.Expr(fmt.Sprintf(`v."VM ID" IN (%s)`, subSQL), subArgs...))
 	}
 
@@ -115,14 +114,11 @@ func (s *VMStore) List(ctx context.Context, filters []sq.Sqlizer, opts ...ListOp
 }
 
 // Count returns the total number of VMs matching the filters.
-func (s *VMStore) Count(ctx context.Context, filters ...sq.Sqlizer) (int, error) {
+func (s *VMStore) Count(ctx context.Context, filter sq.Sqlizer) (int, error) {
 	builder := sq.Select("COUNT(*)").From("vinfo v")
 
-	if len(filters) > 0 {
-		subquery := vmFilterSubquery
-		for _, f := range filters {
-			subquery = subquery.Where(f)
-		}
+	if filter != nil {
+		subquery := vmFilterSubquery.Where(filter)
 		subSQL, subArgs, err := subquery.ToSql()
 		if err != nil {
 			return 0, err
