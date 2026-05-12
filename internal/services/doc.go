@@ -414,6 +414,47 @@
 //	}
 //	vms, total, err := groupService.ListVirtualMachines(ctx, groupID, getParams)
 //
+// # CredentialsService
+//
+// CredentialsService manages the agent-wide master password and per-source
+// encrypted credentials (vCenter URL, username, password).
+//
+// It is NOT wired into ServiceManager. It is a shared dependency: services
+// that need credential access (e.g. collector, inspector) should receive it
+// as a constructor parameter.
+//
+// The master password is hashed with argon2id and stored in a dedicated
+// single-row table. Credential fields (username, password) are encrypted
+// with XChaCha20-Poly1305 using a key derived via argon2id from a SHA-256
+// hash of the master password. Each encrypted field is self-contained:
+// base64(salt || nonce || ciphertext). The URL is stored in plaintext.
+//
+// The raw master password is never kept in memory beyond login. After
+// VerifyPassword succeeds, the caller should compute crypto.Hash256(password)
+// and store the resulting []byte in the session. All subsequent Save/Get
+// calls accept this SHA-256 hash directly. SetPassword handles hashing
+// internally during password rotation.
+//
+// Operations:
+//   - SetPassword: rotates the master password, re-encrypting all credentials atomically
+//   - HasPassword: checks if a master password exists
+//   - VerifyPassword: verifies a password against the stored argon2id hash
+//   - Save: encrypts credentials with the SHA-256 hash and stores them
+//   - Get: retrieves and decrypts credentials using the SHA-256 hash
+//   - List: returns all credential IDs
+//   - Delete: removes credentials by ID (idempotent)
+//
+// Usage:
+//
+//	credsSrv := services.NewCredentialsService(store)
+//	cr := crypto.NewCrypto()
+//	err := credsSrv.SetPassword(ctx, "", "master-key") // initial setup
+//	hash := cr.Hash256("master-key")                   // keep in session
+//	err = credsSrv.Save(ctx, hash, "vc-1", models.Credentials{
+//	    URL: "https://vcenter.local/sdk", Username: "admin", Password: "secret",
+//	})
+//	creds, err := credsSrv.Get(ctx, hash, "vc-1")
+//
 // # Thread Safety
 //
 // CollectorService:

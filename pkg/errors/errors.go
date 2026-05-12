@@ -44,6 +44,10 @@ func NewVddkNotFoundError() *ResourceNotFoundError {
 	return NewResourceNotFoundError("vddk", "")
 }
 
+func NewCredentialsNotFoundError(id string) *ResourceNotFoundError {
+	return NewResourceNotFoundError("credentials", id)
+}
+
 func (e *ResourceNotFoundError) Error() string {
 	if e.ID != "" {
 		return fmt.Sprintf("%s '%s' not found", e.Kind, e.ID)

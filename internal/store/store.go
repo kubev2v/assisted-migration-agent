@@ -24,6 +24,7 @@ type Store struct {
 	forecast      *ForecastStore
 	transactor    pkgstore.Transactor
 	application   *ApplicationStore
+	credentials   *CredentialsStore
 }
 
 func NewStore(db *sql.DB, validator duckdb_parser.Validator) *Store {
@@ -43,6 +44,7 @@ func NewStore(db *sql.DB, validator duckdb_parser.Validator) *Store {
 		forecast:      NewForecastStore(qi),
 		transactor:    pkgstore.NewTransactor(db),
 		application:   NewApplicationStore(qi),
+		credentials:   NewCredentialsStore(qi),
 	}
 }
 
@@ -100,6 +102,10 @@ func (s *Store) Forecast() *ForecastStore {
 
 func (s *Store) Application() *ApplicationStore {
 	return s.application
+}
+
+func (s *Store) Credentials() *CredentialsStore {
+	return s.credentials
 }
 
 func (s *Store) WithTx(ctx context.Context, fn func(ctx context.Context) error) error {
