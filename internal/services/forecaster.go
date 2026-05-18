@@ -21,8 +21,10 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
+	"github.com/kubev2v/assisted-migration-agent/pkg/forecaster"
 	"github.com/kubev2v/assisted-migration-agent/pkg/offload"
 	"github.com/kubev2v/assisted-migration-agent/pkg/vmware"
+	"github.com/kubev2v/assisted-migration-agent/pkg/work"
 )
 
 const (
@@ -32,16 +34,14 @@ const (
 )
 
 // ForecasterService orchestrates migration time estimation benchmarks between
-// datastore pairs. It is a thin orchestrator: it creates a one-time consumable
-// forecastService for each run and derives its state from whether that instance
-// exists (nil = ready, non-nil = running).
+// datastore pairs. See doc.go for full documentation.
 type ForecasterService struct {
-	mu          sync.Mutex
-	forecastSvc *forecastService
-	store       *store.Store
-	pairLimit   int
-	registry    *offload.Registry
-	savedCreds  *models.Credentials // saved after successful inline credential verification (POST)
+	mu         sync.Mutex
+	pool       *work.Pool2[models.ForecastPairStatus, models.ForecastResult]
+	store      *store.Store
+	pairLimit  int
+	registry   *offload.Registry
+	savedCreds *models.Credentials
 }
 
 // NewForecasterService returns an idle forecaster.
@@ -61,13 +61,23 @@ func (f *ForecasterService) GetStatus() models.ForecasterStatus {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	if f.forecastSvc == nil {
+	if f.pool == nil {
 		return models.ForecasterStatus{State: models.ForecasterStateReady}
+	}
+
+	var pairs []models.ForecastPairStatus
+	for _, s := range f.pool.All() {
+		status := s.State
+		if s.Err != nil {
+			status.State = models.ForecastPairStateError
+			status.Error = s.Err
+		}
+		pairs = append(pairs, status)
 	}
 
 	return models.ForecasterStatus{
 		State: models.ForecasterStateRunning,
-		Pairs: f.forecastSvc.GetPairStatuses(),
+		Pairs: pairs,
 	}
 }
 
@@ -75,23 +85,20 @@ func (f *ForecasterService) GetStatus() models.ForecasterStatus {
 // Inline credentials are verified, saved, and used; if omitted, saved credentials are used.
 func (f *ForecasterService) Start(ctx context.Context, req models.ForecastRequest) error {
 	f.mu.Lock()
+	defer f.mu.Unlock()
 
-	if f.forecastSvc != nil {
-		f.mu.Unlock()
+	if f.pool != nil {
 		return srvErrors.NewForecasterInProgressError()
 	}
 
 	if len(req.Pairs) == 0 {
-		f.mu.Unlock()
 		return srvErrors.NewValidationError("at least one datastore pair is required")
 	}
 
 	if len(req.Pairs) > f.pairLimit {
-		f.mu.Unlock()
 		return srvErrors.NewForecasterLimitReachedError(f.pairLimit)
 	}
 
-	// Apply defaults
 	if req.DiskSizeGB <= 0 {
 		req.DiskSizeGB = defaultForecastDiskSizeGB
 	}
@@ -102,16 +109,16 @@ func (f *ForecasterService) Start(ctx context.Context, req models.ForecastReques
 		req.Concurrency = 1
 	}
 
-	f.mu.Unlock()
-
-	cred, err := f.resolveCredentials(ctx, req.Credentials)
-	if err != nil {
+	if err := f.VerifyCredentials(ctx, req.Credentials); err != nil {
 		return err
 	}
 
+	saved := req.Credentials
+	f.savedCreds = &saved
+
 	zap.S().Infow("starting forecaster", "pairs", len(req.Pairs), "diskSizeGB", req.DiskSizeGB, "iterations", req.Iterations, "concurrency", req.Concurrency)
 
-	vClient, err := vmware.NewVsphereClient(ctx, cred.URL, cred.Username, cred.Password, true)
+	vClient, err := vmware.NewVsphereClient(ctx, req.Credentials.URL, req.Credentials.Username, req.Credentials.Password, true)
 	if err != nil {
 		zap.S().Named("forecaster_service").Errorw("failed to connect to vSphere", "error", err)
 		return srvErrors.NewVCenterError(err)
@@ -121,77 +128,72 @@ func (f *ForecasterService) Start(ctx context.Context, req models.ForecastReques
 
 	dm := vmware.NewDiskManager(vClient)
 
-	strategyFactory := func() BenchmarkStrategy {
-		return newVMStrategy(dm, vClient)
+	sessionID, err := f.store.Forecast().NextSessionID(ctx)
+	if err != nil {
+		logoutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_ = vClient.Logout(logoutCtx)
+		return fmt.Errorf("failed to allocate session ID: %w", err)
 	}
 
-	f.mu.Lock()
-	// Re-check after releasing and re-acquiring lock
-	if f.forecastSvc != nil {
-		f.mu.Unlock()
-		logoutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		_ = vClient.Logout(logoutCtx)
-		return srvErrors.NewForecasterInProgressError()
+	builders := make(map[string]work.WorkBuilder2[models.ForecastPairStatus, models.ForecastResult], len(req.Pairs))
+	for _, pair := range req.Pairs {
+		b := &forecastBuilder{
+			diskManager: dm,
+			store:       f.store,
+			strategy:    forecaster.NewVMStrategy(dm, vClient),
+			pair:        pair,
+			diskSizeGB:  req.DiskSizeGB,
+			iterations:  req.Iterations,
+			sessionID:   sessionID,
+		}
+		builders[pair.Name] = b.New()
 	}
 
-	svc := newForecastService(f.store)
-	f.forecastSvc = svc
-	f.mu.Unlock()
+	pool := work.NewPool2(builders).
+		WithWorkers(req.Concurrency, len(req.Pairs)).
+		WithFinalizer(func(_ context.Context) error {
+			logoutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			_ = vClient.Logout(logoutCtx)
 
-	if err := svc.Start(dm, strategyFactory, req, func() {
-		// Cleanup: logout vSphere and nil the forecastSvc reference
+			if f.mu.TryLock() {
+				f.pool = nil
+				f.mu.Unlock()
+			}
+			return nil
+		})
+
+	if err := pool.Start(); err != nil {
 		logoutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		_ = vClient.Logout(logoutCtx)
-
-		f.mu.Lock()
-		f.forecastSvc = nil
-		f.mu.Unlock()
-	}); err != nil {
-		logoutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		_ = vClient.Logout(logoutCtx)
-
-		f.mu.Lock()
-		f.forecastSvc = nil
-		f.mu.Unlock()
 		return err
 	}
+
+	f.pool = pool
 
 	return nil
 }
 
-// VerifyCredentials validates vCenter credentials and required privileges
-// without saving them. Used as a preflight check (PUT /forecaster/credentials).
-func (f *ForecasterService) VerifyCredentials(ctx context.Context, credentials models.Credentials) error {
-	u, err := vmware.NormalizeAndValidateURL(credentials.URL)
+// VerifyCredentials validates vCenter credentials and required privileges.
+func (f *ForecasterService) VerifyCredentials(ctx context.Context, creds models.Credentials) error {
+	u, err := vmware.NormalizeAndValidateURL(creds.URL)
 	if err != nil {
 		return err
 	}
-	credentials.URL = u
+	creds.URL = u
 
-	if err := f.verifyCredentialsAndPrivileges(ctx, &credentials, models.ForecasterRequiredPrivileges); err != nil {
-		return err
-	}
-
-	zap.S().Named("forecaster_service").Info("credentials verified successfully")
-	return nil
-}
-
-// verifyCredentialsAndPrivileges checks both authentication and vSphere privileges.
-// It connects, verifies login, then checks the given privileges on the default VM folder.
-func (f *ForecasterService) verifyCredentialsAndPrivileges(ctx context.Context, creds *models.Credentials, requiredPrivileges []string) error {
-	u, err := url.ParseRequestURI(creds.URL)
+	parsedURL, err := url.ParseRequestURI(creds.URL)
 	if err != nil {
 		return err
 	}
-	u.User = url.UserPassword(creds.Username, creds.Password)
+	parsedURL.User = url.UserPassword(creds.Username, creds.Password)
 
 	verifyCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	vimClient, err := vim25.NewClient(verifyCtx, soap.NewClient(u, true))
+	vimClient, err := vim25.NewClient(verifyCtx, soap.NewClient(parsedURL, true))
 	if err != nil {
 		return err
 	}
@@ -201,8 +203,9 @@ func (f *ForecasterService) verifyCredentialsAndPrivileges(ctx context.Context, 
 		Client:         vimClient,
 	}
 
-	zap.S().Named("forecaster_service").Info("verifying vCenter credentials")
-	if err := client.Login(verifyCtx, u.User); err != nil {
+	log := zap.S().Named("forecaster_service")
+	log.Info("verifying vCenter credentials")
+	if err := client.Login(verifyCtx, parsedURL.User); err != nil {
 		return srvErrors.NewVCenterError(err)
 	}
 	defer func() {
@@ -212,7 +215,7 @@ func (f *ForecasterService) verifyCredentialsAndPrivileges(ctx context.Context, 
 		client.CloseIdleConnections()
 	}()
 
-	zap.S().Named("forecaster_service").Info("vCenter credentials verified, checking privileges")
+	log.Info("vCenter credentials verified, checking privileges")
 
 	// Check privileges on the default VM folder (under the datacenter), since
 	// vSphere privileges are typically granted at this level rather than root.
@@ -227,56 +230,25 @@ func (f *ForecasterService) verifyCredentialsAndPrivileges(ctx context.Context, 
 		return srvErrors.NewVCenterError(fmt.Errorf("failed to find VM folder: %w", err))
 	}
 
-	if err := vmware.ValidateUserPrivilegesOnEntity(verifyCtx, vimClient, vmFolder.Reference(), requiredPrivileges, creds.Username); err != nil {
+	if err := vmware.ValidateUserPrivilegesOnEntity(verifyCtx, vimClient, vmFolder.Reference(), models.ForecasterRequiredPrivileges, creds.Username); err != nil {
 		return err
 	}
 
-	zap.S().Named("forecaster_service").Info("vCenter credentials and privileges verified successfully")
+	log.Info("vCenter credentials and privileges verified successfully")
 	return nil
-}
-
-// resolveCredentials returns inline credentials if provided (after verifying
-// privileges and saving them), otherwise falls back to previously verified
-// saved credentials, or returns CredentialsNotSetError.
-func (f *ForecasterService) resolveCredentials(ctx context.Context, creds models.Credentials) (models.Credentials, error) {
-	u, err := vmware.NormalizeAndValidateURL(creds.URL)
-	if err != nil {
-		return models.Credentials{}, err
-	}
-	creds.URL = u
-
-	if creds.URL != "" {
-		if err := f.verifyCredentialsAndPrivileges(ctx, &creds, models.ForecasterRequiredPrivileges); err != nil {
-			return models.Credentials{}, err
-		}
-		f.mu.Lock()
-		saved := creds
-		f.savedCreds = &saved
-		f.mu.Unlock()
-		return creds, nil
-	}
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if f.savedCreds != nil {
-		return *f.savedCreds, nil
-	}
-	return models.Credentials{}, srvErrors.NewCredentialsNotSetError()
 }
 
 // Stop requests cancellation of all pair benchmarks and waits for cleanup.
 func (f *ForecasterService) Stop() error {
 	f.mu.Lock()
+	pool := f.pool
+	f.mu.Unlock()
 
-	if f.forecastSvc == nil {
-		f.mu.Unlock()
+	if pool == nil {
 		return srvErrors.NewForecasterNotRunningError()
 	}
 
-	svc := f.forecastSvc
-	f.mu.Unlock()
-
-	svc.Stop() // blocks until cleanup finishes (which nils f.forecastSvc)
-
+	_ = pool.Stop()
 	return nil
 }
 
@@ -284,20 +256,21 @@ func (f *ForecasterService) Stop() error {
 func (f *ForecasterService) IsBusy() bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return f.forecastSvc != nil
+	return f.pool != nil
 }
 
 // StopPair cancels a single pair within the running forecast.
 func (f *ForecasterService) StopPair(pairName string) error {
 	f.mu.Lock()
-	svc := f.forecastSvc
+	pool := f.pool
 	f.mu.Unlock()
 
-	if svc == nil {
+	if pool == nil {
 		return srvErrors.NewForecasterNotRunningError()
 	}
 
-	if !svc.StopPair(pairName) {
+	status := pool.Cancel(pairName)
+	if status.Err == nil && status.State.State == "" {
 		return srvErrors.NewResourceNotFoundError("pair", pairName)
 	}
 

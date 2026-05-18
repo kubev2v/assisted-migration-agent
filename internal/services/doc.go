@@ -20,6 +20,7 @@
 //	Services Layer
 //	    ├── CollectorService ──► InventoryService, work.Service[CollectorStatus, CollectorResult]
 //	    ├── InspectorService ──► inspectionService (Scheduler[InspectionResult], one work.Pipeline per VM; in-memory only, no Store)
+//	    ├── ForecasterService ► work.Pool2[ForecastPairStatus, ForecastResult], Store, BenchmarkStrategy, DiskManager
 //	    ├── Console ──────────► Store, work.Pipeline (creates Scheduler[any] per run loop), Console Client, Collector
 //	    ├── InventoryService ─► Store
 //	    ├── VMService ────────► Store
@@ -228,6 +229,90 @@
 //	err = inspector.Cancel(“vm-2”)        // cancel a single VM’s pipeline
 //	err = inspector.Stop()                // cancel entire run, wait for cleanup
 //
+// # ForecasterService
+//
+// ForecasterService estimates migration time by benchmarking disk copy throughput
+// between vSphere datastore pairs. Given a list of source→target datastore pairs,
+// it creates a temporary VMDK on the source, fills it with random data to defeat
+// storage zero-block optimization, then copies it to the target N times to sample
+// throughput. From the samples it computes statistics (mean, median, stddev, 95% CI)
+// and extrapolates wall-clock estimates for migrating 1 TB of data.
+//
+// The benchmark addresses a real operational problem: migration throughput varies
+// widely depending on storage backend, network path, VAIO filters, and datastore
+// contention. Without measurement, capacity planning is guesswork.
+//
+// ## Architecture
+//
+// ForecasterService is a thin lifecycle manager. It owns a single Pool2 (nil = ready,
+// non-nil = running) and delegates all business logic to the builder layer:
+//
+//   - ForecasterService — credential verification, pool lifecycle (start/stop/status),
+//     stored run queries, and statistics computation.
+//   - forecast_builder.go — the pipeline definition. Each datastore pair gets a
+//     forecastBuilder that holds a DiskManager (directory/disk CRUD) and a
+//     BenchmarkStrategy (disk fill + copy). The builder produces a sequence of
+//     WorkUnits: validate datastores → strategy setup → create directories →
+//     create & fill disk → N benchmark iterations → mark complete.
+//   - forecaster.BenchmarkStrategy (pkg/forecaster) — pluggable disk fill and
+//     copy implementation. VMStrategy boots an Alpine VM that fills the disk
+//     at native storage speed, then uses govmomi CopyVirtualDisk for the
+//     timed copy.
+//
+// Pairs run concurrently via Pool2. Each pair's pipeline runs its iterations
+// sequentially. Concurrency is configurable (default 1).
+//
+// ## Benchmark Pipeline (per pair)
+//
+//	┌──────────┐   ┌───────┐   ┌────────────┐   ┌─────────────┐   ┌────────────┐   ┌───────────┐
+//	│ Validate │──►│ Setup │──►│ Create Dir │──►│ Fill Disk   │──►│ Iterate ×N │──►│ Completed │
+//	│ DS Pair  │   │ (VM)  │   │ src [+tgt] │   │ (random dd) │   │ copy+store │   │           │
+//	└──────────┘   └───────┘   └────────────┘   └─────────────┘   └────────────┘   └───────────┘
+//
+// Each iteration copies the source VMDK to the target datastore, records
+// wall-clock duration and throughput (MB/s), persists the run to DuckDB,
+// then deletes the clone. On completion or error, the Finalize step tears
+// down the strategy (destroys the filler VM) and removes temp directories.
+//
+// ## Statistics
+//
+// GetStats computes from all successful stored runs for a pair:
+//   - Min/Max/Mean/Median throughput (MB/s)
+//   - Standard deviation
+//   - 95% confidence interval (t-distribution approximation)
+//   - Estimated time to copy 1 TB (best/expected/worst case)
+//
+// ## Datastore Discovery
+//
+// ListDatastores returns inventory-sourced datastore details enriched with
+// storage vendor identification (derived from NAA device identifiers) and
+// offload capabilities from the plugin registry. PairCapabilities computes
+// per-pair offload support (e.g. VAIO, XCOPY) based on vendor profiles and
+// whether source and target share the same storage array.
+//
+// ## Thread Safety
+//
+//   - sync.Mutex protects pool pointer and savedCreds
+//   - Start holds the lock for its entire duration (defer); the pool finalizer
+//     uses TryLock to nil the pool — if the lock is held, pool is still nil
+//   - Stop/StopPair grab the pool pointer under lock, release, then call
+//     blocking pool methods outside the lock
+//
+// Usage:
+//
+//	forecaster := services.NewForecasterService(store, 10)
+//	err := forecaster.Start(ctx, models.ForecastRequest{
+//	    Credentials: creds,
+//	    Pairs:       []models.DatastorePair{{Name: "p1", SourceDatastore: "ds1", TargetDatastore: "ds2"}},
+//	    DiskSizeGB:  10,
+//	    Iterations:  5,
+//	    Concurrency: 2,
+//	})
+//	status := forecaster.GetStatus()
+//	stats, err := forecaster.GetStats(ctx, "p1")
+//	err = forecaster.StopPair("p1")
+//	err = forecaster.Stop()
+//
 // # Console
 //
 // Console manages communication with the remote console server (console.redhat.com),
@@ -435,6 +520,12 @@
 //   - sync.Mutex protects inspectionSvc, credentials, and lifecycle transitions (Start/Stop/Cancel)
 //   - GetStatus and IsBusy read inspectionSvc under lock
 //   - GetVmStatus snapshots inspectionSvc under lock, then delegates without holding it
+//
+// ForecasterService:
+//   - sync.Mutex protects pool pointer and savedCreds
+//   - Start holds lock for its full duration (defer); finalizer uses TryLock to nil the pool
+//   - Stop/StopPair grab pool pointer under lock, then call blocking methods outside it
+//   - Pool2.getPipelines returns a maps.Clone snapshot for safe iteration
 //
 // inspectionService (internal):
 //   - sync.Mutex protects the per-VM pipeline map; short-held locks around map reads/writes

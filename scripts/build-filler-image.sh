@@ -1,14 +1,29 @@
 #!/usr/bin/env bash
 #
-# Build an Alpine-based filler VMDK for the forecaster VM strategy.
+# Build a minimal Alpine Linux VM image used by the forecaster's VM
+# benchmark strategy to measure datastore write throughput.
 #
-# Prerequisites: qemu-img, curl, guestfish
+# How it works:
+#   The image is a bootable 256 MB Alpine disk with a single job: on boot,
+#   wait for /dev/sdb (the target datastore disk attached by the forecaster),
+#   fill it with pseudo-random data via openssl ChaCha20 (~500+ MB/s), and
+#   power off. The forecaster times the fill to derive throughput numbers.
+#   ChaCha20 is used instead of /dev/urandom because it's fast and produces
+#   incompressible output, which is important for realistic storage benchmarks.
+#
+# Build approach:
+#   We can't just `apk add` in a chroot because that would require root and a
+#   full Alpine environment. Instead we download the Alpine virt ISO, extract
+#   the kernel/initramfs/APKs, unpack the tarballs manually into a rootfs, drop
+#   in a local.d boot script with the fill logic, and assemble a bootable raw
+#   disk image with syslinux/extlinux via guestfish. The result is gzipped to
+#   ~15-20 MB and embedded in pkg/vmware/assets/.
+#
+# Prerequisites: qemu-img, curl, guestfish, genisoimage (or mkisofs)
+#
 # Output:
 #   pkg/vmware/assets/alpine-filler.raw.gz   (~15-20 MB)
-#   pkg/vmware/assets/seed.iso.gz            (~1 KB)
-#
-# The Alpine VM boots, runs a local init script that fills /dev/sdb
-# with random data, then powers off. No cloud-init needed.
+#   pkg/vmware/assets/seed.iso.gz            (~1 KB, legacy, unused)
 #
 
 set -euo pipefail

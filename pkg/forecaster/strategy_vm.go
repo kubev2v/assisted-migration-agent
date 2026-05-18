@@ -1,4 +1,4 @@
-package services
+package forecaster
 
 import (
 	"context"
@@ -30,7 +30,7 @@ type vmStrategy struct {
 	folder   *object.Folder
 }
 
-func newVMStrategy(dm *vmware.DiskManager, gc *govmomi.Client) BenchmarkStrategy {
+func NewVMStrategy(dm *vmware.DiskManager, gc *govmomi.Client) BenchmarkStrategy {
 	return &vmStrategy{
 		dm: dm,
 		gc: gc,
@@ -331,11 +331,7 @@ func (s *vmStrategy) FillDisk(ctx context.Context, dc *object.Datacenter, pair m
 			// The flat VMDK file size reflects physical bytes written.
 			if onProgress != nil {
 				if fi, err := srcDsObj.Stat(ctx, flatDiskPath); err == nil {
-					physicalBytes := fi.GetFileInfo().FileSize
-					if physicalBytes > totalBytes {
-						physicalBytes = totalBytes
-					}
-					onProgress(physicalBytes)
+					onProgress(min(fi.GetFileInfo().FileSize, totalBytes))
 				}
 			}
 		}

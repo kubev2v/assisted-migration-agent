@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
+	"maps"
 	"sync"
 
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
@@ -159,28 +161,38 @@ func (p *Pool2[S, R]) Cancel(key string) Status[S, R] {
 }
 
 func (p *Pool2[S, R]) State(key string) (Status[S, R], error) {
-	p.mu.Lock()
-	pl, ok := p.pipelines[key]
-	p.mu.Unlock()
-
+	pipelines := p.getPipelines()
+	pl, ok := pipelines[key]
 	if !ok {
 		return Status[S, R]{}, fmt.Errorf("unknown key: %s", key)
 	}
-
 	return pl.Status, nil
 }
 
-func (p *Pool2[S, R]) IsRunning() bool {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+func (p *Pool2[S, R]) All() iter.Seq2[string, Status[S, R]] {
+	return func(yield func(string, Status[S, R]) bool) {
+		for key, e := range p.getPipelines() {
+			if !yield(key, e.Status) {
+				return
+			}
+		}
+	}
+}
 
-	for _, pl := range p.pipelines {
+func (p *Pool2[S, R]) IsRunning() bool {
+	for _, pl := range p.getPipelines() {
 		if !pl.Done {
 			return true
 		}
 	}
-
 	return false
+}
+
+func (p *Pool2[S, R]) getPipelines() map[string]entry[S, R] {
+	p.mu.Lock()
+	pipelines := maps.Clone(p.pipelines)
+	p.mu.Unlock()
+	return pipelines
 }
 
 func (p *Pool2[S, R]) run() {
