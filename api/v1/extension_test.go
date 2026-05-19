@@ -138,29 +138,29 @@ var _ = Describe("NewVirtualMachineFromSummary", func() {
 		Expect(vm.InspectionConcernCount).To(BeNil())
 	})
 
-	Context("Tags", func() {
-		It("should include tags when present", func() {
+	Context("Groups", func() {
+		It("should include groups when present", func() {
 			summary := models.VirtualMachineSummary{
-				ID:   "vm-tagged",
-				Name: "Tagged VM",
-				Tags: []string{"production", "critical"},
+				ID:     "vm-grouped",
+				Name:   "Grouped VM",
+				Groups: []string{"production", "critical"},
 			}
 
 			vm := v1.NewVirtualMachineFromSummary(summary)
 
-			Expect(vm.Tags).NotTo(BeNil())
-			Expect(*vm.Tags).To(Equal([]string{"production", "critical"}))
+			Expect(vm.Groups).NotTo(BeNil())
+			Expect(*vm.Groups).To(Equal([]string{"production", "critical"}))
 		})
 
-		It("should not include tags when empty", func() {
+		It("should not include groups when empty", func() {
 			summary := models.VirtualMachineSummary{
-				ID:   "vm-no-tags",
-				Name: "No Tags VM",
+				ID:   "vm-no-groups",
+				Name: "No Groups VM",
 			}
 
 			vm := v1.NewVirtualMachineFromSummary(summary)
 
-			Expect(vm.Tags).To(BeNil())
+			Expect(vm.Groups).To(BeNil())
 		})
 	})
 
@@ -317,7 +317,6 @@ var _ = Describe("NewGroupFromModel", func() {
 			Name:        "prod",
 			Filter:      "cluster = 'prod'",
 			Description: "Production VMs",
-			Tags:        []string{"production", "critical"},
 			CreatedAt:   now,
 			UpdatedAt:   now,
 		}
@@ -329,8 +328,6 @@ var _ = Describe("NewGroupFromModel", func() {
 		Expect(result.Filter).To(Equal("cluster = 'prod'"))
 		Expect(result.Description).NotTo(BeNil())
 		Expect(*result.Description).To(Equal("Production VMs"))
-		Expect(result.Tags).NotTo(BeNil())
-		Expect(*result.Tags).To(Equal([]string{"production", "critical"}))
 		Expect(*result.CreatedAt).To(BeTemporally("~", now, time.Second))
 		Expect(*result.UpdatedAt).To(BeTemporally("~", now, time.Second))
 	})
@@ -341,14 +338,6 @@ var _ = Describe("NewGroupFromModel", func() {
 		result := v1.NewGroupFromModel(g)
 
 		Expect(result.Description).To(BeNil())
-	})
-
-	It("should not include tags when empty", func() {
-		g := models.Group{ID: 1, Name: "g", Filter: "name = 'x'", CreatedAt: time.Now(), UpdatedAt: time.Now()}
-
-		result := v1.NewGroupFromModel(g)
-
-		Expect(result.Tags).To(BeNil())
 	})
 
 	It("should default zero CreatedAt to now", func() {

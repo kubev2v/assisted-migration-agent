@@ -548,6 +548,7 @@ func (a *AgentSvc) CreateGroup(name, filter, description string) (*v1.Group, err
 }
 
 // CreateGroupWithTags creates a new group with the given name, filter, description, and tags.
+// NOTE: The tags parameter is deprecated and ignored - kept for backward compatibility with tests.
 func (a *AgentSvc) CreateGroupWithTags(name, filter, description string, tags []string) (*v1.Group, error) {
 	body := v1.CreateGroupRequest{
 		Name:   name,
@@ -556,9 +557,7 @@ func (a *AgentSvc) CreateGroupWithTags(name, filter, description string, tags []
 	if description != "" {
 		body.Description = &description
 	}
-	if len(tags) > 0 {
-		body.Tags = &tags
-	}
+	// Tags field has been removed from groups - tags parameter is now ignored
 	data, err := json.Marshal(body)
 	if err != nil {
 		return nil, fmt.Errorf("marshaling request: %w", err)

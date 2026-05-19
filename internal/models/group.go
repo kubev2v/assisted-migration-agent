@@ -2,6 +2,8 @@ package models
 
 import (
 	"time"
+
+	"github.com/kubev2v/migration-planner/pkg/inventory"
 )
 
 type Group struct {
@@ -9,7 +11,7 @@ type Group struct {
 	Name        string
 	Description string
 	Filter      string
-	Tags        []string
+	Inventory   *inventory.Inventory
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }

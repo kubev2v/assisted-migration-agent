@@ -36,8 +36,8 @@ func NewVirtualMachineFromSummary(vm models.VirtualMachineSummary) VirtualMachin
 		Template:          &vm.IsTemplate,
 		MigrationExcluded: &vm.MigrationExcluded,
 	}
-	if len(vm.Tags) > 0 {
-		result.Tags = &vm.Tags
+	if len(vm.Groups) > 0 {
+		result.Groups = &vm.Groups
 	}
 	if len(vm.Labels) > 0 {
 		result.Labels = &vm.Labels
@@ -287,9 +287,6 @@ func NewGroupFromModel(g models.Group) Group {
 	}
 	if g.Description != "" {
 		group.Description = &g.Description
-	}
-	if len(g.Tags) > 0 {
-		group.Tags = &g.Tags
 	}
 	return group
 }

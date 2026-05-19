@@ -75,7 +75,7 @@ func (s *VMStore) List(ctx context.Context, filter sq.Sqlizer, opts ...ListOptio
 		var vm models.VirtualMachineSummary
 		var sqlErr string
 		var inspectionConcernCount int
-		var tags StringArray
+		var groups StringArray
 		var migrationExcluded bool
 		var labels StringArray
 		err := rows.Scan(
@@ -92,7 +92,7 @@ func (s *VMStore) List(ctx context.Context, filter sq.Sqlizer, opts ...ListOptio
 			&vm.IsMigratable,
 			&sqlErr,
 			&inspectionConcernCount,
-			&tags,
+			&groups,
 			&migrationExcluded,
 			&labels,
 			&vm.UtilizationCpuP95,
@@ -107,7 +107,7 @@ func (s *VMStore) List(ctx context.Context, filter sq.Sqlizer, opts ...ListOptio
 			vm.InspectionStatus.Error = errors.New(sqlErr)
 		}
 		vm.InspectionConcernCount = inspectionConcernCount
-		vm.Tags = tags
+		vm.Groups = groups
 		vm.MigrationExcluded = migrationExcluded
 		vm.Labels = labels
 		vms = append(vms, vm)
@@ -155,6 +155,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 	}
 
 	var pvm duckdb_models.VM
+	var groups StringArray
 	var (
 		uMoid                                 sql.NullString
 		uVmName                               sql.NullString
@@ -175,7 +176,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 		&pvm.ChangeTrackingEnabled, &pvm.DiskEnableUuid, &pvm.Datacenter,
 		&pvm.Cluster, &pvm.HWVersion, &pvm.TotalDiskCapacityMiB,
 		&pvm.ProvisionedMiB, &pvm.ResourcePool, &pvm.OsDiskComplexity,
-		&pvm.MigrationExcluded, &pvm.Labels,
+		&pvm.MigrationExcluded, &pvm.Labels, &groups,
 		&pvm.CpuHotAddEnabled, &pvm.CpuHotRemoveEnabled, &pvm.CpuSockets,
 		&pvm.CoresPerSocket, &pvm.MemoryHotAddEnabled, &pvm.BalloonedMemory,
 		&pvm.Disks, &pvm.NICs, &pvm.Networks, &pvm.Concerns,
@@ -192,6 +193,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 	}
 
 	result := fromDB(pvm)
+	result.Groups = groups
 
 	if uMoid.Valid {
 		result.Utilization = &models.VmUtilizationDetails{

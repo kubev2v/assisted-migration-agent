@@ -75,7 +75,7 @@ func validateNotBlank(fl validator.FieldLevel) bool {
 
 func validateUpdateGroupAtLeastOneField(sl validator.StructLevel) {
 	req := sl.Current().Interface().(v1.UpdateGroupRequest)
-	if req.Name == nil && req.Filter == nil && req.Description == nil && req.Tags == nil {
+	if req.Name == nil && req.Filter == nil && req.Description == nil {
 		sl.ReportError(req, "UpdateGroupRequest", "", "at_least_one", "")
 	}
 }

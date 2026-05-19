@@ -14,7 +14,7 @@ type VirtualMachineSummary struct {
 	IsTemplate             bool
 	InspectionStatus       InspectionStatus
 	InspectionConcernCount int
-	Tags                   []string
+	Groups                 []string
 	UtilizationCpuP95      *float64 // CPU utilization at p95 (%); nil when no utilization data
 	UtilizationMemP95      *float64 // Memory utilization at p95 (%); nil when no utilization data
 	UtilizationDisk        *float64 // Disk utilization (%); nil when no utilization data
@@ -71,6 +71,7 @@ type VM struct {
 	InspectionConcerns []VmInspectionConcern
 
 	Labels []string
+	Groups []string
 }
 
 type Issue struct {

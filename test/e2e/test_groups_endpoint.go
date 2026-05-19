@@ -608,259 +608,7 @@ var _ = Describe("Group endpoint e2e tests", Ordered, func() {
 
 })
 
-var _ = Describe("Auto-created folder groups e2e tests", Ordered, func() {
-	// vcsim model has 3 folders by MoRef ID:
-	// - group-60 (databases): 17 VMs (index 0-16)
-	// - group-61 (workload): 17 VMs (index 17-33)
-	// - group-62 (sap): 16 VMs (index 34-49)
-	// The Folder column in vinfo stores the folder ID, not the name.
-
-	var (
-		agentSvc *service.AgentSvc
-	)
-
-	BeforeAll(func() {
-		GinkgoWriter.Println("Starting postgres...")
-		err := infraManager.StartPostgres()
-		Expect(err).ToNot(HaveOccurred(), "failed to start postgres")
-		time.Sleep(2 * time.Second)
-
-		GinkgoWriter.Println("Starting vcsim...")
-		err = infraManager.StartVcsim()
-		Expect(err).ToNot(HaveOccurred(), "failed to start vcsim")
-
-		client := &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			},
-		}
-		Eventually(func() error {
-			resp, err := client.Get(infra.VcsimURL)
-			if err != nil {
-				return err
-			}
-			_ = resp.Body.Close()
-			return nil
-		}, 30*time.Second, 1*time.Second).Should(BeNil(), "vcsim did not become ready")
-
-		agentSvc = service.DefaultAgentSvc(cfg.AgentAPIUrl)
-
-		agentID := uuid.NewString()
-		GinkgoWriter.Printf("Starting agent %s in disconnected mode...\n", agentID)
-		_, err = infraManager.StartAgent(infra.AgentConfig{
-			AgentID:        agentID,
-			SourceID:       uuid.NewString(),
-			Mode:           "disconnected",
-			ConsoleURL:     cfg.AgentProxyUrl,
-			UpdateInterval: "1s",
-		})
-		Expect(err).ToNot(HaveOccurred(), "failed to start agent")
-
-		Eventually(func() error {
-			_, err := agentSvc.Status()
-			return err
-		}, 30*time.Second, 1*time.Second).Should(BeNil(), "agent did not become ready")
-
-		GinkgoWriter.Println("Starting collector...")
-		_, err = agentSvc.StartCollector(infra.VcsimURL, infra.VcsimUsername, infra.VcsimPassword)
-		Expect(err).ToNot(HaveOccurred(), "failed to start collector")
-
-		Eventually(func() string {
-			status, err := agentSvc.GetCollectorStatus()
-			if err != nil {
-				return "error"
-			}
-			GinkgoWriter.Printf("Collector status: %s\n", status.Status)
-			return status.Status
-		}, 120*time.Second, 2*time.Second).Should(Equal("collected"), "collector did not reach collected state")
-
-		GinkgoWriter.Println("Auto-created folder groups test setup complete")
-	})
-
-	AfterAll(func() {
-		GinkgoWriter.Println("Cleaning up auto-created folder groups tests...")
-		_ = infraManager.RemoveAgent()
-		_ = infraManager.StopVcsim()
-		_ = infraManager.StopPostgres()
-	})
-
-	// Given an agent that has collected inventory from vcsim with 3 folders
-	// When listing all groups
-	// Then groups for each folder plus "No Folder" should exist
-	It("should have auto-created groups for each folder after collection", func() {
-		// Act
-		list, err := agentSvc.ListGroups()
-		Expect(err).ToNot(HaveOccurred())
-
-		// Assert
-		groupNames := make([]string, len(list.Groups))
-		for i, g := range list.Groups {
-			groupNames[i] = g.Name
-		}
-		GinkgoWriter.Printf("Auto-created groups: %v\n", groupNames)
-
-		Expect(groupNames).To(ContainElement("group-60"))
-		Expect(groupNames).To(ContainElement("group-61"))
-		Expect(groupNames).To(ContainElement("group-62"))
-		Expect(groupNames).To(ContainElement("No Folder"))
-	})
-
-	// Given auto-created folder groups exist
-	// When inspecting the filter field of each group
-	// Then each group should have the correct folder filter syntax
-	It("should have correct filter for folder groups", func() {
-		// Act
-		list, err := agentSvc.ListGroups()
-		Expect(err).ToNot(HaveOccurred())
-
-		// Assert
-		for _, g := range list.Groups {
-			switch g.Name {
-			case "group-60":
-				Expect(g.Filter).To(Equal("folder = 'group-60'"))
-			case "group-61":
-				Expect(g.Filter).To(Equal("folder = 'group-61'"))
-			case "group-62":
-				Expect(g.Filter).To(Equal("folder = 'group-62'"))
-			case "No Folder":
-				Expect(g.Filter).To(Equal("folder = ''"))
-			}
-		}
-	})
-
-	// Given the group-60 folder contains 17 VMs (index 0-16)
-	// When getting the group-60 folder group
-	// Then it should return exactly 17 VMs
-	It("should return correct VMs for group-60 folder group", func() {
-		// Arrange
-		list, err := agentSvc.ListGroups()
-		Expect(err).ToNot(HaveOccurred())
-
-		var folderGroupID string
-		for _, g := range list.Groups {
-			if g.Name == "group-60" {
-				folderGroupID = g.Id
-				break
-			}
-		}
-		Expect(folderGroupID).ToNot(BeEmpty(), "group-60 group should exist")
-
-		// Act
-		pageSize := 100
-		resp, err := agentSvc.GetGroup(folderGroupID, &service.GroupGetParams{PageSize: &pageSize})
-		Expect(err).ToNot(HaveOccurred())
-
-		// Assert
-		GinkgoWriter.Printf("group-60 folder group: total=%d\n", resp.Total)
-		Expect(resp.Total).To(Equal(17))
-	})
-
-	// Given the group-61 folder contains 17 VMs (index 17-33)
-	// When getting the group-61 folder group
-	// Then it should return exactly 17 VMs
-	It("should return correct VMs for group-61 folder group", func() {
-		// Arrange
-		list, err := agentSvc.ListGroups()
-		Expect(err).ToNot(HaveOccurred())
-
-		var folderGroupID string
-		for _, g := range list.Groups {
-			if g.Name == "group-61" {
-				folderGroupID = g.Id
-				break
-			}
-		}
-		Expect(folderGroupID).ToNot(BeEmpty(), "group-61 group should exist")
-
-		// Act
-		pageSize := 100
-		resp, err := agentSvc.GetGroup(folderGroupID, &service.GroupGetParams{PageSize: &pageSize})
-		Expect(err).ToNot(HaveOccurred())
-
-		// Assert
-		GinkgoWriter.Printf("group-61 folder group: total=%d\n", resp.Total)
-		Expect(resp.Total).To(Equal(17))
-	})
-
-	// Given the group-62 folder contains 16 VMs (index 34-49)
-	// When getting the group-62 folder group
-	// Then it should return exactly 16 VMs
-	It("should return correct VMs for group-62 folder group", func() {
-		// Arrange
-		list, err := agentSvc.ListGroups()
-		Expect(err).ToNot(HaveOccurred())
-
-		var folderGroupID string
-		for _, g := range list.Groups {
-			if g.Name == "group-62" {
-				folderGroupID = g.Id
-				break
-			}
-		}
-		Expect(folderGroupID).ToNot(BeEmpty(), "group-62 group should exist")
-
-		// Act
-		pageSize := 100
-		resp, err := agentSvc.GetGroup(folderGroupID, &service.GroupGetParams{PageSize: &pageSize})
-		Expect(err).ToNot(HaveOccurred())
-
-		// Assert
-		GinkgoWriter.Printf("group-62 folder group: total=%d\n", resp.Total)
-		Expect(resp.Total).To(Equal(16))
-	})
-
-	// Given all VMs in vcsim model are organized in folders
-	// When getting the "No Folder" group
-	// Then it should return 0 VMs
-	It("should return 0 VMs for No Folder group in vcsim model", func() {
-		// Arrange
-		list, err := agentSvc.ListGroups()
-		Expect(err).ToNot(HaveOccurred())
-
-		var noFolderGroupID string
-		for _, g := range list.Groups {
-			if g.Name == "No Folder" {
-				noFolderGroupID = g.Id
-				break
-			}
-		}
-		Expect(noFolderGroupID).ToNot(BeEmpty(), "No Folder group should exist")
-
-		// Act
-		resp, err := agentSvc.GetGroup(noFolderGroupID, nil)
-		Expect(err).ToNot(HaveOccurred())
-
-		// Assert
-		GinkgoWriter.Printf("No Folder group: total=%d\n", resp.Total)
-		Expect(resp.Total).To(Equal(0))
-	})
-
-	// Given 50 VMs distributed across 3 folders (group-60: 17, group-61: 17, group-62: 16)
-	// When summing VMs across all folder groups
-	// Then the total should equal 50
-	It("should have all 50 VMs distributed across folder groups", func() {
-		// Arrange
-		list, err := agentSvc.ListGroups()
-		Expect(err).ToNot(HaveOccurred())
-		pageSize := 100
-
-		// Act
-		totalInFolders := 0
-		for _, g := range list.Groups {
-			if g.Name == "group-60" || g.Name == "group-61" || g.Name == "group-62" {
-				resp, err := agentSvc.GetGroup(g.Id, &service.GroupGetParams{PageSize: &pageSize})
-				Expect(err).ToNot(HaveOccurred())
-				totalInFolders += resp.Total
-				GinkgoWriter.Printf("Folder %s: %d VMs\n", g.Name, resp.Total)
-			}
-		}
-
-		// Assert
-		Expect(totalInFolders).To(Equal(50), "all 50 VMs should be in folder groups")
-	})
-})
-
-var _ = Describe("Group tags e2e tests", Ordered, func() {
+var _ = Describe("Group membership e2e tests", Ordered, func() {
 	var (
 		agentSvc *service.AgentSvc
 		allVMs   []v1.VirtualMachine
@@ -928,40 +676,24 @@ var _ = Describe("Group tags e2e tests", Ordered, func() {
 		allVMs = result.Vms
 		Expect(len(allVMs)).To(Equal(50), "vcsim model should produce 50 VMs")
 
-		GinkgoWriter.Println("Group tags test setup complete")
+		GinkgoWriter.Println("Group membership test setup complete")
 	})
 
 	AfterAll(func() {
-		GinkgoWriter.Println("Cleaning up group tags tests...")
+		GinkgoWriter.Println("Cleaning up group membership tests...")
 		_ = infraManager.RemoveAgent()
 		_ = infraManager.StopVcsim()
 		_ = infraManager.StopPostgres()
 	})
 
-	// Given a group with tags
-	// When creating the group
-	// Then the group should have the tags
-	It("should create a group with tags", func() {
-		// Act
-		tags := []string{"prod", "critical"}
-		group, err := agentSvc.CreateGroupWithTags("tagged-group", "memory > 0", "Group with tags", tags)
-		Expect(err).ToNot(HaveOccurred())
-		defer func() { _, _ = agentSvc.DeleteGroup(group.Id) }()
-
-		// Assert
-		Expect(group.Tags).ToNot(BeNil())
-		Expect(*group.Tags).To(ConsistOf("prod", "critical"))
-	})
-
-	// Given a group with tags matching some VMs
+	// Given a group matching some VMs
 	// When listing VMs
-	// Then matching VMs should have the group's tags
-	It("should assign tags to matching VMs", func() {
+	// Then matching VMs should have the group name in their groups field
+	It("should show group names on matching VMs", func() {
 		// Arrange - create a group matching VMs in cluster
 		firstCluster := allVMs[0].Cluster
-		tags := []string{"cluster_tag"}
-		group, err := agentSvc.CreateGroupWithTags("cluster-tagged",
-			fmt.Sprintf("cluster = '%s'", firstCluster), "", tags)
+		group, err := agentSvc.CreateGroupWithTags("cluster-group",
+			fmt.Sprintf("cluster = '%s'", firstCluster), "", nil)
 		Expect(err).ToNot(HaveOccurred())
 		defer func() { _, _ = agentSvc.DeleteGroup(group.Id) }()
 
@@ -970,30 +702,30 @@ var _ = Describe("Group tags e2e tests", Ordered, func() {
 		result, err := agentSvc.ListVMs(&service.VMListParams{PageSize: &pageSize})
 		Expect(err).ToNot(HaveOccurred())
 
-		// Assert - VMs in the cluster should have the tag
+		// Assert - VMs in the cluster should have the group name
 		for _, vm := range result.Vms {
 			if vm.Cluster == firstCluster {
-				Expect(vm.Tags).ToNot(BeNil(), "VM %s in cluster should have tags", vm.Name)
-				Expect(*vm.Tags).To(ContainElement("cluster_tag"),
-					"VM %s should have cluster_tag", vm.Name)
+				Expect(vm.Groups).ToNot(BeNil(), "VM %s in cluster should have groups", vm.Name)
+				Expect(*vm.Groups).To(ContainElement("cluster-group"),
+					"VM %s should be in cluster-group", vm.Name)
 			}
 		}
 	})
 
-	// Given multiple groups with different tags matching the same VM
+	// Given multiple groups matching the same VM
 	// When listing VMs
-	// Then the VM should have tags from all matching groups
-	It("should merge tags from multiple matching groups", func() {
+	// Then the VM should show all matching group names
+	It("should show all matching group names on VMs", func() {
 		// Arrange - create two groups that both match some VMs
 		firstCluster := allVMs[0].Cluster
 
-		group1, err := agentSvc.CreateGroupWithTags("tag-group-1",
-			fmt.Sprintf("cluster = '%s'", firstCluster), "", []string{"tag_a"})
+		group1, err := agentSvc.CreateGroupWithTags("group-1",
+			fmt.Sprintf("cluster = '%s'", firstCluster), "", nil)
 		Expect(err).ToNot(HaveOccurred())
 		defer func() { _, _ = agentSvc.DeleteGroup(group1.Id) }()
 
-		group2, err := agentSvc.CreateGroupWithTags("tag-group-2",
-			"memory > 0", "", []string{"tag_b"})
+		group2, err := agentSvc.CreateGroupWithTags("group-2",
+			"memory > 0", "", nil)
 		Expect(err).ToNot(HaveOccurred())
 		defer func() { _, _ = agentSvc.DeleteGroup(group2.Id) }()
 
@@ -1002,76 +734,52 @@ var _ = Describe("Group tags e2e tests", Ordered, func() {
 		result, err := agentSvc.ListVMs(&service.VMListParams{PageSize: &pageSize})
 		Expect(err).ToNot(HaveOccurred())
 
-		// Assert - VMs in the cluster should have both tags
+		// Assert - VMs in the cluster should be in both groups
 		for _, vm := range result.Vms {
 			if vm.Cluster == firstCluster {
-				Expect(vm.Tags).ToNot(BeNil(), "VM %s should have tags", vm.Name)
-				Expect(*vm.Tags).To(ContainElement("tag_a"),
-					"VM %s should have tag_a", vm.Name)
-				Expect(*vm.Tags).To(ContainElement("tag_b"),
-					"VM %s should have tag_b", vm.Name)
+				Expect(vm.Groups).ToNot(BeNil(), "VM %s should have groups", vm.Name)
+				Expect(*vm.Groups).To(ContainElement("group-1"),
+					"VM %s should be in group-1", vm.Name)
+				Expect(*vm.Groups).To(ContainElement("group-2"),
+					"VM %s should be in group-2", vm.Name)
 			}
 		}
 	})
 
-	// Given a group with tags
+	// Given a group
 	// When the group is deleted
-	// Then VMs should no longer have those tags
-	It("should remove tags when group is deleted", func() {
-		// Arrange - create and verify tags are applied
-		tags := []string{"temp_tag"}
-		group, err := agentSvc.CreateGroupWithTags("temp-group", "memory > 0", "", tags)
+	// Then VMs should no longer show that group name
+	It("should remove group name when group is deleted", func() {
+		// Arrange - create and verify group name appears
+		group, err := agentSvc.CreateGroupWithTags("temp-group", "memory > 0", "", nil)
 		Expect(err).ToNot(HaveOccurred())
 
 		pageSize := 100
 		result, err := agentSvc.ListVMs(&service.VMListParams{PageSize: &pageSize})
 		Expect(err).ToNot(HaveOccurred())
 
-		// Verify tags are present
-		taggedCount := 0
+		// Verify group name is present
+		groupedCount := 0
 		for _, vm := range result.Vms {
-			if vm.Tags != nil && len(*vm.Tags) > 0 {
-				taggedCount++
+			if vm.Groups != nil && len(*vm.Groups) > 0 {
+				groupedCount++
 			}
 		}
-		Expect(taggedCount).To(BeNumerically(">", 0), "some VMs should have tags")
+		Expect(groupedCount).To(BeNumerically(">", 0), "some VMs should be in groups")
 
 		// Act - delete the group
 		_, err = agentSvc.DeleteGroup(group.Id)
 		Expect(err).ToNot(HaveOccurred())
 
-		// Assert - VMs should not have temp_tag anymore
+		// Assert - VMs should not have temp-group anymore
 		result, err = agentSvc.ListVMs(&service.VMListParams{PageSize: &pageSize})
 		Expect(err).ToNot(HaveOccurred())
 
 		for _, vm := range result.Vms {
-			if vm.Tags != nil {
-				Expect(*vm.Tags).ToNot(ContainElement("temp_tag"),
-					"VM %s should not have temp_tag after group deletion", vm.Name)
+			if vm.Groups != nil {
+				Expect(*vm.Groups).ToNot(ContainElement("temp-group"),
+					"VM %s should not be in temp-group after deletion", vm.Name)
 			}
 		}
-	})
-
-	// Given auto-created folder groups
-	// When listing VMs
-	// Then VMs should have tags matching their folder names
-	It("should have folder tags from auto-created groups", func() {
-		// Act - list all VMs
-		pageSize := 100
-		result, err := agentSvc.ListVMs(&service.VMListParams{PageSize: &pageSize})
-		Expect(err).ToNot(HaveOccurred())
-
-		// Assert - VMs should have tags from auto-created folder groups
-		// The auto-created groups should have tags based on folder names
-		taggedVMCount := 0
-		for _, vm := range result.Vms {
-			if vm.Tags != nil && len(*vm.Tags) > 0 {
-				taggedVMCount++
-				GinkgoWriter.Printf("VM %s has tags: %v\n", vm.Name, *vm.Tags)
-			}
-		}
-		GinkgoWriter.Printf("Total VMs with tags: %d\n", taggedVMCount)
-		// All VMs in folders should have tags (50 VMs total, all in folders)
-		Expect(taggedVMCount).To(Equal(50), "all VMs should have folder tags")
 	})
 })

@@ -768,21 +768,20 @@ var _ = Describe("VMStore", func() {
 			insertVM("vm-3", "app-server", "poweredOff", "cluster-b", 16384)
 		})
 
-		It("should return empty tags when no groups have tags", func() {
+		It("should return empty groups when no groups match", func() {
 			vms, err := s.VM().List(ctx, nil)
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vms).To(HaveLen(3))
 			for _, vm := range vms {
-				Expect(vm.Tags).To(BeEmpty())
+				Expect(vm.Groups).To(BeEmpty())
 			}
 		})
 
-		It("should derive tags from group_matches and groups", func() {
+		It("should derive groups from group_matches", func() {
 			g, err := s.Group().Create(ctx, models.Group{
 				Name:   "cluster-a-group",
 				Filter: "cluster = 'cluster-a'",
-				Tags:   []string{"prod", "critical"},
 			})
 			Expect(err).NotTo(HaveOccurred())
 
@@ -793,28 +792,26 @@ var _ = Describe("VMStore", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vms).To(HaveLen(3))
 
-			tagsByID := make(map[string][]string)
+			groupsByID := make(map[string][]string)
 			for _, vm := range vms {
-				tagsByID[vm.ID] = vm.Tags
+				groupsByID[vm.ID] = vm.Groups
 			}
 
-			Expect(tagsByID["vm-1"]).To(ConsistOf("prod", "critical"))
-			Expect(tagsByID["vm-2"]).To(ConsistOf("prod", "critical"))
-			Expect(tagsByID["vm-3"]).To(BeEmpty())
+			Expect(groupsByID["vm-1"]).To(ConsistOf("cluster-a-group"))
+			Expect(groupsByID["vm-2"]).To(ConsistOf("cluster-a-group"))
+			Expect(groupsByID["vm-3"]).To(BeEmpty())
 		})
 
-		It("should merge tags from multiple groups", func() {
+		It("should include VM in multiple groups", func() {
 			g1, err := s.Group().Create(ctx, models.Group{
 				Name:   "cluster-a-group",
 				Filter: "cluster = 'cluster-a'",
-				Tags:   []string{"web"},
 			})
 			Expect(err).NotTo(HaveOccurred())
 
 			g2, err := s.Group().Create(ctx, models.Group{
 				Name:   "all-group",
 				Filter: "memory > 0",
-				Tags:   []string{"infra"},
 			})
 			Expect(err).NotTo(HaveOccurred())
 
@@ -824,21 +821,20 @@ var _ = Describe("VMStore", func() {
 			vms, err := s.VM().List(ctx, nil)
 			Expect(err).NotTo(HaveOccurred())
 
-			tagsByID := make(map[string][]string)
+			groupsByID := make(map[string][]string)
 			for _, vm := range vms {
-				tagsByID[vm.ID] = vm.Tags
+				groupsByID[vm.ID] = vm.Groups
 			}
 
-			Expect(tagsByID["vm-1"]).To(ConsistOf("web", "infra"))
-			Expect(tagsByID["vm-2"]).To(ConsistOf("web", "infra"))
-			Expect(tagsByID["vm-3"]).To(ConsistOf("infra"))
+			Expect(groupsByID["vm-1"]).To(ConsistOf("cluster-a-group", "all-group"))
+			Expect(groupsByID["vm-2"]).To(ConsistOf("cluster-a-group", "all-group"))
+			Expect(groupsByID["vm-3"]).To(ConsistOf("all-group"))
 		})
 
-		It("should return tags when filter is applied", func() {
+		It("should return groups when filter is applied", func() {
 			g, err := s.Group().Create(ctx, models.Group{
 				Name:   "cluster-a-group",
 				Filter: "cluster = 'cluster-a'",
-				Tags:   []string{"prod"},
 			})
 			Expect(err).NotTo(HaveOccurred())
 
@@ -850,7 +846,7 @@ var _ = Describe("VMStore", func() {
 			Expect(vms).To(HaveLen(2))
 
 			for _, vm := range vms {
-				Expect(vm.Tags).To(ConsistOf("prod"))
+				Expect(vm.Groups).To(ConsistOf("cluster-a-group"))
 			}
 		})
 	})

@@ -6,6 +6,7 @@ package v1
 import (
 	"time"
 
+	externalRef0 "github.com/kubev2v/migration-planner/api/v1alpha1"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
@@ -166,9 +167,6 @@ type CreateGroupRequest struct {
 
 	// Name Group display name
 	Name string `binding:"required,min=1,max=100" json:"name"`
-
-	// Tags Tags to apply to matching VMs (only alphanumeric, underscore, and dot allowed)
-	Tags *[]string `binding:"omitempty,dive,tag_format" json:"tags,omitempty"`
 }
 
 // DatastoreDetail defines model for DatastoreDetail.
@@ -329,9 +327,6 @@ type Group struct {
 	// Name Group display name
 	Name string `json:"name"`
 
-	// Tags Tags associated with this group (applied to matching VMs)
-	Tags *[]string `json:"tags,omitempty"`
-
 	// UpdatedAt Timestamp when the group was last updated
 	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
 }
@@ -352,7 +347,8 @@ type GroupListResponse struct {
 
 // GroupResponse defines model for GroupResponse.
 type GroupResponse struct {
-	Group Group `json:"group"`
+	Group     Group                   `json:"group"`
+	Inventory *externalRef0.Inventory `json:"inventory,omitempty"`
 
 	// Page Current page number
 	Page int `json:"page"`
@@ -572,9 +568,6 @@ type UpdateGroupRequest struct {
 
 	// Name Group display name
 	Name *string `binding:"omitempty,min=1,max=100" json:"name,omitempty"`
-
-	// Tags Tags to apply to matching VMs (only alphanumeric, underscore, and dot allowed)
-	Tags *[]string `binding:"omitempty,dive,tag_format" json:"tags,omitempty"`
 }
 
 // UpdateLabelVMsRequest defines model for UpdateLabelVMsRequest.
@@ -711,6 +704,9 @@ type VirtualMachine struct {
 	// DiskSize Total disk size in MB
 	DiskSize int64 `json:"diskSize"`
 
+	// Groups Names of groups this VM matches
+	Groups *[]string `json:"groups,omitempty"`
+
 	// Id VirtualMachine ID in vCenter
 	Id string `json:"id"`
 
@@ -735,9 +731,6 @@ type VirtualMachine struct {
 
 	// Name VirtualMachine name
 	Name string `json:"name"`
-
-	// Tags Tags aggregated from matching groups
-	Tags *[]string `json:"tags,omitempty"`
 
 	// Template True if the vm is a template. False otherwise
 	Template *bool `json:"template,omitempty"`

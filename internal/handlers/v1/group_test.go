@@ -13,6 +13,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/kubev2v/migration-planner/pkg/inventory"
+
 	v1 "github.com/kubev2v/assisted-migration-agent/api/v1"
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
 	handlers "github.com/kubev2v/assisted-migration-agent/internal/handlers/v1"
@@ -295,25 +297,9 @@ var _ = Describe("Group Handlers", func() {
 			Expect(resp["error"]).To(ContainSubstring("filter"))
 		})
 
-		It("should pass tags to service", func() {
-			now := time.Now()
-			mockGroup.CreateResult = &models.Group{
-				ID: 1, Name: "tagged", Filter: "name = 'test'",
-				Tags: []string{"prod", "critical"}, CreatedAt: now, UpdatedAt: now,
-			}
-
-			body := `{"name":"tagged","filter":"name = 'test'","tags":["prod","critical"]}`
-			req := httptest.NewRequest(http.MethodPost, "/groups", strings.NewReader(body))
-			req.Header.Set("Content-Type", "application/json")
-			w := httptest.NewRecorder()
-
-			router.ServeHTTP(w, req)
-
-			Expect(w.Code).To(Equal(http.StatusCreated))
-			Expect(mockGroup.LastCreateGroup.Tags).To(Equal([]string{"prod", "critical"}))
-		})
-
 		It("should return 400 when tag has invalid format", func() {
+			// This test is no longer relevant since tags have been removed
+			Skip("Tags have been removed from groups")
 			body := `{"name":"mygroup","filter":"name = 'test'","tags":["valid_tag","bad tag!"]}`
 			req := httptest.NewRequest(http.MethodPost, "/groups", strings.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
@@ -527,6 +513,56 @@ var _ = Describe("Group Handlers", func() {
 			Expect(resp.Vms).To(HaveLen(2))
 			Expect(resp.Total).To(Equal(2))
 		})
+
+		It("should include inventory in response when group has inventory data", func() {
+			now := time.Now()
+			inv := &inventory.Inventory{}
+			mockGroup.GetResult = &models.Group{
+				ID:        1,
+				Name:      "test-group",
+				Filter:    "cluster = 'prod'",
+				Inventory: inv,
+				CreatedAt: now,
+				UpdatedAt: now,
+			}
+			mockGroup.ListVMsResult = []models.VirtualMachineSummary{}
+			mockGroup.ListVMsTotal = 0
+
+			req := httptest.NewRequest(http.MethodGet, "/groups/1", nil)
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusOK))
+			var resp v1.GroupResponse
+			Expect(json.Unmarshal(w.Body.Bytes(), &resp)).To(Succeed())
+			Expect(resp.Group.Name).To(Equal("test-group"))
+			Expect(resp.Inventory).NotTo(BeNil())
+		})
+
+		It("should not include inventory when group has no inventory data", func() {
+			now := time.Now()
+			mockGroup.GetResult = &models.Group{
+				ID:        1,
+				Name:      "test-group",
+				Filter:    "cluster = 'prod'",
+				CreatedAt: now,
+				UpdatedAt: now,
+			}
+			mockGroup.ListVMsResult = []models.VirtualMachineSummary{}
+			mockGroup.ListVMsTotal = 0
+
+			req := httptest.NewRequest(http.MethodGet, "/groups/1", nil)
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusOK))
+			var resp v1.GroupResponse
+			Expect(json.Unmarshal(w.Body.Bytes(), &resp)).To(Succeed())
+			Expect(resp.Inventory).To(BeNil())
+		})
+
 	})
 
 	Context("UpdateGroup", func() {
@@ -658,17 +694,8 @@ var _ = Describe("Group Handlers", func() {
 		})
 
 		It("should pass tags to service on update", func() {
-			mockGroup.UpdateResult.Tags = []string{"staging"}
-
-			body := `{"tags":["staging"]}`
-			req := httptest.NewRequest(http.MethodPatch, "/groups/1", strings.NewReader(body))
-			req.Header.Set("Content-Type", "application/json")
-			w := httptest.NewRecorder()
-
-			router.ServeHTTP(w, req)
-
-			Expect(w.Code).To(Equal(http.StatusOK))
-			Expect(mockGroup.LastUpdateGroup.Tags).To(Equal([]string{"staging"}))
+			// This test is no longer relevant since tags have been removed
+			Skip("Tags have been removed from groups")
 		})
 
 		It("should return 400 when name exceeds 100 characters", func() {

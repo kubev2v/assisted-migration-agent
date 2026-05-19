@@ -58,6 +58,15 @@ concerns_agg AS (
         }) AS concerns
     FROM concerns
     GROUP BY "VM_ID"
+),
+groups_agg AS (
+    SELECT
+        u.vm_id,
+        ARRAY_AGG(DISTINCT grp.name) AS groups
+    FROM group_matches gm
+    JOIN groups grp ON gm.group_id = grp.id
+    , UNNEST(gm.vm_ids) AS u(vm_id)
+    GROUP BY u.vm_id
 )
 SELECT
     COALESCE(i."VM ID", '') AS "ID",
@@ -88,6 +97,7 @@ SELECT
     COALESCE(i."OsDiskComplexity", 0) AS "OsDiskComplexity",
     COALESCE(i."migration_excluded", false) AS "MigrationExcluded",
     COALESCE(CAST(i."labels" AS VARCHAR[]), [])::VARCHAR[] AS "Labels",
+    COALESCE(g.groups, [])::VARCHAR[] AS "Groups",
     COALESCE(c."Hot Add", false) AS "CpuHotAddEnabled",
     COALESCE(c."Hot Remove", false) AS "CpuHotRemoveEnabled",
     COALESCE(c."Sockets", 0) AS "CpuSockets",
@@ -123,6 +133,7 @@ LEFT JOIN vmemory m ON i."VM ID" = m."VM ID"
 LEFT JOIN disks d ON i."VM ID" = d."VM ID"
 LEFT JOIN nics n ON i."VM ID" = n."VM ID"
 LEFT JOIN concerns_agg con ON i."VM ID" = con."VM_ID"
+LEFT JOIN groups_agg g ON i."VM ID" = g.vm_id
 LEFT JOIN rightsizing_vm_utilization u
     ON u.moid = i."VM ID"
     AND u.report_id = (
@@ -163,7 +174,7 @@ var vmOutputQuery = sq.Select(
 	`COALESCE(crit.critical_count, 0) = 0 AS migratable`,
 	`COALESCE(i.error, '') AS error`,
 	`COALESCE((SELECT COUNT(*)::BIGINT FROM vm_inspection_concerns ic WHERE ic."VM ID" = v."VM ID" AND ic.inspection_id = (SELECT MAX(inspection_id) FROM vm_inspection_concerns imx WHERE imx."VM ID" = v."VM ID")), 0) AS inspection_concern_count`,
-	`COALESCE(t.tags, [])::VARCHAR[] AS tags`,
+	`COALESCE(g.groups, [])::VARCHAR[] AS groups`,
 	`v."migration_excluded" AS migration_excluded`,
 	`COALESCE(CAST(v."labels" AS VARCHAR[]), [])::VARCHAR[] AS labels`,
 ).From("vinfo v").
@@ -172,13 +183,12 @@ var vmOutputQuery = sq.Select(
 	LeftJoin(`(SELECT "VM ID", SUM("Capacity MiB") AS total_disk FROM vdisk GROUP BY "VM ID") d ON v."VM ID" = d."VM ID"`).
 	LeftJoin(`vm_inspection_status i ON v."VM ID" = i."VM ID"`).
 	LeftJoin(`(
-		SELECT u.vm_id, list_distinct(flatten(list(g.tags))) AS tags
+		SELECT u.vm_id, ARRAY_AGG(DISTINCT grp.name) AS groups
 		FROM group_matches gm
-		JOIN groups g ON gm.group_id = g.id
+		JOIN groups grp ON gm.group_id = grp.id
 		, UNNEST(gm.vm_ids) AS u(vm_id)
-		WHERE len(g.tags) > 0
 		GROUP BY u.vm_id
-	) t ON v."VM ID" = t.vm_id`)
+	) g ON v."VM ID" = g.vm_id`)
 
 // vmFilterSubquery is the base flat JOIN query for filtering.
 // It joins all tables so WHERE clauses can reference any raw column.

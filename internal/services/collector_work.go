@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"regexp"
-	"strings"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -99,10 +97,6 @@ func (f *collectorWorkFactory) Build(creds models.Credentials) work.WorkBuilder[
 				}
 
 				zap.S().Named("inventory").Info("successfully created inventory with clusters")
-
-				if err := f.createFolderGroups(ctx); err != nil {
-					zap.S().Named("collector_service").Warnw("failed to create folder groups", "error", err)
-				}
 
 				return r, nil
 			},
@@ -197,50 +191,4 @@ func (f *collectorWorkFactory) process(ctx context.Context, sqlitePath string) (
 	}
 
 	return inventory, nil
-}
-
-func (f *collectorWorkFactory) createFolderGroups(ctx context.Context) error {
-	folders, err := f.store.VM().GetFolders(ctx)
-	if err != nil {
-		return fmt.Errorf("getting folders: %w", err)
-	}
-
-	if err := f.store.WithTx(ctx, func(txCtx context.Context) error {
-		for _, folder := range folders {
-			group := models.Group{
-				Name:        folder.Name,
-				Description: fmt.Sprintf("VMs in folder: %s", folder.Name),
-				Filter:      fmt.Sprintf("folder = '%s'", strings.ReplaceAll(folder.Name, `'`, `\'`)),
-				Tags:        []string{sanitizeTag(folder.Name)},
-			}
-			if _, err := f.store.Group().Create(txCtx, group); err != nil {
-				zap.S().Named("collector_service").Warnw("failed to create folder group",
-					"folder", folder.Name, "error", err)
-			}
-		}
-
-		noFolderGroup := models.Group{
-			Name:        "No Folder",
-			Description: "VMs not organized in any folder",
-			Filter:      "folder = ''",
-			Tags:        []string{},
-		}
-		if _, err := f.store.Group().Create(txCtx, noFolderGroup); err != nil {
-			zap.S().Named("collector_service").Warnw("failed to create no-folder group", "error", err)
-		}
-
-		return f.store.Group().RefreshMatches(txCtx)
-	}); err != nil {
-		return fmt.Errorf("creating folder groups: %w", err)
-	}
-
-	zap.S().Named("collector_service").Infow("folder groups created", "count", len(folders)+1)
-	return nil
-}
-
-var tagSanitizer = regexp.MustCompile(`[^a-zA-Z0-9_.]`)
-
-func sanitizeTag(name string) string {
-	tag := strings.ReplaceAll(name, " ", "_")
-	return tagSanitizer.ReplaceAllString(tag, "")
 }

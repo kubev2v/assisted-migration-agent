@@ -1254,11 +1254,11 @@ components:
         inspectionConcernCount:
           type: integer
           description: Number of inspection concerns recorded for the latest persisted inspection result
-        tags:
+        groups:
           type: array
           items:
             type: string
-          description: Tags aggregated from matching groups
+          description: Names of groups this VM matches
         labels:
           type: array
           items:
@@ -1607,12 +1607,6 @@ components:
           type: string
           description: Filter expression (pkg/filter DSL)
           example: "memory >= 8GB and cluster = 'prod'"
-        tags:
-          type: array
-          items:
-            type: string
-          description: Tags associated with this group (applied to matching VMs)
-          example: [ "production", "critical" ]
         createdAt:
           type: string
           format: date-time
@@ -1655,6 +1649,8 @@ components:
       properties:
         group:
           $ref: '#/components/schemas/Group'
+        inventory:
+          $ref: 'https://raw.githubusercontent.com/kubev2v/migration-planner/main/api/v1alpha1/openapi.yaml#/components/schemas/Inventory'
         vms:
           type: array
           items:
@@ -1694,14 +1690,6 @@ components:
           description: Filter expression (will be validated)
           x-oapi-codegen-extra-tags:
             binding: "required,min=1"
-        tags:
-          type: array
-          items:
-            type: string
-            pattern: "^[a-zA-Z0-9_.]+$"
-          description: Tags to apply to matching VMs (only alphanumeric, underscore, and dot allowed)
-          x-oapi-codegen-extra-tags:
-            binding: "omitempty,dive,tag_format"
 
     UpdateGroupRequest:
       type: object
@@ -1725,14 +1713,6 @@ components:
           description: Filter expression (will be validated)
           x-oapi-codegen-extra-tags:
             binding: "omitempty,min=1"
-        tags:
-          type: array
-          items:
-            type: string
-            pattern: "^[a-zA-Z0-9_.]+$"
-          description: Tags to apply to matching VMs (only alphanumeric, underscore, and dot allowed)
-          x-oapi-codegen-extra-tags:
-            binding: "omitempty,dive,tag_format"
 
     RightsizingCollectRequest:
       type: object

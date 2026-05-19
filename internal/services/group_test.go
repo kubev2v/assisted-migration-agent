@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/kubev2v/migration-planner/pkg/inventory"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -14,6 +15,20 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/test"
 )
+
+// mockInventoryBuilder is a mock implementation of InventoryBuilder for testing
+type mockInventoryBuilder struct{}
+
+func (m *mockInventoryBuilder) BuildInventory(ctx context.Context, vmIDs []string) (*inventory.Inventory, error) {
+	if len(vmIDs) == 0 {
+		return nil, nil
+	}
+	// Return a simple mock inventory
+	return &inventory.Inventory{
+		VCenterID:      "test-vcenter",
+		VCenterVersion: "7.0.0",
+	}, nil
+}
 
 var _ = Describe("GroupService", func() {
 	var (
@@ -33,7 +48,8 @@ var _ = Describe("GroupService", func() {
 		st = store.NewStore(db, test.NewMockValidator())
 		Expect(st.Migrate(ctx)).To(Succeed())
 
-		srv = services.NewGroupService(st)
+		// Create service with mock inventory builder to avoid DuckDB dependencies
+		srv = services.NewGroupServiceWithInventoryBuilder(st, &mockInventoryBuilder{})
 	})
 
 	AfterEach(func() {

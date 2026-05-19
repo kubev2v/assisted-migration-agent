@@ -9,6 +9,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/kubev2v/migration-planner/pkg/inventory"
+
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
@@ -495,6 +497,205 @@ var _ = Describe("GroupStore", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(getMatchedVMIDs(g.ID)).To(BeEmpty())
+		})
+	})
+
+	Context("Inventory Data", func() {
+		It("should create group with inventory data", func() {
+			// Arrange
+			inv := &inventory.Inventory{
+				VCenterID:      "vcenter-1",
+				VCenterVersion: "7.0.3",
+			}
+			g := models.Group{
+				Name:      "test-group",
+				Filter:    "memory >= 8GB",
+				Inventory: inv,
+			}
+
+			// Act
+			created, err := s.Group().Create(ctx, g)
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(created.Inventory).NotTo(BeNil())
+			Expect(created.Inventory.VCenterID).To(Equal("vcenter-1"))
+			Expect(created.Inventory.VCenterVersion).To(Equal("7.0.3"))
+		})
+
+		It("should create group without inventory data", func() {
+			// Arrange
+			g := models.Group{Name: "test-group", Filter: "memory >= 8GB"}
+
+			// Act
+			created, err := s.Group().Create(ctx, g)
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(created.Inventory).To(BeNil())
+		})
+
+		It("should retrieve group with inventory data", func() {
+			// Arrange
+			inv := &inventory.Inventory{
+				VCenterID:      "vcenter-2",
+				VCenterVersion: "8.0.1",
+			}
+			g := models.Group{
+				Name:      "test-group",
+				Filter:    "cluster = 'prod'",
+				Inventory: inv,
+			}
+			created, err := s.Group().Create(ctx, g)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act
+			retrieved, err := s.Group().Get(ctx, created.ID)
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(retrieved.Inventory).NotTo(BeNil())
+			Expect(retrieved.Inventory.VCenterID).To(Equal("vcenter-2"))
+			Expect(retrieved.Inventory.VCenterVersion).To(Equal("8.0.1"))
+		})
+
+		It("should list groups with inventory data", func() {
+			// Arrange
+			inv1 := &inventory.Inventory{VCenterID: "vc1", VCenterVersion: "7.0"}
+			inv2 := &inventory.Inventory{VCenterID: "vc2", VCenterVersion: "8.0"}
+			g1 := models.Group{Name: "group1", Filter: "filter1", Inventory: inv1}
+			g2 := models.Group{Name: "group2", Filter: "filter2", Inventory: inv2}
+			_, err := s.Group().Create(ctx, g1)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = s.Group().Create(ctx, g2)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act
+			groups, err := s.Group().List(ctx, nil, 0, 0)
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(groups).To(HaveLen(2))
+			Expect(groups[0].Inventory).NotTo(BeNil())
+			Expect(groups[0].Inventory.VCenterID).To(Equal("vc1"))
+			Expect(groups[1].Inventory).NotTo(BeNil())
+			Expect(groups[1].Inventory.VCenterID).To(Equal("vc2"))
+		})
+
+		It("should update inventory data using UpdateInventory", func() {
+			// Arrange
+			g := models.Group{Name: "test-group", Filter: "filter"}
+			created, err := s.Group().Create(ctx, g)
+			Expect(err).NotTo(HaveOccurred())
+
+			newInventory := &inventory.Inventory{
+				VCenterID:      "updated-vcenter",
+				VCenterVersion: "9.0.0",
+			}
+
+			// Act
+			err = s.Group().UpdateInventory(ctx, created.ID, newInventory)
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+
+			retrieved, err := s.Group().Get(ctx, created.ID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(retrieved.Inventory).NotTo(BeNil())
+			Expect(retrieved.Inventory.VCenterID).To(Equal("updated-vcenter"))
+			Expect(retrieved.Inventory.VCenterVersion).To(Equal("9.0.0"))
+		})
+
+		It("should update inventory data to nil", func() {
+			// Arrange
+			initialInventory := &inventory.Inventory{
+				VCenterID:      "initial-vcenter",
+				VCenterVersion: "7.0",
+			}
+			g := models.Group{
+				Name:      "test-group",
+				Filter:    "filter",
+				Inventory: initialInventory,
+			}
+			created, err := s.Group().Create(ctx, g)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(created.Inventory).NotTo(BeNil())
+
+			// Act
+			err = s.Group().UpdateInventory(ctx, created.ID, nil)
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+
+			retrieved, err := s.Group().Get(ctx, created.ID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(retrieved.Inventory).To(BeNil())
+		})
+
+		It("should return error when updating inventory for non-existent group", func() {
+			// Arrange
+			nonExistentID := 999999
+			inventoryData := &inventory.Inventory{VCenterID: "test"}
+
+			// Act
+			err := s.Group().UpdateInventory(ctx, nonExistentID, inventoryData)
+
+			// Assert
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("not found"))
+		})
+
+		It("should handle large inventory data", func() {
+			// Arrange
+			clusters := make(map[string]inventory.InventoryData)
+			for i := 0; i < 100; i++ {
+				clusters[fmt.Sprintf("cluster-%d", i)] = inventory.InventoryData{}
+			}
+			largeInventory := &inventory.Inventory{
+				VCenterID:      "large-vcenter",
+				VCenterVersion: "8.0",
+				Clusters:       clusters,
+			}
+			g := models.Group{
+				Name:      "large-group",
+				Filter:    "memory > 0",
+				Inventory: largeInventory,
+			}
+
+			// Act
+			created, err := s.Group().Create(ctx, g)
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(created.Inventory).NotTo(BeNil())
+			Expect(created.Inventory.VCenterID).To(Equal("large-vcenter"))
+			Expect(len(created.Inventory.Clusters)).To(Equal(100))
+
+			retrieved, err := s.Group().Get(ctx, created.ID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(retrieved.Inventory).NotTo(BeNil())
+			Expect(retrieved.Inventory.VCenterID).To(Equal("large-vcenter"))
+			Expect(len(retrieved.Inventory.Clusters)).To(Equal(100))
+		})
+
+		It("should handle corrupted inventory JSON in database", func() {
+			// Arrange - Create a group first
+			g := models.Group{
+				Name:      "test-group",
+				Filter:    "memory >= 8GB",
+				Inventory: &inventory.Inventory{VCenterID: "test"},
+			}
+			created, err := s.Group().Create(ctx, g)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act - Corrupt the inventory data in the database
+			_, err = db.ExecContext(ctx, "UPDATE groups SET inventory_data = ? WHERE id = ?", []byte(`{invalid json}`), created.ID)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Assert - Get should fail with unmarshal error
+			_, err = s.Group().Get(ctx, created.ID)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("unmarshal"))
 		})
 	})
 })

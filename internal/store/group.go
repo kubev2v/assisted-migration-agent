@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -10,19 +11,21 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 
+	"github.com/kubev2v/migration-planner/pkg/inventory"
+
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
 const (
-	groupTable          = "groups"
-	groupColID          = "id"
-	groupColName        = "name"
-	groupColDescription = "description"
-	groupColFilter      = "filter"
-	groupColTags        = "tags"
-	groupColCreatedAt   = "created_at"
-	groupColUpdatedAt   = "updated_at"
+	groupTable            = "groups"
+	groupColID            = "id"
+	groupColName          = "name"
+	groupColDescription   = "description"
+	groupColFilter        = "filter"
+	groupColInventoryData = "inventory_data"
+	groupColCreatedAt     = "created_at"
+	groupColUpdatedAt     = "updated_at"
 
 	groupMatchesTable      = "group_matches"
 	groupMatchesColGroupID = "group_id"
@@ -35,13 +38,13 @@ var (
 		groupColName,
 		groupColDescription,
 		groupColFilter,
-		groupColTags,
+		groupColInventoryData,
 		groupColCreatedAt,
 		groupColUpdatedAt).
 		From(groupTable)
 
 	returningSuffix = fmt.Sprintf("RETURNING %s, %s, %s, %s, %s, %s, %s",
-		groupColID, groupColName, groupColDescription, groupColFilter, groupColTags, groupColCreatedAt, groupColUpdatedAt)
+		groupColID, groupColName, groupColDescription, groupColFilter, groupColInventoryData, groupColCreatedAt, groupColUpdatedAt)
 )
 
 type GroupStore struct {
@@ -80,11 +83,15 @@ func (s *GroupStore) List(ctx context.Context, filters []sq.Sqlizer, limit, offs
 	var groups []models.Group
 	for rows.Next() {
 		var g models.Group
-		var tags StringArray
-		if err := rows.Scan(&g.ID, &g.Name, &g.Description, &g.Filter, &tags, &g.CreatedAt, &g.UpdatedAt); err != nil {
+		var inventoryData []byte
+		if err := rows.Scan(&g.ID, &g.Name, &g.Description, &g.Filter, &inventoryData, &g.CreatedAt, &g.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scanning group row: %w", err)
 		}
-		g.Tags = tags
+		inv, err := unmarshalInventory(inventoryData)
+		if err != nil {
+			return nil, fmt.Errorf("unmarshaling inventory for group %d: %w", g.ID, err)
+		}
+		g.Inventory = inv
 		groups = append(groups, g)
 	}
 
@@ -125,15 +132,20 @@ func (s *GroupStore) Get(ctx context.Context, id int) (*models.Group, error) {
 
 	row := s.db.QueryRowContext(ctx, query, args...)
 	var g models.Group
-	var tags StringArray
-	err = row.Scan(&g.ID, &g.Name, &g.Description, &g.Filter, &tags, &g.CreatedAt, &g.UpdatedAt)
+	var inventoryData []byte
+	err = row.Scan(&g.ID, &g.Name, &g.Description, &g.Filter, &inventoryData, &g.CreatedAt, &g.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, srvErrors.NewResourceNotFoundError("group", fmt.Sprintf("%d", id))
 	}
 	if err != nil {
 		return nil, fmt.Errorf("scanning group: %w", err)
 	}
-	g.Tags = tags
+
+	inv, err := unmarshalInventory(inventoryData)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshaling inventory for group %d: %w", id, err)
+	}
+	g.Inventory = inv
 
 	return &g, nil
 }
@@ -142,14 +154,14 @@ func (s *GroupStore) Get(ctx context.Context, id int) (*models.Group, error) {
 func (s *GroupStore) Create(ctx context.Context, group models.Group) (*models.Group, error) {
 	now := time.Now()
 
-	tags := group.Tags
-	if tags == nil {
-		tags = []string{}
+	inventoryData, err := marshalInventory(group.Inventory)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling inventory: %w", err)
 	}
 
 	query, args, err := sq.Insert(groupTable).
-		Columns(groupColName, groupColDescription, groupColFilter, groupColTags, groupColCreatedAt, groupColUpdatedAt).
-		Values(group.Name, group.Description, group.Filter, tags, now, now).
+		Columns(groupColName, groupColDescription, groupColFilter, groupColInventoryData, groupColCreatedAt, groupColUpdatedAt).
+		Values(group.Name, group.Description, group.Filter, inventoryData, now, now).
 		Suffix(returningSuffix).
 		ToSql()
 	if err != nil {
@@ -159,31 +171,30 @@ func (s *GroupStore) Create(ctx context.Context, group models.Group) (*models.Gr
 	row := s.db.QueryRowContext(ctx, query, args...)
 
 	var g models.Group
-	var scannedTags StringArray
-	err = row.Scan(&g.ID, &g.Name, &g.Description, &g.Filter, &scannedTags, &g.CreatedAt, &g.UpdatedAt)
+	var returnedInventoryData []byte
+	err = row.Scan(&g.ID, &g.Name, &g.Description, &g.Filter, &returnedInventoryData, &g.CreatedAt, &g.UpdatedAt)
 	if err != nil {
 		if isUniqueConstraintError(err) {
 			return nil, srvErrors.NewDuplicateResourceError("group", "name", group.Name)
 		}
 		return nil, fmt.Errorf("creating group: %w", err)
 	}
-	g.Tags = scannedTags
+
+	inv, err := unmarshalInventory(returnedInventoryData)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshaling returned inventory: %w", err)
+	}
+	g.Inventory = inv
 
 	return &g, nil
 }
 
 // Update updates an existing group by ID.
 func (s *GroupStore) Update(ctx context.Context, id int, group models.Group) (*models.Group, error) {
-	tags := group.Tags
-	if tags == nil {
-		tags = []string{}
-	}
-
 	query, args, err := sq.Update(groupTable).
 		Set(groupColName, group.Name).
 		Set(groupColDescription, group.Description).
 		Set(groupColFilter, group.Filter).
-		Set(groupColTags, tags).
 		Set(groupColUpdatedAt, time.Now()).
 		Where(sq.Eq{groupColID: id}).
 		Suffix(returningSuffix).
@@ -194,8 +205,8 @@ func (s *GroupStore) Update(ctx context.Context, id int, group models.Group) (*m
 
 	row := s.db.QueryRowContext(ctx, query, args...)
 	var g models.Group
-	var scannedTags StringArray
-	err = row.Scan(&g.ID, &g.Name, &g.Description, &g.Filter, &scannedTags, &g.CreatedAt, &g.UpdatedAt)
+	var inventoryData []byte
+	err = row.Scan(&g.ID, &g.Name, &g.Description, &g.Filter, &inventoryData, &g.CreatedAt, &g.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, srvErrors.NewResourceNotFoundError("group", fmt.Sprintf("%d", id))
@@ -205,7 +216,12 @@ func (s *GroupStore) Update(ctx context.Context, id int, group models.Group) (*m
 		}
 		return nil, fmt.Errorf("updating group: %w", err)
 	}
-	g.Tags = scannedTags
+
+	inv, err := unmarshalInventory(inventoryData)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshaling inventory for updated group: %w", err)
+	}
+	g.Inventory = inv
 
 	return &g, nil
 }
@@ -342,4 +358,58 @@ func (s *GroupStore) GetMatchedIDs(ctx context.Context, groupID int) ([]string, 
 		return nil, fmt.Errorf("fetching matched VM IDs for group %d: %w", groupID, err)
 	}
 	return vmIDs, nil
+}
+
+// UpdateInventory updates the inventory_data for a group by ID.
+func (s *GroupStore) UpdateInventory(ctx context.Context, id int, inv *inventory.Inventory) error {
+	inventoryData, err := marshalInventory(inv)
+	if err != nil {
+		return fmt.Errorf("marshaling inventory: %w", err)
+	}
+
+	query, args, err := sq.Update(groupTable).
+		Set(groupColInventoryData, inventoryData).
+		Set(groupColUpdatedAt, time.Now()).
+		Where(sq.Eq{groupColID: id}).
+		ToSql()
+	if err != nil {
+		return fmt.Errorf("building update inventory query: %w", err)
+	}
+
+	result, err := s.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("updating inventory: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return srvErrors.NewResourceNotFoundError("group", fmt.Sprintf("%d", id))
+	}
+
+	return nil
+}
+
+// marshalInventory converts an inventory model to JSON bytes for DB storage.
+// Stores the internal format (not API format).
+func marshalInventory(inv *inventory.Inventory) ([]byte, error) {
+	if inv == nil {
+		return nil, nil
+	}
+	return json.Marshal(inv)
+}
+
+// unmarshalInventory converts JSON bytes from DB to inventory model.
+func unmarshalInventory(data []byte) (*inventory.Inventory, error) {
+	if len(data) == 0 {
+		return nil, nil
+	}
+	var inv inventory.Inventory
+	if err := json.Unmarshal(data, &inv); err != nil {
+		return nil, fmt.Errorf("unmarshaling inventory: %w", err)
+	}
+	return &inv, nil
 }

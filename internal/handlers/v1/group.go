@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kubev2v/migration-planner/pkg/inventory/converters"
 
 	v1 "github.com/kubev2v/assisted-migration-agent/api/v1"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
@@ -89,9 +90,6 @@ func (h *Handler) CreateGroup(c *gin.Context) {
 	}
 	if req.Description != nil {
 		group.Description = *req.Description
-	}
-	if req.Tags != nil {
-		group.Tags = *req.Tags
 	}
 
 	created, err := h.groupSrv.Create(c.Request.Context(), group)
@@ -177,13 +175,20 @@ func (h *Handler) GetGroup(c *gin.Context, id string, params v1.GetGroupParams) 
 		apiVMs = append(apiVMs, v1.NewVirtualMachineFromSummary(vm))
 	}
 
-	c.JSON(http.StatusOK, v1.GroupResponse{
+	response := v1.GroupResponse{
 		Group:     v1.NewGroupFromModel(*group),
 		Page:      page,
 		PageCount: pageCount,
 		Total:     total,
 		Vms:       apiVMs,
-	})
+	}
+
+	// Include inventory if available
+	if group.Inventory != nil {
+		response.Inventory = converters.ToAPI(group.Inventory)
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 // UpdateGroup partially updates an existing group
@@ -235,9 +240,6 @@ func (h *Handler) UpdateGroup(c *gin.Context, id string) {
 	}
 	if req.Description != nil {
 		existing.Description = *req.Description
-	}
-	if req.Tags != nil {
-		existing.Tags = *req.Tags
 	}
 
 	updated, err := h.groupSrv.Update(c.Request.Context(), groupID, *existing)

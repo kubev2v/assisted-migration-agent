@@ -5,6 +5,9 @@ import (
 	"fmt"
 
 	sq "github.com/Masterminds/squirrel"
+	"go.uber.org/zap"
+
+	"github.com/kubev2v/migration-planner/pkg/inventory"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
@@ -15,12 +18,29 @@ const (
 	filterByNameExpression = "name like '%s'"
 )
 
+type InventoryBuilder interface {
+	BuildInventory(ctx context.Context, vmIDs []string) (*inventory.Inventory, error)
+}
+
 type GroupService struct {
-	store *store.Store
+	store            *store.Store
+	inventoryBuilder InventoryBuilder
 }
 
 func NewGroupService(st *store.Store) *GroupService {
-	return &GroupService{store: st}
+	return &GroupService{
+		store:            st,
+		inventoryBuilder: st.Parser(),
+	}
+}
+
+// NewGroupServiceWithInventoryBuilder creates a GroupService with a custom inventory builder.
+// Used for testing to inject mocks.
+func NewGroupServiceWithInventoryBuilder(st *store.Store, builder InventoryBuilder) *GroupService {
+	return &GroupService{
+		store:            st,
+		inventoryBuilder: builder,
+	}
 }
 
 type GroupGetParams struct {
@@ -105,33 +125,89 @@ func (s *GroupService) ListVirtualMachines(ctx context.Context, id int, params G
 
 func (s *GroupService) Create(ctx context.Context, group models.Group) (*models.Group, error) {
 	var created *models.Group
+	var vmIDs []string
+
 	err := s.store.WithTx(ctx, func(txCtx context.Context) error {
 		var err error
 		created, err = s.store.Group().Create(txCtx, group)
 		if err != nil {
 			return err
 		}
-		return s.store.Group().RefreshMatches(txCtx, created.ID)
+
+		if err := s.store.Group().RefreshMatches(txCtx, created.ID); err != nil {
+			return err
+		}
+
+		vmIDs, err = s.store.Group().GetMatchedIDs(txCtx, created.ID)
+		if err != nil {
+			return fmt.Errorf("getting matched VM IDs: %w", err)
+		}
+
+		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
+
+	// TODO: Build inventory outside transaction - DuckDB has SetMaxOpenConns(1), so
+	// BuildInventory needs the connection to be released from the transaction.
+	// This makes the operation non-atomic. See ECOPROJECT-4704 for proper fix.
+	inv, err := s.buildGroupInventory(ctx, vmIDs)
+	if err != nil {
+		zap.S().Named("group_service").Warnw("failed to build group inventory",
+			"group_id", created.ID, "error", err)
+		inv = nil // Clear inventory on error
+	}
+
+	if err := s.store.Group().UpdateInventory(ctx, created.ID, inv); err != nil {
+		return nil, fmt.Errorf("updating group inventory: %w", err)
+	}
+
+	created.Inventory = inv
 	return created, nil
 }
 
 func (s *GroupService) Update(ctx context.Context, id int, group models.Group) (*models.Group, error) {
 	var updated *models.Group
+	var vmIDs []string
+
 	err := s.store.WithTx(ctx, func(txCtx context.Context) error {
 		var err error
 		updated, err = s.store.Group().Update(txCtx, id, group)
 		if err != nil {
 			return err
 		}
-		return s.store.Group().RefreshMatches(txCtx, id)
+
+		if err := s.store.Group().RefreshMatches(txCtx, id); err != nil {
+			return err
+		}
+
+		vmIDs, err = s.store.Group().GetMatchedIDs(txCtx, id)
+		if err != nil {
+			return fmt.Errorf("getting matched VM IDs: %w", err)
+		}
+
+		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
+
+	// TODO: Build inventory outside transaction - DuckDB has SetMaxOpenConns(1), so
+	// BuildInventory needs the connection to be released from the transaction.
+	// This makes the operation non-atomic. See ECOPROJECT-4704 for proper fix.
+	inv, err := s.buildGroupInventory(ctx, vmIDs)
+	if err != nil {
+		zap.S().Named("group_service").Warnw("failed to rebuild group inventory",
+			"group_id", id, "error", err)
+		inv = nil // Clear inventory on error to avoid stale data
+	}
+
+	if err := s.store.Group().UpdateInventory(ctx, id, inv); err != nil {
+		return nil, fmt.Errorf("updating group inventory: %w", err)
+	}
+
+	updated.Inventory = inv
 	return updated, nil
 }
 
@@ -142,4 +218,19 @@ func (s *GroupService) Delete(ctx context.Context, id int) error {
 		}
 		return s.store.Group().DeleteMatches(txCtx, id)
 	})
+}
+
+// buildGroupInventory creates a subset inventory containing infrastructure
+// relevant to the VMs matched by the group.
+func (s *GroupService) buildGroupInventory(ctx context.Context, vmIDs []string) (*inventory.Inventory, error) {
+	if len(vmIDs) == 0 {
+		return nil, nil
+	}
+
+	inv, err := s.inventoryBuilder.BuildInventory(ctx, vmIDs)
+	if err != nil {
+		return nil, fmt.Errorf("building filtered inventory: %w", err)
+	}
+
+	return inv, nil
 }
