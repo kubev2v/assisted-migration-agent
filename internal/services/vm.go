@@ -104,8 +104,9 @@ func (s *VMService) UpdateLabels(ctx context.Context, id string, labels []string
 	return s.store.VM().UpdateLabels(ctx, id, labels)
 }
 
-// GetAllLabels returns all distinct labels in use across VMs.
-func (s *VMService) GetAllLabels(ctx context.Context) ([]string, error) {
+// GetAllLabels returns all distinct labels in use across VMs along with their counts.
+// The labels and counts are returned in the same order (sorted alphabetically by label).
+func (s *VMService) GetAllLabels(ctx context.Context) ([]string, []int, error) {
 	return s.store.VM().GetAllLabels(ctx)
 }
 

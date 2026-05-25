@@ -232,8 +232,8 @@ var _ = ginkgo.Describe("VM Labels e2e tests", ginkgo.Ordered, func() {
 
 		// Given multiple VMs with various labels
 		// When I call GET /vms/labels
-		// Then I should get all distinct labels
-		ginkgo.It("should return all distinct labels across all VMs", func() {
+		// Then I should get all distinct labels with their counts
+		ginkgo.It("should return all distinct labels across all VMs with counts", func() {
 			// Act
 			response, err := agentSvc.GetVMLabels()
 
@@ -247,6 +247,12 @@ var _ = ginkgo.Describe("VM Labels e2e tests", ginkgo.Ordered, func() {
 			gomega.Expect(response.Labels).To(gomega.Equal([]string{
 				"cache", "critical", "database", "prod-cluster", "prod-database", "production", "staging", "test",
 			}))
+			// Counts should have the same length as labels
+			gomega.Expect(response.Counts).To(gomega.HaveLen(len(response.Labels)))
+			// Each count should be at least 1
+			for i, count := range response.Counts {
+				gomega.Expect(count).To(gomega.BeNumerically(">=", 1), "label %s should have count >= 1", response.Labels[i])
+			}
 		})
 
 		// Given multiple VMs with duplicate labels
@@ -265,6 +271,196 @@ var _ = ginkgo.Describe("VM Labels e2e tests", ginkgo.Ordered, func() {
 				gomega.Expect(seen[label]).To(gomega.BeFalse(), "label %s appears multiple times", label)
 				seen[label] = true
 			}
+		})
+
+		// Given VMs with specific label distributions
+		// When I call GET /vms/labels
+		// Then counts should accurately reflect VM distribution
+		ginkgo.It("should return accurate counts reflecting actual VM label usage", func() {
+			// Arrange - Get VMs and set specific label patterns
+			result, err := agentSvc.ListVMs(&service.VMListParams{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(len(result.Vms)).To(gomega.BeNumerically(">=", 5), "need at least 5 VMs")
+
+			// Clear all labels first
+			for _, vm := range result.Vms {
+				_ = agentSvc.UpdateVMLabels(vm.Id, []string{})
+			}
+			time.Sleep(300 * time.Millisecond)
+
+			// Set up known label distribution:
+			// - "common": 3 VMs
+			// - "rare": 1 VM
+			// - "shared": 2 VMs
+			err = agentSvc.UpdateVMLabels(result.Vms[0].Id, []string{"common", "shared"})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			err = agentSvc.UpdateVMLabels(result.Vms[1].Id, []string{"common", "shared"})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			err = agentSvc.UpdateVMLabels(result.Vms[2].Id, []string{"common"})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			err = agentSvc.UpdateVMLabels(result.Vms[3].Id, []string{"rare"})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			time.Sleep(500 * time.Millisecond)
+
+			// Act
+			response, err := agentSvc.GetVMLabels()
+
+			// Assert
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// Build a map for easier validation
+			labelCounts := make(map[string]int)
+			for i, label := range response.Labels {
+				labelCounts[label] = response.Counts[i]
+			}
+
+			// Verify specific counts
+			gomega.Expect(labelCounts["common"]).To(gomega.Equal(3), "common label should have 3 VMs")
+			gomega.Expect(labelCounts["rare"]).To(gomega.Equal(1), "rare label should have 1 VM")
+			gomega.Expect(labelCounts["shared"]).To(gomega.Equal(2), "shared label should have 2 VMs")
+		})
+
+		// Given labels are added and removed dynamically
+		// When I call GET /vms/labels
+		// Then counts should update accordingly
+		ginkgo.It("should update counts when labels are added or removed", func() {
+			// Arrange - Get VMs
+			result, err := agentSvc.ListVMs(&service.VMListParams{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(len(result.Vms)).To(gomega.BeNumerically(">=", 3), "need at least 3 VMs")
+
+			// Clear all labels
+			for _, vm := range result.Vms {
+				_ = agentSvc.UpdateVMLabels(vm.Id, []string{})
+			}
+			time.Sleep(300 * time.Millisecond)
+
+			// Add "dynamic" label to 1 VM
+			err = agentSvc.UpdateVMLabels(result.Vms[0].Id, []string{"dynamic"})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			time.Sleep(300 * time.Millisecond)
+
+			// Verify count is 1
+			response, err := agentSvc.GetVMLabels()
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			labelCounts := make(map[string]int)
+			for i, label := range response.Labels {
+				labelCounts[label] = response.Counts[i]
+			}
+			gomega.Expect(labelCounts["dynamic"]).To(gomega.Equal(1))
+
+			// Add "dynamic" label to 2 more VMs
+			err = agentSvc.UpdateVMLabels(result.Vms[1].Id, []string{"dynamic"})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			err = agentSvc.UpdateVMLabels(result.Vms[2].Id, []string{"dynamic"})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			time.Sleep(300 * time.Millisecond)
+
+			// Verify count is now 3
+			response, err = agentSvc.GetVMLabels()
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			labelCounts = make(map[string]int)
+			for i, label := range response.Labels {
+				labelCounts[label] = response.Counts[i]
+			}
+			gomega.Expect(labelCounts["dynamic"]).To(gomega.Equal(3))
+
+			// Remove label from 1 VM
+			err = agentSvc.UpdateVMLabels(result.Vms[0].Id, []string{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			time.Sleep(300 * time.Millisecond)
+
+			// Verify count is now 2
+			response, err = agentSvc.GetVMLabels()
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			labelCounts = make(map[string]int)
+			for i, label := range response.Labels {
+				labelCounts[label] = response.Counts[i]
+			}
+			gomega.Expect(labelCounts["dynamic"]).To(gomega.Equal(2))
+		})
+
+		// Given labels and counts arrays
+		// When I call GET /vms/labels
+		// Then arrays should have matching lengths
+		ginkgo.It("should always return labels and counts arrays of same length", func() {
+			// Act
+			response, err := agentSvc.GetVMLabels()
+
+			// Assert
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(len(response.Labels)).To(gomega.Equal(len(response.Counts)),
+				"labels and counts arrays must have the same length")
+
+			// Verify all counts are positive
+			for i, count := range response.Counts {
+				gomega.Expect(count).To(gomega.BeNumerically(">", 0),
+					"count for label %s should be positive", response.Labels[i])
+			}
+		})
+
+		// Given batch label operations
+		// When I call GET /vms/labels
+		// Then counts should reflect all changes
+		ginkgo.It("should accurately count after batch label operations", func() {
+			// Arrange - Get VMs
+			result, err := agentSvc.ListVMs(&service.VMListParams{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(len(result.Vms)).To(gomega.BeNumerically(">=", 4), "need at least 4 VMs")
+
+			// Clear all labels
+			for _, vm := range result.Vms {
+				_ = agentSvc.UpdateVMLabels(vm.Id, []string{})
+			}
+			time.Sleep(300 * time.Millisecond)
+
+			// Batch operation: add "batch-label" to multiple VMs at once
+			vm1ID := result.Vms[0].Id
+			vm2ID := result.Vms[1].Id
+			vm3ID := result.Vms[2].Id
+			vm4ID := result.Vms[3].Id
+
+			err = agentSvc.UpdateLabelVMs("batch-label", []string{vm1ID, vm2ID, vm3ID}, nil)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			time.Sleep(300 * time.Millisecond)
+
+			// Verify count is 3
+			response, err := agentSvc.GetVMLabels()
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			labelCounts := make(map[string]int)
+			for i, label := range response.Labels {
+				labelCounts[label] = response.Counts[i]
+			}
+			gomega.Expect(labelCounts["batch-label"]).To(gomega.Equal(3))
+
+			// Add one more VM to the label
+			err = agentSvc.UpdateLabelVMs("batch-label", []string{vm4ID}, nil)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			time.Sleep(300 * time.Millisecond)
+
+			// Verify count is now 4
+			response, err = agentSvc.GetVMLabels()
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			labelCounts = make(map[string]int)
+			for i, label := range response.Labels {
+				labelCounts[label] = response.Counts[i]
+			}
+			gomega.Expect(labelCounts["batch-label"]).To(gomega.Equal(4))
+
+			// Batch remove 2 VMs
+			err = agentSvc.UpdateLabelVMs("batch-label", nil, []string{vm1ID, vm2ID})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			time.Sleep(300 * time.Millisecond)
+
+			// Verify count is now 2
+			response, err = agentSvc.GetVMLabels()
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			labelCounts = make(map[string]int)
+			for i, label := range response.Labels {
+				labelCounts[label] = response.Counts[i]
+			}
+			gomega.Expect(labelCounts["batch-label"]).To(gomega.Equal(2))
 		})
 	})
 

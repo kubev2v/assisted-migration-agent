@@ -90,6 +90,7 @@ type MockVMService struct {
 	LastUpdateLabelsID             string
 	LastUpdateLabelsValue          []string
 	GetAllLabelsResult             []string
+	GetAllLabelsCountsResult       []int
 	GetAllLabelsError              error
 	RemoveLabelFromAllVMsResult    int
 	RemoveLabelFromAllVMsError     error
@@ -121,8 +122,8 @@ func (m *MockVMService) UpdateLabels(ctx context.Context, id string, labels []st
 	return m.UpdateLabelsError
 }
 
-func (m *MockVMService) GetAllLabels(ctx context.Context) ([]string, error) {
-	return m.GetAllLabelsResult, m.GetAllLabelsError
+func (m *MockVMService) GetAllLabels(ctx context.Context) ([]string, []int, error) {
+	return m.GetAllLabelsResult, m.GetAllLabelsCountsResult, m.GetAllLabelsError
 }
 
 func (m *MockVMService) RemoveLabelFromAllVMs(ctx context.Context, label string) (int, error) {

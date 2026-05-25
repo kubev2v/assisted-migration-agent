@@ -633,6 +633,9 @@ type VMIssueCategory string
 
 // VMLabelsResponse defines model for VMLabelsResponse.
 type VMLabelsResponse struct {
+	// Counts Number of VMs with each label (same order as labels array)
+	Counts []int `json:"counts"`
+
 	// Labels Distinct labels currently in use
 	Labels []string `json:"labels"`
 }

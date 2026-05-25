@@ -211,11 +211,18 @@ var _ = Describe("VMService Labels", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
-			labels, err := svc.GetAllLabels(ctx)
+			labels, counts, err := svc.GetAllLabels(ctx)
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
 			Expect(labels).To(ConsistOf("critical", "production", "staging", "test"))
+			Expect(counts).To(HaveLen(4))
+			// critical: vm-1, vm-2 = 2
+			// production: vm-1 = 1
+			// staging: vm-3 = 1
+			// test: vm-2 = 1
+			Expect(labels).To(Equal([]string{"critical", "production", "staging", "test"}))
+			Expect(counts).To(Equal([]int{2, 1, 1, 1}))
 		})
 
 		// Given no VMs have labels
@@ -227,11 +234,12 @@ var _ = Describe("VMService Labels", func() {
 			insertVM("vm-2", "VM 2", "cluster-a")
 
 			// Act
-			labels, err := svc.GetAllLabels(ctx)
+			labels, counts, err := svc.GetAllLabels(ctx)
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
 			Expect(labels).To(BeEmpty())
+			Expect(counts).To(BeEmpty())
 		})
 
 		// Given multiple VMs with duplicate labels
@@ -251,12 +259,18 @@ var _ = Describe("VMService Labels", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
-			labels, err := svc.GetAllLabels(ctx)
+			labels, counts, err := svc.GetAllLabels(ctx)
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
 			Expect(labels).To(HaveLen(3))
 			Expect(labels).To(ConsistOf("critical", "production", "test"))
+			Expect(counts).To(HaveLen(3))
+			// critical: vm-1, vm-3 = 2
+			// production: vm-1, vm-2 = 2
+			// test: vm-3 = 1
+			Expect(labels).To(Equal([]string{"critical", "production", "test"}))
+			Expect(counts).To(Equal([]int{2, 2, 1}))
 		})
 
 		// Given labels exist
@@ -269,11 +283,120 @@ var _ = Describe("VMService Labels", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
-			labels, err := svc.GetAllLabels(ctx)
+			labels, counts, err := svc.GetAllLabels(ctx)
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
 			Expect(labels).To(Equal([]string{"apple", "banana", "mango", "zebra"}))
+			Expect(counts).To(Equal([]int{1, 1, 1, 1}))
+		})
+
+		// Given many VMs with overlapping labels
+		// When GetAllLabels is called
+		// Then counts should accurately reflect usage
+		It("should accurately count VMs when labels are heavily shared", func() {
+			// Arrange
+			insertVM("vm-1", "VM 1", "cluster-a")
+			insertVM("vm-2", "VM 2", "cluster-a")
+			insertVM("vm-3", "VM 3", "cluster-a")
+			insertVM("vm-4", "VM 4", "cluster-a")
+			insertVM("vm-5", "VM 5", "cluster-a")
+			insertVM("vm-6", "VM 6", "cluster-a")
+
+			err := svc.UpdateLabels(ctx, "vm-1", []string{"production", "database", "critical"})
+			Expect(err).NotTo(HaveOccurred())
+			err = svc.UpdateLabels(ctx, "vm-2", []string{"production", "database"})
+			Expect(err).NotTo(HaveOccurred())
+			err = svc.UpdateLabels(ctx, "vm-3", []string{"production", "web"})
+			Expect(err).NotTo(HaveOccurred())
+			err = svc.UpdateLabels(ctx, "vm-4", []string{"production"})
+			Expect(err).NotTo(HaveOccurred())
+			err = svc.UpdateLabels(ctx, "vm-5", []string{"staging", "web"})
+			Expect(err).NotTo(HaveOccurred())
+			err = svc.UpdateLabels(ctx, "vm-6", []string{"staging"})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act
+			labels, counts, err := svc.GetAllLabels(ctx)
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(labels).To(Equal([]string{"critical", "database", "production", "staging", "web"}))
+			// critical: 1, database: 2, production: 4, staging: 2, web: 2
+			Expect(counts).To(Equal([]int{1, 2, 4, 2, 2}))
+		})
+
+		// Given labels are dynamically updated
+		// When GetAllLabels is called
+		// Then counts should reflect current state
+		It("should reflect updated counts after batch label operations", func() {
+			// Arrange
+			insertVM("vm-1", "VM 1", "cluster-a")
+			insertVM("vm-2", "VM 2", "cluster-a")
+			insertVM("vm-3", "VM 3", "cluster-a")
+
+			// Initial state
+			err := svc.UpdateLabels(ctx, "vm-1", []string{"test"})
+			Expect(err).NotTo(HaveOccurred())
+
+			labels, counts, err := svc.GetAllLabels(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(labels).To(Equal([]string{"test"}))
+			Expect(counts).To(Equal([]int{1}))
+
+			// Add test label to more VMs
+			err = svc.UpdateLabels(ctx, "vm-2", []string{"test"})
+			Expect(err).NotTo(HaveOccurred())
+			err = svc.UpdateLabels(ctx, "vm-3", []string{"test"})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act
+			labels, counts, err = svc.GetAllLabels(ctx)
+
+			// Assert - count should now be 3
+			Expect(err).NotTo(HaveOccurred())
+			Expect(labels).To(Equal([]string{"test"}))
+			Expect(counts).To(Equal([]int{3}))
+
+			// Remove from one VM
+			err = svc.UpdateLabels(ctx, "vm-1", []string{})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act again
+			labels, counts, err = svc.GetAllLabels(ctx)
+
+			// Assert - count should now be 2
+			Expect(err).NotTo(HaveOccurred())
+			Expect(labels).To(Equal([]string{"test"}))
+			Expect(counts).To(Equal([]int{2}))
+		})
+
+		// Given mixed label scenarios
+		// When GetAllLabels is called
+		// Then all counts should be accurate
+		It("should handle complex mixed label scenarios", func() {
+			// Arrange
+			insertVM("vm-1", "VM 1", "cluster-a")
+			insertVM("vm-2", "VM 2", "cluster-a")
+			insertVM("vm-3", "VM 3", "cluster-a")
+
+			// vm-1: unique label
+			err := svc.UpdateLabels(ctx, "vm-1", []string{"unique-to-vm1"})
+			Expect(err).NotTo(HaveOccurred())
+
+			// vm-2 and vm-3: shared label
+			err = svc.UpdateLabels(ctx, "vm-2", []string{"shared-label", "another-unique"})
+			Expect(err).NotTo(HaveOccurred())
+			err = svc.UpdateLabels(ctx, "vm-3", []string{"shared-label"})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act
+			labels, counts, err := svc.GetAllLabels(ctx)
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(labels).To(Equal([]string{"another-unique", "shared-label", "unique-to-vm1"}))
+			Expect(counts).To(Equal([]int{1, 2, 1}))
 		})
 	})
 

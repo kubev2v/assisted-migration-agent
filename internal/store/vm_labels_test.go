@@ -3,6 +3,7 @@ package store_test
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	sq "github.com/Masterminds/squirrel"
 	. "github.com/onsi/ginkgo/v2"
@@ -257,11 +258,19 @@ var _ = Describe("VMStore Labels", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
-			labels, err := s.VM().GetAllLabels(ctx)
+			labels, counts, err := s.VM().GetAllLabels(ctx)
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
 			Expect(labels).To(ConsistOf("critical", "production", "staging", "test"))
+			Expect(counts).To(HaveLen(4))
+			// critical: vm-1, vm-2 = 2
+			// production: vm-1 = 1
+			// staging: vm-3 = 1
+			// test: vm-2 = 1
+			// Labels are sorted alphabetically, so counts should match that order
+			Expect(labels).To(Equal([]string{"critical", "production", "staging", "test"}))
+			Expect(counts).To(Equal([]int{2, 1, 1, 1}))
 		})
 
 		// Given VMs exist but none have labels
@@ -273,11 +282,12 @@ var _ = Describe("VMStore Labels", func() {
 			insertVM("vm-2", "Test VM 2", "cluster-a")
 
 			// Act
-			labels, err := s.VM().GetAllLabels(ctx)
+			labels, counts, err := s.VM().GetAllLabels(ctx)
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
 			Expect(labels).To(BeEmpty())
+			Expect(counts).To(BeEmpty())
 		})
 
 		// Given multiple VMs with duplicate labels
@@ -297,12 +307,18 @@ var _ = Describe("VMStore Labels", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
-			labels, err := s.VM().GetAllLabels(ctx)
+			labels, counts, err := s.VM().GetAllLabels(ctx)
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
 			Expect(labels).To(HaveLen(3))
 			Expect(labels).To(ConsistOf("critical", "production", "test"))
+			Expect(counts).To(HaveLen(3))
+			// critical: vm-1, vm-3 = 2
+			// production: vm-1, vm-2 = 2
+			// test: vm-2 = 1
+			Expect(labels).To(Equal([]string{"critical", "production", "test"}))
+			Expect(counts).To(Equal([]int{2, 2, 1}))
 		})
 
 		// Given labels exist
@@ -315,11 +331,126 @@ var _ = Describe("VMStore Labels", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
-			labels, err := s.VM().GetAllLabels(ctx)
+			labels, counts, err := s.VM().GetAllLabels(ctx)
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
 			Expect(labels).To(Equal([]string{"apple", "banana", "mango", "zebra"}))
+			Expect(counts).To(Equal([]int{1, 1, 1, 1}))
+		})
+
+		// Given VMs with many shared labels
+		// When GetAllLabels is called
+		// Then counts should accurately reflect VM count per label
+		It("should return accurate counts when multiple VMs share labels", func() {
+			// Arrange
+			insertVM("vm-1", "Test VM 1", "cluster-a")
+			insertVM("vm-2", "Test VM 2", "cluster-a")
+			insertVM("vm-3", "Test VM 3", "cluster-a")
+			insertVM("vm-4", "Test VM 4", "cluster-a")
+			insertVM("vm-5", "Test VM 5", "cluster-a")
+
+			// All VMs have production
+			err := s.VM().UpdateLabels(ctx, "vm-1", []string{"production", "critical", "database"})
+			Expect(err).NotTo(HaveOccurred())
+			err = s.VM().UpdateLabels(ctx, "vm-2", []string{"production", "critical"})
+			Expect(err).NotTo(HaveOccurred())
+			err = s.VM().UpdateLabels(ctx, "vm-3", []string{"production", "web"})
+			Expect(err).NotTo(HaveOccurred())
+			err = s.VM().UpdateLabels(ctx, "vm-4", []string{"production"})
+			Expect(err).NotTo(HaveOccurred())
+			err = s.VM().UpdateLabels(ctx, "vm-5", []string{"staging"})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act
+			labels, counts, err := s.VM().GetAllLabels(ctx)
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			// Verify expected labels
+			Expect(labels).To(Equal([]string{"critical", "database", "production", "staging", "web"}))
+			// Verify counts:
+			// critical: vm-1, vm-2 = 2
+			// database: vm-1 = 1
+			// production: vm-1, vm-2, vm-3, vm-4 = 4
+			// staging: vm-5 = 1
+			// web: vm-3 = 1
+			Expect(counts).To(Equal([]int{2, 1, 4, 1, 1}))
+		})
+
+		// Given a single VM with multiple labels
+		// When GetAllLabels is called
+		// Then each label should have count of 1
+		It("should return count of 1 for each label when single VM has multiple labels", func() {
+			// Arrange
+			insertVM("vm-1", "Test VM 1", "cluster-a")
+			err := s.VM().UpdateLabels(ctx, "vm-1", []string{"label-a", "label-b", "label-c", "label-d"})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act
+			labels, counts, err := s.VM().GetAllLabels(ctx)
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(labels).To(Equal([]string{"label-a", "label-b", "label-c", "label-d"}))
+			Expect(counts).To(Equal([]int{1, 1, 1, 1}))
+		})
+
+		// Given labels are added and then removed
+		// When GetAllLabels is called
+		// Then counts should reflect current state
+		It("should return accurate counts after labels are removed from VMs", func() {
+			// Arrange
+			insertVM("vm-1", "Test VM 1", "cluster-a")
+			insertVM("vm-2", "Test VM 2", "cluster-a")
+			insertVM("vm-3", "Test VM 3", "cluster-a")
+
+			// Add labels
+			err := s.VM().UpdateLabels(ctx, "vm-1", []string{"production"})
+			Expect(err).NotTo(HaveOccurred())
+			err = s.VM().UpdateLabels(ctx, "vm-2", []string{"production"})
+			Expect(err).NotTo(HaveOccurred())
+			err = s.VM().UpdateLabels(ctx, "vm-3", []string{"production"})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify initial count
+			labels, counts, err := s.VM().GetAllLabels(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(labels).To(Equal([]string{"production"}))
+			Expect(counts).To(Equal([]int{3}))
+
+			// Remove label from one VM
+			err = s.VM().UpdateLabels(ctx, "vm-1", []string{})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act
+			labels, counts, err = s.VM().GetAllLabels(ctx)
+
+			// Assert - count should now be 2
+			Expect(err).NotTo(HaveOccurred())
+			Expect(labels).To(Equal([]string{"production"}))
+			Expect(counts).To(Equal([]int{2}))
+		})
+
+		// Given label with exact count boundary
+		// When GetAllLabels is called
+		// Then counts should be exact not approximate
+		It("should return exact counts not approximate", func() {
+			// Arrange - create 10 VMs with same label
+			for i := 1; i <= 10; i++ {
+				vmID := fmt.Sprintf("vm-%d", i)
+				insertVM(vmID, fmt.Sprintf("Test VM %d", i), "cluster-a")
+				err := s.VM().UpdateLabels(ctx, vmID, []string{"shared-label"})
+				Expect(err).NotTo(HaveOccurred())
+			}
+
+			// Act
+			labels, counts, err := s.VM().GetAllLabels(ctx)
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(labels).To(Equal([]string{"shared-label"}))
+			Expect(counts).To(Equal([]int{10}))
 		})
 	})
 

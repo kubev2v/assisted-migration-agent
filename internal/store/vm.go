@@ -486,41 +486,46 @@ func (s *VMStore) UpdateLabels(ctx context.Context, vmID string, labels []string
 	return nil
 }
 
-// GetAllLabels returns all distinct labels in use across VMs.
-func (s *VMStore) GetAllLabels(ctx context.Context) ([]string, error) {
+// GetAllLabels returns all distinct labels in use across VMs along with their counts.
+// The labels and counts are returned in the same order (sorted alphabetically by label).
+func (s *VMStore) GetAllLabels(ctx context.Context) ([]string, []int, error) {
 	// Build subquery for unnesting labels
 	subquery := sq.Select(`unnest(CAST(v."labels" AS VARCHAR[])) AS label`).
 		From("vinfo v").
 		Where(sq.NotEq{`v."labels"`: "[]"})
 
-	// Build main query
-	query, args, err := sq.Select("DISTINCT label").
+	// Build main query with COUNT grouped by label
+	query, args, err := sq.Select("label", "COUNT(*) as count").
 		FromSelect(subquery, "labels_unnested").
 		Where(sq.NotEq{"label": ""}).
+		GroupBy("label").
 		OrderBy("label ASC").
 		ToSql()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer func() {
 		_ = rows.Close()
 	}()
 
 	var labels []string
+	var counts []int
 	for rows.Next() {
 		var label string
-		if err := rows.Scan(&label); err != nil {
-			return nil, err
+		var count int
+		if err := rows.Scan(&label, &count); err != nil {
+			return nil, nil, err
 		}
 		labels = append(labels, label)
+		counts = append(counts, count)
 	}
 
-	return labels, rows.Err()
+	return labels, counts, rows.Err()
 }
 
 // AddLabel adds a label to a VM's labels array (idempotent - no duplicates).

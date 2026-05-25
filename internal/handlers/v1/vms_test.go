@@ -448,9 +448,10 @@ var _ = Describe("VMs Handlers", func() {
 		})
 
 		Context("GetVMLabels", func() {
-			It("should return all labels", func() {
+			It("should return all labels with counts", func() {
 				// Arrange
-				mockVM.GetAllLabelsResult = []string{"production", "staging", "critical"}
+				mockVM.GetAllLabelsResult = []string{"critical", "production", "staging"}
+				mockVM.GetAllLabelsCountsResult = []int{2, 5, 3}
 				req := httptest.NewRequest(http.MethodGet, "/vms/labels", nil)
 				w := httptest.NewRecorder()
 
@@ -462,7 +463,105 @@ var _ = Describe("VMs Handlers", func() {
 				var response v1.VMLabelsResponse
 				err := json.Unmarshal(w.Body.Bytes(), &response)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(response.Labels).To(ConsistOf("production", "staging", "critical"))
+				Expect(response.Labels).To(Equal([]string{"critical", "production", "staging"}))
+				Expect(response.Counts).To(Equal([]int{2, 5, 3}))
+			})
+
+			It("should return empty arrays when no labels exist", func() {
+				// Arrange
+				mockVM.GetAllLabelsResult = []string{}
+				mockVM.GetAllLabelsCountsResult = []int{}
+				req := httptest.NewRequest(http.MethodGet, "/vms/labels", nil)
+				w := httptest.NewRecorder()
+
+				// Act
+				router.ServeHTTP(w, req)
+
+				// Assert
+				Expect(w.Code).To(Equal(http.StatusOK))
+				var response v1.VMLabelsResponse
+				err := json.Unmarshal(w.Body.Bytes(), &response)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(response.Labels).To(BeEmpty())
+				Expect(response.Counts).To(BeEmpty())
+			})
+
+			It("should ensure labels and counts have same length", func() {
+				// Arrange
+				mockVM.GetAllLabelsResult = []string{"label1", "label2", "label3", "label4", "label5"}
+				mockVM.GetAllLabelsCountsResult = []int{10, 20, 5, 1, 15}
+				req := httptest.NewRequest(http.MethodGet, "/vms/labels", nil)
+				w := httptest.NewRecorder()
+
+				// Act
+				router.ServeHTTP(w, req)
+
+				// Assert
+				Expect(w.Code).To(Equal(http.StatusOK))
+				var response v1.VMLabelsResponse
+				err := json.Unmarshal(w.Body.Bytes(), &response)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(response.Labels).To(HaveLen(5))
+				Expect(response.Counts).To(HaveLen(5))
+				Expect(len(response.Labels)).To(Equal(len(response.Counts)))
+			})
+
+			It("should handle single label with high count", func() {
+				// Arrange
+				mockVM.GetAllLabelsResult = []string{"production"}
+				mockVM.GetAllLabelsCountsResult = []int{100}
+				req := httptest.NewRequest(http.MethodGet, "/vms/labels", nil)
+				w := httptest.NewRecorder()
+
+				// Act
+				router.ServeHTTP(w, req)
+
+				// Assert
+				Expect(w.Code).To(Equal(http.StatusOK))
+				var response v1.VMLabelsResponse
+				err := json.Unmarshal(w.Body.Bytes(), &response)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(response.Labels).To(Equal([]string{"production"}))
+				Expect(response.Counts).To(Equal([]int{100}))
+			})
+
+			It("should handle service error gracefully", func() {
+				// Arrange
+				mockVM.GetAllLabelsResult = nil
+				mockVM.GetAllLabelsCountsResult = nil
+				mockVM.GetAllLabelsError = errors.New("database error")
+				req := httptest.NewRequest(http.MethodGet, "/vms/labels", nil)
+				w := httptest.NewRecorder()
+
+				// Act
+				router.ServeHTTP(w, req)
+
+				// Assert
+				Expect(w.Code).To(Equal(http.StatusInternalServerError))
+			})
+
+			It("should return counts in same order as labels", func() {
+				// Arrange - alphabetically sorted labels with corresponding counts
+				mockVM.GetAllLabelsResult = []string{"alpha", "beta", "gamma", "omega"}
+				mockVM.GetAllLabelsCountsResult = []int{5, 10, 15, 20}
+				req := httptest.NewRequest(http.MethodGet, "/vms/labels", nil)
+				w := httptest.NewRecorder()
+
+				// Act
+				router.ServeHTTP(w, req)
+
+				// Assert
+				Expect(w.Code).To(Equal(http.StatusOK))
+				var response v1.VMLabelsResponse
+				err := json.Unmarshal(w.Body.Bytes(), &response)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Verify order is maintained
+				for i, label := range response.Labels {
+					expectedCount := mockVM.GetAllLabelsCountsResult[i]
+					Expect(response.Counts[i]).To(Equal(expectedCount),
+						"Count for label %s at index %d should be %d", label, i, expectedCount)
+				}
 			})
 		})
 

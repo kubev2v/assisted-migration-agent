@@ -2089,6 +2089,7 @@ components:
       type: object
       required:
         - labels
+        - counts
       properties:
         labels:
           type: array
@@ -2099,6 +2100,13 @@ components:
             pattern: '\S'
           description: Distinct labels currently in use
           example: ["production", "staging", "critical"]
+        counts:
+          type: array
+          items:
+            type: integer
+            minimum: 0
+          description: Number of VMs with each label (same order as labels array)
+          example: [5, 3, 2]
 
     UpdateLabelVMsRequest:
       type: object

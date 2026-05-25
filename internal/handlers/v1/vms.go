@@ -178,10 +178,10 @@ func (h *Handler) UpdateVM(c *gin.Context, id string) {
 	c.Status(http.StatusOK)
 }
 
-// GetVMLabels returns all distinct labels in use across VMs
+// GetVMLabels returns all distinct labels in use across VMs along with their counts
 // (GET /vms/labels)
 func (h *Handler) GetVMLabels(c *gin.Context) {
-	labels, err := h.vmSrv.GetAllLabels(c.Request.Context())
+	labels, counts, err := h.vmSrv.GetAllLabels(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to get labels: %v", err)})
 		return
@@ -189,6 +189,7 @@ func (h *Handler) GetVMLabels(c *gin.Context) {
 
 	c.JSON(http.StatusOK, v1.VMLabelsResponse{
 		Labels: labels,
+		Counts: counts,
 	})
 }
 
