@@ -360,6 +360,43 @@ func (s *GroupStore) GetMatchedIDs(ctx context.Context, groupID int) ([]string, 
 	return vmIDs, nil
 }
 
+// GetGroupsContainingVM returns all group IDs that contain the specified VM.
+// It queries the group_matches table for groups whose vm_ids array contains the given VM ID.
+func (s *GroupStore) GetGroupsContainingVM(ctx context.Context, vmID string) ([]int, error) {
+	query, args, err := sq.Select(groupMatchesColGroupID).
+		From(groupMatchesTable).
+		Where(sq.Expr("list_contains("+groupMatchesColVMIDs+", ?)", vmID)).
+		ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("building query: %w", err)
+	}
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("querying groups containing VM %s: %w", vmID, err)
+	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			err = fmt.Errorf("closing rows: %w", closeErr)
+		}
+	}()
+
+	var groupIDs []int
+	for rows.Next() {
+		var groupID int
+		if err := rows.Scan(&groupID); err != nil {
+			return nil, fmt.Errorf("scanning group ID: %w", err)
+		}
+		groupIDs = append(groupIDs, groupID)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating rows: %w", err)
+	}
+
+	return groupIDs, nil
+}
+
 // UpdateInventory updates the inventory_data for a group by ID.
 func (s *GroupStore) UpdateInventory(ctx context.Context, id int, inv *inventory.Inventory) error {
 	inventoryData, err := marshalInventory(inv)

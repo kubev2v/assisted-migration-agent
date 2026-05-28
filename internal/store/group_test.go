@@ -500,6 +500,109 @@ var _ = Describe("GroupStore", func() {
 		})
 	})
 
+	Context("GetGroupsContainingVM", func() {
+		BeforeEach(func() {
+			insertVM("vm-1", "web-server", "production")
+			insertVM("vm-2", "db-server", "production")
+			insertVM("vm-3", "staging-app", "staging")
+			insertVM("vm-4", "dev-server", "development")
+		})
+
+		It("should return empty slice when VM is not in any group", func() {
+			g, err := s.Group().Create(ctx, models.Group{
+				Name:   "prod-group",
+				Filter: "folder = 'production'",
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			err = s.Group().RefreshMatches(ctx, g.ID)
+			Expect(err).NotTo(HaveOccurred())
+
+			groupIDs, err := s.Group().GetGroupsContainingVM(ctx, "vm-3")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(groupIDs).To(BeEmpty())
+		})
+
+		It("should return group ID when VM is in single group", func() {
+			g, err := s.Group().Create(ctx, models.Group{
+				Name:   "prod-group",
+				Filter: "folder = 'production'",
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			err = s.Group().RefreshMatches(ctx, g.ID)
+			Expect(err).NotTo(HaveOccurred())
+
+			groupIDs, err := s.Group().GetGroupsContainingVM(ctx, "vm-1")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(groupIDs).To(ConsistOf(g.ID))
+		})
+
+		It("should return multiple group IDs when VM is in multiple groups", func() {
+			g1, err := s.Group().Create(ctx, models.Group{
+				Name:   "prod-group",
+				Filter: "folder = 'production'",
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			g2, err := s.Group().Create(ctx, models.Group{
+				Name:   "all-servers",
+				Filter: "name ~ /server/",
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			err = s.Group().RefreshMatches(ctx)
+			Expect(err).NotTo(HaveOccurred())
+
+			// vm-1 is in production folder AND has 'server' in name
+			groupIDs, err := s.Group().GetGroupsContainingVM(ctx, "vm-1")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(groupIDs).To(ConsistOf(g1.ID, g2.ID))
+
+			// vm-4 only has 'server' in name
+			groupIDs, err = s.Group().GetGroupsContainingVM(ctx, "vm-4")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(groupIDs).To(ConsistOf(g2.ID))
+		})
+
+		It("should return empty slice when no groups exist", func() {
+			groupIDs, err := s.Group().GetGroupsContainingVM(ctx, "vm-1")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(groupIDs).To(BeEmpty())
+		})
+
+		It("should return empty slice for non-existent VM", func() {
+			g, err := s.Group().Create(ctx, models.Group{
+				Name:   "prod-group",
+				Filter: "folder = 'production'",
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			err = s.Group().RefreshMatches(ctx, g.ID)
+			Expect(err).NotTo(HaveOccurred())
+
+			groupIDs, err := s.Group().GetGroupsContainingVM(ctx, "non-existent-vm")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(groupIDs).To(BeEmpty())
+		})
+
+		It("should handle groups with no matches", func() {
+			g, err := s.Group().Create(ctx, models.Group{
+				Name:   "empty-group",
+				Filter: "folder = 'non-existent-folder'",
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			err = s.Group().RefreshMatches(ctx, g.ID)
+			Expect(err).NotTo(HaveOccurred())
+
+			// VM should not be found in the empty group
+			groupIDs, err := s.Group().GetGroupsContainingVM(ctx, "vm-1")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(groupIDs).To(BeEmpty())
+		})
+	})
+
 	Context("Inventory Data", func() {
 		It("should create group with inventory data", func() {
 			// Arrange

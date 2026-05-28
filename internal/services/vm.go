@@ -2,6 +2,11 @@ package services
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+
+	"github.com/kubev2v/migration-planner/pkg/inventory"
+	"github.com/kubev2v/migration-planner/pkg/inventory/converters"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
@@ -93,6 +98,14 @@ func (s *VMService) GetFilterOptions(ctx context.Context) (models.VMFilterOption
 }
 
 // UpdateMigrationExcluded updates the migration exclusion status for a VM.
+// This operation updates the VM first, then rebuilds the main inventory and all
+// affected group inventories to reflect the new exclusion state.
+// The updates happen in two separate transactions due to DuckDB's single-connection
+// constraint (ECOPROJECT-4704). If inventory updates fail, the VM update still succeeds.
+//
+// TODO: When ECOPROJECT-4704 is resolved, refactor to use a single atomic transaction:
+//  1. Build inventories with modified VM state (in-memory, not from DB)
+//  2. Update VM + main inventory + all group inventories in one transaction
 func (s *VMService) UpdateMigrationExcluded(ctx context.Context, id string, excluded bool) error {
 	// Verify VM exists first
 	_, err := s.store.VM().Get(ctx, id)
@@ -100,7 +113,88 @@ func (s *VMService) UpdateMigrationExcluded(ctx context.Context, id string, excl
 		return err
 	}
 
-	return s.store.VM().UpdateMigrationExcluded(ctx, id, excluded)
+	// Find all groups that contain this VM (before updating)
+	groupIDs, err := s.store.Group().GetGroupsContainingVM(ctx, id)
+	if err != nil {
+		return fmt.Errorf("finding groups containing VM: %w", err)
+	}
+
+	// Transaction 1: Update the VM's migration_excluded field
+	err = s.store.WithTx(ctx, func(txCtx context.Context) error {
+		if err := s.store.VM().UpdateMigrationExcluded(txCtx, id, excluded); err != nil {
+			return fmt.Errorf("updating VM migration_excluded: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// Now build inventories with the updated VM state
+	// BuildInventory will read from the database where the VM is now marked as excluded
+
+	// Build main inventory (for all VMs)
+	mainInventory, err := s.store.Parser().BuildInventory(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("building main inventory: %w", err)
+	}
+
+	// Marshal main inventory to JSON
+	mainInventoryData, err := json.Marshal(converters.ToAPI(mainInventory))
+	if err != nil {
+		return fmt.Errorf("marshaling main inventory: %w", err)
+	}
+
+	// Build group inventories
+	type groupInventory struct {
+		groupID   int
+		inventory *inventory.Inventory
+	}
+	newInventories := make([]groupInventory, 0, len(groupIDs))
+
+	for _, groupID := range groupIDs {
+		// Get current VM matches for this group
+		vmIDs, err := s.store.Group().GetMatchedIDs(ctx, groupID)
+		if err != nil {
+			return fmt.Errorf("getting matched VM IDs for group %d: %w", groupID, err)
+		}
+
+		// Build scoped inventory for this group's VMs
+		// This reads the current DB state where the VM is now excluded
+		var inv *inventory.Inventory
+		if len(vmIDs) > 0 {
+			inv, err = s.store.Parser().BuildInventory(ctx, vmIDs)
+			if err != nil {
+				return fmt.Errorf("building inventory for group %d: %w", groupID, err)
+			}
+		}
+
+		newInventories = append(newInventories, groupInventory{
+			groupID:   groupID,
+			inventory: inv,
+		})
+	}
+
+	// Transaction 2: Update main inventory and all affected group inventories
+	err = s.store.WithTx(ctx, func(txCtx context.Context) error {
+		// Update main inventory
+		if err := s.store.Inventory().Save(txCtx, mainInventoryData); err != nil {
+			return fmt.Errorf("updating main inventory: %w", err)
+		}
+
+		// Update group inventories
+		for _, gi := range newInventories {
+			if err := s.store.Group().UpdateInventory(txCtx, gi.groupID, gi.inventory); err != nil {
+				return fmt.Errorf("updating inventory for group %d: %w", gi.groupID, err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // UpdateLabels updates the labels for a VM.
