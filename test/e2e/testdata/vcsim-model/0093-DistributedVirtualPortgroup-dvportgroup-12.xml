@@ -80,7 +80,13 @@
   </propSet>
   <propSet>
     <name>vm</name>
-    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfManagedObjectReference"></val>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfManagedObjectReference">
+      <ManagedObjectReference type="VirtualMachine">vm-100</ManagedObjectReference>
+      <ManagedObjectReference type="VirtualMachine">vm-101</ManagedObjectReference>
+      <ManagedObjectReference type="VirtualMachine">vm-102</ManagedObjectReference>
+      <ManagedObjectReference type="VirtualMachine">vm-103</ManagedObjectReference>
+      <ManagedObjectReference type="VirtualMachine">vm-104</ManagedObjectReference>
+    </val>
   </propSet>
   <propSet>
     <name>name</name>

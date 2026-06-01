@@ -116,9 +116,10 @@ var _ = Describe("Group inventory e2e tests", Ordered, func() {
 		vcenter := resp.Inventory.Vcenter
 		Expect(vcenter.Infra.Hosts).ToNot(BeNil(), "vcenter infra should contain hosts")
 		Expect(vcenter.Infra.Datastores).ToNot(BeEmpty(), "vcenter infra should contain datastores")
-		// TODO: Networks may be empty due to migration-planner filtering bug
-		// See: ECOPROJECT-4703
-		// Expect(vcenter.Infra.Networks).ToNot(BeEmpty(), "vcenter infra should contain networks")
+		Expect(vcenter.Infra.Networks).ToNot(BeEmpty(), "vcenter infra should contain networks")
+		// ECOPROJECT-4703: Only networks with VMs should be included (1 out of 3 networks in vcsim model)
+		Expect(vcenter.Infra.Networks).To(HaveLen(1), "should have exactly 1 network (dvportgroup-12 with VMs, not network-6 or dvportgroup-10 with 0 VMs)")
+		Expect(vcenter.Infra.Networks[0].Name).To(Equal("DC0_DVPG0"), "network should be DC0_DVPG0 (dvportgroup-12)")
 
 		GinkgoWriter.Printf("Group %s inventory - VCenter ID: %s\n", group.Name, resp.Inventory.VcenterId)
 	})
@@ -146,9 +147,10 @@ var _ = Describe("Group inventory e2e tests", Ordered, func() {
 		// Verify infra is scoped - check that we have hosts/datastores
 		Expect(vcenter.Infra.Hosts).ToNot(BeNil(), "infra should have hosts")
 		Expect(vcenter.Infra.Datastores).ToNot(BeEmpty(), "infra should have datastores")
-		// TODO: Networks may be empty due to migration-planner filtering bug
-		// See: ECOPROJECT-4703
-		// Expect(vcenter.Infra.Networks).ToNot(BeEmpty(), "infra should have networks")
+		Expect(vcenter.Infra.Networks).ToNot(BeEmpty(), "infra should have networks")
+		// ECOPROJECT-4703: Only networks with VMs in the filtered set should be included
+		Expect(vcenter.Infra.Networks).To(HaveLen(1), "scoped inventory should have exactly 1 network (dvportgroup-12)")
+		Expect(vcenter.Infra.Networks[0].Name).To(Equal("DC0_DVPG0"), "network should be DC0_DVPG0 (dvportgroup-12)")
 
 		// Count VMs in firstCluster to verify scoping
 		expectedVMs := 0
