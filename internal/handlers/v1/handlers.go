@@ -65,6 +65,11 @@ type GroupService interface {
 	Delete(ctx context.Context, id int) error
 }
 
+// ApplicationService defines the interface for application operations.
+type ApplicationService interface {
+	List(ctx context.Context) ([]models.ApplicationOverview, error)
+}
+
 // RightsizingService defines the interface for rightsizing operations.
 type RightsizingService interface {
 	TriggerCollection(ctx context.Context, params models.RightsizingParams) (*models.RightsizingReportSummary, error)
@@ -86,6 +91,7 @@ type Handler struct {
 	groupSrv       GroupService
 	rightsizingSrv RightsizingService
 	forecasterSrv  ForecasterService
+	appSrv         ApplicationService
 }
 
 func NewHandler(cfg config.Configuration) *Handler {
@@ -134,5 +140,10 @@ func (h *Handler) WithRightsizingService(srv RightsizingService) *Handler {
 
 func (h *Handler) WithForecasterService(srv ForecasterService) *Handler {
 	h.forecasterSrv = srv
+	return h
+}
+
+func (h *Handler) WithApplicationService(srv ApplicationService) *Handler {
+	h.appSrv = srv
 	return h
 }

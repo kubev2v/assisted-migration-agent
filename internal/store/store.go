@@ -23,6 +23,7 @@ type Store struct {
 	rightsizing   *RightSizingStore
 	forecast      *ForecastStore
 	transactor    pkgstore.Transactor
+	application   *ApplicationStore
 }
 
 func NewStore(db *sql.DB, validator duckdb_parser.Validator) *Store {
@@ -41,6 +42,7 @@ func NewStore(db *sql.DB, validator duckdb_parser.Validator) *Store {
 		rightsizing:   NewRightSizingStore(qi),
 		forecast:      NewForecastStore(qi),
 		transactor:    pkgstore.NewTransactor(db),
+		application:   NewApplicationStore(qi),
 	}
 }
 
@@ -94,6 +96,10 @@ func (s *Store) RightSizing() *RightSizingStore {
 
 func (s *Store) Forecast() *ForecastStore {
 	return s.forecast
+}
+
+func (s *Store) Application() *ApplicationStore {
+	return s.application
 }
 
 func (s *Store) WithTx(ctx context.Context, fn func(ctx context.Context) error) error {

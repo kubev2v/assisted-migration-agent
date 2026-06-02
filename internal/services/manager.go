@@ -29,6 +29,7 @@ type ServiceManager struct {
 	vm          *VMService
 	group       *GroupService
 	rightsizing *RightsizingService
+	application *ApplicationService
 }
 
 type ServiceManagerOption func(*ServiceManager)
@@ -105,11 +106,17 @@ func (m *ServiceManager) Initialize() error {
 	m.group = NewGroupService(m.store)
 	m.rightsizing = NewRightsizingService(m.store)
 
+	m.application, err = NewApplicationService(m.store)
+	if err != nil {
+		return err
+	}
+
 	factory.WithPostCollectionBuilder(m.rightsizing.BuildCollectorWorkUnits(
 		rightsizingDefaultLookbackHours,
 		rightsizingDefaultIntervalSeconds,
 		rightsizingDefaultBatchSize,
 	))
+	factory.WithPostCollectionBuilder(m.application.BuildCollectorWorkUnits())
 
 	return nil
 }
@@ -152,6 +159,10 @@ func (m *ServiceManager) RightsizingService() *RightsizingService {
 
 func (m *ServiceManager) ForecasterService() *ForecasterService {
 	return m.forecaster
+}
+
+func (m *ServiceManager) ApplicationService() *ApplicationService {
+	return m.application
 }
 
 func (m *ServiceManager) Stop(ctx context.Context) {

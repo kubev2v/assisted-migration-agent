@@ -312,3 +312,12 @@ func (m *MockRightsizingService) ListLatestClusterUtilization(ctx context.Contex
 	m.LastLatestClusterFilterExpr = filterExpr
 	return m.LatestClusterUtilizationReportID, m.LatestClusterUtilizationResult, m.LatestClusterUtilizationError
 }
+
+type MockApplicationService struct {
+	ListResult []models.ApplicationOverview
+	ListError  error
+}
+
+func (m *MockApplicationService) List(ctx context.Context) ([]models.ApplicationOverview, error) {
+	return m.ListResult, m.ListError
+}

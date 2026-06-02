@@ -121,6 +121,25 @@ type AgentStatusConsoleConnection string
 // AgentStatusMode Target mode for the agent
 type AgentStatusMode string
 
+// ApplicationListResponse defines model for ApplicationListResponse.
+type ApplicationListResponse struct {
+	Applications []ApplicationOverview `json:"applications"`
+}
+
+// ApplicationOverview defines model for ApplicationOverview.
+type ApplicationOverview struct {
+	Description string          `json:"description"`
+	Name        string          `json:"name"`
+	VmCount     int             `json:"vmCount"`
+	Vms         []ApplicationVM `json:"vms"`
+}
+
+// ApplicationVM defines model for ApplicationVM.
+type ApplicationVM struct {
+	Id   string `json:"id"`
+	Name string `json:"name"`
+}
+
 // BenchmarkRun defines model for BenchmarkRun.
 type BenchmarkRun struct {
 	CreatedAt   time.Time `json:"createdAt"`
@@ -611,6 +630,9 @@ type VMDisk struct {
 
 // VMFilterOptionsResponse defines model for VMFilterOptionsResponse.
 type VMFilterOptionsResponse struct {
+	// Applications Distinct detected application names
+	Applications []string `json:"applications"`
+
 	// Clusters Distinct cluster names
 	Clusters []string `json:"clusters"`
 

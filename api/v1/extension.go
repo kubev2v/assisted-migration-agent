@@ -390,6 +390,7 @@ func NewVMFilterOptionsFromModel(m models.VMFilterOptions) VMFilterOptionsRespon
 		Datacenters:       m.Datacenters,
 		ConcernLabels:     m.ConcernLabels,
 		ConcernCategories: m.ConcernCategories,
+		Applications:      m.Applications,
 	}
 }
 

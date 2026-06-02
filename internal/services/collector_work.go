@@ -21,11 +21,11 @@ import (
 )
 
 type collectorWorkFactory struct {
-	store                 *store.Store
-	eventSrv              *EventService
-	dataDir               string
-	opaPoliciesDir        string
-	postCollectionBuilder postCollectionBuilderFn
+	store                  *store.Store
+	eventSrv               *EventService
+	dataDir                string
+	opaPoliciesDir         string
+	postCollectionBuilders []postCollectionBuilderFn
 }
 
 func newCollectorWorkFactory(st *store.Store, eventSrv *EventService, dataDir, opaPoliciesDir string) *collectorWorkFactory {
@@ -39,9 +39,9 @@ func newCollectorWorkFactory(st *store.Store, eventSrv *EventService, dataDir, o
 
 // WithPostCollectionBuilder registers extra work units to be spliced into the
 // pipeline immediately before the final "collected" event unit. Called after
-// construction so that the rightsizing service can be wired in by the manager.
+// construction so that services can be wired in by the manager.
 func (f *collectorWorkFactory) WithPostCollectionBuilder(fn postCollectionBuilderFn) *collectorWorkFactory {
-	f.postCollectionBuilder = fn
+	f.postCollectionBuilders = append(f.postCollectionBuilders, fn)
 	return f
 }
 
@@ -85,8 +85,8 @@ func (f *collectorWorkFactory) Build(creds models.Credentials) work.WorkBuilder[
 		},
 	}
 
-	if f.postCollectionBuilder != nil {
-		units = append(units, f.postCollectionBuilder(creds)...)
+	for _, builder := range f.postCollectionBuilders {
+		units = append(units, builder(creds)...)
 	}
 
 	units = append(units, []collectorWorkUnit{

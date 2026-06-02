@@ -119,6 +119,7 @@ type VMFilterOptions struct {
 	Datacenters       []string
 	ConcernLabels     []string
 	ConcernCategories []string
+	Applications      []string
 }
 
 // Folder represents a VM folder in the vCenter hierarchy.

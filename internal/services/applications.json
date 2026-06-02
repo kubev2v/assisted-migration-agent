@@ -1,0 +1,488 @@
+[
+  {
+    "name": "Active Directory Domain Services",
+    "desc": "Hosts identified as running Active Directory Domain Services",
+    "processes": ["lsass", "winlogon", "services"],
+    "min_matched": 1
+  },
+  {
+    "name": "Apache HTTP Server",
+    "desc": "Hosts identified as Apache HTTP Server Servers",
+    "processes": ["httpd"],
+    "min_matched": 1
+  },
+  {
+    "name": "Automic Automation Engine",
+    "desc": "Hosts identified as Automic Automation Engine Servers",
+    "processes": ["ucsrvwp", "ucsrvcp"],
+    "min_matched": 2
+  },
+  {
+    "name": "Automic ServiceManager",
+    "desc": "Hosts identified as Automic ServiceManager Servers",
+    "processes": ["ucybsmgr", "ucxjap6"],
+    "min_matched": 2
+  },
+  {
+    "name": "Batch Teradata Query",
+    "desc": "Hosts identified as Batch Teradata Query Servers",
+    "processes": ["bteq"],
+    "min_matched": 1
+  },
+  {
+    "name": "BMC Patrol Agent",
+    "desc": "Hosts identified as BMC Patrol Agent Servers",
+    "processes": ["PatrolAgent"],
+    "min_matched": 1
+  },
+  {
+    "name": "CA SystemEdge Client",
+    "desc": "Hosts identified as CA SystemEdge Client Servers",
+    "processes": ["sysedge"],
+    "min_matched": 1
+  },
+  {
+    "name": "CA Workload Automation Agent",
+    "desc": "Hosts identified as CA Workload Automation Agent Servers",
+    "processes": ["cybAgent.bin"],
+    "min_matched": 1
+  },
+  {
+    "name": "Catalyst Warehouse Management System",
+    "desc": "Hosts identified as Catalyst Warehouse Management System Servers",
+    "processes": ["catalyst"],
+    "min_matched": 1
+  },
+  {
+    "name": "Commvault Agent",
+    "desc": "Hosts identified as Commvault Agent Servers",
+    "processes": ["cvlaunchd", "cvd", "EvMgrC"],
+    "min_matched": 2
+  },
+  {
+    "name": "Docker",
+    "desc": "Hosts identified as running Docker Daemon",
+    "processes": ["dockerd"],
+    "min_matched": 1
+  },
+  {
+    "name": "IBM BigFix Agent",
+    "desc": "Hosts identified as IBM BigFix Agent",
+    "processes": ["BESClient"],
+    "min_matched": 1
+  },
+  {
+    "name": "IBM Cognos Analytics",
+    "desc": "Hosts identified as IBM Cognos Analytics Servers",
+    "processes": ["cogbootstrapservice", "CognosCMDerby.jar"],
+    "min_matched": 2
+  },
+  {
+    "name": "IBM Cognos Business Intelligence",
+    "desc": "Hosts identified as IBM Cognos Business Intelligence Servers",
+    "processes": ["cgsServer.sh", "CAM_LPSvr"],
+    "min_matched": 2
+  },
+  {
+    "name": "IBM DB2 Database Server",
+    "desc": "Hosts identified as IBM DB2 Database Servers",
+    "processes": ["db2fmp", "db2ckpwd", "db2sysc", "db2wdog"],
+    "min_matched": 3
+  },
+  {
+    "name": "IBM InfoSphere DataStage",
+    "desc": "Hosts identified as IBM InfoSphere DataStage Servers",
+    "processes": ["dscs", "dsapi_slave", "dsjob"],
+    "min_matched": 2
+  },
+  {
+    "name": "IBM InfoSphere Information Server",
+    "desc": "Hosts identified as IBM InfoSphere Information Servers",
+    "processes": ["dsrpcd", "resource_tracker"],
+    "min_matched": 2
+  },
+  {
+    "name": "IBM Rational ClearCase",
+    "desc": "Hosts identified as IBM Rational ClearCase Servers",
+    "processes": ["albd_server"],
+    "min_matched": 1
+  },
+  {
+    "name": "IBM Sterling Commerce",
+    "desc": "Hosts identified as IBM Sterling Commerce Servers",
+    "processes": ["agentserverJVM.sh", "startHealthMonitor.sh", "startIntegrationServerJVM.sh"],
+    "min_matched": 2
+  },
+  {
+    "name": "IBM Tivoli Monitoring",
+    "desc": "Hosts identified as IBM Tivoli Monitoring Servers",
+    "processes": ["kuxagent"],
+    "min_matched": 1
+  },
+  {
+    "name": "IBM TSM Backup Client",
+    "desc": "Hosts identified as IBM TSM Backup/Archive Client Servers",
+    "processes": ["dsmcad"],
+    "min_matched": 1
+  },
+  {
+    "name": "IBM TSM Server",
+    "desc": "Hosts identified as IBM TSM Servers",
+    "processes": ["dsmserv"],
+    "min_matched": 1
+  },
+  {
+    "name": "IBM WebSphere Application Server",
+    "desc": "Hosts identified as IBM WebSphere Application Servers",
+    "processes": ["com.ibm.ws.runtime.WsServer"],
+    "min_matched": 1
+  },
+  {
+    "name": "IBM WebSphere Message Broker",
+    "desc": "Hosts identified as IBM WebSphere Message Broker Servers",
+    "processes": ["bipbroker", "bipservice"],
+    "min_matched": 2
+  },
+  {
+    "name": "IBM WebSphere MQ Everyplace",
+    "desc": "Hosts identified as IBM WebSphere MQ Everyplace Servers",
+    "processes": ["MQeGateway.jar"],
+    "min_matched": 1
+  },
+  {
+    "name": "IBM WebSphere MQ File Transfer Edition",
+    "desc": "Hosts identified as IBM WebSphere MQ File Transfer Edition Servers",
+    "processes": ["com.ibm.wmqfte.agent.Agent"],
+    "min_matched": 1
+  },
+  {
+    "name": "IBM WebSphere MQ Server",
+    "desc": "Hosts identified as IBM WebSphere MQ Servers",
+    "processes": ["amqzxma0"],
+    "min_matched": 1
+  },
+  {
+    "name": "Informatica PowerCenter",
+    "desc": "Hosts identified as Informatica PowerCenter Servers",
+    "processes": ["pmserver", "pmrepagent", "pmdtm"],
+    "min_matched": 2
+  },
+  {
+    "name": "IRI Cosort",
+    "desc": "Hosts identified as IRI Cosort Servers",
+    "processes": ["sortcl"],
+    "min_matched": 1
+  },
+  {
+    "name": "JBoss Application Server",
+    "desc": "Hosts identified as JBoss Application Servers",
+    "processes": ["jboss"],
+    "min_matched": 1
+  },
+  {
+    "name": "Java",
+    "desc": "Hosts identified as running Java applications",
+    "processes": ["java"],
+    "min_matched": 1
+  },
+  {
+    "name": "Kubernetes Kubelet",
+    "desc": "Hosts identified as running Kubernetes Kubelet",
+    "processes": ["kubelet"],
+    "min_matched": 1
+  },
+  {
+    "name": "LPAR2RRD Agent",
+    "desc": "Hosts identified as LPAR2RRD Agent Servers",
+    "processes": ["lpar2rrd-agent.pl"],
+    "min_matched": 1
+  },
+  {
+    "name": "Manhattan Warehouse Management",
+    "desc": "Hosts identified as Manhattan Warehouse Management Servers",
+    "processes": ["PkManager.py"],
+    "min_matched": 1
+  },
+  {
+    "name": "Memcached",
+    "desc": "Hosts identified as running Memcached Server",
+    "processes": ["memcached"],
+    "min_matched": 1
+  },
+  {
+    "name": "MicroStrategy Intelligence Server",
+    "desc": "Hosts identified as MicroStrategy Intelligence Servers",
+    "processes": ["MSTRSvr"],
+    "min_matched": 1
+  },
+  {
+    "name": "Microsoft Exchange Server",
+    "desc": "Hosts identified as running Microsoft Exchange Server",
+    "processes": ["store", "mad", "MSExchangeIS"],
+    "min_matched": 1
+  },
+  {
+    "name": "Microsoft IIS",
+    "desc": "Hosts identified as running Microsoft Internet Information Services (IIS)",
+    "processes": ["w3wp", "inetinfo"],
+    "min_matched": 1
+  },
+  {
+    "name": "Microsoft Remote Desktop Services",
+    "desc": "Hosts identified as running Microsoft Remote Desktop Services",
+    "processes": ["TermService", "rdpinit"],
+    "min_matched": 1
+  },
+  {
+    "name": "Microsoft SQL Server",
+    "desc": "Hosts identified as running Microsoft SQL Server",
+    "processes": ["sqlservr", "sqlbrowser"],
+    "min_matched": 1
+  },
+  {
+    "name": "MySQL",
+    "desc": "Hosts identified as running MySQL Database Server",
+    "processes": ["mysqld"],
+    "min_matched": 1
+  },
+  {
+    "name": "NFS Server",
+    "desc": "Hosts identified as running NFS (Network File System) Servers",
+    "processes": ["nfsd", "rpc.nfsd"],
+    "min_matched": 1
+  },
+  {
+    "name": "Nginx",
+    "desc": "Hosts identified as running Nginx Web Server",
+    "processes": ["nginx"],
+    "min_matched": 1
+  },
+  {
+    "name": "Objective Development Sharity",
+    "desc": "Hosts identified as Objective Development Sharity Servers",
+    "processes": ["sharityd"],
+    "min_matched": 1
+  },
+  {
+    "name": "Opswise Universal Agent",
+    "desc": "Hosts identified as Opswise Universal Agent Servers",
+    "processes": ["ubrokerd"],
+    "min_matched": 1
+  },
+  {
+    "name": "OptiFlowMgr",
+    "desc": "Hosts identified as OptiFlowMgr Servers",
+    "processes": ["startOFM", "optiflomgr.jar"],
+    "min_matched": 2
+  },
+  {
+    "name": "Oracle Automatic Storage Management",
+    "desc": "Hosts identified as Oracle Automatic Storage Management (ASM) Servers",
+    "processes": ["asm_mmon_", "asm_pmon_", "asm_smon_"],
+    "min_matched": 3
+  },
+  {
+    "name": "Oracle Business Intelligence",
+    "desc": "Hosts identified as Oracle Business Intelligence Servers",
+    "processes": ["nqsclustercontroller", "sawserver", "nqsserver"],
+    "min_matched": 2
+  },
+  {
+    "name": "Oracle Concurrent Manager",
+    "desc": "Hosts identified as Oracle Concurrent Manager Servers",
+    "processes": ["FNDSM", "FNDLIBR", "FNDIMON"],
+    "min_matched": 2
+  },
+  {
+    "name": "Oracle Configuration Manager",
+    "desc": "Hosts identified as Oracle Configuration Manager Servers",
+    "processes": ["nmz"],
+    "min_matched": 1
+  },
+  {
+    "name": "Oracle Data Integrator Agent",
+    "desc": "Hosts identified as Oracle Data Integrator Agent Servers",
+    "processes": ["agent.sh", "oracle.odi.Agent"],
+    "min_matched": 1
+  },
+  {
+    "name": "Oracle Database",
+    "desc": "Hosts identified as Oracle Database Servers",
+    "processes": ["ora_mmon_", "ora_pmon_", "ora_smon_", "tnslsnr"],
+    "min_matched": 3
+  },
+  {
+    "name": "Oracle Enterprise Manager",
+    "desc": "Hosts identified as Oracle Enterprise Manager Servers",
+    "processes": ["emwd.pl"],
+    "min_matched": 1
+  },
+  {
+    "name": "Oracle ESSBASE Server",
+    "desc": "Hosts identified as Oracle ESSBASE Servers",
+    "processes": ["ESSBASE", "ESSSVR"],
+    "min_matched": 2
+  },
+  {
+    "name": "Oracle HTTP Server",
+    "desc": "Hosts identified as Oracle HTTP Servers",
+    "processes": ["httpd.worker", "oracle"],
+    "min_matched": 2
+  },
+  {
+    "name": "Oracle Real Application Clusters",
+    "desc": "Hosts identified as Oracle Real Application Clusters Servers",
+    "processes": ["ocssd", "cssdmonitor", "cssdagent"],
+    "min_matched": 2
+  },
+  {
+    "name": "Oracle WebLogic Server",
+    "desc": "Hosts identified as Oracle WebLogic Servers",
+    "processes": ["startWebLogic.sh", "startManagedWebLogic.sh", "weblogic.Server", "opmn"],
+    "min_matched": 1
+  },
+  {
+    "name": "PostgreSQL",
+    "desc": "Hosts identified as running PostgreSQL Database Server",
+    "processes": ["postgres"],
+    "min_matched": 1
+  },
+  {
+    "name": "Quest Authentication Services",
+    "desc": "Hosts identified as Quest Authentication Services Servers",
+    "processes": ["vasd"],
+    "min_matched": 1
+  },
+  {
+    "name": "RRD Tool",
+    "desc": "Hosts identified as RRD Tool Servers",
+    "processes": ["rrdtool"],
+    "min_matched": 1
+  },
+  {
+    "name": "RabbitMQ",
+    "desc": "Hosts identified as running RabbitMQ Server",
+    "processes": ["rabbitmq-server"],
+    "min_matched": 1
+  },
+  {
+    "name": "Redis",
+    "desc": "Hosts identified as running Redis Server",
+    "processes": ["redis-server"],
+    "min_matched": 1
+  },
+  {
+    "name": "SAS Intelligent Planning Suite",
+    "desc": "Hosts identified as SAS Intelligent Planning Suite Servers",
+    "processes": ["startSMPS.sh", "httpd.worker", "SASWebServer"],
+    "min_matched": 2
+  },
+  {
+    "name": "SAS Merchandise Planning Server",
+    "desc": "Hosts identified as SAS Merchandise Planning Server Servers",
+    "processes": ["BPServer", "MEServer"],
+    "min_matched": 2
+  },
+  {
+    "name": "SAS Scalable Performance Data Server",
+    "desc": "Hosts identified as SAS Scalable Performance Data Servers",
+    "processes": ["spdssnet", "spdsnsrv"],
+    "min_matched": 2
+  },
+  {
+    "name": "SAP Adaptive Server Enterprise",
+    "desc": "Hosts identified as SAP ASE (Sybase) Database Servers",
+    "processes": ["dataserver", "backupserver"],
+    "min_matched": 2
+  },
+  {
+    "name": "SAP Application Server ABAP",
+    "desc": "Hosts identified as SAP Application Server ABAP instances",
+    "processes": ["disp+work", "sapstartsrv", "icman", "gwrd"],
+    "min_matched": 2
+  },
+  {
+    "name": "SAP Business Objects",
+    "desc": "Hosts identified as SAP Business Objects Servers",
+    "processes": ["SIA.sh", "boe_", "webiserver"],
+    "min_matched": 1
+  },
+  {
+    "name": "SAP Content Server",
+    "desc": "Hosts identified as SAP Content Servers",
+    "processes": ["sapcontentserver"],
+    "min_matched": 1
+  },
+  {
+    "name": "SAP HANA Database",
+    "desc": "Hosts identified as SAP HANA Database Servers",
+    "processes": ["hdbdaemon", "hdbnameserver", "hdbindexserver", "hdbcompileserver", "hdbpreprocessor"],
+    "min_matched": 2
+  },
+  {
+    "name": "SAP Host Agent",
+    "desc": "Hosts identified as SAP Host Agent Servers",
+    "processes": ["saphostexec", "saposcol"],
+    "min_matched": 2
+  },
+  {
+    "name": "SAP NetWeaver Application Server Java",
+    "desc": "Hosts identified as SAP NetWeaver Application Server Java instances",
+    "processes": ["jstart", "jcontrol", "sapstartsrv"],
+    "min_matched": 2
+  },
+  {
+    "name": "SAP NetWeaver Gateway",
+    "desc": "Hosts identified as SAP NetWeaver Gateway Servers",
+    "processes": ["msg_server", "enserver", "enrepserver"],
+    "min_matched": 2
+  },
+  {
+    "name": "SAP Router",
+    "desc": "Hosts identified as SAP Router Servers",
+    "processes": ["saprouter"],
+    "min_matched": 1
+  },
+  {
+    "name": "SAP Solution Manager Diagnostic Agent",
+    "desc": "Hosts identified as SAP Solution Manager Diagnostic Agent Servers",
+    "processes": ["sapstartsrv", "daaadm"],
+    "min_matched": 2
+  },
+  {
+    "name": "SAP Web Dispatcher",
+    "desc": "Hosts identified as SAP Web Dispatcher Servers",
+    "processes": ["sapwebdisp"],
+    "min_matched": 1
+  },
+  {
+    "name": "Samba",
+    "desc": "Hosts identified as Samba Servers",
+    "processes": ["smbd", "nmbd"],
+    "min_matched": 2
+  },
+  {
+    "name": "Squid Proxy",
+    "desc": "Hosts identified as running Squid Proxy Server",
+    "processes": ["squid"],
+    "min_matched": 1
+  },
+  {
+    "name": "Tripwire Agent",
+    "desc": "Hosts identified as Tripwire Agent Servers",
+    "processes": ["twagent", "tegesd", "tesvc"],
+    "min_matched": 2
+  },
+  {
+    "name": "WebMethods Integration Server",
+    "desc": "Hosts identified as WebMethods Integration Servers",
+    "processes": ["server.sh", "wm-isproxy.jar"],
+    "min_matched": 2
+  },
+  {
+    "name": "sshd",
+    "desc": "Hosts identified as running the OpenSSH SSH daemon",
+    "processes": ["sshd"],
+    "min_matched": 1
+  }
+]

@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -226,8 +227,8 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 func (s *VMStore) GetFilterOptions(ctx context.Context) (models.VMFilterOptions, error) {
 	row := s.db.QueryRowContext(ctx, vmFilterOptionsQuery)
 
-	var clusters, datacenters, concernLabels, concernCategories StringArray
-	if err := row.Scan(&clusters, &datacenters, &concernLabels, &concernCategories); err != nil {
+	var clusters, datacenters, concernLabels, concernCategories, applications StringArray
+	if err := row.Scan(&clusters, &datacenters, &concernLabels, &concernCategories, &applications); err != nil {
 		return models.VMFilterOptions{}, err
 	}
 
@@ -236,7 +237,56 @@ func (s *VMStore) GetFilterOptions(ctx context.Context) (models.VMFilterOptions,
 		Datacenters:       datacenters,
 		ConcernLabels:     concernLabels,
 		ConcernCategories: concernCategories,
+		Applications:      applications,
 	}, nil
+}
+
+// GetGuestApps returns all VMs with their guest application names.
+func (s *VMStore) GetGuestApps(ctx context.Context) ([]models.VMGuestApps, error) {
+	query, args, err := sq.Select(
+		`v."VM ID"`,
+		`v."VM"`,
+		`COALESCE(v."guest_apps", '[]')`,
+	).From("vinfo v").ToSql()
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var result []models.VMGuestApps
+	for rows.Next() {
+		var id, name, guestAppsJSON string
+		if err := rows.Scan(&id, &name, &guestAppsJSON); err != nil {
+			return nil, err
+		}
+
+		var apps []struct {
+			Name string `json:"name"`
+		}
+		if err := json.Unmarshal([]byte(guestAppsJSON), &apps); err != nil {
+			return nil, fmt.Errorf("parsing guest_apps for VM %s: %w", id, err)
+		}
+
+		appNames := make([]string, 0, len(apps))
+		for _, a := range apps {
+			if a.Name != "" {
+				appNames = append(appNames, a.Name)
+			}
+		}
+
+		result = append(result, models.VMGuestApps{
+			ID:       id,
+			Name:     name,
+			AppNames: appNames,
+		})
+	}
+
+	return result, rows.Err()
 }
 
 // normalizeCategory validates and normalizes an issue category (case-insensitive).

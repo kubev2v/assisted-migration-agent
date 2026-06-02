@@ -211,6 +211,12 @@ var defaultMapFn MapFunc = func(name string) (string, FieldType, error) {
 	case "utilization.confidence":
 		return "utilization.confidence_pct", NumericField, nil
 
+	// vm_applications (va) — application.* prefix
+	case "application", "application.name":
+		return `va.app_name`, StringField, nil
+	case "application.description":
+		return `va.app_desc`, StringField, nil
+
 	default:
 		return "", 0, fmt.Errorf("unknown filter field: %s", name)
 	}

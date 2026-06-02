@@ -1076,6 +1076,20 @@ paths:
         '500':
           description: Internal server error
 
+  /applications:
+    get:
+      summary: List detected applications running on VMs
+      operationId: getApplications
+      responses:
+        '200':
+          description: List of applications with matching VMs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationListResponse'
+        '500':
+          description: Internal server error
+
 components:
   schemas:
     VddkProperties:
@@ -2186,6 +2200,7 @@ components:
         - datacenters
         - concernLabels
         - concernCategories
+        - applications
       properties:
         clusters:
           type: array
@@ -2207,6 +2222,11 @@ components:
           items:
             type: string
           description: Distinct concern categories
+        applications:
+          type: array
+          items:
+            type: string
+          description: Distinct detected application names
 
     # --- Forecaster schemas ---
 
@@ -2515,3 +2535,43 @@ components:
               - rdm
               - vvol
           description: Feasible offload methods for this source-target pair
+
+    ApplicationVM:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+
+    ApplicationOverview:
+      type: object
+      required:
+        - name
+        - description
+        - vmCount
+        - vms
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        vmCount:
+          type: integer
+        vms:
+          type: array
+          items:
+            $ref: '#/components/schemas/ApplicationVM'
+
+    ApplicationListResponse:
+      type: object
+      required:
+        - applications
+      properties:
+        applications:
+          type: array
+          items:
+            $ref: '#/components/schemas/ApplicationOverview'

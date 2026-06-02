@@ -155,7 +155,9 @@ SELECT
     (SELECT COALESCE(list(DISTINCT "Label" ORDER BY "Label"), [])
      FROM concerns WHERE "Label" IS NOT NULL AND "Label" != '') AS concern_labels,
     (SELECT COALESCE(list(DISTINCT "Category" ORDER BY "Category"), [])
-     FROM concerns WHERE "Category" IS NOT NULL AND "Category" != '') AS concern_categories
+     FROM concerns WHERE "Category" IS NOT NULL AND "Category" != '') AS concern_categories,
+    (SELECT COALESCE(list(DISTINCT app_name ORDER BY app_name), [])
+     FROM vm_applications) AS applications
 `
 
 // vmOutputQuery is the base aggregated output query that produces one row per VM.
@@ -217,4 +219,5 @@ WHERE report_id = (
       SELECT id FROM rightsizing_reports
       WHERE written_batch_count > 0
       ORDER BY created_at DESC LIMIT 1
-  )) as utilization ON v."VM ID" = utilization.moid`)
+  )) as utilization ON v."VM ID" = utilization.moid`).
+	LeftJoin(`vm_applications va ON v."VM ID" = va.vm_id`)
