@@ -8,11 +8,14 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	oapimiddleware "github.com/oapi-codegen/gin-middleware"
 
 	v1 "github.com/kubev2v/assisted-migration-agent/api/v1"
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
@@ -38,6 +41,17 @@ var _ = Describe("VMs Handlers", func() {
 		mockInspector = &MockInspectorService{}
 		handler = handlers.NewHandler(config.Configuration{}).WithVMService(mockVM).WithInspectorService(mockInspector)
 		router = gin.New()
+
+		swagger, err := v1.GetSwagger()
+		Expect(err).ToNot(HaveOccurred())
+		swagger.Servers = nil
+		router.Use(oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapimiddleware.Options{
+			ErrorHandler: func(c *gin.Context, message string, statusCode int) {
+				c.JSON(statusCode, gin.H{"error": message})
+				c.Abort()
+			},
+		}))
+
 		router.GET("/vms", func(c *gin.Context) {
 			var params v1.GetVMsParams
 			if err := c.ShouldBindQuery(&params); err != nil {
@@ -263,6 +277,23 @@ var _ = Describe("VMs Handlers", func() {
 			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
 			Expect(body["error"]).To(HavePrefix("expression filter is invalid:"))
 		})
+
+		It("should return 400 when byExpression exceeds 10KB", func() {
+			longValue := strings.Repeat("x", 10240)
+			expr := fmt.Sprintf("name = '%s'", longValue)
+			Expect(len(expr)).To(BeNumerically(">", 10240))
+
+			req := httptest.NewRequest(http.MethodGet, "/vms?byExpression="+url.QueryEscape(expr), nil)
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusBadRequest))
+			var body map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &body)).To(Succeed())
+			Expect(body["error"]).To(ContainSubstring("maximum string length is 10240"))
+		})
+
 	})
 
 	Context("GetVM", func() {
@@ -627,7 +658,7 @@ var _ = Describe("VMs Handlers", func() {
 
 				// Assert
 				Expect(w.Code).To(Equal(http.StatusBadRequest))
-				Expect(w.Body.String()).To(ContainSubstring("exceeds maximum length"))
+				Expect(w.Body.String()).To(ContainSubstring("maximum string length is 100"))
 			})
 
 			It("should reject request with neither add nor remove", func() {
@@ -702,7 +733,7 @@ var _ = Describe("VMs Handlers", func() {
 
 				// Assert
 				Expect(w.Code).To(Equal(http.StatusBadRequest))
-				Expect(w.Body.String()).To(ContainSubstring("exceeds maximum length"))
+				Expect(w.Body.String()).To(ContainSubstring("maximum string length is 100"))
 			})
 		})
 	})

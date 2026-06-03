@@ -49,7 +49,6 @@ func (h *Handler) GetVMs(c *gin.Context, params v1.GetVMsParams) {
 	}
 
 	if params.ByExpression != nil {
-		// validate expression
 		if _, err := filter.ParseWithDefaultMap([]byte(*params.ByExpression)); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("expression filter is invalid: %v", err)})
 			return

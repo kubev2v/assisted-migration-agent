@@ -163,7 +163,7 @@ type CreateGroupRequest struct {
 	Description *string `binding:"omitempty,max=500" json:"description,omitempty"`
 
 	// Filter Filter expression (will be validated)
-	Filter string `binding:"required,min=1" json:"filter"`
+	Filter string `binding:"required,min=1,max=10240" json:"filter"`
 
 	// Name Group display name
 	Name string `binding:"required,min=1,max=100" json:"name"`
@@ -564,7 +564,7 @@ type UpdateGroupRequest struct {
 	Description *string `binding:"omitempty,max=500" json:"description,omitempty"`
 
 	// Filter Filter expression (will be validated)
-	Filter *string `binding:"omitempty,min=1" json:"filter,omitempty"`
+	Filter *string `binding:"omitempty,min=1,max=10240" json:"filter,omitempty"`
 
 	// Name Group display name
 	Name *string `binding:"omitempty,min=1,max=100" json:"name,omitempty"`

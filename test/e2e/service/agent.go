@@ -434,9 +434,12 @@ func (a *AgentSvc) UpdateLabelVMs(label string, add []string, remove []string) e
 		return fmt.Errorf("label cannot be empty")
 	}
 
-	reqBody := v1.UpdateLabelVMsRequest{
-		Add:    &add,
-		Remove: &remove,
+	reqBody := v1.UpdateLabelVMsRequest{}
+	if add != nil {
+		reqBody.Add = &add
+	}
+	if remove != nil {
+		reqBody.Remove = &remove
 	}
 	data, err := json.Marshal(reqBody)
 	if err != nil {

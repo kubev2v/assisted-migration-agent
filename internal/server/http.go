@@ -17,6 +17,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
+	api "github.com/kubev2v/assisted-migration-agent/api/v1"
+
+	oapimiddleware "github.com/oapi-codegen/gin-middleware"
+
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
 	"github.com/kubev2v/assisted-migration-agent/internal/server/middlewares"
 	"github.com/kubev2v/assisted-migration-agent/pkg/certificates"
@@ -38,6 +42,18 @@ func NewServer(cfg *config.Configuration, registerHandlerFn map[string]func(rout
 	}
 	engine := gin.New()
 	engine.MaxMultipartMemory = 64 << 20 // max 64Mb
+
+	swagger, err := api.GetSwagger()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load swagger spec: %w", err)
+	}
+	oapiOpts := oapimiddleware.Options{
+		SilenceServersWarning: true,
+		ErrorHandler: func(c *gin.Context, message string, statusCode int) {
+			c.JSON(statusCode, gin.H{"error": message})
+			c.Abort()
+		},
+	}
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf("0.0.0.0:%d", cfg.Server.HTTPPort),
@@ -80,6 +96,7 @@ func NewServer(cfg *config.Configuration, registerHandlerFn map[string]func(rout
 		router.Use(
 			middlewares.Logger(),
 			ginzap.RecoveryWithZap(zap.S().Desugar(), true),
+			oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),
 		)
 
 		handlersFn(router)

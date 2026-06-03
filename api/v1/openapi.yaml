@@ -128,6 +128,7 @@ paths:
           description: Filter by expression (matches VMs with the provided expression)
           schema:
             type: string
+            maxLength: 10240
           example: "exp1"
         - name: sort
           in: query
@@ -686,6 +687,7 @@ paths:
           description: Filter DSL expression (e.g. "cluster_id = 'domain-c123'"). Omit to return all clusters.
           schema:
             type: string
+            maxLength: 10240
       responses:
         '200':
           description: Cluster utilization aggregates
@@ -716,6 +718,7 @@ paths:
           description: Filter DSL expression (e.g. "cluster_id = 'domain-c123'"). Omit to return all clusters.
           schema:
             type: string
+            maxLength: 10240
       responses:
         '200':
           description: Cluster utilization aggregates
@@ -768,6 +771,7 @@ paths:
           description: Filter DSL expression (e.g. "cluster_id = 'domain-c123'"). Omit to return all clusters.
           schema:
             type: string
+            maxLength: 10240
       responses:
         '200':
           description: Cluster utilization aggregates
@@ -1721,9 +1725,10 @@ components:
         filter:
           type: string
           minLength: 1
+          maxLength: 10240
           description: Filter expression (will be validated)
           x-oapi-codegen-extra-tags:
-            binding: "required,min=1"
+            binding: "required,min=1,max=10240"
 
     UpdateGroupRequest:
       type: object
@@ -1744,9 +1749,10 @@ components:
         filter:
           type: string
           minLength: 1
+          maxLength: 10240
           description: Filter expression (will be validated)
           x-oapi-codegen-extra-tags:
-            binding: "omitempty,min=1"
+            binding: "omitempty,min=1,max=10240"
 
     RightsizingCollectRequest:
       type: object

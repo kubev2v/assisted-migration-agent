@@ -3,6 +3,7 @@ package v1_test
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -295,6 +296,22 @@ var _ = Describe("Group Handlers", func() {
 			var resp map[string]string
 			Expect(json.Unmarshal(w.Body.Bytes(), &resp)).To(Succeed())
 			Expect(resp["error"]).To(ContainSubstring("filter"))
+		})
+
+		It("should return 400 when filter exceeds 10KB", func() {
+			longValue := strings.Repeat("x", 10240)
+			longFilter := fmt.Sprintf("name = '%s'", longValue)
+			body := `{"name":"mygroup","filter":"` + longFilter + `"}`
+			req := httptest.NewRequest(http.MethodPost, "/groups", strings.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusBadRequest))
+			var resp map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &resp)).To(Succeed())
+			Expect(resp["error"]).To(ContainSubstring("Filter must not exceed 10240 characters"))
 		})
 
 		It("should return 400 when tag has invalid format", func() {
@@ -675,6 +692,22 @@ var _ = Describe("Group Handlers", func() {
 			var resp map[string]string
 			Expect(json.Unmarshal(w.Body.Bytes(), &resp)).To(Succeed())
 			Expect(resp["error"]).To(ContainSubstring("filter"))
+		})
+
+		It("should return 400 when filter exceeds 10KB", func() {
+			longValue := strings.Repeat("x", 10240)
+			longFilter := fmt.Sprintf("name = '%s'", longValue)
+			body := `{"filter":"` + longFilter + `"}`
+			req := httptest.NewRequest(http.MethodPatch, "/groups/1", strings.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusBadRequest))
+			var resp map[string]any
+			Expect(json.Unmarshal(w.Body.Bytes(), &resp)).To(Succeed())
+			Expect(resp["error"]).To(ContainSubstring("Filter must not exceed 10240 characters"))
 		})
 
 		It("should return 500 when Get returns non-404 error", func() {

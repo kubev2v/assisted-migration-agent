@@ -748,7 +748,7 @@ var _ = ginkgo.Describe("VM Labels e2e tests", ginkgo.Ordered, func() {
 			// Assert
 			gomega.Expect(err).To(gomega.HaveOccurred(), "should fail for label exceeding max length")
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("400"), "should return 400 Bad Request")
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("must not exceed 100 characters"), "should include validation message")
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("maximum string length is 100"), "should include validation message")
 		})
 
 		// Given a label is exactly 100 characters
@@ -781,7 +781,7 @@ var _ = ginkgo.Describe("VM Labels e2e tests", ginkgo.Ordered, func() {
 			// Assert
 			gomega.Expect(err).To(gomega.HaveOccurred(), "should fail for empty label")
 			gomega.Expect(err.Error()).To(gomega.ContainSubstring("400"), "should return 400 Bad Request")
-			gomega.Expect(err.Error()).To(gomega.ContainSubstring("must not be empty or whitespace-only"), "should include validation message")
+			gomega.Expect(err.Error()).To(gomega.ContainSubstring("minimum string length is 1"), "should include validation message")
 
 			// Act - try with whitespace-only
 			err = agentSvc.UpdateVMLabels(testVMID, []string{"valid", "   "})

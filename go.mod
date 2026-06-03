@@ -9,6 +9,7 @@ require (
 	github.com/duckdb/duckdb-go/v2 v2.5.4
 	github.com/ecordell/optgen v0.1.1
 	github.com/fatih/color v1.18.0
+	github.com/getkin/kin-openapi v0.133.0
 	github.com/gin-contrib/zap v1.1.5
 	github.com/gin-gonic/gin v1.11.0
 	github.com/go-extras/cobraflags v0.0.0-20260116100222-f76efc9500d4
@@ -20,6 +21,7 @@ require (
 	github.com/kubev2v/forklift v0.0.0-20260602073417-e96a7f58d4e2
 	github.com/kubev2v/migration-planner v0.13.5-0.20260605070017-88a042a02aba
 	github.com/kubev2v/vm-migration-detective v0.0.0-20260506144435-77e61ac7d78d
+	github.com/oapi-codegen/gin-middleware v1.0.2
 	github.com/oapi-codegen/runtime v1.1.2
 	github.com/onsi/ginkgo/v2 v2.27.4
 	github.com/onsi/gomega v1.38.2
@@ -96,7 +98,6 @@ require (
 	github.com/fxamacker/cbor/v2 v2.9.1 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.13 // indirect
 	github.com/georgysavva/scany/v2 v2.1.4 // indirect
-	github.com/getkin/kin-openapi v0.133.0 // indirect
 	github.com/gin-contrib/cors v1.7.6 // indirect
 	github.com/gin-contrib/sse v1.1.0 // indirect
 	github.com/go-ini/ini v1.67.2 // indirect

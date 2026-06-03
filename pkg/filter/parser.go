@@ -8,6 +8,10 @@ import (
 	sq "github.com/Masterminds/squirrel"
 )
 
+const (
+	maxNestedLevels = 100
+)
+
 // ParseError is the type of error returned by parse.
 type ParseError struct {
 	// Source column position where the error occurred.
@@ -22,10 +26,11 @@ func (e ParseError) Error() string {
 }
 
 type parser struct {
-	lexer *lexer
-	pos   int    // position of last token (tok)
-	tok   Token  // last lexed token
-	val   string // string value of last token (or "")
+	lexer           *lexer
+	pos             int    // position of last token (tok)
+	tok             Token  // last lexed token
+	val             string // string value of last token (or "")
+	countExpression int
 }
 
 func ParseWithDefaultMap(src []byte) (sq.Sqlizer, error) {
@@ -79,6 +84,12 @@ func parse(src []byte) (expr Expression, err error) {
 //
 // term ( "or" term )*
 func (p *parser) expression() Expression {
+	p.countExpression++
+	if p.countExpression > maxNestedLevels {
+		panic(p.errorf(p.pos, "maximum level of nested expression reached: %d", maxNestedLevels))
+	}
+	defer func() { p.countExpression-- }()
+
 	expr := p.term()
 
 	for p.matches(or) {

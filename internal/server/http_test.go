@@ -44,8 +44,8 @@ var _ = Describe("HTTP Server", func() {
 
 		registerHandlerFn = map[string]func(router *gin.RouterGroup){
 			"/api/v1": func(router *gin.RouterGroup) {
-				router.GET("/health", func(c *gin.Context) {
-					c.JSON(200, gin.H{"status": "ok"})
+				router.GET("/vms", func(c *gin.Context) {
+					c.JSON(200, gin.H{"vms": []any{}, "total": 0, "page": 1, "pageCount": 1})
 				})
 			},
 		}
@@ -82,7 +82,7 @@ var _ = Describe("HTTP Server", func() {
 			}()
 			time.Sleep(100 * time.Millisecond)
 
-			resp, err := http.Get(fmt.Sprintf("http://localhost:%d/api/v1/health", cfg.Server.HTTPPort))
+			resp, err := http.Get(fmt.Sprintf("http://localhost:%d/api/v1/vms", cfg.Server.HTTPPort))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(200))
 			_ = resp.Body.Close()
@@ -122,7 +122,7 @@ var _ = Describe("HTTP Server", func() {
 				},
 			}
 
-			resp, err := client.Get(fmt.Sprintf("https://localhost:%d/api/v1/health", cfg.Server.HTTPPort))
+			resp, err := client.Get(fmt.Sprintf("https://localhost:%d/api/v1/vms", cfg.Server.HTTPPort))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(resp.StatusCode).To(Equal(200))
 			_ = resp.Body.Close()
@@ -226,7 +226,7 @@ var _ = Describe("HTTP Server", func() {
 					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 				},
 			}
-			_, err = client.Get(fmt.Sprintf("https://localhost:%d/api/v1/health", cfg.Server.HTTPPort))
+			_, err = client.Get(fmt.Sprintf("https://localhost:%d/api/v1/vms", cfg.Server.HTTPPort))
 			Expect(err).To(HaveOccurred())
 		})
 	})

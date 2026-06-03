@@ -2,6 +2,7 @@ package filter
 
 import (
 	"errors"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -181,6 +182,57 @@ var _ = Describe("Parser", func() {
 				Expect(expr.String()).To(Equal(test.output))
 			})
 		}
+	})
+
+	Context("Nesting depth limit", func() {
+		nestParens := func(depth int) []byte {
+			input := make([]byte, 0, depth*2+len("a = '1'"))
+			for i := 0; i < depth; i++ {
+				input = append(input, '(')
+			}
+			input = append(input, "a = '1'"...)
+			for i := 0; i < depth; i++ {
+				input = append(input, ')')
+			}
+			return input
+		}
+
+		It("should parse at exactly the nesting limit", func() {
+			input := nestParens(99)
+			expr, err := parse(input)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(expr).ToNot(BeNil())
+		})
+
+		It("should return ParseError when nesting exceeds the limit", func() {
+			input := nestParens(100)
+			_, err := parse(input)
+			Expect(err).To(HaveOccurred())
+			var pe ParseError
+			Expect(errors.As(err, &pe)).To(BeTrue())
+			Expect(pe.Message).To(ContainSubstring("maximum level of nested expression"))
+		})
+
+		It("should not overflow the stack with extreme nesting", func() {
+			input := nestParens(100_000)
+			_, err := parse(input)
+			Expect(err).To(HaveOccurred())
+			var pe ParseError
+			Expect(errors.As(err, &pe)).To(BeTrue())
+		})
+
+		It("should parse many grouped siblings without hitting the nesting limit", func() {
+			var b []byte
+			for i := 0; i < 150; i++ {
+				if i > 0 {
+					b = append(b, " or "...)
+				}
+				b = append(b, fmt.Sprintf("(a = '%d')", i)...)
+			}
+			expr, err := parse(b)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(expr).ToNot(BeNil())
+		})
 	})
 
 	Context("Invalid expressions", func() {
