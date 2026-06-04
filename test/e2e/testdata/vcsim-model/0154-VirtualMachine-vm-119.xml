@@ -367,6 +367,10 @@
         <key>govcsim</key>
         <value _XMLSchema-instance:type="xsd:string">TRUE</value>
       </extraConfig>
+      <extraConfig _XMLSchema-instance:type="OptionValue">
+        <key>guestinfo.appInfo</key>
+        <value _XMLSchema-instance:type="xsd:string">{"applications":[{"a":"nginx","v":"1.24.0"}]}</value>
+      </extraConfig>
       <bootOptions></bootOptions>
       <firmware>bios</firmware>
     </val>

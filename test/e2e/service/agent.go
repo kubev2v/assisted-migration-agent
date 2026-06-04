@@ -111,6 +111,33 @@ func (a *AgentSvc) Status() (*AgentStatus, error) {
 	return &status, nil
 }
 
+// ListApplications returns the list of detected applications
+func (a *AgentSvc) ListApplications() (*v1.ApplicationListResponse, error) {
+	req, err := http.NewRequest(http.MethodGet, a.baseURL+"/api/v1/applications", nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	resp, err := a.request(NewAgentRequest(req))
+	if err != nil {
+		return nil, fmt.Errorf("sending request: %w", err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var result v1.ApplicationListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+
+	return &result, nil
+}
+
 // SetAgentMode sets the agent mode (connected/disconnected)
 func (a *AgentSvc) SetAgentMode(mode string) (*AgentStatus, error) {
 	body := AgentModeRequest{Mode: mode}

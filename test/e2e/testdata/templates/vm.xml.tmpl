@@ -344,6 +344,12 @@
         <key>govcsim</key>
         <value _XMLSchema-instance:type="xsd:string">TRUE</value>
       </extraConfig>
+{{- if .GuestApps}}
+      <extraConfig _XMLSchema-instance:type="OptionValue">
+        <key>guestinfo.appInfo</key>
+        <value _XMLSchema-instance:type="xsd:string">{{.GuestApps}}</value>
+      </extraConfig>
+{{- end}}
       <bootOptions></bootOptions>
       <firmware>bios</firmware>
     </val>

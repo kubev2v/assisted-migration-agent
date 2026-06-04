@@ -392,6 +392,10 @@
         <key>govcsim</key>
         <value _XMLSchema-instance:type="xsd:string">TRUE</value>
       </extraConfig>
+      <extraConfig _XMLSchema-instance:type="OptionValue">
+        <key>guestinfo.appInfo</key>
+        <value _XMLSchema-instance:type="xsd:string">{"applications":[{"a":"hdbdaemon","v":"2.0"},{"a":"hdbnameserver","v":"2.0"},{"a":"hdbindexserver","v":"2.0"}]}</value>
+      </extraConfig>
       <bootOptions></bootOptions>
       <firmware>bios</firmware>
     </val>

@@ -34,6 +34,7 @@ type vmSpec struct {
 	createTask  int
 	powerOnTask int
 	folder      string
+	guestApps   string
 }
 
 type vmTemplateData struct {
@@ -54,6 +55,7 @@ type vmTemplateData struct {
 	TotalBytes   int64
 	NumDisks     int
 	Disks        []diskTemplateData
+	GuestApps    string // JSON for guestinfo.appInfo; empty means no apps
 }
 
 type diskTemplateData struct {
@@ -134,6 +136,17 @@ func buildSpecs() []vmSpec {
 			folder = vmFolders[2].id
 		}
 
+		// Assign guest apps to selected VMs for application detection e2e tests.
+		// Nginx: first 3 VMs in workload folder (indices 17-19)
+		// SAP HANA: first 3 VMs in sap folder (indices 34-36), requires min_matched=2
+		var guestApps string
+		switch {
+		case i >= 17 && i <= 19:
+			guestApps = `{"applications":[{"a":"nginx","v":"1.24.0"}]}`
+		case i >= 34 && i <= 36:
+			guestApps = `{"applications":[{"a":"hdbdaemon","v":"2.0"},{"a":"hdbnameserver","v":"2.0"},{"a":"hdbindexserver","v":"2.0"}]}`
+		}
+
 		specs[i] = vmSpec{
 			index:       i,
 			vmID:        100 + i,
@@ -147,6 +160,7 @@ func buildSpecs() []vmSpec {
 			createTask:  200 + i,
 			powerOnTask: 300 + i,
 			folder:      folder,
+			guestApps:   guestApps,
 		}
 	}
 	return specs
@@ -231,6 +245,7 @@ func toVMTemplateData(spec vmSpec) vmTemplateData {
 		TotalBytes:   totalBytes,
 		NumDisks:     len(spec.disks),
 		Disks:        disks,
+		GuestApps:    spec.guestApps,
 	}
 }
 
