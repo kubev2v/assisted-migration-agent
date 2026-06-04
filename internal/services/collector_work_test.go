@@ -74,6 +74,46 @@ func TestCollectorWorkFactory_WithPostCollectionBuilder(t *testing.T) {
 	}
 }
 
+func TestCollectorWorkFactory_WithMultiplePostCollectionBuilders(t *testing.T) {
+	unit1 := work.WorkUnit[models.CollectorStatus, models.CollectorResult]{
+		Status: func() models.CollectorStatus {
+			return models.CollectorStatus{State: models.CollectorStateRightsizingConnecting}
+		},
+		Work: func(ctx context.Context, r models.CollectorResult) (models.CollectorResult, error) {
+			return r, nil
+		},
+	}
+	unit2 := work.WorkUnit[models.CollectorStatus, models.CollectorResult]{
+		Status: func() models.CollectorStatus {
+			return models.CollectorStatus{State: models.CollectorStateParsing}
+		},
+		Work: func(ctx context.Context, r models.CollectorResult) (models.CollectorResult, error) {
+			return r, nil
+		},
+	}
+
+	f := newCollectorWorkFactory(nil, nil, "", "")
+	f.WithPostCollectionBuilder(func(_ models.Credentials) []collectorWorkUnit {
+		return []collectorWorkUnit{unit1}
+	})
+	f.WithPostCollectionBuilder(func(_ models.Credentials) []collectorWorkUnit {
+		return []collectorWorkUnit{unit2}
+	})
+
+	units := drainBuilder(f.Build(models.Credentials{}))
+
+	// Base 3 + 2 extra + 2 final (save-inventory + collected-event) = 7 total.
+	if len(units) != 7 {
+		t.Fatalf("expected 7 units with two builders, got %d", len(units))
+	}
+
+	// The final unit must still be CollectorStateCollected.
+	last := units[len(units)-1]
+	if s := last.Status(); s.State != models.CollectorStateCollected {
+		t.Errorf("expected last unit status CollectorStateCollected, got %q", s.State)
+	}
+}
+
 // TestEmbedClusterUtilization_Mapping validates that agent models map correctly to inventory models.
 // This is a pure unit test that doesn't require store interaction.
 func TestEmbedClusterUtilization_Mapping(t *testing.T) {
