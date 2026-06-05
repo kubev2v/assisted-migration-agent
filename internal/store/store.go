@@ -5,6 +5,7 @@ import (
 	"database/sql"
 
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
+	pkgstore "github.com/kubev2v/migration-planner/pkg/store"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 )
@@ -21,12 +22,12 @@ type Store struct {
 	outbox        *OutboxStore
 	rightsizing   *RightSizingStore
 	forecast      *ForecastStore
-	transactor    *DBTransactor
+	transactor    pkgstore.Transactor
 }
 
 func NewStore(db *sql.DB, validator duckdb_parser.Validator) *Store {
-	qi := newQueryInterceptor(db)
-	parser := duckdb_parser.New(db, validator)
+	qi := pkgstore.NewQueryInterceptor(db)
+	parser := duckdb_parser.New(qi, validator)
 	return &Store{
 		db:            db,
 		parser:        parser,
@@ -39,7 +40,7 @@ func NewStore(db *sql.DB, validator duckdb_parser.Validator) *Store {
 		outbox:        NewOutboxStore(qi),
 		rightsizing:   NewRightSizingStore(qi),
 		forecast:      NewForecastStore(qi),
-		transactor:    newTransactor(db),
+		transactor:    pkgstore.NewTransactor(db),
 	}
 }
 
@@ -113,8 +114,6 @@ func (s *Store) DB() *sql.DB {
 	return s.db
 }
 
-type QueryInterceptor interface {
-	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
-	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
-	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
-}
+// QueryInterceptor is an alias for the shared store.QueryInterceptor interface.
+// Kept for backward compatibility with existing repository constructors.
+type QueryInterceptor = pkgstore.QueryInterceptor

@@ -3,6 +3,7 @@ package services_test
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/kubev2v/migration-planner/pkg/inventory"
 	. "github.com/onsi/ginkgo/v2"
@@ -489,6 +490,75 @@ var _ = Describe("GroupService", func() {
 			Expect(srvErrors.IsResourceNotFoundError(err)).To(BeTrue())
 			Expect(vms).To(BeEmpty())
 			Expect(total).To(Equal(0))
+		})
+	})
+
+	Context("Atomic Transactions", func() {
+		var (
+			realService *services.GroupService
+		)
+
+		BeforeEach(func() {
+			// Insert minimal DuckDB data required for Parser.BuildInventory
+			_, err := db.ExecContext(ctx, `
+				INSERT INTO about ("InstanceUuid", "APIVersion")
+				VALUES ('test-vcenter-id', '8.0.0')
+			`)
+			Expect(err).NotTo(HaveOccurred())
+
+			_, err = db.ExecContext(ctx, `
+				INSERT INTO vcluster ("Name", "Object ID")
+				VALUES ('production', 'cluster-1')
+			`)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Insert VMs for BuildInventory to process
+			Expect(test.InsertVMs(ctx, db)).To(Succeed())
+
+			// Create service with REAL Parser (no mock inventory builder)
+			// This will use Parser.BuildInventory which needs the DB connection
+			realService = services.NewGroupService(st)
+		})
+
+		// This test demonstrates the deadlock issue when BuildInventory is inside transaction.
+		// BEFORE Stage 4 fix: This test will FAIL with timeout error
+		//   - WithTx holds the only DB connection (SetMaxOpenConns(1))
+		//   - Parser.BuildInventory tries to acquire a connection via p.db
+		//   - No connections available -> DEADLOCK -> timeout
+		// AFTER Stage 4 fix: This test will PASS
+		//   - Parser uses QueryInterceptor -> reuses transaction connection
+		//   - All operations complete atomically
+		It("should handle group creation atomically with real Parser", func() {
+			// Arrange
+			group := models.Group{
+				Name:        "atomic-test-group",
+				Description: "Test atomic transaction behavior",
+				Filter:      "cluster = 'production'",
+			}
+
+			// Act - This will timeout/fail before Stage 4 fix, succeed after
+			ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+			defer cancel()
+
+			created, err := realService.Create(ctx, group)
+
+			// Assert - Expect success (will FAIL before fix, PASS after fix)
+			Expect(err).NotTo(HaveOccurred(), "Group creation should succeed atomically")
+			Expect(created).NotTo(BeNil())
+			Expect(created.ID).To(BeNumerically(">", 0))
+			Expect(created.Inventory).NotTo(BeNil(), "Inventory should be built atomically")
+
+			// Verify all data was committed atomically
+			var groupCount, matchCount int
+			err = db.QueryRowContext(context.Background(),
+				"SELECT COUNT(*) FROM groups WHERE id = ?", created.ID).Scan(&groupCount)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(groupCount).To(Equal(1))
+
+			err = db.QueryRowContext(context.Background(),
+				"SELECT COUNT(*) FROM group_matches WHERE group_id = ?", created.ID).Scan(&matchCount)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(matchCount).To(BeNumerically(">", 0))
 		})
 	})
 })

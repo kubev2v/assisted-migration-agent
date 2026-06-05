@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	sq "github.com/Masterminds/squirrel"
-	"go.uber.org/zap"
 
 	"github.com/kubev2v/migration-planner/pkg/inventory"
 
@@ -125,7 +124,6 @@ func (s *GroupService) ListVirtualMachines(ctx context.Context, id int, params G
 
 func (s *GroupService) Create(ctx context.Context, group models.Group) (*models.Group, error) {
 	var created *models.Group
-	var vmIDs []string
 
 	err := s.store.WithTx(ctx, func(txCtx context.Context) error {
 		var err error
@@ -138,38 +136,32 @@ func (s *GroupService) Create(ctx context.Context, group models.Group) (*models.
 			return err
 		}
 
-		vmIDs, err = s.store.Group().GetMatchedIDs(txCtx, created.ID)
+		vmIDs, err := s.store.Group().GetMatchedIDs(txCtx, created.ID)
 		if err != nil {
 			return fmt.Errorf("getting matched VM IDs: %w", err)
 		}
 
+		inv, err := s.buildGroupInventory(txCtx, vmIDs)
+		if err != nil {
+			return fmt.Errorf("building group inventory: %w", err)
+		}
+
+		if err := s.store.Group().UpdateInventory(txCtx, created.ID, inv); err != nil {
+			return fmt.Errorf("updating group inventory: %w", err)
+		}
+
+		created.Inventory = inv
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: Build inventory outside transaction - DuckDB has SetMaxOpenConns(1), so
-	// BuildInventory needs the connection to be released from the transaction.
-	// This makes the operation non-atomic. See ECOPROJECT-4704 for proper fix.
-	inv, err := s.buildGroupInventory(ctx, vmIDs)
-	if err != nil {
-		zap.S().Named("group_service").Warnw("failed to build group inventory",
-			"group_id", created.ID, "error", err)
-		inv = nil // Clear inventory on error
-	}
-
-	if err := s.store.Group().UpdateInventory(ctx, created.ID, inv); err != nil {
-		return nil, fmt.Errorf("updating group inventory: %w", err)
-	}
-
-	created.Inventory = inv
 	return created, nil
 }
 
 func (s *GroupService) Update(ctx context.Context, id int, group models.Group) (*models.Group, error) {
 	var updated *models.Group
-	var vmIDs []string
 
 	err := s.store.WithTx(ctx, func(txCtx context.Context) error {
 		var err error
@@ -182,32 +174,27 @@ func (s *GroupService) Update(ctx context.Context, id int, group models.Group) (
 			return err
 		}
 
-		vmIDs, err = s.store.Group().GetMatchedIDs(txCtx, id)
+		vmIDs, err := s.store.Group().GetMatchedIDs(txCtx, id)
 		if err != nil {
 			return fmt.Errorf("getting matched VM IDs: %w", err)
 		}
 
+		inv, err := s.buildGroupInventory(txCtx, vmIDs)
+		if err != nil {
+			return fmt.Errorf("building group inventory: %w", err)
+		}
+
+		if err := s.store.Group().UpdateInventory(txCtx, id, inv); err != nil {
+			return fmt.Errorf("updating group inventory: %w", err)
+		}
+
+		updated.Inventory = inv
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: Build inventory outside transaction - DuckDB has SetMaxOpenConns(1), so
-	// BuildInventory needs the connection to be released from the transaction.
-	// This makes the operation non-atomic. See ECOPROJECT-4704 for proper fix.
-	inv, err := s.buildGroupInventory(ctx, vmIDs)
-	if err != nil {
-		zap.S().Named("group_service").Warnw("failed to rebuild group inventory",
-			"group_id", id, "error", err)
-		inv = nil // Clear inventory on error to avoid stale data
-	}
-
-	if err := s.store.Group().UpdateInventory(ctx, id, inv); err != nil {
-		return nil, fmt.Errorf("updating group inventory: %w", err)
-	}
-
-	updated.Inventory = inv
 	return updated, nil
 }
 
