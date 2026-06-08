@@ -271,6 +271,7 @@ func (s *RightSizingStore) clusterUtilizationRows(ctx context.Context, reportID,
 		Where(sq.Eq{"report_id": reportID}).
 		Where(sq.NotEq{"cluster_name": nil}).
 		Where(sq.NotEq{"cluster_id": nil}).
+		Where("moid NOT IN (SELECT \"VM ID\" FROM vinfo WHERE \"migration_excluded\" = TRUE)").
 		GroupBy("cluster_id", "cluster_name").
 		OrderBy("cluster_name")
 
