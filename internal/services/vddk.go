@@ -192,13 +192,20 @@ func extractTarGz(r io.Reader, destDir string) error {
 			if parentDir != destDir {
 				resolvedParent, err := filepath.EvalSymlinks(parentDir)
 				if err == nil {
+					// Resolve symlinks in destDir as well for proper comparison
+					// (e.g., on macOS /var is a symlink to /private/var)
+					resolvedDest := destDir
+					if rd, err := filepath.EvalSymlinks(destDir); err == nil {
+						resolvedDest = rd
+					}
+
 					// Parent exists - verify resolved path is still strictly inside destDir.
 					// If it resolves to destDir itself, that means a symlink has traversed
 					// back to the root, which indicates an escape attempt.
-					if filepath.Clean(resolvedParent) == filepath.Clean(destDir) {
+					if filepath.Clean(resolvedParent) == filepath.Clean(resolvedDest) {
 						return fmt.Errorf("symlink escape detected: %s resolves to %s (root)", parentDir, resolvedParent)
 					}
-					if !pathInsideDest(destDir, resolvedParent) {
+					if !pathInsideDest(resolvedDest, resolvedParent) {
 						return fmt.Errorf("symlink escape detected: %s resolves to %s", parentDir, resolvedParent)
 					}
 				}
