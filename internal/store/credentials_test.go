@@ -252,4 +252,52 @@ var _ = Describe("CredentialsStore", func() {
 			Expect(kept.Username).To(Equal("k"))
 		})
 	})
+
+	Context("SkipTLS and CACert persistence", func() {
+		// Given credentials with SkipTLS=true are saved
+		// When they are retrieved
+		// Then SkipTLS must be true
+		It("should round-trip SkipTLS=true", func() {
+			// Arrange
+			creds := models.Credentials{
+				URL:      "https://vc.local/sdk",
+				Username: "user",
+				Password: "pass",
+				SkipTLS:  true,
+			}
+			Expect(s.Credentials().Save(ctx, "vc-skip-tls", creds)).To(Succeed())
+
+			// Act
+			retrieved, err := s.Credentials().Get(ctx, "vc-skip-tls")
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(retrieved.SkipTLS).To(BeTrue())
+			Expect(retrieved.URL).To(Equal(creds.URL))
+			Expect(retrieved.Username).To(Equal(creds.Username))
+			Expect(retrieved.Password).To(Equal(creds.Password))
+		})
+
+		// Given credentials with a non-empty CACert are saved
+		// When they are retrieved
+		// Then CACert must equal what was saved
+		It("should round-trip CACert", func() {
+			// Arrange
+			pemCert := []byte("-----BEGIN CERTIFICATE-----\nMIIDXTCCAsag...\n-----END CERTIFICATE-----")
+			creds := models.Credentials{
+				URL:      "https://vc.local/sdk",
+				Username: "user",
+				Password: "pass",
+				CACert:   pemCert,
+			}
+			Expect(s.Credentials().Save(ctx, "vc-cacert", creds)).To(Succeed())
+
+			// Act
+			retrieved, err := s.Credentials().Get(ctx, "vc-cacert")
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(retrieved.CACert).To(Equal(pemCert))
+		})
+	})
 })

@@ -168,6 +168,8 @@ func (c *Crypto) Encrypt(hash []byte, creds models.Credentials) (models.Credenti
 		URL:      creds.URL,
 		Username: encUsername,
 		Password: encPassword,
+		SkipTLS:  creds.SkipTLS,
+		CACert:   creds.CACert,
 	}, nil
 }
 
@@ -186,6 +188,8 @@ func (c *Crypto) Decrypt(hash []byte, creds models.Credentials) (models.Credenti
 		URL:      creds.URL,
 		Username: username,
 		Password: pw,
+		SkipTLS:  creds.SkipTLS,
+		CACert:   creds.CACert,
 	}, nil
 }
 

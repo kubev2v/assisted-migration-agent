@@ -18,6 +18,8 @@ const (
 	credentialsColURL      = "url"
 	credentialsColUsername = "username"
 	credentialsColPassword = "password"
+	credentialsColSkipTLS  = "skip_tls"
+	credentialsColCACert   = "ca_cert"
 
 	masterPasswordTable       = "master_password"
 	masterPasswordColPassword = "password"
@@ -59,7 +61,7 @@ func (s *CredentialsStore) List(ctx context.Context) ([]string, error) {
 }
 
 func (s *CredentialsStore) Get(ctx context.Context, id string) (models.Credentials, error) {
-	query, args, err := sq.Select(credentialsColURL, credentialsColUsername, credentialsColPassword).
+	query, args, err := sq.Select(credentialsColURL, credentialsColUsername, credentialsColPassword, credentialsColSkipTLS, credentialsColCACert).
 		From(credentialsTable).
 		Where(sq.Eq{credentialsColID: id}).
 		ToSql()
@@ -69,12 +71,16 @@ func (s *CredentialsStore) Get(ctx context.Context, id string) (models.Credentia
 
 	row := s.db.QueryRowContext(ctx, query, args...)
 	var creds models.Credentials
-	err = row.Scan(&creds.URL, &creds.Username, &creds.Password)
+	var caCert string
+	err = row.Scan(&creds.URL, &creds.Username, &creds.Password, &creds.SkipTLS, &caCert)
 	if errors.Is(err, sql.ErrNoRows) {
 		return models.Credentials{}, srvErrors.NewCredentialsNotFoundError(id)
 	}
 	if err != nil {
 		return models.Credentials{}, fmt.Errorf("scanning credentials: %w", err)
+	}
+	if caCert != "" {
+		creds.CACert = []byte(caCert)
 	}
 
 	return creds, nil
@@ -82,9 +88,9 @@ func (s *CredentialsStore) Get(ctx context.Context, id string) (models.Credentia
 
 func (s *CredentialsStore) Save(ctx context.Context, id string, creds models.Credentials) error {
 	query, args, err := sq.Insert(credentialsTable).
-		Columns(credentialsColID, credentialsColURL, credentialsColUsername, credentialsColPassword).
-		Values(id, creds.URL, creds.Username, creds.Password).
-		Suffix("ON CONFLICT (id) DO UPDATE SET url = EXCLUDED.url, username = EXCLUDED.username, password = EXCLUDED.password").
+		Columns(credentialsColID, credentialsColURL, credentialsColUsername, credentialsColPassword, credentialsColSkipTLS, credentialsColCACert).
+		Values(id, creds.URL, creds.Username, creds.Password, creds.SkipTLS, string(creds.CACert)).
+		Suffix("ON CONFLICT (id) DO UPDATE SET url = EXCLUDED.url, username = EXCLUDED.username, password = EXCLUDED.password, skip_tls = EXCLUDED.skip_tls, ca_cert = EXCLUDED.ca_cert").
 		ToSql()
 	if err != nil {
 		return fmt.Errorf("building save query: %w", err)

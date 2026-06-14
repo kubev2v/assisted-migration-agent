@@ -241,4 +241,52 @@ var _ = Describe("Crypto", func() {
 			Expect(decrypted).To(Equal(original))
 		})
 	})
+
+	Context("SkipTLS and CACert pass-through", func() {
+		// Given credentials with SkipTLS=true
+		// When we encrypt and then decrypt
+		// Then SkipTLS must survive the round-trip unchanged
+		It("should round-trip SkipTLS=true through Encrypt/Decrypt", func() {
+			// Arrange
+			original := models.Credentials{
+				URL:      "https://vc.local/sdk",
+				Username: "admin",
+				Password: "pass",
+				SkipTLS:  true,
+			}
+			key := c.Hash256("master-key")
+
+			// Act
+			encrypted, err := c.Encrypt(key, original)
+			Expect(err).NotTo(HaveOccurred())
+			decrypted, err := c.Decrypt(key, encrypted)
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(decrypted).To(Equal(original))
+		})
+
+		// Given credentials with a non-empty CACert
+		// When we encrypt and then decrypt
+		// Then CACert must survive the round-trip unchanged
+		It("should round-trip CACert through Encrypt/Decrypt", func() {
+			// Arrange
+			original := models.Credentials{
+				URL:      "https://vc.local/sdk",
+				Username: "admin",
+				Password: "pass",
+				CACert:   []byte("-----BEGIN CERTIFICATE-----\nMIIDXTCCAsag...\n-----END CERTIFICATE-----"),
+			}
+			key := c.Hash256("master-key")
+
+			// Act
+			encrypted, err := c.Encrypt(key, original)
+			Expect(err).NotTo(HaveOccurred())
+			decrypted, err := c.Decrypt(key, encrypted)
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(decrypted).To(Equal(original))
+		})
+	})
 })

@@ -127,6 +127,20 @@ var _ = Describe("Migrations", func() {
 		})
 
 		// Given migrations have been applied
+		// When we insert a row into credentials using the new columns
+		// Then it should succeed, confirming skip_tls and ca_cert exist
+		It("should add skip_tls and ca_cert columns to credentials table", func() {
+			err := migrations.Run(ctx, db)
+			Expect(err).NotTo(HaveOccurred())
+
+			_, err = db.ExecContext(ctx, `
+				INSERT INTO credentials (id, url, username, password, skip_tls, ca_cert)
+				VALUES ('test-tls', 'https://vc.local', 'u', 'p', true, 'cert')
+			`)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		// Given migrations have been applied
 		// When we check the vm_inspection_status table
 		// Then it should exist and accept inserts
 		It("should create vm_inspection_status table", func() {
