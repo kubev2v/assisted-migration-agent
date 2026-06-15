@@ -91,6 +91,7 @@ func (s *VMStore) List(ctx context.Context, filter sq.Sqlizer, opts ...ListOptio
 			&vm.DiskSize,
 			&vm.IssueCount,
 			&vm.InspectionStatus.State,
+			&vm.InspectionStatus.Details,
 			&vm.IsTemplate,
 			&vm.IsMigratable,
 			&sqlErr,

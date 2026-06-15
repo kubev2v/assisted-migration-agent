@@ -16,6 +16,7 @@ const (
 	inspectionColVmID     = `"VM ID"`
 	inspectionColStatus   = "status"
 	inspectionColError    = "error"
+	inspectionColDetails  = "details"
 	inspectionColSequence = "sequence"
 )
 
@@ -47,11 +48,12 @@ func (s *InspectionStore) Update(ctx context.Context, vmID string, status models
 	}
 
 	query, args, err := sq.Insert(inspectionTable).
-		Columns(inspectionColVmID, inspectionColStatus, inspectionColError).
-		Values(vmID, status.State.Value(), errStr).
+		Columns(inspectionColVmID, inspectionColStatus, inspectionColError, inspectionColDetails).
+		Values(vmID, status.State.Value(), errStr, status.Details).
 		Suffix("ON CONFLICT (" + inspectionColVmID + ") DO UPDATE SET " +
 			inspectionColStatus + " = EXCLUDED." + inspectionColStatus + ", " +
-			inspectionColError + " = EXCLUDED." + inspectionColError).
+			inspectionColError + " = EXCLUDED." + inspectionColError + ", " +
+			inspectionColDetails + " = EXCLUDED." + inspectionColDetails).
 		ToSql()
 	if err != nil {
 		return fmt.Errorf("building update query for vm %s: %w", vmID, err)

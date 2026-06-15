@@ -172,6 +172,7 @@ var vmOutputQuery = sq.Select(
 	`COALESCE(d.total_disk, 0) AS disk_size`,
 	`COALESCE(c.issues_count, 0) AS issue_count`,
 	`COALESCE(i.status, 'not_started') AS status`,
+	`COALESCE(i.details, '') AS details`,
 	`v."Template" as template`,
 	`COALESCE(crit.critical_count, 0) = 0 AS migratable`,
 	`COALESCE(i.error, '') AS error`,

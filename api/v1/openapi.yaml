@@ -1256,6 +1256,7 @@ components:
       type: object
       required:
         - state
+        - message
       properties:
         state:
           type: string
@@ -1272,6 +1273,9 @@ components:
             - VmInspectionStatusStateCanceled
             - VmInspectionStatusStateError
           description: Current inspection state
+        message:
+          type: string
+          description: State details 
         error:
           type: string
           description: Error message when state is error

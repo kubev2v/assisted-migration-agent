@@ -35,12 +35,17 @@ func (i InspectionState) Value() string {
 
 // InspectionStatus holds the current Inspection state for a vm.
 type InspectionStatus struct {
-	State InspectionState
-	Error error
+	State   InspectionState
+	Details string
+	Error   error
 }
 
 // InspectionResult is the shared result struct threaded through inspection work units.
+// Completed is false by default; the last work unit sets it to true on success.
+// Finalize uses it to distinguish cancel (pipeline stopped before last unit) from completion.
 type InspectionResult struct {
+	Err        error
+	Completed  bool
 	SnapshotID string
 	Concerns   []VmInspectionConcern
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -43,7 +44,7 @@ var _ = Describe("Pipeline2", func() {
 			units := []work.WorkUnit[string, int]{
 				unit("step", func(_ context.Context, r int) (int, error) { return r, nil }),
 			}
-			p := work.NewPipeline2[string, int](nil, wb(units...))
+			p := work.NewPipeline2[string, int](nil, newTestBuilder(nil, units...))
 
 			_, err := p.Start()
 
@@ -62,7 +63,7 @@ var _ = Describe("Pipeline2", func() {
 				}),
 			}
 
-			p := work.NewPipeline2(sched, wb(units...))
+			p := work.NewPipeline2(sched, newTestBuilder(nil, units...))
 			_, err := p.Start()
 			Expect(err).NotTo(HaveOccurred())
 
@@ -74,12 +75,12 @@ var _ = Describe("Pipeline2", func() {
 		})
 
 		It("should close the channel when no units are provided", func() {
-			p := work.NewPipeline2(sched, wb())
+			p := work.NewPipeline2(sched, newTestBuilder(nil))
 
-			c, err := p.Start()
+			ticks, err := p.Start()
 			Expect(err).NotTo(HaveOccurred())
 
-			Eventually(c).Should(BeClosed())
+			Eventually(ticks).Should(BeClosed())
 		})
 	})
 
@@ -91,25 +92,23 @@ var _ = Describe("Pipeline2", func() {
 				unit("mul-2", func(_ context.Context, r int) (int, error) { return r * 2, nil }),
 			}
 
-			p := work.NewPipeline2(sched, wb(units...))
-			c, err := p.Start()
+			p := work.NewPipeline2(sched, newTestBuilder(nil, units...))
+			ticks, err := p.Start()
 			Expect(err).NotTo(HaveOccurred())
 
-			var statuses []work.Status[string, int]
-			for s := range c {
-				statuses = append(statuses, s)
+			var count int
+			for range ticks {
+				count++
 			}
 
-			Expect(statuses).To(HaveLen(3))
-			Expect(statuses[0].State).To(Equal("add-1"))
-			Expect(statuses[0].Result).To(Equal(1))
-			Expect(statuses[1].State).To(Equal("add-10"))
-			Expect(statuses[1].Result).To(Equal(11))
-			Expect(statuses[2].State).To(Equal("mul-2"))
-			Expect(statuses[2].Result).To(Equal(22))
+			Expect(count).To(Equal(3))
+
+			result, pErr := p.Result()
+			Expect(pErr).NotTo(HaveOccurred())
+			Expect(result).To(Equal(22))
 		})
 
-		It("should stop on first error and report it", func() {
+		It("should stop on first error and report it with extra error tick", func() {
 			expectedErr := errors.New("unit-2 failed")
 
 			units := []work.WorkUnit[string, int]{
@@ -118,24 +117,24 @@ var _ = Describe("Pipeline2", func() {
 				unit("never", func(_ context.Context, r int) (int, error) { return r, nil }),
 			}
 
-			p := work.NewPipeline2(sched, wb(units...))
-			c, err := p.Start()
+			p := work.NewPipeline2(sched, newTestBuilder(nil, units...))
+			ticks, err := p.Start()
 			Expect(err).NotTo(HaveOccurred())
 
-			var statuses []work.Status[string, int]
-			for s := range c {
-				statuses = append(statuses, s)
+			var count int
+			for range ticks {
+				count++
 			}
 
-			Expect(statuses).To(HaveLen(2))
-			Expect(statuses[0].State).To(Equal("ok"))
-			Expect(statuses[1].Err).To(MatchError(expectedErr))
+			Expect(count).To(Equal(3), "expected 2 normal ticks + 1 error tick")
+			_, pErr := p.Result()
+			Expect(pErr).To(MatchError(expectedErr))
 		})
 	})
 
 	Context("Stop", func() {
 		It("should be safe to call when not running", func() {
-			p := work.NewPipeline2(sched, wb())
+			p := work.NewPipeline2(sched, newTestBuilder(nil))
 			Expect(func() { p.Stop() }).NotTo(Panic())
 		})
 
@@ -155,13 +154,15 @@ var _ = Describe("Pipeline2", func() {
 				}),
 			}
 
-			p := work.NewPipeline2(sched, wb(units...))
-			c, err := p.Start()
+			p := work.NewPipeline2(sched, newTestBuilder(nil, units...))
+			ticks, err := p.Start()
 			Expect(err).NotTo(HaveOccurred())
 
+			<-ticks
 			p.Stop()
 
-			Eventually(c).Should(BeClosed())
+			Eventually(ticks).Should(BeClosed())
+			Expect(p.State()).To(Equal("blocking"))
 		})
 
 		It("should not deadlock when stop races with natural completion", func() {
@@ -169,12 +170,11 @@ var _ = Describe("Pipeline2", func() {
 				unit("fast", func(_ context.Context, r int) (int, error) { return r + 1, nil }),
 			}
 
-			p := work.NewPipeline2(sched, wb(units...))
-			c, _ := p.Start()
+			p := work.NewPipeline2(sched, newTestBuilder(nil, units...))
+			ticks, _ := p.Start()
 
-			// drain so pipeline can advance
 			go func() {
-				for range c {
+				for range ticks {
 				}
 			}()
 
@@ -206,19 +206,18 @@ var _ = Describe("Pipeline2", func() {
 					unit("step-b", func(_ context.Context, r int) (int, error) { return r + 1, nil }),
 				}
 
-				p := work.NewPipeline2(multiSched, wb(units...))
-				c, err := p.Start()
+				p := work.NewPipeline2(multiSched, newTestBuilder(nil, units...))
+				ticks, err := p.Start()
 				Expect(err).NotTo(HaveOccurred())
 
-				go func(idx int, c chan work.Status[string, int]) {
+				go func(idx int, ticks chan struct{}, p *work.Pipeline2[string, int]) {
 					defer wg.Done()
 					defer GinkgoRecover()
-					var last work.Status[string, int]
-					for s := range c {
-						last = s
+					for range ticks {
 					}
-					results[idx] = last.Result
-				}(i, c)
+					result, _ := p.Result()
+					results[idx] = result
+				}(i, ticks, p)
 			}
 
 			wg.Wait()
@@ -243,10 +242,10 @@ var _ = Describe("Pipeline2", func() {
 				}),
 			}
 
-			p := work.NewPipeline2(stressSched, wb(units...))
-			c, _ := p.Start()
+			p := work.NewPipeline2(stressSched, newTestBuilder(nil, units...))
+			ticks, _ := p.Start()
 			go func() {
-				for range c {
+				for range ticks {
 				}
 			}()
 
@@ -268,6 +267,154 @@ var _ = Describe("Pipeline2", func() {
 				close(waitCh)
 			}()
 			Eventually(waitCh, 10*time.Second).Should(BeClosed())
+		})
+	})
+
+	Context("Finalize", func() {
+		It("should call Finalize with the accumulated result", func() {
+			finalizeSched := newScheduler(1, 1)
+			defer finalizeSched.Close()
+
+			var receivedResult atomic.Int64
+			units := []work.WorkUnit[string, int]{
+				unit("add-100", func(_ context.Context, r int) (int, error) { return r + 100, nil }),
+				unit("add-1", func(_ context.Context, r int) (int, error) { return r + 1, nil }),
+			}
+
+			p := work.NewPipeline2(finalizeSched, newTestBuilder(
+				func(_ context.Context, result int) error {
+					receivedResult.Store(int64(result))
+					return nil
+				}, units...))
+			ticks, err := p.Start()
+			Expect(err).NotTo(HaveOccurred())
+
+			for range ticks {
+			}
+
+			Expect(receivedResult.Load()).To(Equal(int64(101)))
+		})
+
+		It("should surface Finalize error via Result", func() {
+			finalizeSched := newScheduler(1, 1)
+			defer finalizeSched.Close()
+
+			units := []work.WorkUnit[string, int]{
+				unit("ok", func(_ context.Context, r int) (int, error) { return r + 1, nil }),
+			}
+
+			p := work.NewPipeline2(finalizeSched, newTestBuilder(
+				func(_ context.Context, _ int) error {
+					return errors.New("finalize boom")
+				}, units...))
+			ticks, err := p.Start()
+			Expect(err).NotTo(HaveOccurred())
+
+			for range ticks {
+			}
+
+			_, pErr := p.Result()
+			Expect(pErr).To(MatchError("finalize boom"))
+		})
+
+		It("should run Finalize when stopped mid-pipeline", func() {
+			finalizeSched := newScheduler(1, 1)
+			defer finalizeSched.Close()
+
+			var finalized atomic.Bool
+			gate := make(chan struct{})
+			units := []work.WorkUnit[string, int]{
+				unit("blocking", func(ctx context.Context, r int) (int, error) {
+					select {
+					case <-gate:
+						return r + 1, nil
+					case <-ctx.Done():
+						return r, ctx.Err()
+					}
+				}),
+			}
+
+			p := work.NewPipeline2(finalizeSched, newTestBuilder(
+				func(_ context.Context, _ int) error {
+					finalized.Store(true)
+					return nil
+				}, units...))
+			ticks, err := p.Start()
+			Expect(err).NotTo(HaveOccurred())
+
+			<-ticks
+			p.Stop()
+
+			Eventually(ticks).Should(BeClosed())
+			Expect(finalized.Load()).To(BeTrue())
+		})
+
+		It("should run Finalize when a work unit errors", func() {
+			finalizeSched := newScheduler(1, 1)
+			defer finalizeSched.Close()
+
+			var finalized atomic.Bool
+			units := []work.WorkUnit[string, int]{
+				unit("boom", func(_ context.Context, _ int) (int, error) {
+					return 0, errors.New("work failed")
+				}),
+			}
+
+			p := work.NewPipeline2(finalizeSched, newTestBuilder(
+				func(_ context.Context, _ int) error {
+					finalized.Store(true)
+					return nil
+				}, units...))
+			ticks, err := p.Start()
+			Expect(err).NotTo(HaveOccurred())
+
+			for range ticks {
+			}
+
+			Expect(finalized.Load()).To(BeTrue())
+			_, pErr := p.Result()
+			Expect(pErr).To(MatchError("work failed"))
+		})
+	})
+
+	Context("State", func() {
+		It("should reflect state transitions at tick boundaries across multiple units", func() {
+			finalizeSched := newScheduler(1, 1)
+			defer finalizeSched.Close()
+
+			gates := [3]chan struct{}{make(chan struct{}), make(chan struct{}), make(chan struct{})}
+			names := [3]string{"step-1", "step-2", "step-3"}
+
+			units := make([]work.WorkUnit[string, int], 3)
+			for i := range 3 {
+				gate := gates[i]
+				offset := (i + 1) * 10
+				units[i] = unit(names[i], func(ctx context.Context, r int) (int, error) {
+					select {
+					case <-gate:
+						return r + offset, nil
+					case <-ctx.Done():
+						return r, ctx.Err()
+					}
+				})
+			}
+
+			p := work.NewPipeline2(finalizeSched, newTestBuilder(nil, units...))
+			ticks, err := p.Start()
+			Expect(err).NotTo(HaveOccurred())
+
+			for i := range 3 {
+				<-ticks
+				Expect(p.State()).To(Equal(names[i]))
+				close(gates[i])
+			}
+
+			for range ticks {
+			}
+
+			result, pErr := p.Result()
+			Expect(pErr).NotTo(HaveOccurred())
+			Expect(result).To(Equal(60))
 		})
 	})
 })

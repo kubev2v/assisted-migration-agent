@@ -57,15 +57,13 @@ var _ = Describe("Pool2", func() {
 			Expect(pool.Start()).To(Succeed())
 			Eventually(pool.IsRunning).Should(BeFalse())
 
-			stateA, err := pool.State("a")
+			resultA, err := pool.Result("a")
 			Expect(err).NotTo(HaveOccurred())
-			Expect(stateA.Err).NotTo(HaveOccurred())
-			Expect(stateA.Result).To(Equal(101))
+			Expect(resultA).To(Equal(101))
 
-			stateB, err := pool.State("b")
+			resultB, err := pool.Result("b")
 			Expect(err).NotTo(HaveOccurred())
-			Expect(stateB.Err).NotTo(HaveOccurred())
-			Expect(stateB.Result).To(Equal(202))
+			Expect(resultB).To(Equal(202))
 		})
 
 		It("should return error on double start", func() {
@@ -77,6 +75,7 @@ var _ = Describe("Pool2", func() {
 
 			pool := work.NewPool2[string, int](builders)
 			Expect(pool.Start()).To(Succeed())
+			defer func() { _ = pool.Stop() }()
 
 			err := pool.Start()
 			Expect(err).To(MatchError("service already started"))
@@ -96,14 +95,12 @@ var _ = Describe("Pool2", func() {
 			Expect(pool.Start()).To(Succeed())
 			Eventually(pool.IsRunning).Should(BeFalse())
 
-			stateFail, err := pool.State("fail")
-			Expect(err).NotTo(HaveOccurred())
-			Expect(stateFail.Err).To(MatchError("boom"))
+			_, errFail := pool.Result("fail")
+			Expect(errFail).To(MatchError("boom"))
 
-			stateOk, err := pool.State("ok")
-			Expect(err).NotTo(HaveOccurred())
-			Expect(stateOk.Err).NotTo(HaveOccurred())
-			Expect(stateOk.Result).To(Equal(42))
+			resultOk, errOk := pool.Result("ok")
+			Expect(errOk).NotTo(HaveOccurred())
+			Expect(resultOk).To(Equal(42))
 		})
 	})
 
@@ -131,21 +128,23 @@ var _ = Describe("Pool2", func() {
 			Expect(pool.Start()).To(Succeed())
 
 			Eventually(func() int {
-				s, _ := pool.State("fast")
-				return s.Result
+				r, _ := pool.Result("fast")
+				return r
 			}).Should(Equal(10))
 
-			stateSlow := pool.Cancel("slow")
-			Expect(stateSlow.Result).To(Equal(0))
+			_, err := pool.Cancel("slow")
+			Expect(err).NotTo(HaveOccurred())
+
+			resultSlow, _ := pool.Result("slow")
+			Expect(resultSlow).To(Equal(0))
 			Eventually(pool.IsRunning).Should(BeFalse())
 
-			stateFast, err := pool.State("fast")
-			Expect(err).NotTo(HaveOccurred())
-			Expect(stateFast.Err).NotTo(HaveOccurred())
-			Expect(stateFast.Result).To(Equal(10))
+			resultFast, errFast := pool.Result("fast")
+			Expect(errFast).NotTo(HaveOccurred())
+			Expect(resultFast).To(Equal(10))
 		})
 
-		It("should return the final status including finalize result", func() {
+		It("should return the final status including finalize error", func() {
 			builders := map[string]work.WorkBuilder2[string, int]{
 				"a": newTestBuilder(
 					func(_ context.Context, _ int) error { return errors.New("finalize failed") },
@@ -162,12 +161,46 @@ var _ = Describe("Pool2", func() {
 
 			Eventually(func() string {
 				s, _ := pool.State("a")
-				return s.State
-			}).Should(Equal("step-1"))
+				return s
+			}).Should(Equal("blocking"))
 
-			status := pool.Cancel("a")
-			Expect(status.Err).To(MatchError("finalize failed"))
-			Expect(status.Result).To(Equal(5))
+			_, err := pool.Cancel("a")
+			Expect(err).NotTo(HaveOccurred())
+
+			_, resultErr := pool.Result("a")
+			Expect(resultErr).To(MatchError("finalize failed"))
+		})
+
+		It("should return error for unknown key", func() {
+			builders := map[string]work.WorkBuilder2[string, int]{
+				"a": newTestBuilder(nil,
+					unit("s", func(_ context.Context, r int) (int, error) { return r, nil }),
+				),
+			}
+
+			pool := work.NewPool2[string, int](builders)
+			Expect(pool.Start()).To(Succeed())
+			Eventually(pool.IsRunning).Should(BeFalse())
+
+			_, err := pool.Cancel("nonexistent")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("unknown key"))
+		})
+
+		It("should return state for already-done pipeline without calling Stop", func() {
+			builders := map[string]work.WorkBuilder2[string, int]{
+				"a": newTestBuilder(nil,
+					unit("add-1", func(_ context.Context, r int) (int, error) { return r + 1, nil }),
+				),
+			}
+
+			pool := work.NewPool2[string, int](builders)
+			Expect(pool.Start()).To(Succeed())
+			Eventually(pool.IsRunning).Should(BeFalse())
+
+			state, err := pool.Cancel("a")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(state).To(Equal("add-1"))
 		})
 	})
 
@@ -206,15 +239,23 @@ var _ = Describe("Pool2", func() {
 		})
 
 		It("should not block when called twice", func() {
+			gate := make(chan struct{})
+
 			builders := map[string]work.WorkBuilder2[string, int]{
 				"a": newTestBuilder(nil,
-					unit("fast", func(_ context.Context, r int) (int, error) { return r + 1, nil }),
+					unit("blocking", func(ctx context.Context, r int) (int, error) {
+						select {
+						case <-gate:
+							return r + 1, nil
+						case <-ctx.Done():
+							return r, ctx.Err()
+						}
+					}),
 				),
 			}
 
 			pool := work.NewPool2[string, int](builders)
 			Expect(pool.Start()).To(Succeed())
-			Eventually(pool.IsRunning).Should(BeFalse())
 
 			Expect(pool.Stop()).To(BeNil())
 
@@ -266,15 +307,33 @@ var _ = Describe("Pool2", func() {
 
 			Eventually(func() string {
 				s, _ := pool.State("a")
-				return s.State
-			}).Should(Equal("step-1"))
+				return s
+			}).Should(Equal("step-2"))
 
 			close(gate)
 			Eventually(pool.IsRunning).Should(BeFalse())
 
-			state, err := pool.State("a")
+			result, err := pool.Result("a")
 			Expect(err).NotTo(HaveOccurred())
-			Expect(state.Result).To(Equal(11))
+			Expect(result).To(Equal(11))
+		})
+	})
+
+	Context("Result", func() {
+		It("should return error for unknown key", func() {
+			builders := map[string]work.WorkBuilder2[string, int]{
+				"a": newTestBuilder(nil,
+					unit("s", func(_ context.Context, r int) (int, error) { return r, nil }),
+				),
+			}
+
+			pool := work.NewPool2[string, int](builders)
+			Expect(pool.Start()).To(Succeed())
+			Eventually(pool.IsRunning).Should(BeFalse())
+
+			_, err := pool.Result("nonexistent")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("unknown key"))
 		})
 	})
 
@@ -339,8 +398,11 @@ var _ = Describe("Pool2", func() {
 			pool := work.NewPool2[string, int](builders)
 			Expect(pool.Start()).To(Succeed())
 
-			status := pool.Cancel("slow")
-			Expect(status.Result).To(Equal(0))
+			_, err := pool.Cancel("slow")
+			Expect(err).NotTo(HaveOccurred())
+
+			resultSlow, _ := pool.Result("slow")
+			Expect(resultSlow).To(Equal(0))
 			Eventually(pool.IsRunning).Should(BeFalse())
 
 			Expect(finalized.Load()).To(BeTrue())
@@ -357,9 +419,9 @@ var _ = Describe("Pool2", func() {
 			Expect(pool.Start()).To(Succeed())
 			Eventually(pool.IsRunning).Should(BeFalse())
 
-			state, err := pool.State("a")
+			result, err := pool.Result("a")
 			Expect(err).NotTo(HaveOccurred())
-			Expect(state.Result).To(Equal(1))
+			Expect(result).To(Equal(1))
 		})
 
 		It("should pass the final result to finalize", func() {
@@ -383,7 +445,7 @@ var _ = Describe("Pool2", func() {
 			Expect(receivedResult.Load()).To(Equal(int64(101)))
 		})
 
-		It("should surface finalize error via State", func() {
+		It("should surface finalize error via Result", func() {
 			builders := map[string]work.WorkBuilder2[string, int]{
 				"a": newTestBuilder(
 					func(_ context.Context, _ int) error { return errors.New("finalize failed") },
@@ -395,9 +457,8 @@ var _ = Describe("Pool2", func() {
 			Expect(pool.Start()).To(Succeed())
 			Eventually(pool.IsRunning).Should(BeFalse())
 
-			state, err := pool.State("a")
-			Expect(err).NotTo(HaveOccurred())
-			Expect(state.Err).To(MatchError("finalize failed"))
+			_, err := pool.Result("a")
+			Expect(err).To(MatchError("finalize failed"))
 		})
 	})
 
@@ -450,10 +511,14 @@ var _ = Describe("Pool2", func() {
 					return nil
 				})
 			Expect(pool.Start()).To(Succeed())
+			Eventually(pool.IsRunning).Should(BeFalse())
 
 			Expect(pool.Stop()).To(BeNil())
 
 			Expect(generalCalled.Load()).To(BeTrue())
+
+			_, errFail := pool.Result("fail")
+			Expect(errFail).To(MatchError("boom"))
 		})
 
 		It("should not run pool finalize if not set", func() {
@@ -550,7 +615,7 @@ var _ = Describe("Pool2", func() {
 				go func() {
 					defer wg.Done()
 					defer GinkgoRecover()
-					pool.Cancel("a")
+					_, _ = pool.Cancel("a")
 				}()
 			}
 

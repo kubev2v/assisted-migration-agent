@@ -15,6 +15,7 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
+	"github.com/kubev2v/assisted-migration-agent/pkg/work"
 	"github.com/kubev2v/assisted-migration-agent/test"
 )
 
@@ -29,18 +30,47 @@ func getVCenterCredentials() models.Credentials {
 	}
 }
 
-// mockInspectionStep implements services.InspectionWorkUnit for tests.
-type mockInspectionStep struct {
-	status models.InspectionStatus
-	work   func(ctx context.Context, result models.InspectionResult) (models.InspectionResult, error)
+// testInspectionBuilder implements work.WorkBuilder2 for inspector-level tests.
+type testInspectionBuilder struct {
+	units      []work.WorkUnit[models.InspectionStatus, models.InspectionResult]
+	idx        int
+	vmID       string
+	st         *store.Store
+	finalizeFn func(ctx context.Context, result models.InspectionResult) error
 }
 
-func (s *mockInspectionStep) Status() models.InspectionStatus { return s.status }
-func (s *mockInspectionStep) Work(ctx context.Context, result models.InspectionResult) (models.InspectionResult, error) {
-	return s.work(ctx, result)
+func (b *testInspectionBuilder) Next() (work.WorkUnit[models.InspectionStatus, models.InspectionResult], bool) {
+	if b.idx >= len(b.units) {
+		return work.WorkUnit[models.InspectionStatus, models.InspectionResult]{}, false
+	}
+	u := b.units[b.idx]
+	b.idx++
+	return u, true
 }
 
-// mockInspectionBuilder provides a configurable inspectionWorkBuilder for tests (per-VM inspection work units).
+func (b *testInspectionBuilder) Finalize(ctx context.Context, result models.InspectionResult) error {
+	if b.finalizeFn != nil {
+		return b.finalizeFn(ctx, result)
+	}
+
+	var status models.InspectionStatus
+	switch {
+	case result.Err != nil:
+		status = models.InspectionStatus{State: models.InspectionStateError, Error: result.Err}
+	case result.Completed:
+		status = models.InspectionStatus{State: models.InspectionStateCompleted}
+	default:
+		status = models.InspectionStatus{State: models.InspectionStateCanceled}
+	}
+
+	if b.st != nil {
+		_ = b.st.Inspection().Update(ctx, b.vmID, status)
+	}
+
+	return nil
+}
+
+// mockInspectionBuilder provides a configurable inspectionBuilderFactory for tests.
 type mockInspectionBuilder struct {
 	delay     time.Duration
 	vmErrors  map[string]error
@@ -76,40 +106,45 @@ func (m *mockInspectionBuilder) getInspectedVMs() []string {
 	return append([]string(nil), m.inspected...)
 }
 
-func (m *mockInspectionBuilder) builder() func(id string) []services.InspectionWorkUnit {
-	return func(id string) []services.InspectionWorkUnit {
-		return []services.InspectionWorkUnit{
-			&mockInspectionStep{
-				status: models.InspectionStatus{State: models.InspectionStateRunning},
-				work: func(ctx context.Context, result models.InspectionResult) (models.InspectionResult, error) {
-					if m.delay > 0 {
-						select {
-						case <-time.After(m.delay):
-						case <-ctx.Done():
-							return result, ctx.Err()
+func (m *mockInspectionBuilder) builder() func(id string) work.WorkBuilder2[models.InspectionStatus, models.InspectionResult] {
+	return func(id string) work.WorkBuilder2[models.InspectionStatus, models.InspectionResult] {
+		running := func() models.InspectionStatus {
+			return models.InspectionStatus{State: models.InspectionStateRunning}
+		}
+
+		return &testInspectionBuilder{
+			vmID: id,
+			st:   m.st,
+			units: []work.WorkUnit[models.InspectionStatus, models.InspectionResult]{
+				{
+					Status: running,
+					Work: func(ctx context.Context, result models.InspectionResult) (models.InspectionResult, error) {
+						if m.delay > 0 {
+							select {
+							case <-time.After(m.delay):
+							case <-ctx.Done():
+								return result, ctx.Err()
+							}
 						}
-					}
-					if err, ok := m.vmErrors[id]; ok && err != nil {
-						return result, err
-					}
-					m.mu.Lock()
-					m.inspected = append(m.inspected, id)
-					m.mu.Unlock()
-					if cc := m.concerns[id]; len(cc) > 0 {
-						err := m.st.WithTx(ctx, func(txCtx context.Context) error {
-							return m.st.Inspection().InsertResult(txCtx, id, cc)
-						})
-						if err != nil {
-							return result, err
+						if err, ok := m.vmErrors[id]; ok && err != nil {
+							result.Err = err
+							return result, nil
 						}
-					}
-					return result, nil
-				},
-			},
-			&mockInspectionStep{
-				status: models.InspectionStatus{State: models.InspectionStateCompleted},
-				work: func(ctx context.Context, result models.InspectionResult) (models.InspectionResult, error) {
-					return result, nil
+						m.mu.Lock()
+						m.inspected = append(m.inspected, id)
+						m.mu.Unlock()
+						if cc := m.concerns[id]; len(cc) > 0 {
+							err := m.st.WithTx(ctx, func(txCtx context.Context) error {
+								return m.st.Inspection().InsertResult(txCtx, id, cc)
+							})
+							if err != nil {
+								result.Err = err
+								return result, nil
+							}
+						}
+						result.Completed = true
+						return result, nil
+					},
 				},
 			},
 		}
@@ -211,7 +246,8 @@ var _ = Describe("InspectorService", func() {
 
 			It("should return nil when trying to stop idle inspector", func() {
 				err := srv.Stop()
-				Expect(err).NotTo(HaveOccurred())
+				var notRunningErr *srvErrors.InspectorNotRunningError
+				Expect(errors.As(err, &notRunningErr)).To(BeTrue())
 			})
 		})
 

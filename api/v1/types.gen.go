@@ -943,6 +943,9 @@ type VmInspectionStatus struct {
 	// Error Error message when state is error
 	Error *string `json:"error,omitempty"`
 
+	// Message State details
+	Message string `json:"message"`
+
 	// Results Inspection results
 	Results *map[string]interface{} `json:"results,omitempty"`
 

@@ -10,14 +10,11 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/pkg/scheduler"
 )
 
-type event[S any, R any] struct {
+type event struct {
 	PipelineID string
-	Status     Status[S, R]
-	IsDone     bool
 }
 
 type entry[S any, R any] struct {
-	Status   Status[S, R]
 	Done     bool
 	CancelCh chan struct{}
 	Pipeline *Pipeline2[S, R]
@@ -33,7 +30,7 @@ type Pool2[S any, R any] struct {
 	workers         int
 	reservedWorkers int
 	started         bool
-	events          chan event[S, R]
+	events          chan event
 	done            chan struct{}
 }
 
@@ -42,7 +39,7 @@ func NewPool2[S any, R any](builders map[string]WorkBuilder2[S, R]) *Pool2[S, R]
 		builders:        builders,
 		workers:         len(builders),
 		reservedWorkers: len(builders),
-		events:          make(chan event[S, R]),
+		events:          make(chan event),
 	}
 }
 
@@ -81,26 +78,17 @@ func (p *Pool2[S, R]) Start() error {
 
 	for key, builder := range p.builders {
 		pipeline := NewPipeline2(sched, builder)
-		c, _ := pipeline.Start()
+		ticks, err := pipeline.Start()
+		if err != nil {
+			return fmt.Errorf("pipeline %s: %w", key, err)
+		}
 		p.pipelines[key] = entry[S, R]{Pipeline: pipeline}
 
-		go func(pipelineID string, c chan Status[S, R], builder WorkBuilder2[S, R]) {
-			var lastStatus Status[S, R]
-			for s := range c {
-				lastStatus = s
-				p.events <- event[S, R]{PipelineID: pipelineID, Status: s}
+		go func(pipelineID string, ticks chan struct{}) {
+			for range ticks {
 			}
-
-			future := sched.AddPriorityWork(func(ctx context.Context) (R, error) {
-				return lastStatus.Result, builder.Finalize(ctx, lastStatus.Result)
-			}, 1)
-			res := <-future.C()
-			if res.Err != nil {
-				lastStatus.Err = res.Err
-			}
-
-			p.events <- event[S, R]{PipelineID: pipelineID, Status: lastStatus, IsDone: true}
-		}(key, c, builder)
+			p.events <- event{PipelineID: pipelineID}
+		}(key, ticks)
 	}
 
 	p.done = make(chan struct{})
@@ -134,14 +122,22 @@ func (p *Pool2[S, R]) Stop() error {
 	return p.finalizeErr
 }
 
-func (p *Pool2[S, R]) Cancel(key string) Status[S, R] {
+func (p *Pool2[S, R]) Cancel(key string) (S, error) {
 	p.mu.Lock()
 	pl, ok := p.pipelines[key]
-	if !ok || pl.Done {
-		s := pl.Status
+
+	if !ok {
+		var empty S
 		p.mu.Unlock()
-		return s
+		return empty, fmt.Errorf("unknown key: %s", key)
 	}
+
+	if pl.Done {
+		s := pl.Pipeline.State()
+		p.mu.Unlock()
+		return s, nil
+	}
+
 	if pl.CancelCh == nil {
 		pl.CancelCh = make(chan struct{})
 		p.pipelines[key] = pl
@@ -152,22 +148,33 @@ func (p *Pool2[S, R]) Cancel(key string) Status[S, R] {
 	pl.Pipeline.Stop()
 	<-done
 
-	p.mu.Lock()
-	s := p.pipelines[key].Status
-	p.mu.Unlock()
-	return s
+	return pl.Pipeline.State(), nil
 }
 
-func (p *Pool2[S, R]) State(key string) (Status[S, R], error) {
+func (p *Pool2[S, R]) State(key string) (S, error) {
 	p.mu.Lock()
 	pl, ok := p.pipelines[key]
 	p.mu.Unlock()
 
 	if !ok {
-		return Status[S, R]{}, fmt.Errorf("unknown key: %s", key)
+		var empty S
+		return empty, fmt.Errorf("unknown key: %s", key)
 	}
 
-	return pl.Status, nil
+	return pl.Pipeline.State(), nil
+}
+
+func (p *Pool2[S, R]) Result(key string) (R, error) {
+	p.mu.Lock()
+	pl, ok := p.pipelines[key]
+	p.mu.Unlock()
+
+	if !ok {
+		var empty R
+		return empty, fmt.Errorf("unknown key: %s", key)
+	}
+
+	return pl.Pipeline.Result()
 }
 
 func (p *Pool2[S, R]) IsRunning() bool {
@@ -190,15 +197,12 @@ func (p *Pool2[S, R]) run() {
 	for ev := range p.events {
 		p.mu.Lock()
 		e := p.pipelines[ev.PipelineID]
-		e.Status = ev.Status
-		if ev.IsDone {
-			e.Done = true
-			if e.CancelCh != nil {
-				close(e.CancelCh)
-			}
-			remaining--
+		e.Done = true
+		if e.CancelCh != nil {
+			close(e.CancelCh)
 		}
 		p.pipelines[ev.PipelineID] = e
+		remaining--
 		p.mu.Unlock()
 
 		if remaining == 0 {

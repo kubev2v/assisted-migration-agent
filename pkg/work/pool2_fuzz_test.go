@@ -103,7 +103,7 @@ func FuzzPool2(f *testing.F) {
 				wg.Add(1)
 				go func(key string) {
 					defer wg.Done()
-					pool.Cancel(key)
+					_, _ = pool.Cancel(key)
 				}(fmt.Sprintf("p%d", i))
 			}
 		}

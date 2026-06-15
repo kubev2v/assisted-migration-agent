@@ -293,6 +293,8 @@ func NewInspectionStatus(status models.InspectionStatus) VmInspectionStatus {
 		c.State = VmInspectionStatusStateError
 	}
 
+	c.Message = status.Details
+
 	if status.Error != nil {
 		err := status.Error.Error()
 		c.Error = &err

@@ -12,8 +12,8 @@ import (
 
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 
-	"github.com/kubev2v/assisted-migration-agent/pkg/scheduler"
 	"github.com/kubev2v/assisted-migration-agent/pkg/vmware"
+	"github.com/kubev2v/assisted-migration-agent/pkg/work"
 
 	"go.uber.org/zap"
 
@@ -21,66 +21,56 @@ import (
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
-const (
-	defaultInspectionWorkers         = 5
-	defaultPriorityInspectionWorkers = 0
-)
+const defaultInspectionWorkers = 5
 
-// InspectorService orchestrates vCenter VM inspection: one asynchronous WorkPipeline per VM,
-// a shared vSphere client for the run, and service-level status.
+// InspectorService orchestrates vCenter VM inspection: one Pipeline2 per VM
+// managed by a Pool2, a shared vSphere client for the run, and service-level status.
 type InspectorService struct {
 	mu              sync.Mutex
-	inspectionSvc   *inspectionService
-	buildFn         inspectionWorkBuilder
+	pool            *work.Pool2[models.InspectionStatus, models.InspectionResult]
+	buildFn         inspectionBuilderFactory
 	store           *store.Store
 	inspectionLimit int
-	scheduler       *scheduler.Scheduler[models.InspectionResult]
 	vddkLibDir      string
 }
 
 // NewInspectorService returns an idle inspector using the default inspection work units
-// (validate, snapshot, inspect, save, remove snapshot).
-// inspectionLimit is the maximum distinct VMs per cycle (Start batch + Add)
+// (validate, snapshot, inspect+save).
+// inspectionLimit is the maximum distinct VMs per cycle.
 func NewInspectorService(s *store.Store, inspectionLimit int, dateDir string) (*InspectorService, error) {
-	scheduler, err := scheduler.NewScheduler[models.InspectionResult](defaultInspectionWorkers, defaultPriorityInspectionWorkers)
-	if err != nil {
-		return nil, err
-	}
 	return &InspectorService{
 		store:           s,
 		inspectionLimit: inspectionLimit,
 		vddkLibDir:      filepath.Join(dateDir, vddkFolder, vddkLibPath),
-		scheduler:       scheduler,
 	}, nil
 }
 
-// GetStatus returns the current inspector status.
 func (i *InspectorService) GetStatus() models.InspectorStatus {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
-	if i.inspectionSvc == nil {
-		return models.InspectorStatus{State: models.InspectorStateReady}
+	if i.pool != nil && i.pool.IsRunning() {
+		return models.InspectorStatus{State: models.InspectorStateRunning}
 	}
 
-	return models.InspectorStatus{State: models.InspectorStateRunning}
+	return models.InspectorStatus{State: models.InspectorStateReady}
 }
 
-// IsBusy reports whether the inspector is currently running.
 func (i *InspectorService) IsBusy() bool {
-	i.mu.Lock()
-	defer i.mu.Unlock()
-	return i.inspectionSvc != nil
+	return i.GetStatus().State == models.InspectorStateRunning
 }
 
-// Start connects to vSphere, starts pipelines for each vmIDs entry, and launches the run loop.
-func (i *InspectorService) Start(ctx context.Context, creds models.Credentials, vmIDs []string) error {
+// Start connects to vSphere, starts pipelines for each vmIDs entry, and launches the pool.
+func (i *InspectorService) Start(ctx context.Context, creds models.Credentials, vmIDs []string) (err error) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
-	if i.inspectionSvc != nil && i.inspectionSvc.IsBusy() {
+	if i.pool != nil && i.pool.IsRunning() {
 		return srvErrors.NewInspectionInProgressError()
 	}
+
+	// it's safe to nil in order to be GCed. either is already nil(from previous stop call) or not running
+	i.pool = nil
 
 	if len(vmIDs) > i.inspectionLimit {
 		return srvErrors.NewInspectionLimitReachedError(i.inspectionLimit)
@@ -94,7 +84,7 @@ func (i *InspectorService) Start(ctx context.Context, creds models.Credentials, 
 	}
 	creds.URL = url
 
-	if err := creds.Validate(); err != nil {
+	if err = creds.Validate(); err != nil {
 		return err
 	}
 
@@ -105,6 +95,14 @@ func (i *InspectorService) Start(ctx context.Context, creds models.Credentials, 
 	}
 
 	zap.S().Named("inspector_service").Info("vSphere connection established")
+
+	defer func() {
+		if err != nil {
+			logoutCtx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+			defer cancel()
+			_ = vClient.Logout(logoutCtx)
+		}
+	}()
 
 	detector, err := vmdetect.NewDetector(vmdetect.DetectorConfig{
 		Credentials: vmdetect.Credentials{
@@ -120,30 +118,40 @@ func (i *InspectorService) Start(ctx context.Context, creds models.Credentials, 
 	}
 
 	vmwareOperator := vmware.NewVMManager(vClient, creds.Username)
-	i.inspectionSvc = newInspectionService(i.store, i.scheduler, vmwareOperator, detector)
-	if i.buildFn != nil {
-		i.inspectionSvc.WithBuilder(i.buildFn)
-	}
-	if err := i.inspectionSvc.Start(vmIDs, func() {
-		logoutCtx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-		defer cancel()
-		_ = vClient.Logout(logoutCtx)
 
-		i.mu.Lock()
-		i.inspectionSvc = nil
-		i.mu.Unlock()
-	}); err != nil {
-		logoutCtx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-		defer cancel()
-		_ = vClient.Logout(logoutCtx)
-		i.inspectionSvc = nil
+	buildFn := i.buildFn
+	if buildFn == nil {
+		buildFn = defaultInspectionBuilderFactory(i.store, vmwareOperator, detector)
+	}
+
+	wb := make(map[string]work.WorkBuilder2[models.InspectionStatus, models.InspectionResult], len(vmIDs))
+	for _, id := range vmIDs {
+		wb[id] = buildFn(id)
+	}
+
+	for _, id := range vmIDs {
+		if err = i.store.Inspection().Update(ctx, id, models.InspectionStatus{State: models.InspectionStatePending}); err != nil {
+			return err
+		}
+	}
+
+	pool := work.NewPool2(wb).WithWorkers(defaultInspectionWorkers, defaultInspectionWorkers).
+		WithFinalizer(func(_ context.Context) error {
+			logoutCtx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+			defer cancel()
+			_ = vClient.Logout(logoutCtx)
+			return nil
+		})
+
+	if err = pool.Start(); err != nil {
 		return err
 	}
+
+	i.pool = pool
 
 	return nil
 }
 
-// Credentials verifies vCenter credentials without storing them.
 func (i *InspectorService) Credentials(ctx context.Context, credentials models.Credentials) error {
 	url, err := vmware.NormalizeAndValidateURL(credentials.URL)
 	if err != nil {
@@ -158,39 +166,38 @@ func (i *InspectorService) Credentials(ctx context.Context, credentials models.C
 	return nil
 }
 
-// Stop requests cancellation of all VM pipelines and tears down the scheduler.
+// Stop is blocking so it holds the lock while stopping the pipeline to block Start from shadowing i.pool
 func (i *InspectorService) Stop() error {
 	i.mu.Lock()
+	defer i.mu.Unlock()
 
-	if i.inspectionSvc == nil {
-		i.mu.Unlock()
-		return nil
+	pool := i.pool
+	i.pool = nil
+
+	if pool == nil {
+		return srvErrors.NewInspectorNotRunningError()
 	}
 
-	currentInspectionSrv := i.inspectionSvc
-	i.inspectionSvc = nil
+	return pool.Stop()
+}
 
-	i.mu.Unlock()
+func (i *InspectorService) Cancel(virtualMachineID string) error {
+	i.mu.Lock()
+	defer i.mu.Unlock()
 
-	currentInspectionSrv.Stop()
+	if i.pool == nil || !i.pool.IsRunning() {
+		return srvErrors.NewInspectorNotRunningError()
+	}
+
+	if _, err := i.pool.Cancel(virtualMachineID); err != nil {
+		return srvErrors.NewResourceNotFoundError("vm", virtualMachineID)
+	}
 
 	return nil
 }
 
-// Cancel stops the pipeline for a single VM ID.
-func (i *InspectorService) Cancel(id string) error {
-	i.mu.Lock()
-	defer i.mu.Unlock()
-
-	if i.inspectionSvc == nil {
-		return srvErrors.NewInspectorNotRunningError()
-	}
-
-	return i.inspectionSvc.Cancel(id)
-}
-
-// WithInspectionBuilder replaces the default per-VM work unit list.
-func (i *InspectorService) WithInspectionBuilder(builder inspectionWorkBuilder) *InspectorService {
+// WithInspectionBuilder replaces the default per-VM work builder factory.
+func (i *InspectorService) WithInspectionBuilder(builder inspectionBuilderFactory) *InspectorService {
 	i.buildFn = builder
 	return i
 }
