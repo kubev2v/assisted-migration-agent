@@ -3,6 +3,8 @@ package service
 import (
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
+
+	v1 "github.com/kubev2v/assisted-migration-agent/api/v1"
 )
 
 // PlannerService defines the interface for interacting with the planner service
@@ -19,7 +21,7 @@ type sourceApi interface {
 	GetSources() (*v1alpha1.SourceList, error)
 	RemoveSource(uuid.UUID) error
 	RemoveSources() error
-	UpdateSource(sourceID, agentID uuid.UUID, inventory *v1alpha1.Inventory) error
+	UpdateSource(sourceID uuid.UUID, inventory *v1alpha1.UpdateInventory) error
 }
 
 type imageApi interface {
@@ -27,7 +29,7 @@ type imageApi interface {
 }
 
 type assessmentApi interface {
-	CreateAssessment(name, sourceType string, sourceId *uuid.UUID, inventory *v1alpha1.Inventory) (*v1alpha1.Assessment, error)
+	CreateAssessment(name, sourceType string, sourceId *uuid.UUID, inventory *v1.UpdateInventory) (*v1alpha1.Assessment, error)
 	CreateAssessmentFromRvtools(name, filepath string) (*v1alpha1.Assessment, error)
 	GetAssessment(uuid.UUID) (*v1alpha1.Assessment, error)
 	GetAssessments() (*v1alpha1.AssessmentList, error)

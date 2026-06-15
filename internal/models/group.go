@@ -3,7 +3,7 @@ package models
 import (
 	"time"
 
-	"github.com/kubev2v/migration-planner/pkg/inventory"
+	"github.com/kubev2v/migration-planner-common/pkg/inventory"
 )
 
 type Group struct {

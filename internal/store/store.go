@@ -4,8 +4,8 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
-	pkgstore "github.com/kubev2v/migration-planner/pkg/store"
+	"github.com/kubev2v/migration-planner-common/pkg/duckdb_parser"
+	pkgstore "github.com/kubev2v/migration-planner-common/pkg/store"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 )

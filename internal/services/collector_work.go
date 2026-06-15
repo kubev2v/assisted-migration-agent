@@ -11,8 +11,8 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
-	"github.com/kubev2v/migration-planner/pkg/inventory"
-	"github.com/kubev2v/migration-planner/pkg/inventory/converters"
+	"github.com/kubev2v/migration-planner-common/pkg/inventory"
+	"github.com/kubev2v/migration-planner-common/pkg/inventory/converters"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"

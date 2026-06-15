@@ -11,6 +11,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"go.uber.org/zap"
+
+	v1 "github.com/kubev2v/assisted-migration-agent/api/v1"
 )
 
 // CreateSource sends a request to create a new source with the given name
@@ -174,7 +176,7 @@ func (s *PlannerSvc) RemoveSources() error {
 }
 
 // UpdateSource updates the inventory of a specific source
-func (s *PlannerSvc) UpdateSource(sourceID uuid.UUID, inventory *v1alpha1.UpdateInventory) error {
+func (s *PlannerSvc) UpdateSource(sourceID uuid.UUID, inventory *v1.UpdateInventory) error {
 	zap.S().Infof("[PlannerService] Update source: %s with agent: %s", sourceID, inventory.AgentId)
 
 	reqBody, err := json.Marshal(inventory)

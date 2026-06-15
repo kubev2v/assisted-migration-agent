@@ -10,7 +10,7 @@ import (
 	v1 "github.com/kubev2v/assisted-migration-agent/api/v1"
 
 	"github.com/google/uuid"
-	"github.com/kubev2v/migration-planner/api/v1alpha1"
+	inventoryapi "github.com/kubev2v/migration-planner-common/api/inventory"
 
 	"github.com/gin-gonic/gin"
 	. "github.com/onsi/ginkgo/v2"
@@ -65,7 +65,7 @@ var _ = Describe("Inventory Handlers", func() {
 			Expect(w.Code).To(Equal(http.StatusOK))
 			Expect(w.Header().Get("Content-Type")).To(Equal("application/json; charset=utf-8"))
 
-			var result v1alpha1.Inventory
+			var result inventoryapi.Inventory
 			resBody := w.Body.Bytes()
 			err := json.Unmarshal(resBody, &result)
 			Expect(err).To(BeNil())
@@ -89,7 +89,7 @@ var _ = Describe("Inventory Handlers", func() {
 			Expect(w.Code).To(Equal(http.StatusOK))
 			Expect(w.Header().Get("Content-Type")).To(Equal("application/json; charset=utf-8"))
 
-			var result v1alpha1.UpdateInventory
+			var result v1.UpdateInventory
 			resBody := w.Body.Bytes()
 			err := json.Unmarshal(resBody, &result)
 			Expect(err).To(BeNil())

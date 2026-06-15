@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	sq "github.com/Masterminds/squirrel"
-	duckdb_models "github.com/kubev2v/migration-planner/pkg/duckdb_parser/models"
+	duckdb_models "github.com/kubev2v/migration-planner-common/pkg/duckdb_parser/models"
 	"go.uber.org/zap"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"

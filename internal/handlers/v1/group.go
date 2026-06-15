@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/kubev2v/migration-planner/pkg/inventory/converters"
+	"github.com/kubev2v/migration-planner-common/pkg/inventory/converters"
 
 	v1 "github.com/kubev2v/assisted-migration-agent/api/v1"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"

@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-	externalRef0 "github.com/kubev2v/migration-planner/api/v1alpha1"
+	inventoryapi "github.com/kubev2v/migration-planner-common/api/inventory"
 	apiAgent "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	agentClient "github.com/kubev2v/migration-planner/pkg/client"
 
@@ -72,7 +72,7 @@ func (c *Client) UpdateAgentStatus(ctx context.Context, agentID uuid.UUID, sourc
 // UpdateSourceStatus sends source inventory to console.redhat.com
 // PUT /api/v1/sources/{id}/status
 func (c *Client) UpdateSourceStatus(ctx context.Context, sourceID, agentID uuid.UUID, data []byte) error {
-	inv := externalRef0.Inventory{}
+	inv := inventoryapi.Inventory{}
 	if err := json.Unmarshal(data, &inv); err != nil {
 		return fmt.Errorf("failed to unmarshal inventory: %w", err)
 	}

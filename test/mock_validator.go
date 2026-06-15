@@ -3,8 +3,8 @@ package test
 import (
 	"context"
 
-	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
-	"github.com/kubev2v/migration-planner/pkg/duckdb_parser/models"
+	"github.com/kubev2v/migration-planner-common/pkg/duckdb_parser"
+	"github.com/kubev2v/migration-planner-common/pkg/duckdb_parser/models"
 )
 
 // MockValidator implements duckdb_parser.Validator for testing.

@@ -10,12 +10,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	inventoryapi "github.com/kubev2v/migration-planner-common/api/inventory"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"go.uber.org/zap"
 )
 
 // CreateAssessment creates a new assessment per the OpenAPI spec
-func (s *PlannerSvc) CreateAssessment(name, sourceType string, sourceId *uuid.UUID, inventory *v1alpha1.Inventory) (*v1alpha1.Assessment, error) {
+func (s *PlannerSvc) CreateAssessment(name, sourceType string, sourceId *uuid.UUID, inventory *inventoryapi.Inventory) (*v1alpha1.Assessment, error) {
 	zap.S().Info("[PlannerService] Create assessment")
 
 	body := v1alpha1.CreateAssessmentJSONRequestBody{

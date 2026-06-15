@@ -3,14 +3,14 @@ package models
 import (
 	"time"
 
-	api "github.com/kubev2v/migration-planner/api/v1alpha1"
+	inventoryapi "github.com/kubev2v/migration-planner-common/api/inventory"
 )
 
 type InfrastructureData struct {
-	Datastores            []api.Datastore
-	Networks              []api.Network
+	Datastores            []inventoryapi.Datastore
+	Networks              []inventoryapi.Network
 	HostPowerStates       map[string]int
-	Hosts                 *[]api.Host
+	Hosts                 *[]inventoryapi.Host
 	HostsPerCluster       []int
 	ClustersPerDatacenter []int
 	TotalHosts            int

@@ -588,6 +588,18 @@ components:
         type: string
 
   schemas:
+    UpdateInventory:
+      type: object
+      properties:
+        agentId:
+          type: string
+          format: uuid
+        inventory:
+          $ref: 'https://raw.githubusercontent.com/nirarg/migration-planner-common/9d3e72cf0b64c84f4f974fb45dd0c2fd0e6732bc/api/inventory/openapi.yaml#/components/schemas/Inventory'
+      required:
+        - inventory
+        - agentId
+
     # ── Collectors ───────────────────────────────────────────────────────
     CollectorStatus:
       type: object
@@ -637,7 +649,7 @@ components:
           type: string
           description: Computed hash of the vCenter URL
         inventory:
-          $ref: 'https://raw.githubusercontent.com/kubev2v/migration-planner/main/api/v1alpha1/openapi.yaml#/components/schemas/UpdateInventory'
+          $ref: '#/components/schemas/UpdateInventory'
 
     InventoryListResponse:
       type: object

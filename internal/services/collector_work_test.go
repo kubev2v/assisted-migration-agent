@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/kubev2v/migration-planner/pkg/inventory"
+	"github.com/kubev2v/migration-planner-common/pkg/inventory"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/pkg/work"

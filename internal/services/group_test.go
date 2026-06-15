@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/kubev2v/migration-planner/pkg/inventory"
+	"github.com/kubev2v/migration-planner-common/pkg/inventory"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 

@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
+	"github.com/kubev2v/migration-planner-common/pkg/duckdb_parser"
 
 	"go.uber.org/zap"
 )

@@ -26,7 +26,7 @@ import (
 
 	"github.com/go-extras/cobraflags"
 
-	"github.com/kubev2v/migration-planner/pkg/opa"
+	"github.com/kubev2v/migration-planner-common/pkg/opa"
 
 	v1 "github.com/kubev2v/assisted-migration-agent/api/v1"
 	"github.com/kubev2v/assisted-migration-agent/internal/config"

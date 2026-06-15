@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/kubev2v/migration-planner/pkg/inventory"
-	"github.com/kubev2v/migration-planner/pkg/inventory/converters"
+	"github.com/kubev2v/migration-planner-common/pkg/inventory"
+	"github.com/kubev2v/migration-planner-common/pkg/inventory/converters"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"

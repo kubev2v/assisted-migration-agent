@@ -6,7 +6,7 @@ package v1
 import (
 	"time"
 
-	externalRef0 "github.com/kubev2v/migration-planner/api/v1alpha1"
+	externalRef0 "github.com/kubev2v/migration-planner-common/api/inventory"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
@@ -587,6 +587,12 @@ type UpdateGroupRequest struct {
 
 	// Name Group display name
 	Name *string `binding:"omitempty,min=1,max=100" json:"name,omitempty"`
+}
+
+// UpdateInventory defines model for UpdateInventory.
+type UpdateInventory struct {
+	AgentId   openapi_types.UUID     `json:"agentId"`
+	Inventory externalRef0.Inventory `json:"inventory"`
 }
 
 // UpdateLabelVMsRequest defines model for UpdateLabelVMsRequest.

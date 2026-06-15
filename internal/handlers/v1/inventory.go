@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
-	"github.com/kubev2v/migration-planner/api/v1alpha1"
+	inventoryapi "github.com/kubev2v/migration-planner-common/api/inventory"
 
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
@@ -30,7 +30,7 @@ func (h *Handler) GetInventory(c *gin.Context, params v1.GetInventoryParams) {
 		return
 	}
 
-	var inventory v1alpha1.Inventory
+	var inventory inventoryapi.Inventory
 	if err := json.Unmarshal(inv.Data, &inventory); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Errorf("error unmarshalling inventory: %w", err)})
 		return
@@ -48,7 +48,7 @@ func (h *Handler) GetInventory(c *gin.Context, params v1.GetInventoryParams) {
 	}
 
 	// With Agent ID
-	payload := &v1alpha1.UpdateInventory{
+	payload := &v1.UpdateInventory{
 		Inventory: inventory,
 		AgentId:   uuid.MustParse(h.cfg.Agent.ID),
 	}

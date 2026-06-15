@@ -6,7 +6,7 @@ package v2
 import (
 	"time"
 
-	externalRef0 "github.com/kubev2v/migration-planner/api/v1alpha1"
+	externalRef0 "github.com/kubev2v/migration-planner-common/api/inventory"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
@@ -211,7 +211,7 @@ type InspectorStatusState string
 
 // Inventory defines model for Inventory.
 type Inventory struct {
-	Inventory externalRef0.UpdateInventory `json:"inventory"`
+	Inventory UpdateInventory `json:"inventory"`
 
 	// VCenterID Computed hash of the vCenter URL
 	VCenterID string `json:"vCenterID"`
@@ -228,6 +228,12 @@ type UpdateGroupRequest struct {
 	Filter      *string   `binding:"omitempty,min=1" json:"filter,omitempty"`
 	Name        *string   `binding:"omitempty,min=1,max=100" json:"name,omitempty"`
 	Tags        *[]string `binding:"omitempty,dive,tag_format" json:"tags,omitempty"`
+}
+
+// UpdateInventory defines model for UpdateInventory.
+type UpdateInventory struct {
+	AgentId   openapi_types.UUID     `json:"agentId"`
+	Inventory externalRef0.Inventory `json:"inventory"`
 }
 
 // VcenterCredentials defines model for VcenterCredentials.
