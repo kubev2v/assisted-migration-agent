@@ -220,4 +220,11 @@ WHERE report_id = (
       WHERE written_batch_count > 0
       ORDER BY created_at DESC LIMIT 1
   )) as utilization ON v."VM ID" = utilization.moid`).
-	LeftJoin(`vm_applications va ON v."VM ID" = va.vm_id`)
+	LeftJoin(`vm_applications va ON v."VM ID" = va.vm_id`).
+	LeftJoin(`(
+		SELECT u.vm_id, ARRAY_AGG(DISTINCT grp.name) AS groups
+		FROM group_matches gm
+		JOIN groups grp ON gm.group_id = grp.id
+		, UNNEST(gm.vm_ids) AS u(vm_id)
+		GROUP BY u.vm_id
+	) g ON v."VM ID" = g.vm_id`)

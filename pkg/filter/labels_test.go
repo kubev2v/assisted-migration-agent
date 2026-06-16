@@ -60,8 +60,8 @@ var _ = Describe("Labels Filter", func() {
 			{input: "labels contains 'staging'", output: `list_contains(CAST("labels" AS VARCHAR[]), 'staging')`},
 
 			// ===== NOT CONTAINS OPERATOR =====
-			{input: "labels not contains 'production'", output: `NOT list_contains(CAST("labels" AS VARCHAR[]), 'production')`},
-			{input: "labels not contains 'test'", output: `NOT list_contains(CAST("labels" AS VARCHAR[]), 'test')`},
+			{input: "labels not contains 'production'", output: `("labels" IS NULL OR NOT list_contains(CAST("labels" AS VARCHAR[]), 'production'))`},
+			{input: "labels not contains 'test'", output: `("labels" IS NULL OR NOT list_contains(CAST("labels" AS VARCHAR[]), 'test'))`},
 
 			// ===== COMBINED WITH AND =====
 			{input: "name = 'vm1' and labels contains 'production'", output: `(("name" = 'vm1') AND list_contains(CAST("labels" AS VARCHAR[]), 'production'))`},
@@ -71,7 +71,7 @@ var _ = Describe("Labels Filter", func() {
 			{input: "labels contains 'production' or labels contains 'staging'", output: `(list_contains(CAST("labels" AS VARCHAR[]), 'production') OR list_contains(CAST("labels" AS VARCHAR[]), 'staging'))`},
 
 			// ===== MIXED CONTAINS AND NOT CONTAINS =====
-			{input: "labels contains 'production' and labels not contains 'test'", output: `(list_contains(CAST("labels" AS VARCHAR[]), 'production') AND NOT list_contains(CAST("labels" AS VARCHAR[]), 'test'))`},
+			{input: "labels contains 'production' and labels not contains 'test'", output: `(list_contains(CAST("labels" AS VARCHAR[]), 'production') AND ("labels" IS NULL OR NOT list_contains(CAST("labels" AS VARCHAR[]), 'test')))`},
 		}
 
 		for _, test := range tests {
@@ -105,7 +105,7 @@ var _ = Describe("Labels Filter", func() {
 			Expect(err).ToNot(HaveOccurred())
 			sql, args, err := sqlizer.ToSql()
 			Expect(err).ToNot(HaveOccurred())
-			Expect(sql).To(Equal(`NOT list_contains(CAST(v."labels" AS VARCHAR[]), ?)`))
+			Expect(sql).To(Equal(`(v."labels" IS NULL OR NOT list_contains(CAST(v."labels" AS VARCHAR[]), ?))`))
 			Expect(args).To(Equal([]interface{}{"test"}))
 		})
 

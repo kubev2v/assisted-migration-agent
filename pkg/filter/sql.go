@@ -84,6 +84,8 @@ var defaultMapFn MapFunc = func(name string) (string, FieldType, error) {
 	// vinfo (v) — array fields
 	case "labels":
 		return `v."labels"`, ArrayField, nil
+	case "groups":
+		return `g.groups`, ArrayField, nil
 
 	// vdisk (dk) — disk.* prefix
 	case "disk.path":
@@ -350,7 +352,8 @@ func toSql(expr Expression, mf MapFunc) (sq.Sqlizer, error) {
 		// Cast VARCHAR to VARCHAR[] for DuckDB's list_contains function
 		castedCol := fmt.Sprintf("CAST(%s AS VARCHAR[])", col)
 		if e.Negated {
-			return sq.Expr(fmt.Sprintf("NOT list_contains(%s, ?)", castedCol), e.Value), nil
+			// Include NULLs in "not contains" results (VMs without any groups)
+			return sq.Expr(fmt.Sprintf("(%s IS NULL OR NOT list_contains(%s, ?))", col, castedCol), e.Value), nil
 		}
 		return sq.Expr(fmt.Sprintf("list_contains(%s, ?)", castedCol), e.Value), nil
 	default:

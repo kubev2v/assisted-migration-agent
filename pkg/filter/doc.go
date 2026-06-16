@@ -159,7 +159,7 @@
 //	powerstate (alias: status), connection_state, ft_state, cpus, memory,
 //	os_config, os_tools, dns_name, ip_address, storage_used, template,
 //	cbt, enable_uuid, datacenter, cluster, hw_version, total_disk_capacity,
-//	provisioned, resource_pool, labels
+//	provisioned, resource_pool, labels, groups
 //
 // vdisk (dk) — disk.* prefix:
 //
@@ -252,6 +252,12 @@
 //	labels contains 'production'
 //	labels not contains 'test'
 //	labels contains 'critical' and labels not contains 'excluded'
+//
+// Group filtering with CONTAINS:
+//
+//	groups contains 'production-vms'
+//	groups not contains 'test'
+//	groups contains 'critical' and labels contains 'production'
 //
 // Combined filters:
 //
