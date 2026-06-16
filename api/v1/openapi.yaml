@@ -621,6 +621,7 @@ paths:
           description: Group ID
           schema:
             type: string
+            format: uuid
         - name: sort
           in: query
           description: Sort fields with direction (e.g., "name:asc" or "cluster:desc,name:asc"). Valid fields are name, vCenterState, cluster, diskSize, memory, issues, cpuUsage, diskUsage, ramUsage, cpuAvg, memAvg.
@@ -665,6 +666,7 @@ paths:
           description: Group ID
           schema:
             type: string
+            format: uuid
       requestBody:
         required: true
         content:
@@ -694,6 +696,7 @@ paths:
           description: Group ID
           schema:
             type: string
+            format: uuid
       responses:
         '204':
           description: Group deleted
@@ -1745,6 +1748,7 @@ components:
       properties:
         id:
           type: string
+          format: uuid
           description: Unique group identifier (UUID)
         name:
           type: string

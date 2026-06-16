@@ -3,11 +3,12 @@ package models
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/pkg/inventory"
 )
 
 type Group struct {
-	ID          int
+	ID          uuid.UUID
 	Name        string
 	Description string
 	Filter      string

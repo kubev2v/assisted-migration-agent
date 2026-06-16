@@ -15,6 +15,7 @@ import (
 
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
+	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -251,8 +252,8 @@ type MockGroupService struct {
 	LastListVMsParams services.GroupGetParams
 	LastCreateGroup   models.Group
 	LastUpdateGroup   models.Group
-	LastUpdateID      int
-	LastDeleteID      int
+	LastUpdateID      uuid.UUID
+	LastDeleteID      uuid.UUID
 }
 
 func (m *MockGroupService) List(ctx context.Context, params services.GroupListParams) ([]models.Group, int, error) {
@@ -260,11 +261,11 @@ func (m *MockGroupService) List(ctx context.Context, params services.GroupListPa
 	return m.ListResult, m.ListTotal, m.ListError
 }
 
-func (m *MockGroupService) Get(ctx context.Context, id int) (*models.Group, error) {
+func (m *MockGroupService) Get(ctx context.Context, id uuid.UUID) (*models.Group, error) {
 	return m.GetResult, m.GetError
 }
 
-func (m *MockGroupService) ListVirtualMachines(ctx context.Context, id int, params services.GroupGetParams) ([]models.VirtualMachineSummary, int, error) {
+func (m *MockGroupService) ListVirtualMachines(ctx context.Context, id uuid.UUID, params services.GroupGetParams) ([]models.VirtualMachineSummary, int, error) {
 	m.LastListVMsParams = params
 	return m.ListVMsResult, m.ListVMsTotal, m.ListVMsError
 }
@@ -274,13 +275,13 @@ func (m *MockGroupService) Create(ctx context.Context, group models.Group) (*mod
 	return m.CreateResult, m.CreateError
 }
 
-func (m *MockGroupService) Update(ctx context.Context, id int, group models.Group) (*models.Group, error) {
+func (m *MockGroupService) Update(ctx context.Context, id uuid.UUID, group models.Group) (*models.Group, error) {
 	m.LastUpdateID = id
 	m.LastUpdateGroup = group
 	return m.UpdateResult, m.UpdateError
 }
 
-func (m *MockGroupService) Delete(ctx context.Context, id int) error {
+func (m *MockGroupService) Delete(ctx context.Context, id uuid.UUID) error {
 	m.LastDeleteID = id
 	return m.DeleteError
 }

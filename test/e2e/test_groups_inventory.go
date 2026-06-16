@@ -103,9 +103,9 @@ var _ = Describe("Group inventory e2e tests", Ordered, func() {
 			"Test group for inventory",
 		)
 		Expect(err).ToNot(HaveOccurred())
-		defer func() { _, _ = agentSvc.DeleteGroup(group.Id) }()
+		defer func() { _, _ = agentSvc.DeleteGroup(group.Id.String()) }()
 
-		resp, err := agentSvc.GetGroup(group.Id, nil)
+		resp, err := agentSvc.GetGroup(group.Id.String(), nil)
 		Expect(err).ToNot(HaveOccurred())
 
 		Expect(resp.Inventory).ToNot(BeNil(), "inventory should be populated")
@@ -132,10 +132,10 @@ var _ = Describe("Group inventory e2e tests", Ordered, func() {
 			"Test scoped inventory",
 		)
 		Expect(err).ToNot(HaveOccurred())
-		defer func() { _, _ = agentSvc.DeleteGroup(group.Id) }()
+		defer func() { _, _ = agentSvc.DeleteGroup(group.Id.String()) }()
 
 		pageSize := 100
-		resp, err := agentSvc.GetGroup(group.Id, &service.GroupGetParams{PageSize: &pageSize})
+		resp, err := agentSvc.GetGroup(group.Id.String(), &service.GroupGetParams{PageSize: &pageSize})
 		Expect(err).ToNot(HaveOccurred())
 
 		Expect(resp.Inventory).ToNot(BeNil())
@@ -175,19 +175,19 @@ var _ = Describe("Group inventory e2e tests", Ordered, func() {
 			"Test inventory rebuild",
 		)
 		Expect(err).ToNot(HaveOccurred())
-		defer func() { _, _ = agentSvc.DeleteGroup(group.Id) }()
+		defer func() { _, _ = agentSvc.DeleteGroup(group.Id.String()) }()
 
-		resp1, err := agentSvc.GetGroup(group.Id, nil)
+		resp1, err := agentSvc.GetGroup(group.Id.String(), nil)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(resp1.Inventory).ToNot(BeNil())
 
 		newFilter := "memory >= 16384"
-		_, err = agentSvc.UpdateGroup(group.Id, v1.UpdateGroupRequest{
+		_, err = agentSvc.UpdateGroup(group.Id.String(), v1.UpdateGroupRequest{
 			Filter: &newFilter,
 		})
 		Expect(err).ToNot(HaveOccurred())
 
-		resp2, err := agentSvc.GetGroup(group.Id, nil)
+		resp2, err := agentSvc.GetGroup(group.Id.String(), nil)
 		Expect(err).ToNot(HaveOccurred())
 
 		Expect(resp2.Inventory).ToNot(BeNil())
@@ -204,9 +204,9 @@ var _ = Describe("Group inventory e2e tests", Ordered, func() {
 			"Test empty inventory",
 		)
 		Expect(err).ToNot(HaveOccurred())
-		defer func() { _, _ = agentSvc.DeleteGroup(group.Id) }()
+		defer func() { _, _ = agentSvc.DeleteGroup(group.Id.String()) }()
 
-		resp, err := agentSvc.GetGroup(group.Id, nil)
+		resp, err := agentSvc.GetGroup(group.Id.String(), nil)
 		Expect(err).ToNot(HaveOccurred())
 
 		Expect(resp.Total).To(Equal(0))
@@ -233,7 +233,7 @@ var _ = Describe("Group inventory e2e tests", Ordered, func() {
 			"Cluster 1",
 		)
 		Expect(err).ToNot(HaveOccurred())
-		defer func() { _, _ = agentSvc.DeleteGroup(group1.Id) }()
+		defer func() { _, _ = agentSvc.DeleteGroup(group1.Id.String()) }()
 
 		group2, err := agentSvc.CreateGroup(
 			"cluster2-inventory",
@@ -241,12 +241,12 @@ var _ = Describe("Group inventory e2e tests", Ordered, func() {
 			"Cluster 2",
 		)
 		Expect(err).ToNot(HaveOccurred())
-		defer func() { _, _ = agentSvc.DeleteGroup(group2.Id) }()
+		defer func() { _, _ = agentSvc.DeleteGroup(group2.Id.String()) }()
 
-		resp1, err := agentSvc.GetGroup(group1.Id, nil)
+		resp1, err := agentSvc.GetGroup(group1.Id.String(), nil)
 		Expect(err).ToNot(HaveOccurred())
 
-		resp2, err := agentSvc.GetGroup(group2.Id, nil)
+		resp2, err := agentSvc.GetGroup(group2.Id.String(), nil)
 		Expect(err).ToNot(HaveOccurred())
 
 		Expect(resp1.Inventory).ToNot(BeNil())
@@ -259,10 +259,10 @@ var _ = Describe("Group inventory e2e tests", Ordered, func() {
 	It("should include inventory when listing VMs within a group", func() {
 		group, err := agentSvc.CreateGroup("all-vms-inventory", "memory > 0", "All VMs")
 		Expect(err).ToNot(HaveOccurred())
-		defer func() { _, _ = agentSvc.DeleteGroup(group.Id) }()
+		defer func() { _, _ = agentSvc.DeleteGroup(group.Id.String()) }()
 
 		pageSize := 10
-		resp, err := agentSvc.GetGroup(group.Id, &service.GroupGetParams{
+		resp, err := agentSvc.GetGroup(group.Id.String(), &service.GroupGetParams{
 			PageSize: &pageSize,
 		})
 		Expect(err).ToNot(HaveOccurred())
@@ -284,20 +284,20 @@ var _ = Describe("Group inventory e2e tests", Ordered, func() {
 			"Test inventory clearing",
 		)
 		Expect(err).ToNot(HaveOccurred())
-		defer func() { _, _ = agentSvc.DeleteGroup(group.Id) }()
+		defer func() { _, _ = agentSvc.DeleteGroup(group.Id.String()) }()
 
-		resp1, err := agentSvc.GetGroup(group.Id, nil)
+		resp1, err := agentSvc.GetGroup(group.Id.String(), nil)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(resp1.Inventory).ToNot(BeNil(), "initial inventory should be populated")
 		Expect(resp1.Total).To(BeNumerically(">", 0), "should have matching VMs initially")
 
 		emptyFilter := "name = 'nonexistent-vm-999999'"
-		_, err = agentSvc.UpdateGroup(group.Id, v1.UpdateGroupRequest{
+		_, err = agentSvc.UpdateGroup(group.Id.String(), v1.UpdateGroupRequest{
 			Filter: &emptyFilter,
 		})
 		Expect(err).ToNot(HaveOccurred())
 
-		resp2, err := agentSvc.GetGroup(group.Id, nil)
+		resp2, err := agentSvc.GetGroup(group.Id.String(), nil)
 		Expect(err).ToNot(HaveOccurred())
 
 		Expect(resp2.Total).To(Equal(0), "should match no VMs after update")
@@ -307,18 +307,18 @@ var _ = Describe("Group inventory e2e tests", Ordered, func() {
 	It("should maintain inventory across pagination requests", func() {
 		group, err := agentSvc.CreateGroup("paginated-inventory", "memory > 0", "Paginated test")
 		Expect(err).ToNot(HaveOccurred())
-		defer func() { _, _ = agentSvc.DeleteGroup(group.Id) }()
+		defer func() { _, _ = agentSvc.DeleteGroup(group.Id.String()) }()
 
 		pageSize := 10
 		page1 := 1
-		resp1, err := agentSvc.GetGroup(group.Id, &service.GroupGetParams{
+		resp1, err := agentSvc.GetGroup(group.Id.String(), &service.GroupGetParams{
 			PageSize: &pageSize,
 			Page:     &page1,
 		})
 		Expect(err).ToNot(HaveOccurred())
 
 		page2 := 2
-		resp2, err := agentSvc.GetGroup(group.Id, &service.GroupGetParams{
+		resp2, err := agentSvc.GetGroup(group.Id.String(), &service.GroupGetParams{
 			PageSize: &pageSize,
 			Page:     &page2,
 		})

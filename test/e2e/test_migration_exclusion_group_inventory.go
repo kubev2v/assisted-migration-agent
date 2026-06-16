@@ -145,7 +145,7 @@ var _ = Describe("Migration Exclusion Group Inventory e2e tests", Ordered, func(
 		AfterEach(func() {
 			// Clean up: delete the test group and reset VM exclusion states
 			if testGroup != nil {
-				_, _ = agentSvc.DeleteGroup(testGroup.Id)
+				_, _ = agentSvc.DeleteGroup(testGroup.Id.String())
 			}
 			if testVMID != "" {
 				_ = agentSvc.UpdateVMMigrationExclusion(testVMID, false)
@@ -160,7 +160,7 @@ var _ = Describe("Migration Exclusion Group Inventory e2e tests", Ordered, func(
 		// Then the group inventory should be updated to reflect the new exclusion state
 		It("should update group inventory when VM is excluded", func() {
 			// Arrange: Get initial group state
-			initialGroup, err := agentSvc.GetGroup(testGroup.Id, nil)
+			initialGroup, err := agentSvc.GetGroup(testGroup.Id.String(), nil)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(initialGroup.Inventory).ToNot(BeNil(), "initial inventory should exist")
 
@@ -175,7 +175,7 @@ var _ = Describe("Migration Exclusion Group Inventory e2e tests", Ordered, func(
 			Expect(err).ToNot(HaveOccurred(), "failed to exclude VM")
 
 			// Assert: Group inventory should be updated
-			updatedGroup, err := agentSvc.GetGroup(testGroup.Id, nil)
+			updatedGroup, err := agentSvc.GetGroup(testGroup.Id.String(), nil)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(updatedGroup.Inventory).ToNot(BeNil(), "updated inventory should exist")
 
@@ -200,7 +200,7 @@ var _ = Describe("Migration Exclusion Group Inventory e2e tests", Ordered, func(
 			err := agentSvc.UpdateVMMigrationExclusion(testVMID, true)
 			Expect(err).ToNot(HaveOccurred())
 
-			excludedGroup, err := agentSvc.GetGroup(testGroup.Id, nil)
+			excludedGroup, err := agentSvc.GetGroup(testGroup.Id.String(), nil)
 			Expect(err).ToNot(HaveOccurred())
 			excludedUpdatedAt := excludedGroup.Group.UpdatedAt
 			GinkgoWriter.Printf("Group updated_at after exclusion: %v\n", excludedUpdatedAt)
@@ -212,7 +212,7 @@ var _ = Describe("Migration Exclusion Group Inventory e2e tests", Ordered, func(
 			Expect(err).ToNot(HaveOccurred(), "failed to include VM")
 
 			// Assert: Group inventory should be updated again
-			includedGroup, err := agentSvc.GetGroup(testGroup.Id, nil)
+			includedGroup, err := agentSvc.GetGroup(testGroup.Id.String(), nil)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(includedGroup.Inventory).ToNot(BeNil())
 
@@ -243,15 +243,15 @@ var _ = Describe("Migration Exclusion Group Inventory e2e tests", Ordered, func(
 			)
 			Expect(err).ToNot(HaveOccurred())
 			defer func() {
-				_, _ = agentSvc.DeleteGroup(secondGroup.Id)
+				_, _ = agentSvc.DeleteGroup(secondGroup.Id.String())
 			}()
 
 			// Get initial states
-			initialGroup1, err := agentSvc.GetGroup(testGroup.Id, nil)
+			initialGroup1, err := agentSvc.GetGroup(testGroup.Id.String(), nil)
 			Expect(err).ToNot(HaveOccurred())
 			initialUpdatedAt1 := initialGroup1.Group.UpdatedAt
 
-			initialGroup2, err := agentSvc.GetGroup(secondGroup.Id, nil)
+			initialGroup2, err := agentSvc.GetGroup(secondGroup.Id.String(), nil)
 			Expect(err).ToNot(HaveOccurred())
 			initialUpdatedAt2 := initialGroup2.Group.UpdatedAt
 
@@ -265,12 +265,12 @@ var _ = Describe("Migration Exclusion Group Inventory e2e tests", Ordered, func(
 			Expect(err).ToNot(HaveOccurred())
 
 			// Assert: Both groups should have updated inventories
-			updatedGroup1, err := agentSvc.GetGroup(testGroup.Id, nil)
+			updatedGroup1, err := agentSvc.GetGroup(testGroup.Id.String(), nil)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(updatedGroup1.Group.UpdatedAt).ToNot(Equal(initialUpdatedAt1),
 				"first group updated_at should change")
 
-			updatedGroup2, err := agentSvc.GetGroup(secondGroup.Id, nil)
+			updatedGroup2, err := agentSvc.GetGroup(secondGroup.Id.String(), nil)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(updatedGroup2.Group.UpdatedAt).ToNot(Equal(initialUpdatedAt2),
 				"second group updated_at should change")
@@ -343,7 +343,7 @@ var _ = Describe("Migration Exclusion Group Inventory e2e tests", Ordered, func(
 			Expect(*vm2After.MigrationExcluded).To(BeFalse(), "second VM should remain included")
 
 			// Verify group inventory was updated
-			updatedGroup, err := agentSvc.GetGroup(testGroup.Id, nil)
+			updatedGroup, err := agentSvc.GetGroup(testGroup.Id.String(), nil)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(updatedGroup.Inventory).ToNot(BeNil(), "group inventory should exist")
 

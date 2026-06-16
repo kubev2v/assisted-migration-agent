@@ -243,7 +243,7 @@ var _ = Describe("API validation e2e tests", Ordered, func() {
 		It("should reject duplicate group name", func() {
 			group, err := agentSvc.CreateGroup("dup-check", "memory > 0", "")
 			Expect(err).ToNot(HaveOccurred())
-			defer func() { _, _ = agentSvc.DeleteGroup(group.Id) }()
+			defer func() { _, _ = agentSvc.DeleteGroup(group.Id.String()) }()
 
 			body, _ := json.Marshal(v1.CreateGroupRequest{Name: "dup-check", Filter: "memory > 0"})
 			status, err := agentSvc.CreateGroupRaw(body)
@@ -261,7 +261,7 @@ var _ = Describe("API validation e2e tests", Ordered, func() {
 		BeforeEach(func() {
 			group, err := agentSvc.CreateGroup("update-target", "memory > 0", "")
 			Expect(err).ToNot(HaveOccurred())
-			groupID = group.Id
+			groupID = group.Id.String()
 		})
 
 		AfterEach(func() {
@@ -327,12 +327,13 @@ var _ = Describe("API validation e2e tests", Ordered, func() {
 		It("should return 404 for non-existent group", func() {
 			name := "new-name"
 			body, _ := json.Marshal(v1.UpdateGroupRequest{Name: &name})
-			status, err := agentSvc.UpdateGroupRaw("999999", body)
+			nonExistentUUID := uuid.New().String()
+			status, err := agentSvc.UpdateGroupRaw(nonExistentUUID, body)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(status).To(Equal(http.StatusNotFound))
 		})
 
-		It("should return 400 for non-numeric group id", func() {
+		It("should return 400 for invalid UUID group id", func() {
 			name := "new-name"
 			body, _ := json.Marshal(v1.UpdateGroupRequest{Name: &name})
 			status, err := agentSvc.UpdateGroupRaw("abc", body)
@@ -346,12 +347,13 @@ var _ = Describe("API validation e2e tests", Ordered, func() {
 	// -----------------------------------------------------------------
 	Context("DELETE /groups/{id}", func() {
 		It("should return 204 for non-existent group (idempotent)", func() {
-			status, err := agentSvc.DeleteGroup("999999")
+			nonExistentUUID := uuid.New().String()
+			status, err := agentSvc.DeleteGroup(nonExistentUUID)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(status).To(Equal(http.StatusNoContent))
 		})
 
-		It("should return 400 for non-numeric group id", func() {
+		It("should return 400 for invalid UUID group id", func() {
 			status, err := agentSvc.DeleteGroup("abc")
 			Expect(err).ToNot(HaveOccurred())
 			Expect(status).To(Equal(http.StatusBadRequest))
@@ -363,12 +365,13 @@ var _ = Describe("API validation e2e tests", Ordered, func() {
 	// -----------------------------------------------------------------
 	Context("GET /groups/{id}", func() {
 		It("should return 404 for non-existent group", func() {
-			status, err := agentSvc.GetGroupStatus("999999")
+			nonExistentUUID := uuid.New().String()
+			status, err := agentSvc.GetGroupStatus(nonExistentUUID)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(status).To(Equal(http.StatusNotFound))
 		})
 
-		It("should return 400 for non-numeric group id", func() {
+		It("should return 400 for invalid UUID group id", func() {
 			status, err := agentSvc.GetGroupStatus("abc")
 			Expect(err).ToNot(HaveOccurred())
 			Expect(status).To(Equal(http.StatusBadRequest))

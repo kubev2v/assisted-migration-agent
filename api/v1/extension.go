@@ -3,7 +3,6 @@ package v1
 import (
 	"crypto/x509"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
@@ -305,7 +304,6 @@ func NewInspectionStatus(status models.InspectionStatus) VmInspectionStatus {
 
 // NewGroupFromModel converts a models.Group to an API Group.
 func NewGroupFromModel(g models.Group) Group {
-	id := fmt.Sprintf("%d", g.ID)
 	createdAt := g.CreatedAt
 	if createdAt.IsZero() {
 		createdAt = time.Now()
@@ -315,7 +313,7 @@ func NewGroupFromModel(g models.Group) Group {
 		updatedAt = time.Now()
 	}
 	group := Group{
-		Id:        id,
+		Id:        g.ID,
 		Name:      g.Name,
 		Filter:    g.Filter,
 		CreatedAt: &createdAt,

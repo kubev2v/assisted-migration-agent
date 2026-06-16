@@ -3,10 +3,10 @@ package v1
 import (
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/pkg/inventory/converters"
 
 	v1 "github.com/kubev2v/assisted-migration-agent/api/v1"
@@ -107,14 +107,8 @@ func (h *Handler) CreateGroup(c *gin.Context) {
 
 // GetGroup returns a group by ID with its VMs
 // (GET /groups/{id})
-func (h *Handler) GetGroup(c *gin.Context, id string, params v1.GetGroupParams) {
-	groupID, err := strconv.Atoi(id)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid group id"})
-		return
-	}
-
-	group, err := h.groupSrv.Get(c.Request.Context(), groupID)
+func (h *Handler) GetGroup(c *gin.Context, id uuid.UUID, params v1.GetGroupParams) {
+	group, err := h.groupSrv.Get(c.Request.Context(), id)
 	if err != nil {
 		if srvErrors.IsResourceNotFoundError(err) {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
@@ -159,7 +153,7 @@ func (h *Handler) GetGroup(c *gin.Context, id string, params v1.GetGroupParams) 
 		}
 	}
 
-	vms, total, err := h.groupSrv.ListVirtualMachines(c.Request.Context(), groupID, svcParams)
+	vms, total, err := h.groupSrv.ListVirtualMachines(c.Request.Context(), id, svcParams)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -193,13 +187,7 @@ func (h *Handler) GetGroup(c *gin.Context, id string, params v1.GetGroupParams) 
 
 // UpdateGroup partially updates an existing group
 // (PATCH /groups/{id})
-func (h *Handler) UpdateGroup(c *gin.Context, id string) {
-	groupID, err := strconv.Atoi(id)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid group id"})
-		return
-	}
-
+func (h *Handler) UpdateGroup(c *gin.Context, id uuid.UUID) {
 	var req v1.UpdateGroupRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": validationErrorMessage(err)})
@@ -222,7 +210,7 @@ func (h *Handler) UpdateGroup(c *gin.Context, id string) {
 		}
 	}
 
-	existing, err := h.groupSrv.Get(c.Request.Context(), groupID)
+	existing, err := h.groupSrv.Get(c.Request.Context(), id)
 	if err != nil {
 		if srvErrors.IsResourceNotFoundError(err) {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
@@ -242,7 +230,7 @@ func (h *Handler) UpdateGroup(c *gin.Context, id string) {
 		existing.Description = *req.Description
 	}
 
-	updated, err := h.groupSrv.Update(c.Request.Context(), groupID, *existing)
+	updated, err := h.groupSrv.Update(c.Request.Context(), id, *existing)
 	if err != nil {
 		if srvErrors.IsDuplicateResourceError(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -257,14 +245,8 @@ func (h *Handler) UpdateGroup(c *gin.Context, id string) {
 
 // DeleteGroup deletes a group
 // (DELETE /groups/{id})
-func (h *Handler) DeleteGroup(c *gin.Context, id string) {
-	groupID, err := strconv.Atoi(id)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid group id"})
-		return
-	}
-
-	if err := h.groupSrv.Delete(c.Request.Context(), groupID); err != nil {
+func (h *Handler) DeleteGroup(c *gin.Context, id uuid.UUID) {
+	if err := h.groupSrv.Delete(c.Request.Context(), id); err != nil {
 		if !srvErrors.IsResourceNotFoundError(err) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return

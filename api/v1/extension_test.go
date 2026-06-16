@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -312,8 +313,9 @@ var _ = Describe("NewCollectorStatusWithError", func() {
 var _ = Describe("NewGroupFromModel", func() {
 	It("should convert all fields", func() {
 		now := time.Now()
+		testID := uuid.MustParse("550e8400-e29b-41d4-a716-446655440000")
 		g := models.Group{
-			ID:          42,
+			ID:          testID,
 			Name:        "prod",
 			Filter:      "cluster = 'prod'",
 			Description: "Production VMs",
@@ -323,7 +325,7 @@ var _ = Describe("NewGroupFromModel", func() {
 
 		result := v1.NewGroupFromModel(g)
 
-		Expect(result.Id).To(Equal("42"))
+		Expect(result.Id).To(Equal(testID))
 		Expect(result.Name).To(Equal("prod"))
 		Expect(result.Filter).To(Equal("cluster = 'prod'"))
 		Expect(result.Description).NotTo(BeNil())
@@ -333,7 +335,8 @@ var _ = Describe("NewGroupFromModel", func() {
 	})
 
 	It("should not include description when empty", func() {
-		g := models.Group{ID: 1, Name: "g", Filter: "name = 'x'", CreatedAt: time.Now(), UpdatedAt: time.Now()}
+		testID := uuid.MustParse("550e8400-e29b-41d4-a716-446655440001")
+		g := models.Group{ID: testID, Name: "g", Filter: "name = 'x'", CreatedAt: time.Now(), UpdatedAt: time.Now()}
 
 		result := v1.NewGroupFromModel(g)
 
@@ -341,7 +344,8 @@ var _ = Describe("NewGroupFromModel", func() {
 	})
 
 	It("should default zero CreatedAt to now", func() {
-		g := models.Group{ID: 1, Name: "g", Filter: "name = 'x'", UpdatedAt: time.Now()}
+		testID := uuid.MustParse("550e8400-e29b-41d4-a716-446655440002")
+		g := models.Group{ID: testID, Name: "g", Filter: "name = 'x'", UpdatedAt: time.Now()}
 
 		result := v1.NewGroupFromModel(g)
 
@@ -349,7 +353,8 @@ var _ = Describe("NewGroupFromModel", func() {
 	})
 
 	It("should default zero UpdatedAt to now", func() {
-		g := models.Group{ID: 1, Name: "g", Filter: "name = 'x'", CreatedAt: time.Now()}
+		testID := uuid.MustParse("550e8400-e29b-41d4-a716-446655440003")
+		g := models.Group{ID: testID, Name: "g", Filter: "name = 'x'", CreatedAt: time.Now()}
 
 		result := v1.NewGroupFromModel(g)
 

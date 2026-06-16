@@ -2,11 +2,14 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	sq "github.com/Masterminds/squirrel"
+	"github.com/google/uuid"
 
 	"github.com/kubev2v/migration-planner/pkg/inventory"
+	"github.com/kubev2v/migration-planner/pkg/inventory/converters"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
@@ -78,11 +81,11 @@ func (s *GroupService) List(ctx context.Context, params GroupListParams) ([]mode
 	return groups, total, nil
 }
 
-func (s *GroupService) Get(ctx context.Context, id int) (*models.Group, error) {
+func (s *GroupService) Get(ctx context.Context, id uuid.UUID) (*models.Group, error) {
 	return s.store.Group().Get(ctx, id)
 }
 
-func (s *GroupService) ListVirtualMachines(ctx context.Context, id int, params GroupGetParams) ([]models.VirtualMachineSummary, int, error) {
+func (s *GroupService) ListVirtualMachines(ctx context.Context, id uuid.UUID, params GroupGetParams) ([]models.VirtualMachineSummary, int, error) {
 	if _, err := s.store.Group().Get(ctx, id); err != nil {
 		return []models.VirtualMachineSummary{}, 0, err
 	}
@@ -151,6 +154,12 @@ func (s *GroupService) Create(ctx context.Context, group models.Group) (*models.
 		}
 
 		created.Inventory = inv
+
+		// Add outbox event for group creation
+		if err := s.addGroupInventoryEvent(txCtx, models.GroupInventoryUpsertEvent, created); err != nil {
+			return fmt.Errorf("adding group inventory event: %w", err)
+		}
+
 		return nil
 	})
 	if err != nil {
@@ -160,7 +169,7 @@ func (s *GroupService) Create(ctx context.Context, group models.Group) (*models.
 	return created, nil
 }
 
-func (s *GroupService) Update(ctx context.Context, id int, group models.Group) (*models.Group, error) {
+func (s *GroupService) Update(ctx context.Context, id uuid.UUID, group models.Group) (*models.Group, error) {
 	var updated *models.Group
 
 	err := s.store.WithTx(ctx, func(txCtx context.Context) error {
@@ -189,6 +198,12 @@ func (s *GroupService) Update(ctx context.Context, id int, group models.Group) (
 		}
 
 		updated.Inventory = inv
+
+		// Add outbox event for group update
+		if err := s.addGroupInventoryEvent(txCtx, models.GroupInventoryUpsertEvent, updated); err != nil {
+			return fmt.Errorf("adding group inventory event: %w", err)
+		}
+
 		return nil
 	})
 	if err != nil {
@@ -198,8 +213,31 @@ func (s *GroupService) Update(ctx context.Context, id int, group models.Group) (
 	return updated, nil
 }
 
-func (s *GroupService) Delete(ctx context.Context, id int) error {
+func (s *GroupService) Delete(ctx context.Context, id uuid.UUID) error {
 	return s.store.WithTx(ctx, func(txCtx context.Context) error {
+		// Get group info before deletion for the event
+		group, err := s.store.Group().Get(txCtx, id)
+		if err != nil {
+			return err
+		}
+
+		// Add delete event BEFORE actual deletion
+		payload := models.GroupInventoryDeleteEventPayload{
+			GroupID:   id.String(),
+			GroupName: group.Name,
+		}
+		payloadBytes, err := json.Marshal(payload)
+		if err != nil {
+			return fmt.Errorf("marshaling delete event payload: %w", err)
+		}
+
+		if err := s.store.Outbox().Insert(txCtx, models.Event{
+			Kind: models.GroupInventoryDeleteEvent,
+			Data: payloadBytes,
+		}); err != nil {
+			return fmt.Errorf("adding group delete event: %w", err)
+		}
+
 		if err := s.store.Group().Delete(txCtx, id); err != nil {
 			return err
 		}
@@ -220,4 +258,43 @@ func (s *GroupService) buildGroupInventory(ctx context.Context, vmIDs []string) 
 	}
 
 	return inv, nil
+}
+
+// addGroupInventoryEvent creates an outbox event for group inventory changes.
+// Must be called within a transaction context.
+// Event payload contains: groupID, groupName, and inventory.
+// Fields like vmsCount and vCenterID are extracted from inventory when processing the event.
+// Always emits an event, even for empty groups, to ensure cross-system consistency.
+func (s *GroupService) addGroupInventoryEvent(ctx context.Context, eventKind models.EventKind, group *models.Group) error {
+	// Prepare inventory as JSON
+	var invJSON json.RawMessage
+	if group.Inventory != nil {
+		// Convert domain inventory to API type before marshaling
+		apiInventory := converters.ToAPI(group.Inventory)
+		invBytes, err := json.Marshal(apiInventory)
+		if err != nil {
+			return fmt.Errorf("marshaling inventory: %w", err)
+		}
+		invJSON = invBytes
+	} else {
+		// Empty inventory - use JSON null to indicate the group has no VMs
+		invJSON = json.RawMessage("null")
+	}
+
+	// Create typed event payload
+	payload := models.GroupInventoryEventPayload{
+		GroupID:   group.ID.String(),
+		GroupName: group.Name,
+		Inventory: invJSON,
+	}
+
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshaling event payload: %w", err)
+	}
+
+	return s.store.Outbox().Insert(ctx, models.Event{
+		Kind: eventKind,
+		Data: payloadBytes,
+	})
 }

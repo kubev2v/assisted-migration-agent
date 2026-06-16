@@ -3,7 +3,9 @@ package store_test
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 
+	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -152,6 +154,133 @@ var _ = Describe("OutboxStore", func() {
 
 		It("should succeed on empty outbox", func() {
 			Expect(s.Outbox().Delete(ctx, 0)).To(Succeed())
+		})
+	})
+
+	Describe("New Event Types", func() {
+		Context("GroupInventoryUpsertEvent", func() {
+			It("should insert group inventory upsert event", func() {
+				groupID := uuid.New().String()
+				payload := map[string]interface{}{
+					"groupID":   groupID,
+					"groupName": "test-group",
+					"inventory": map[string]interface{}{
+						"vCenterID": "vcenter-01",
+						"vms":       []interface{}{map[string]interface{}{"id": "vm1"}},
+					},
+				}
+				payloadBytes, err := json.Marshal(payload)
+				Expect(err).NotTo(HaveOccurred())
+
+				event := models.Event{
+					Kind: models.GroupInventoryUpsertEvent,
+					Data: payloadBytes,
+				}
+
+				Expect(s.Outbox().Insert(ctx, event)).To(Succeed())
+
+				events, err := s.Outbox().Get(ctx)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(events).To(HaveLen(1))
+				Expect(events[0].Kind).To(Equal(models.GroupInventoryUpsertEvent))
+				Expect(events[0].Data).To(MatchJSON(payloadBytes))
+			})
+
+			It("should verify payload contains groupID, groupName, and inventory", func() {
+				groupID := uuid.New().String()
+				payload := map[string]interface{}{
+					"groupID":   groupID,
+					"groupName": "production-vms",
+					"inventory": map[string]interface{}{
+						"vCenterID": "vcenter-prod",
+						"vms":       []interface{}{},
+					},
+				}
+				data, err := json.Marshal(payload)
+				Expect(err).NotTo(HaveOccurred())
+
+				event := models.Event{
+					Kind: models.GroupInventoryUpsertEvent,
+					Data: data,
+				}
+
+				Expect(s.Outbox().Insert(ctx, event)).To(Succeed())
+
+				events, err := s.Outbox().Get(ctx)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(events).To(HaveLen(1))
+
+				var retrieved map[string]interface{}
+				Expect(json.Unmarshal(events[0].Data, &retrieved)).To(Succeed())
+				Expect(retrieved).To(HaveKey("groupID"))
+				Expect(retrieved).To(HaveKey("groupName"))
+				Expect(retrieved).To(HaveKey("inventory"))
+				Expect(retrieved).NotTo(HaveKey("vmsCount"), "vmsCount should be extracted from inventory, not stored")
+				Expect(retrieved).NotTo(HaveKey("vCenterID"), "vCenterID should be extracted from inventory, not stored")
+			})
+		})
+
+		Context("GroupInventoryDeleteEvent", func() {
+			It("should insert group inventory delete event", func() {
+				groupID := uuid.New().String()
+				payload := map[string]interface{}{
+					"groupID":   groupID,
+					"groupName": "test-group",
+				}
+				payloadBytes, err := json.Marshal(payload)
+				Expect(err).NotTo(HaveOccurred())
+
+				event := models.Event{
+					Kind: models.GroupInventoryDeleteEvent,
+					Data: payloadBytes,
+				}
+
+				Expect(s.Outbox().Insert(ctx, event)).To(Succeed())
+
+				events, err := s.Outbox().Get(ctx)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(events).To(HaveLen(1))
+				Expect(events[0].Kind).To(Equal(models.GroupInventoryDeleteEvent))
+				Expect(events[0].Data).To(MatchJSON(payloadBytes))
+			})
+		})
+
+		Context("Event Ordering", func() {
+			It("should process upsert then delete in correct order", func() {
+				groupID := uuid.New().String()
+				upsertPayload := map[string]interface{}{
+					"groupID":   groupID,
+					"groupName": "test",
+					"inventory": map[string]interface{}{},
+				}
+				deletePayload := map[string]interface{}{
+					"groupID":   groupID,
+					"groupName": "test",
+				}
+				upsertBytes, err := json.Marshal(upsertPayload)
+				Expect(err).NotTo(HaveOccurred())
+				deleteBytes, err := json.Marshal(deletePayload)
+				Expect(err).NotTo(HaveOccurred())
+
+				upsert := models.Event{
+					Kind: models.GroupInventoryUpsertEvent,
+					Data: upsertBytes,
+				}
+				delete := models.Event{
+					Kind: models.GroupInventoryDeleteEvent,
+					Data: deleteBytes,
+				}
+
+				Expect(s.Outbox().Insert(ctx, upsert)).To(Succeed())
+				Expect(s.Outbox().Insert(ctx, delete)).To(Succeed())
+
+				events, err := s.Outbox().Get(ctx)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(events).To(HaveLen(2))
+				Expect(events[0].Kind).To(Equal(models.GroupInventoryUpsertEvent))
+				Expect(events[1].Kind).To(Equal(models.GroupInventoryDeleteEvent))
+				Expect(events[0].ID).To(BeNumerically("<", events[1].ID))
+			})
 		})
 	})
 })

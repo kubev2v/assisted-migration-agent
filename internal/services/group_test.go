@@ -3,9 +3,12 @@ package services_test
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/pkg/inventory"
+	"github.com/kubev2v/migration-planner/pkg/inventory/converters"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -14,6 +17,7 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/services"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
+	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	"github.com/kubev2v/assisted-migration-agent/test"
 )
 
@@ -77,7 +81,7 @@ var _ = Describe("GroupService", func() {
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
 			Expect(created).NotTo(BeNil())
-			Expect(created.ID).To(BeNumerically(">", 0))
+			Expect(created.ID).NotTo(BeEmpty())
 			Expect(created.Name).To(Equal("production-vms"))
 			Expect(created.Filter).To(Equal("cluster = 'production'"))
 			Expect(created.Description).To(Equal("All production VMs"))
@@ -135,17 +139,18 @@ var _ = Describe("GroupService", func() {
 		// Then it should return the group with all fields
 		It("should return a group inserted via raw SQL", func() {
 			// Arrange
+			testID := uuid.New()
 			_, err := db.ExecContext(ctx,
-				`INSERT INTO groups (id, name, filter, description) VALUES (42, 'raw-group', 'name = ''test''', 'inserted via SQL')`)
+				`INSERT INTO groups (id, name, filter, description) VALUES (?, 'raw-group', 'name = ''test''', 'inserted via SQL')`, testID)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
-			group, err := srv.Get(ctx, 42)
+			group, err := srv.Get(ctx, testID)
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
 			Expect(group).NotTo(BeNil())
-			Expect(group.ID).To(Equal(42))
+			Expect(group.ID).To(Equal(testID))
 			Expect(group.Name).To(Equal("raw-group"))
 			Expect(group.Filter).To(Equal("name = 'test'"))
 			Expect(group.Description).To(Equal("inserted via SQL"))
@@ -156,7 +161,7 @@ var _ = Describe("GroupService", func() {
 		// Then it should return a ResourceNotFoundError
 		It("should return not found for non-existent group", func() {
 			// Act
-			group, err := srv.Get(ctx, 999)
+			group, err := srv.Get(ctx, uuid.New())
 
 			// Assert
 			Expect(err).To(HaveOccurred())
@@ -343,7 +348,7 @@ var _ = Describe("GroupService", func() {
 		// Then it should return a ResourceNotFoundError
 		It("should return not found for non-existent group", func() {
 			// Act
-			_, err := srv.Update(ctx, 999, models.Group{Name: "x", Filter: "name = 'x'"})
+			_, err := srv.Update(ctx, uuid.New(), models.Group{Name: "x", Filter: "name = 'x'"})
 
 			// Assert
 			Expect(err).To(HaveOccurred())
@@ -377,7 +382,7 @@ var _ = Describe("GroupService", func() {
 		// Then it should return a ResourceNotFoundError
 		It("should return not found for non-existent group", func() {
 			// Act
-			err := srv.Delete(ctx, 999)
+			err := srv.Delete(ctx, uuid.New())
 
 			// Assert
 			Expect(err).To(HaveOccurred())
@@ -483,7 +488,7 @@ var _ = Describe("GroupService", func() {
 		// Then it should return a ResourceNotFoundError
 		It("should return not found for non-existent group", func() {
 			// Act
-			vms, total, err := srv.ListVirtualMachines(ctx, 999, services.GroupGetParams{})
+			vms, total, err := srv.ListVirtualMachines(ctx, uuid.New(), services.GroupGetParams{})
 
 			// Assert
 			Expect(err).To(HaveOccurred())
@@ -545,7 +550,7 @@ var _ = Describe("GroupService", func() {
 			// Assert - Expect success (will FAIL before fix, PASS after fix)
 			Expect(err).NotTo(HaveOccurred(), "Group creation should succeed atomically")
 			Expect(created).NotTo(BeNil())
-			Expect(created.ID).To(BeNumerically(">", 0))
+			Expect(created.ID).NotTo(BeEmpty())
 			Expect(created.Inventory).NotTo(BeNil(), "Inventory should be built atomically")
 
 			// Verify all data was committed atomically
@@ -559,6 +564,303 @@ var _ = Describe("GroupService", func() {
 				"SELECT COUNT(*) FROM group_matches WHERE group_id = ?", created.ID).Scan(&matchCount)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(matchCount).To(BeNumerically(">", 0))
+		})
+	})
+
+	Context("Inventory Converter", func() {
+		It("should use converter when marshaling inventory", func() {
+			// Test the converter directly to ensure it produces correct field names
+			domainInv := &inventory.Inventory{
+				VCenterID:      "test-vcenter-123",
+				VCenterVersion: "7.0.3",
+			}
+
+			// Convert to API type
+			apiInv := converters.ToAPI(domainInv)
+
+			// Marshal to JSON
+			jsonBytes, err := json.Marshal(apiInv)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Parse back to map to verify field names
+			var invMap map[string]interface{}
+			err = json.Unmarshal(jsonBytes, &invMap)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Verify API field names (snake_case with json tags)
+			_, hasVcenterID := invMap["vcenter_id"]
+			_, hasWrongField := invMap["VCenterID"]
+
+			Expect(hasVcenterID).To(BeTrue(), "Should have 'vcenter_id' (API field)")
+			Expect(hasWrongField).To(BeFalse(), "Should NOT have 'VCenterID' (domain field)")
+
+			// Verify values are correct
+			Expect(invMap["vcenter_id"]).To(Equal("test-vcenter-123"))
+		})
+
+		It("should convert vcenter_version field correctly", func() {
+			// Test VCenterVersion mapping
+			domainInv := &inventory.Inventory{
+				VCenterVersion: "8.0.0",
+			}
+
+			apiInv := converters.ToAPI(domainInv)
+			jsonBytes, err := json.Marshal(apiInv)
+			Expect(err).NotTo(HaveOccurred())
+
+			var invMap map[string]interface{}
+			err = json.Unmarshal(jsonBytes, &invMap)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Check the pointer is handled correctly
+			if vcenterVersion, ok := invMap["vcenter_version"].(string); ok {
+				Expect(vcenterVersion).To(Equal("8.0.0"))
+			} else {
+				Fail("vcenter_version should be present as string")
+			}
+
+			_, hasWrongField := invMap["VCenterVersion"]
+			Expect(hasWrongField).To(BeFalse(), "Should NOT have 'VCenterVersion' (domain field)")
+		})
+	})
+
+	Describe("Outbox Event Generation", Ordered, func() {
+		var (
+			ctx context.Context
+			st  *store.Store
+			srv *services.GroupService
+			db  *sql.DB
+		)
+
+		BeforeAll(func() {
+			ctx = context.Background()
+
+			var err error
+			db, err = store.NewDB(nil, ":memory:")
+			Expect(err).NotTo(HaveOccurred())
+
+			err = migrations.Run(ctx, db)
+			Expect(err).NotTo(HaveOccurred())
+
+			st = store.NewStore(db, test.NewMockValidator())
+
+			// Insert test VM data
+			Expect(test.InsertVMs(ctx, db)).To(Succeed())
+
+			mockBuilder := &mockInventoryBuilder{}
+			srv = services.NewGroupServiceWithInventoryBuilder(st, mockBuilder)
+		})
+
+		AfterAll(func() {
+			if db != nil {
+				_ = db.Close()
+			}
+		})
+
+		Context("Create", func() {
+			It("should add outbox event when creating group", func() {
+				group := models.Group{
+					Name:        "test-outbox-create",
+					Description: "Test group for outbox events",
+					Filter:      "name like 'web%'", // Match web-server VMs from test data
+				}
+
+				created, err := srv.Create(ctx, group)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(created.ID).NotTo(BeZero())
+
+				// Verify outbox event was created
+				events, err := st.Outbox().Get(ctx)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(events).To(HaveLen(1))
+				Expect(events[0].Kind).To(Equal(models.GroupInventoryUpsertEvent))
+
+				// Verify payload structure
+				var payload map[string]interface{}
+				err = json.Unmarshal(events[0].Data, &payload)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(payload["groupID"]).To(Equal(created.ID.String()))
+				Expect(payload["groupName"]).To(Equal("test-outbox-create"))
+				Expect(payload).To(HaveKey("inventory"))
+				Expect(payload).NotTo(HaveKey("vmsCount"), "vmsCount should be extracted from inventory")
+				Expect(payload).NotTo(HaveKey("vCenterID"), "vCenterID should be extracted from inventory")
+			})
+
+			It("should add outbox event for empty groups", func() {
+				// Clear previous events
+				events, _ := st.Outbox().Get(ctx)
+				for _, e := range events {
+					_ = st.Outbox().Delete(ctx, e.ID)
+				}
+
+				// Create a group with filter that matches no VMs
+				group := models.Group{
+					Name:        "test-empty-group",
+					Description: "Group with no matching VMs",
+					Filter:      "name = 'nonexistent-vm-12345'", // Will match no VMs
+				}
+
+				created, err := srv.Create(ctx, group)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(created.ID).NotTo(BeEmpty())
+
+				// Verify outbox event was created even though group is empty
+				events, err = st.Outbox().Get(ctx)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(events).To(HaveLen(1), "Empty groups should emit outbox events")
+				Expect(events[0].Kind).To(Equal(models.GroupInventoryUpsertEvent))
+
+				// Verify payload structure
+				var payload map[string]interface{}
+				err = json.Unmarshal(events[0].Data, &payload)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(payload["groupID"]).To(Equal(created.ID.String()))
+				Expect(payload["groupName"]).To(Equal("test-empty-group"))
+				Expect(payload).To(HaveKey("inventory"))
+
+				// Verify inventory is null for empty group
+				Expect(payload["inventory"]).To(BeNil(), "Empty group should have null inventory")
+			})
+
+			It("should rollback outbox event on group creation failure", func() {
+				// Get current event count
+				eventsBefore, err := st.Outbox().Get(ctx)
+				Expect(err).NotTo(HaveOccurred())
+				countBefore := len(eventsBefore)
+
+				// Try to create group with duplicate name (should fail)
+				group := models.Group{
+					Name:   "test-outbox-create", // Same name as previous test
+					Filter: "invalid syntax",     // This will cause validation failure
+				}
+
+				_, err = srv.Create(ctx, group)
+				Expect(err).To(HaveOccurred())
+
+				// Verify no new outbox event was created
+				eventsAfter, err := st.Outbox().Get(ctx)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(eventsAfter).To(HaveLen(countBefore), "Event should be rolled back on failure")
+			})
+		})
+
+		Context("Update", func() {
+			It("should add outbox event when updating group", func() {
+				// First create a group
+				group := models.Group{
+					Name:   "test-outbox-update",
+					Filter: "name like 'web%'",
+				}
+				created, err := srv.Create(ctx, group)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Clear all outbox events to ensure clean state
+				events, _ := st.Outbox().Get(ctx)
+				for _, e := range events {
+					_ = st.Outbox().Delete(ctx, e.ID)
+				}
+
+				// Update the group
+				updated := models.Group{
+					Name:   "test-outbox-updated",
+					Filter: "name like 'db%'",
+				}
+				_, err = srv.Update(ctx, created.ID, updated)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Verify update event
+				events, err = st.Outbox().Get(ctx)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(events).To(HaveLen(1))
+				Expect(events[0].Kind).To(Equal(models.GroupInventoryUpsertEvent))
+
+				// Verify payload has updated name
+				var payload map[string]interface{}
+				err = json.Unmarshal(events[0].Data, &payload)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(payload["groupName"]).To(Equal("test-outbox-updated"))
+			})
+		})
+
+		Context("Delete", func() {
+			It("should add outbox event when deleting group", func() {
+				// Create a group
+				group := models.Group{
+					Name:   "test-outbox-delete",
+					Filter: "name like 'app%'",
+				}
+				created, err := srv.Create(ctx, group)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Clear all outbox events to ensure clean state
+				events, _ := st.Outbox().Get(ctx)
+				for _, e := range events {
+					_ = st.Outbox().Delete(ctx, e.ID)
+				}
+
+				// Delete the group
+				err = srv.Delete(ctx, created.ID)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Verify delete event
+				events, err = st.Outbox().Get(ctx)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(events).To(HaveLen(1))
+				Expect(events[0].Kind).To(Equal(models.GroupInventoryDeleteEvent))
+
+				// Verify payload structure
+				var payload map[string]interface{}
+				err = json.Unmarshal(events[0].Data, &payload)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(payload["groupID"]).To(Equal(created.ID.String()))
+				Expect(payload["groupName"]).To(Equal("test-outbox-delete"))
+			})
+		})
+
+		Context("Event Payload Self-Containment", func() {
+			It("should have all data needed for API call without DB lookups", func() {
+				group := models.Group{
+					Name:   "test-self-contained",
+					Filter: "name like 'cache%'",
+				}
+
+				created, err := srv.Create(ctx, group)
+				Expect(err).NotTo(HaveOccurred())
+
+				events, err := st.Outbox().Get(ctx)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(events).NotTo(BeEmpty())
+
+				// Find the event for this group
+				var event *models.Event
+				for i := range events {
+					var payload map[string]interface{}
+					if err := json.Unmarshal(events[i].Data, &payload); err == nil {
+						if groupID, ok := payload["groupID"]; ok && groupID == created.ID.String() {
+							event = &events[i]
+							break
+						}
+					}
+				}
+				Expect(event).NotTo(BeNil())
+
+				// Verify payload has all required fields
+				var payload struct {
+					GroupID   string          `json:"groupID"`
+					GroupName string          `json:"groupName"`
+					Inventory json.RawMessage `json:"inventory"`
+				}
+				err = json.Unmarshal(event.Data, &payload)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(payload.GroupID).To(Equal(created.ID.String()))
+				Expect(payload.GroupName).To(Equal("test-self-contained"))
+				Expect(payload.Inventory).NotTo(BeNil())
+
+				// Verify inventory can be parsed
+				var inv map[string]interface{}
+				err = json.Unmarshal(payload.Inventory, &inv)
+				Expect(err).NotTo(HaveOccurred())
+			})
 		})
 	})
 })

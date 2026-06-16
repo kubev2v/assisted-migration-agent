@@ -350,7 +350,7 @@ type Group struct {
 	Filter string `json:"filter"`
 
 	// Id Unique group identifier (UUID)
-	Id string `json:"id"`
+	Id openapi_types.UUID `json:"id"`
 
 	// Name Group display name
 	Name string `json:"name"`

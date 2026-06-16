@@ -4,6 +4,8 @@ import (
 	"context"
 	"io"
 
+	"github.com/google/uuid"
+
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/services"
@@ -65,11 +67,11 @@ type VddkService interface {
 // GroupService defines the interface for group operations.
 type GroupService interface {
 	List(ctx context.Context, params services.GroupListParams) ([]models.Group, int, error)
-	ListVirtualMachines(ctx context.Context, id int, params services.GroupGetParams) ([]models.VirtualMachineSummary, int, error)
-	Get(ctx context.Context, id int) (*models.Group, error)
+	ListVirtualMachines(ctx context.Context, id uuid.UUID, params services.GroupGetParams) ([]models.VirtualMachineSummary, int, error)
+	Get(ctx context.Context, id uuid.UUID) (*models.Group, error)
 	Create(ctx context.Context, group models.Group) (*models.Group, error)
-	Update(ctx context.Context, id int, group models.Group) (*models.Group, error)
-	Delete(ctx context.Context, id int) error
+	Update(ctx context.Context, id uuid.UUID, group models.Group) (*models.Group, error)
+	Delete(ctx context.Context, id uuid.UUID) error
 }
 
 // ApplicationService defines the interface for application operations.

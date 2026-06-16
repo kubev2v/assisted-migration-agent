@@ -132,7 +132,7 @@ var _ = Describe("Group endpoint e2e tests", Ordered, func() {
 		It("should create a group and return it with id and timestamps", func() {
 			group, err := agentSvc.CreateGroup("test-group", "memory > 0", "e2e test group")
 			Expect(err).ToNot(HaveOccurred())
-			groupID = group.Id
+			groupID = group.Id.String()
 
 			Expect(group.Id).ToNot(BeEmpty())
 			Expect(group.Name).To(Equal("test-group"))
@@ -146,11 +146,11 @@ var _ = Describe("Group endpoint e2e tests", Ordered, func() {
 		It("should list created groups", func() {
 			g1, err := agentSvc.CreateGroup("group-a", "memory > 0", "")
 			Expect(err).ToNot(HaveOccurred())
-			defer func() { _, _ = agentSvc.DeleteGroup(g1.Id) }()
+			defer func() { _, _ = agentSvc.DeleteGroup(g1.Id.String()) }()
 
 			g2, err := agentSvc.CreateGroup("group-b", "memory >= 8192", "")
 			Expect(err).ToNot(HaveOccurred())
-			defer func() { _, _ = agentSvc.DeleteGroup(g2.Id) }()
+			defer func() { _, _ = agentSvc.DeleteGroup(g2.Id.String()) }()
 
 			list, err := agentSvc.ListGroups()
 			Expect(err).ToNot(HaveOccurred())
@@ -170,11 +170,11 @@ var _ = Describe("Group endpoint e2e tests", Ordered, func() {
 		It("should filter groups by name", func() {
 			g1, err := agentSvc.CreateGroup("filter-target", "memory > 0", "")
 			Expect(err).ToNot(HaveOccurred())
-			defer func() { _, _ = agentSvc.DeleteGroup(g1.Id) }()
+			defer func() { _, _ = agentSvc.DeleteGroup(g1.Id.String()) }()
 
 			g2, err := agentSvc.CreateGroup("other-group", "memory > 0", "")
 			Expect(err).ToNot(HaveOccurred())
-			defer func() { _, _ = agentSvc.DeleteGroup(g2.Id) }()
+			defer func() { _, _ = agentSvc.DeleteGroup(g2.Id.String()) }()
 
 			byName := "filter-target"
 			list, err := agentSvc.ListGroups(&service.GroupListParams{ByName: &byName})
@@ -187,10 +187,10 @@ var _ = Describe("Group endpoint e2e tests", Ordered, func() {
 		It("should get a group by ID with its VMs", func() {
 			group, err := agentSvc.CreateGroup("all-vms", "memory > 0", "")
 			Expect(err).ToNot(HaveOccurred())
-			groupID = group.Id
+			groupID = group.Id.String()
 
 			pageSize := 100
-			resp, err := agentSvc.GetGroup(group.Id, &service.GroupGetParams{PageSize: &pageSize})
+			resp, err := agentSvc.GetGroup(group.Id.String(), &service.GroupGetParams{PageSize: &pageSize})
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(resp.Group.Id).To(Equal(group.Id))
@@ -202,10 +202,10 @@ var _ = Describe("Group endpoint e2e tests", Ordered, func() {
 		It("should update group name via PATCH", func() {
 			group, err := agentSvc.CreateGroup("original-name", "memory > 0", "")
 			Expect(err).ToNot(HaveOccurred())
-			groupID = group.Id
+			groupID = group.Id.String()
 
 			newName := "updated-name"
-			updated, err := agentSvc.UpdateGroup(group.Id, v1.UpdateGroupRequest{Name: &newName})
+			updated, err := agentSvc.UpdateGroup(group.Id.String(), v1.UpdateGroupRequest{Name: &newName})
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(updated.Name).To(Equal("updated-name"))
@@ -215,19 +215,19 @@ var _ = Describe("Group endpoint e2e tests", Ordered, func() {
 		It("should update group filter via PATCH and change VM list", func() {
 			group, err := agentSvc.CreateGroup("filter-test", "memory > 0", "")
 			Expect(err).ToNot(HaveOccurred())
-			groupID = group.Id
+			groupID = group.Id.String()
 
 			pageSize := 100
-			before, err := agentSvc.GetGroup(group.Id, &service.GroupGetParams{PageSize: &pageSize})
+			before, err := agentSvc.GetGroup(group.Id.String(), &service.GroupGetParams{PageSize: &pageSize})
 			Expect(err).ToNot(HaveOccurred())
 			Expect(before.Total).To(Equal(totalVMs))
 
 			newFilter := "memory >= 32768"
-			_, err = agentSvc.UpdateGroup(group.Id, v1.UpdateGroupRequest{Filter: &newFilter})
+			_, err = agentSvc.UpdateGroup(group.Id.String(), v1.UpdateGroupRequest{Filter: &newFilter})
 			Expect(err).ToNot(HaveOccurred())
 
 			expectedAfter := countVMs(func(vm v1.VirtualMachine) bool { return vm.Memory >= 32768 })
-			after, err := agentSvc.GetGroup(group.Id, &service.GroupGetParams{PageSize: &pageSize})
+			after, err := agentSvc.GetGroup(group.Id.String(), &service.GroupGetParams{PageSize: &pageSize})
 			Expect(err).ToNot(HaveOccurred())
 			Expect(after.Total).To(Equal(expectedAfter))
 			Expect(after.Total).To(BeNumerically("<", totalVMs))
@@ -237,17 +237,18 @@ var _ = Describe("Group endpoint e2e tests", Ordered, func() {
 			group, err := agentSvc.CreateGroup("to-delete", "memory > 0", "")
 			Expect(err).ToNot(HaveOccurred())
 
-			status, err := agentSvc.DeleteGroup(group.Id)
+			status, err := agentSvc.DeleteGroup(group.Id.String())
 			Expect(err).ToNot(HaveOccurred())
 			Expect(status).To(Equal(http.StatusNoContent))
 
-			getStatus, err := agentSvc.GetGroupStatus(group.Id)
+			getStatus, err := agentSvc.GetGroupStatus(group.Id.String())
 			Expect(err).ToNot(HaveOccurred())
 			Expect(getStatus).To(Equal(http.StatusNotFound))
 		})
 
 		It("should return 204 when deleting non-existent group", func() {
-			status, err := agentSvc.DeleteGroup("999999")
+			nonExistentUUID := uuid.New().String()
+			status, err := agentSvc.DeleteGroup(nonExistentUUID)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(status).To(Equal(http.StatusNoContent))
 		})
@@ -289,10 +290,10 @@ var _ = Describe("Group endpoint e2e tests", Ordered, func() {
 		It("should reject PATCH with no fields", func() {
 			group, err := agentSvc.CreateGroup("patch-test", "memory > 0", "")
 			Expect(err).ToNot(HaveOccurred())
-			defer func() { _, _ = agentSvc.DeleteGroup(group.Id) }()
+			defer func() { _, _ = agentSvc.DeleteGroup(group.Id.String()) }()
 
 			body, _ := json.Marshal(v1.UpdateGroupRequest{})
-			status, err := agentSvc.UpdateGroupRaw(group.Id, body)
+			status, err := agentSvc.UpdateGroupRaw(group.Id.String(), body)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(status).To(Equal(http.StatusBadRequest))
 		})
@@ -300,7 +301,7 @@ var _ = Describe("Group endpoint e2e tests", Ordered, func() {
 		It("should reject duplicate group name on create", func() {
 			group, err := agentSvc.CreateGroup("unique-name", "memory > 0", "")
 			Expect(err).ToNot(HaveOccurred())
-			defer func() { _, _ = agentSvc.DeleteGroup(group.Id) }()
+			defer func() { _, _ = agentSvc.DeleteGroup(group.Id.String()) }()
 
 			// Try to create another group with the same name
 			body, _ := json.Marshal(v1.CreateGroupRequest{Name: "unique-name", Filter: "memory > 0"})
@@ -312,16 +313,16 @@ var _ = Describe("Group endpoint e2e tests", Ordered, func() {
 		It("should reject duplicate group name on update", func() {
 			group1, err := agentSvc.CreateGroup("first-name", "memory > 0", "")
 			Expect(err).ToNot(HaveOccurred())
-			defer func() { _, _ = agentSvc.DeleteGroup(group1.Id) }()
+			defer func() { _, _ = agentSvc.DeleteGroup(group1.Id.String()) }()
 
 			group2, err := agentSvc.CreateGroup("second-name", "memory > 0", "")
 			Expect(err).ToNot(HaveOccurred())
-			defer func() { _, _ = agentSvc.DeleteGroup(group2.Id) }()
+			defer func() { _, _ = agentSvc.DeleteGroup(group2.Id.String()) }()
 
 			// Try to update first group to have the same name as second
 			newName := "second-name"
 			body, _ := json.Marshal(v1.UpdateGroupRequest{Name: &newName})
-			status, err := agentSvc.UpdateGroupRaw(group1.Id, body)
+			status, err := agentSvc.UpdateGroupRaw(group1.Id.String(), body)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(status).To(Equal(http.StatusBadRequest))
 		})
@@ -335,7 +336,7 @@ var _ = Describe("Group endpoint e2e tests", Ordered, func() {
 			list, err := agentSvc.ListGroups()
 			if err == nil {
 				for _, g := range list.Groups {
-					_, _ = agentSvc.DeleteGroup(g.Id)
+					_, _ = agentSvc.DeleteGroup(g.Id.String())
 				}
 			}
 		})
@@ -345,7 +346,7 @@ var _ = Describe("Group endpoint e2e tests", Ordered, func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			pageSize := 100
-			resp, err := agentSvc.GetGroup(group.Id, &service.GroupGetParams{PageSize: &pageSize})
+			resp, err := agentSvc.GetGroup(group.Id.String(), &service.GroupGetParams{PageSize: &pageSize})
 			Expect(err).ToNot(HaveOccurred())
 
 			GinkgoWriter.Printf("Filter 'memory > 0': total=%d\n", resp.Total)
@@ -361,7 +362,7 @@ var _ = Describe("Group endpoint e2e tests", Ordered, func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			pageSize := 100
-			resp, err := agentSvc.GetGroup(group.Id, &service.GroupGetParams{PageSize: &pageSize})
+			resp, err := agentSvc.GetGroup(group.Id.String(), &service.GroupGetParams{PageSize: &pageSize})
 			Expect(err).ToNot(HaveOccurred())
 
 			GinkgoWriter.Printf("Filter 'poweredOn': total=%d\n", resp.Total)
@@ -381,7 +382,7 @@ var _ = Describe("Group endpoint e2e tests", Ordered, func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			pageSize := 100
-			resp, err := agentSvc.GetGroup(group.Id, &service.GroupGetParams{PageSize: &pageSize})
+			resp, err := agentSvc.GetGroup(group.Id.String(), &service.GroupGetParams{PageSize: &pageSize})
 			Expect(err).ToNot(HaveOccurred())
 
 			GinkgoWriter.Printf("Filter cluster='%s': total=%d\n", clusterName, resp.Total)
@@ -398,7 +399,7 @@ var _ = Describe("Group endpoint e2e tests", Ordered, func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			pageSize := 100
-			resp, err := agentSvc.GetGroup(group.Id, &service.GroupGetParams{PageSize: &pageSize})
+			resp, err := agentSvc.GetGroup(group.Id.String(), &service.GroupGetParams{PageSize: &pageSize})
 			Expect(err).ToNot(HaveOccurred())
 
 			GinkgoWriter.Printf("Filter memory>=32768: total=%d (expected %d)\n", resp.Total, expected)
@@ -415,7 +416,7 @@ var _ = Describe("Group endpoint e2e tests", Ordered, func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			pageSize := 100
-			resp, err := agentSvc.GetGroup(group.Id, &service.GroupGetParams{PageSize: &pageSize})
+			resp, err := agentSvc.GetGroup(group.Id.String(), &service.GroupGetParams{PageSize: &pageSize})
 			Expect(err).ToNot(HaveOccurred())
 
 			GinkgoWriter.Printf("Filter memory=131072: total=%d (expected %d)\n", resp.Total, expected)
@@ -432,7 +433,7 @@ var _ = Describe("Group endpoint e2e tests", Ordered, func() {
 				fmt.Sprintf("name = '%s'", vmName), "")
 			Expect(err).ToNot(HaveOccurred())
 
-			resp, err := agentSvc.GetGroup(group.Id, nil)
+			resp, err := agentSvc.GetGroup(group.Id.String(), nil)
 			Expect(err).ToNot(HaveOccurred())
 
 			GinkgoWriter.Printf("Filter name='%s': total=%d\n", vmName, resp.Total)
@@ -445,7 +446,7 @@ var _ = Describe("Group endpoint e2e tests", Ordered, func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			pageSize := 100
-			resp, err := agentSvc.GetGroup(group.Id, &service.GroupGetParams{PageSize: &pageSize})
+			resp, err := agentSvc.GetGroup(group.Id.String(), &service.GroupGetParams{PageSize: &pageSize})
 			Expect(err).ToNot(HaveOccurred())
 
 			GinkgoWriter.Printf("Filter firmware='bios': total=%d\n", resp.Total)
@@ -457,7 +458,7 @@ var _ = Describe("Group endpoint e2e tests", Ordered, func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			pageSize := 100
-			resp, err := agentSvc.GetGroup(group.Id, &service.GroupGetParams{PageSize: &pageSize})
+			resp, err := agentSvc.GetGroup(group.Id.String(), &service.GroupGetParams{PageSize: &pageSize})
 			Expect(err).ToNot(HaveOccurred())
 
 			GinkgoWriter.Printf("Filter cpus=4: total=%d\n", resp.Total)
@@ -477,7 +478,7 @@ var _ = Describe("Group endpoint e2e tests", Ordered, func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			pageSize := 100
-			resp, err := agentSvc.GetGroup(group.Id, &service.GroupGetParams{PageSize: &pageSize})
+			resp, err := agentSvc.GetGroup(group.Id.String(), &service.GroupGetParams{PageSize: &pageSize})
 			Expect(err).ToNot(HaveOccurred())
 
 			GinkgoWriter.Printf("Combined filter: total=%d\n", resp.Total)
@@ -492,7 +493,7 @@ var _ = Describe("Group endpoint e2e tests", Ordered, func() {
 			group, err := agentSvc.CreateGroup("no-match", "memory > 999999999", "")
 			Expect(err).ToNot(HaveOccurred())
 
-			resp, err := agentSvc.GetGroup(group.Id, nil)
+			resp, err := agentSvc.GetGroup(group.Id.String(), nil)
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(resp.Total).To(Equal(0))
@@ -509,7 +510,7 @@ var _ = Describe("Group endpoint e2e tests", Ordered, func() {
 		BeforeAll(func() {
 			group, err := agentSvc.CreateGroup("paginate-group", "memory > 0", "")
 			Expect(err).ToNot(HaveOccurred())
-			groupID = group.Id
+			groupID = group.Id.String()
 		})
 
 		AfterAll(func() {
@@ -568,7 +569,7 @@ var _ = Describe("Group endpoint e2e tests", Ordered, func() {
 		BeforeAll(func() {
 			group, err := agentSvc.CreateGroup("sort-group", "memory > 0", "")
 			Expect(err).ToNot(HaveOccurred())
-			groupID = group.Id
+			groupID = group.Id.String()
 		})
 
 		AfterAll(func() {
@@ -695,7 +696,7 @@ var _ = Describe("Group membership e2e tests", Ordered, func() {
 		group, err := agentSvc.CreateGroupWithTags("cluster-group",
 			fmt.Sprintf("cluster = '%s'", firstCluster), "", nil)
 		Expect(err).ToNot(HaveOccurred())
-		defer func() { _, _ = agentSvc.DeleteGroup(group.Id) }()
+		defer func() { _, _ = agentSvc.DeleteGroup(group.Id.String()) }()
 
 		// Act - list all VMs
 		pageSize := 100
@@ -722,12 +723,12 @@ var _ = Describe("Group membership e2e tests", Ordered, func() {
 		group1, err := agentSvc.CreateGroupWithTags("group-1",
 			fmt.Sprintf("cluster = '%s'", firstCluster), "", nil)
 		Expect(err).ToNot(HaveOccurred())
-		defer func() { _, _ = agentSvc.DeleteGroup(group1.Id) }()
+		defer func() { _, _ = agentSvc.DeleteGroup(group1.Id.String()) }()
 
 		group2, err := agentSvc.CreateGroupWithTags("group-2",
 			"memory > 0", "", nil)
 		Expect(err).ToNot(HaveOccurred())
-		defer func() { _, _ = agentSvc.DeleteGroup(group2.Id) }()
+		defer func() { _, _ = agentSvc.DeleteGroup(group2.Id.String()) }()
 
 		// Act - list VMs
 		pageSize := 100
@@ -768,7 +769,7 @@ var _ = Describe("Group membership e2e tests", Ordered, func() {
 		Expect(groupedCount).To(BeNumerically(">", 0), "some VMs should be in groups")
 
 		// Act - delete the group
-		_, err = agentSvc.DeleteGroup(group.Id)
+		_, err = agentSvc.DeleteGroup(group.Id.String())
 		Expect(err).ToNot(HaveOccurred())
 
 		// Assert - VMs should not have temp-group anymore

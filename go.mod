@@ -19,7 +19,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jzelinskie/cobrautil/v2 v2.0.0-20240819150235-f7fe73942d0f
 	github.com/kubev2v/forklift v0.0.0-20260602073417-e96a7f58d4e2
-	github.com/kubev2v/migration-planner v0.13.7-0.20260618070602-3947a175ebfc
+	github.com/kubev2v/migration-planner v0.14.1-0.20260622083705-21224f1f74cf
 	github.com/kubev2v/vm-migration-detective v0.0.0-20260506144435-77e61ac7d78d
 	github.com/oapi-codegen/gin-middleware v1.0.2
 	github.com/oapi-codegen/runtime v1.1.2

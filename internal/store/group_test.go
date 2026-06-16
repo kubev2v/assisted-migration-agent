@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	sq "github.com/Masterminds/squirrel"
+	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -55,7 +56,7 @@ var _ = Describe("GroupStore", func() {
 	}
 
 	// Helper to get matched VM IDs for a group from group_matches
-	getMatchedVMIDs := func(groupID int) []string {
+	getMatchedVMIDs := func(groupID uuid.UUID) []string {
 		ids, err := s.Group().GetMatchedIDs(ctx, groupID)
 		if err != nil {
 			return nil
@@ -83,8 +84,8 @@ var _ = Describe("GroupStore", func() {
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(groups).To(HaveLen(2))
-			Expect(groups[0].Name).To(Equal("group1"))
-			Expect(groups[1].Name).To(Equal("group2"))
+			groupNames := []string{groups[0].Name, groups[1].Name}
+			Expect(groupNames).To(ConsistOf("group1", "group2"))
 		})
 
 		It("should filter by name", func() {
@@ -160,7 +161,8 @@ var _ = Describe("GroupStore", func() {
 
 	Context("Get", func() {
 		It("should return ResourceNotFoundError when group does not exist", func() {
-			_, err := s.Group().Get(ctx, 999)
+			nonExistentID := uuid.New()
+			_, err := s.Group().Get(ctx, nonExistentID)
 
 			Expect(err).To(HaveOccurred())
 			Expect(srvErrors.IsResourceNotFoundError(err)).To(BeTrue())
@@ -194,7 +196,7 @@ var _ = Describe("GroupStore", func() {
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
-			Expect(created.ID).To(BeNumerically(">", 0))
+			Expect(created.ID).NotTo(Equal(uuid.Nil), "ID should be a non-zero UUID")
 			Expect(created.Name).To(Equal("newgroup"))
 			Expect(created.Filter).To(Equal("cluster in ['prod', 'staging']"))
 			Expect(created.Description).To(Equal("Production clusters"))
@@ -208,9 +210,11 @@ var _ = Describe("GroupStore", func() {
 
 			created1, err := s.Group().Create(ctx, g1)
 			Expect(err).NotTo(HaveOccurred())
+			Expect(created1.ID).NotTo(Equal(uuid.Nil), "ID should be a non-zero UUID")
 
 			created2, err := s.Group().Create(ctx, g2)
 			Expect(err).NotTo(HaveOccurred())
+			Expect(created2.ID).NotTo(Equal(uuid.Nil), "ID should be a non-zero UUID")
 
 			Expect(created1.ID).NotTo(Equal(created2.ID))
 		})
@@ -230,8 +234,9 @@ var _ = Describe("GroupStore", func() {
 
 	Context("Update", func() {
 		It("should return ResourceNotFoundError when group does not exist", func() {
+			nonExistentID := uuid.New()
 			g := models.Group{Name: "updated"}
-			_, err := s.Group().Update(ctx, 999, g)
+			_, err := s.Group().Update(ctx, nonExistentID, g)
 
 			Expect(err).To(HaveOccurred())
 			Expect(srvErrors.IsResourceNotFoundError(err)).To(BeTrue())
@@ -337,7 +342,8 @@ var _ = Describe("GroupStore", func() {
 
 	Context("Delete", func() {
 		It("should return ResourceNotFoundError when group does not exist", func() {
-			err := s.Group().Delete(ctx, 999)
+			nonExistentID := uuid.New()
+			err := s.Group().Delete(ctx, nonExistentID)
 
 			Expect(err).To(HaveOccurred())
 			Expect(srvErrors.IsResourceNotFoundError(err)).To(BeTrue())
@@ -535,7 +541,8 @@ var _ = Describe("GroupStore", func() {
 
 			groupIDs, err := s.Group().GetGroupsContainingVM(ctx, "vm-1")
 			Expect(err).NotTo(HaveOccurred())
-			Expect(groupIDs).To(ConsistOf(g.ID))
+			Expect(groupIDs).To(HaveLen(1))
+			Expect(groupIDs[0]).To(Equal(g.ID))
 		})
 
 		It("should return multiple group IDs when VM is in multiple groups", func() {
@@ -557,12 +564,14 @@ var _ = Describe("GroupStore", func() {
 			// vm-1 is in production folder AND has 'server' in name
 			groupIDs, err := s.Group().GetGroupsContainingVM(ctx, "vm-1")
 			Expect(err).NotTo(HaveOccurred())
-			Expect(groupIDs).To(ConsistOf(g1.ID, g2.ID))
+			Expect(groupIDs).To(HaveLen(2))
+			Expect(groupIDs).To(ContainElements(g1.ID, g2.ID))
 
 			// vm-4 only has 'server' in name
 			groupIDs, err = s.Group().GetGroupsContainingVM(ctx, "vm-4")
 			Expect(err).NotTo(HaveOccurred())
-			Expect(groupIDs).To(ConsistOf(g2.ID))
+			Expect(groupIDs).To(HaveLen(1))
+			Expect(groupIDs[0]).To(Equal(g2.ID))
 		})
 
 		It("should return empty slice when no groups exist", func() {
@@ -680,9 +689,9 @@ var _ = Describe("GroupStore", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(groups).To(HaveLen(2))
 			Expect(groups[0].Inventory).NotTo(BeNil())
-			Expect(groups[0].Inventory.VCenterID).To(Equal("vc1"))
 			Expect(groups[1].Inventory).NotTo(BeNil())
-			Expect(groups[1].Inventory.VCenterID).To(Equal("vc2"))
+			vcenterIDs := []string{groups[0].Inventory.VCenterID, groups[1].Inventory.VCenterID}
+			Expect(vcenterIDs).To(ConsistOf("vc1", "vc2"))
 		})
 
 		It("should update inventory data using UpdateInventory", func() {
@@ -737,7 +746,7 @@ var _ = Describe("GroupStore", func() {
 
 		It("should return error when updating inventory for non-existent group", func() {
 			// Arrange
-			nonExistentID := 999999
+			nonExistentID := uuid.New()
 			inventoryData := &inventory.Inventory{VCenterID: "test"}
 
 			// Act
