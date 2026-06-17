@@ -3,20 +3,30 @@ package services
 import (
 	"context"
 	"fmt"
+	"net/url"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/pkg/crypto"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
+	"github.com/kubev2v/assisted-migration-agent/pkg/vmware"
 )
+
+const credentialsRecordID = "credentials"
 
 type CredentialsService struct {
 	store  *store.Store
 	crypto *crypto.Crypto
+	keyMgr *crypto.KeyManager
 }
 
 func NewCredentialsService(st *store.Store) *CredentialsService {
 	return &CredentialsService{store: st, crypto: crypto.NewCrypto()}
+}
+
+func (s *CredentialsService) WithKeyManager(keyMgr *crypto.KeyManager) *CredentialsService {
+	s.keyMgr = keyMgr
+	return s
 }
 
 // SetMasterPassword changes the master password, re-encrypting all stored credentials.
@@ -102,6 +112,44 @@ func (s *CredentialsService) VerifyMasterPassword(ctx context.Context, password 
 	return s.crypto.Verify(password, stored)
 }
 
+func (s *CredentialsService) Store(ctx context.Context, creds models.Credentials) (string, error) {
+	normalizedURL, err := vmware.NormalizeAndValidateURL(creds.URL)
+	if err != nil {
+		return creds.URL, srvErrors.NewValidationError(fmt.Sprintf("invalid vCenter URL: %s", err))
+	}
+
+	parsedURL, err := url.Parse(normalizedURL)
+	if err != nil {
+		return creds.URL, srvErrors.NewValidationError(fmt.Sprintf("invalid vCenter URL: %s", err))
+	}
+	if parsedURL.User != nil {
+		return creds.URL, srvErrors.NewValidationError("vCenter URL must not include embedded credentials")
+	}
+	parsedURL.RawQuery = ""
+	parsedURL.Fragment = ""
+	creds.URL = parsedURL.String()
+
+	if s.keyMgr == nil {
+		return creds.URL, fmt.Errorf("key manager is not configured")
+	}
+	if err := vmware.VerifyCredentials(ctx, &creds, "credentials_mgmt"); err != nil {
+		return creds.URL, err
+	}
+	if err := s.Save(ctx, s.keyMgr.Key(), credentialsRecordID, creds); err != nil {
+		return creds.URL, fmt.Errorf("saving credentials: %w", err)
+	}
+
+	return creds.URL, nil
+}
+
+func (s *CredentialsService) Status(ctx context.Context) (string, error) {
+	url, err := s.GetURL(ctx, credentialsRecordID)
+	if err != nil {
+		return "", fmt.Errorf("getting credentials: %w", err)
+	}
+	return url, nil
+}
+
 func (s *CredentialsService) List(ctx context.Context) ([]string, error) {
 	return s.store.Credentials().List(ctx)
 }
@@ -132,6 +180,14 @@ func (s *CredentialsService) Get(ctx context.Context, hash []byte, id string) (m
 	return decrypted, nil
 }
 
+func (s *CredentialsService) GetURL(ctx context.Context, id string) (string, error) {
+	return s.store.Credentials().GetURL(ctx, id)
+}
+
 func (s *CredentialsService) Delete(ctx context.Context, id string) error {
 	return s.store.Credentials().Delete(ctx, id)
+}
+
+func (s *CredentialsService) DeleteAll(ctx context.Context) error {
+	return s.store.Credentials().DeleteAll(ctx)
 }

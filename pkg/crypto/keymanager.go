@@ -20,6 +20,15 @@ type KeyManager struct {
 }
 
 func NewKeyManager(dataFolder string) (*KeyManager, error) {
+	if dataFolder == "" {
+		zap.S().Named("keymanager").Warn("data-folder not set, using ephemeral encryption key (credentials will be lost on restart)")
+		key, err := generateKey()
+		if err != nil {
+			return nil, err
+		}
+		return &KeyManager{key: key}, nil
+	}
+
 	keyPath := filepath.Join(dataFolder, keyFileName)
 
 	data, err := os.ReadFile(keyPath)
@@ -27,14 +36,14 @@ func NewKeyManager(dataFolder string) (*KeyManager, error) {
 		if len(data) == keySize {
 			return &KeyManager{key: data}, nil
 		}
-		zap.S().Warnf("corrupted key file %s (%d bytes, expected %d) — regenerating; previously encrypted credentials are unrecoverable", keyPath, len(data), keySize)
+		zap.S().Named("keymanager").Warnf("corrupted key file %s (%d bytes, expected %d) — regenerating; previously encrypted credentials are unrecoverable", keyPath, len(data), keySize)
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, fmt.Errorf("reading key file: %w", err)
 	}
 
-	key := make([]byte, keySize)
-	if _, err := rand.Read(key); err != nil {
-		return nil, fmt.Errorf("generating encryption key: %w", err)
+	key, err := generateKey()
+	if err != nil {
+		return nil, err
 	}
 
 	if err := os.WriteFile(keyPath, key, 0600); err != nil {
@@ -42,6 +51,14 @@ func NewKeyManager(dataFolder string) (*KeyManager, error) {
 	}
 
 	return &KeyManager{key: key}, nil
+}
+
+func generateKey() ([]byte, error) {
+	key := make([]byte, keySize)
+	if _, err := rand.Read(key); err != nil {
+		return nil, fmt.Errorf("generating encryption key: %w", err)
+	}
+	return key, nil
 }
 
 func (km *KeyManager) Key() []byte {

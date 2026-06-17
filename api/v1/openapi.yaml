@@ -430,6 +430,65 @@ paths:
           description: Bad Credentials
         "500":
           description: Internal server error
+  /credentials:
+    put:
+      summary: Store vCenter credentials
+      operationId: putCredentials
+      description: >-
+        Validates credentials against vSphere, encrypts with disk-based key,
+        and stores in the local database as the active credential set.
+        A subsequent PUT overwrites the previously stored credentials.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VcenterCredentials'
+      responses:
+        '201':
+          description: Credentials created and stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CredentialStatus'
+        '200':
+          description: Credentials validated and stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CredentialStatus'
+        '400':
+          description: Invalid credentials or unreachable vCenter
+        '500':
+          description: Internal server error
+    get:
+      summary: Get stored credential status
+      operationId: getCredentials
+      description: >-
+        Returns stored credential metadata (URL only). Never exposes
+        username or password. This endpoint does not revalidate credentials
+        against vSphere.
+      responses:
+        '200':
+          description: Credential status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CredentialStatus'
+        '404':
+          description: No credentials stored
+        '500':
+          description: Internal server error
+    delete:
+      summary: Delete stored credentials
+      operationId: deleteCredentials
+      description: Removes all stored vCenter credentials from the database.
+      responses:
+        '204':
+          description: Credentials deleted
+        '500':
+          description: Internal server error
+
   /version:
     get:
       summary: Get agent version information
@@ -1620,6 +1679,19 @@ components:
         vddk:
           allOf:
             - $ref: '#/components/schemas/VddkProperties'
+
+    CredentialStatus:
+      type: object
+      required:
+        - url
+        - valid
+      properties:
+        url:
+          type: string
+          description: vCenter URL the credentials belong to
+        valid:
+          type: boolean
+          description: Whether credentials are stored for the returned URL.
 
     VcenterCredentials:
       required:

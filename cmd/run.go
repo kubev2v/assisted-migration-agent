@@ -36,6 +36,7 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/services"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/pkg/console"
+	"github.com/kubev2v/assisted-migration-agent/pkg/crypto"
 )
 
 const (
@@ -114,6 +115,12 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 				v1Handlers.RegisterValidators(v)
 			}
 
+			// init credential management
+			keyMgr, err := crypto.NewKeyManager(cfg.Agent.DataFolder)
+			if err != nil {
+				return fmt.Errorf("failed to initialize key manager: %w", err)
+			}
+
 			// init handlers
 			v1H := v1Handlers.NewHandler(*cfg).
 				WithConsoleService(svcMgr.ConsoleService()).
@@ -125,7 +132,8 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 				WithGroupService(svcMgr.GroupService()).
 				WithRightsizingService(svcMgr.RightsizingService()).
 				WithForecasterService(svcMgr.ForecasterService()).
-				WithApplicationService(svcMgr.ApplicationService())
+				WithApplicationService(svcMgr.ApplicationService()).
+				WithCredentialsService(services.NewCredentialsService(st).WithKeyManager(keyMgr))
 
 			srv, err := server.NewServer(cfg, map[string]func(router *gin.RouterGroup){
 				apiV1: func(router *gin.RouterGroup) {

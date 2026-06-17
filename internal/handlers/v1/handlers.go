@@ -9,6 +9,13 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/services"
 )
 
+// CredentialsService defines the interface for /credentials API operations.
+type CredentialsService interface {
+	Store(ctx context.Context, creds models.Credentials) (url string, err error)
+	Status(ctx context.Context) (url string, err error)
+	DeleteAll(ctx context.Context) error
+}
+
 // CollectorService defines the interface for collector operations.
 type CollectorService interface {
 	GetStatus() models.CollectorStatus
@@ -92,6 +99,7 @@ type Handler struct {
 	rightsizingSrv RightsizingService
 	forecasterSrv  ForecasterService
 	appSrv         ApplicationService
+	credentialsSrv CredentialsService
 }
 
 func NewHandler(cfg config.Configuration) *Handler {
@@ -145,5 +153,10 @@ func (h *Handler) WithForecasterService(srv ForecasterService) *Handler {
 
 func (h *Handler) WithApplicationService(srv ApplicationService) *Handler {
 	h.appSrv = srv
+	return h
+}
+
+func (h *Handler) WithCredentialsService(srv CredentialsService) *Handler {
+	h.credentialsSrv = srv
 	return h
 }

@@ -188,6 +188,15 @@ type CreateGroupRequest struct {
 	Name string `binding:"required,min=1,max=100" json:"name"`
 }
 
+// CredentialStatus defines model for CredentialStatus.
+type CredentialStatus struct {
+	// Url vCenter URL the credentials belong to
+	Url string `json:"url"`
+
+	// Valid Whether credentials are stored for the returned URL.
+	Valid bool `json:"valid"`
+}
+
 // DatastoreDetail defines model for DatastoreDetail.
 type DatastoreDetail struct {
 	// Capabilities Intrinsic offload capabilities of this datastore based on vendor support
@@ -1077,6 +1086,9 @@ type SetAgentModeJSONRequestBody = AgentModeRequest
 
 // StartCollectorJSONRequestBody defines body for StartCollector for application/json ContentType.
 type StartCollectorJSONRequestBody = CollectorStartRequest
+
+// PutCredentialsJSONRequestBody defines body for PutCredentials for application/json ContentType.
+type PutCredentialsJSONRequestBody = VcenterCredentials
 
 // StartForecasterJSONRequestBody defines body for StartForecaster for application/json ContentType.
 type StartForecasterJSONRequestBody = ForecasterStartRequest

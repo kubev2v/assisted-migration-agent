@@ -69,4 +69,18 @@ var _ = Describe("KeyManager", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(km.Key()).To(HaveLen(32))
 	})
+
+	It("uses an ephemeral key when data folder is empty", func() {
+		wd, err := os.Getwd()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(os.Chdir(tmpDir)).To(Succeed())
+		DeferCleanup(func() {
+			Expect(os.Chdir(wd)).To(Succeed())
+		})
+
+		km, err := crypto.NewKeyManager("")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(km.Key()).To(HaveLen(32))
+		Expect(filepath.Join(tmpDir, "credentials.key")).NotTo(BeAnExistingFile())
+	})
 })
