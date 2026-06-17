@@ -1,5 +1,12 @@
 package models
 
+// CollectorRequiredPrivileges lists the vSphere privileges needed by the collector
+// for basic read-only inventory access.
+var CollectorRequiredPrivileges = []string{
+	"System.Read",
+	"System.View",
+}
+
 // CollectorStateType represents the current state of the collector.
 type CollectorStateType string
 

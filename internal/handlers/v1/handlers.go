@@ -11,8 +11,9 @@ import (
 
 // CredentialsService defines the interface for /credentials API operations.
 type CredentialsService interface {
-	Store(ctx context.Context, creds models.Credentials) (url string, err error)
-	Status(ctx context.Context) (url string, err error)
+	Store(ctx context.Context, creds models.Credentials) (url string, perms *models.PermissionStatus, err error)
+	Status(ctx context.Context) (url string, perms *models.PermissionStatus, err error)
+	RefreshCredentials(ctx context.Context) (url string, perms *models.PermissionStatus, err error)
 	DeleteAll(ctx context.Context) error
 }
 

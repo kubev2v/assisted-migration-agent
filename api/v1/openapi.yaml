@@ -489,6 +489,25 @@ paths:
         '500':
           description: Internal server error
 
+  /credentials/refresh:
+    post:
+      summary: Re-validate stored credentials
+      operationId: refreshCredentials
+      description: >-
+        Re-validates stored credentials against vSphere and updates
+        permission status for each operation (collector, inspector, forecaster).
+      responses:
+        '200':
+          description: Credentials re-validated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CredentialStatus'
+        '404':
+          description: No credentials stored
+        '500':
+          description: Internal server error
+
   /version:
     get:
       summary: Get agent version information
@@ -1692,6 +1711,30 @@ components:
         valid:
           type: boolean
           description: Whether credentials are stored for the returned URL.
+        permissions:
+          type: object
+          description: vSphere permission status per operation
+          properties:
+            collector:
+              $ref: '#/components/schemas/OperationPermission'
+            inspector:
+              $ref: '#/components/schemas/OperationPermission'
+            forecaster:
+              $ref: '#/components/schemas/OperationPermission'
+
+    OperationPermission:
+      type: object
+      required:
+        - allowed
+      properties:
+        allowed:
+          type: boolean
+          description: Whether the stored credentials have sufficient privileges for this operation
+        missingPrivileges:
+          type: array
+          items:
+            type: string
+          description: List of specific vSphere privileges that are missing
 
     VcenterCredentials:
       required:

@@ -4,6 +4,14 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"sync"
+	"time"
+
+	"github.com/vmware/govmomi"
+	"github.com/vmware/govmomi/find"
+	"github.com/vmware/govmomi/session"
+	"github.com/vmware/govmomi/vim25"
+	"go.uber.org/zap"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
@@ -18,6 +26,9 @@ type CredentialsService struct {
 	store  *store.Store
 	crypto *crypto.Crypto
 	keyMgr *crypto.KeyManager
+
+	mu              sync.RWMutex
+	permissionCache *models.PermissionStatus
 }
 
 func NewCredentialsService(st *store.Store) *CredentialsService {
@@ -112,42 +123,54 @@ func (s *CredentialsService) VerifyMasterPassword(ctx context.Context, password 
 	return s.crypto.Verify(password, stored)
 }
 
-func (s *CredentialsService) Store(ctx context.Context, creds models.Credentials) (string, error) {
+func (s *CredentialsService) Store(ctx context.Context, creds models.Credentials) (string, *models.PermissionStatus, error) {
 	normalizedURL, err := vmware.NormalizeAndValidateURL(creds.URL)
 	if err != nil {
-		return creds.URL, srvErrors.NewValidationError(fmt.Sprintf("invalid vCenter URL: %s", err))
+		return creds.URL, nil, srvErrors.NewValidationError(fmt.Sprintf("invalid vCenter URL: %s", err))
 	}
 
 	parsedURL, err := url.Parse(normalizedURL)
 	if err != nil {
-		return creds.URL, srvErrors.NewValidationError(fmt.Sprintf("invalid vCenter URL: %s", err))
+		return creds.URL, nil, srvErrors.NewValidationError(fmt.Sprintf("invalid vCenter URL: %s", err))
 	}
 	if parsedURL.User != nil {
-		return creds.URL, srvErrors.NewValidationError("vCenter URL must not include embedded credentials")
+		return creds.URL, nil, srvErrors.NewValidationError("vCenter URL must not include embedded credentials")
 	}
 	parsedURL.RawQuery = ""
 	parsedURL.Fragment = ""
 	creds.URL = parsedURL.String()
 
-	if s.keyMgr == nil {
-		return creds.URL, fmt.Errorf("key manager is not configured")
-	}
 	if err := vmware.VerifyCredentials(ctx, &creds, "credentials_mgmt"); err != nil {
-		return creds.URL, err
+		return creds.URL, nil, err
+	}
+	if s.keyMgr == nil {
+		return creds.URL, nil, fmt.Errorf("key manager is not configured")
 	}
 	if err := s.Save(ctx, s.keyMgr.Key(), credentialsRecordID, creds); err != nil {
-		return creds.URL, fmt.Errorf("saving credentials: %w", err)
+		return creds.URL, nil, fmt.Errorf("saving credentials: %w", err)
 	}
 
-	return creds.URL, nil
+	perms, err := s.checkPermissions(ctx, &creds)
+	if err != nil {
+		zap.S().Named("credentials_service").Warnw("permission check failed after storing credentials", "error", err)
+	} else {
+		s.mu.Lock()
+		s.permissionCache = perms
+		s.mu.Unlock()
+	}
+
+	return creds.URL, perms, nil
 }
 
-func (s *CredentialsService) Status(ctx context.Context) (string, error) {
+func (s *CredentialsService) Status(ctx context.Context) (string, *models.PermissionStatus, error) {
 	url, err := s.GetURL(ctx, credentialsRecordID)
 	if err != nil {
-		return "", fmt.Errorf("getting credentials: %w", err)
+		return "", nil, fmt.Errorf("getting credentials: %w", err)
 	}
-	return url, nil
+	s.mu.RLock()
+	perms := s.permissionCache
+	s.mu.RUnlock()
+	return url, perms, nil
 }
 
 func (s *CredentialsService) List(ctx context.Context) ([]string, error) {
@@ -189,5 +212,113 @@ func (s *CredentialsService) Delete(ctx context.Context, id string) error {
 }
 
 func (s *CredentialsService) DeleteAll(ctx context.Context) error {
+	s.mu.Lock()
+	s.permissionCache = nil
+	s.mu.Unlock()
 	return s.store.Credentials().DeleteAll(ctx)
+}
+
+// RefreshCredentials re-validates stored credentials against vSphere, re-checks
+// permissions, and returns the updated credential status.
+func (s *CredentialsService) RefreshCredentials(ctx context.Context) (string, *models.PermissionStatus, error) {
+	if s.keyMgr == nil {
+		return "", nil, fmt.Errorf("key manager is not configured")
+	}
+
+	creds, err := s.Get(ctx, s.keyMgr.Key(), credentialsRecordID)
+	if err != nil {
+		return "", nil, err
+	}
+
+	perms, err := s.checkPermissions(ctx, &creds)
+	if err != nil {
+		return creds.URL, nil, fmt.Errorf("checking permissions: %w", err)
+	}
+
+	s.mu.Lock()
+	s.permissionCache = perms
+	s.mu.Unlock()
+
+	return creds.URL, perms, nil
+}
+
+// checkPermissions connects to vSphere and validates privileges for all three
+// operations (collector, inspector, forecaster) in a single session.
+func (s *CredentialsService) checkPermissions(ctx context.Context, creds *models.Credentials) (*models.PermissionStatus, error) {
+	u, err := url.ParseRequestURI(creds.URL)
+	if err != nil {
+		return nil, err
+	}
+	u.User = url.UserPassword(creds.Username, creds.Password)
+
+	verifyCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	soapClient, err := vmware.NewSoapClient(u, creds.SkipTLS, creds.CACert)
+	if err != nil {
+		return nil, err
+	}
+	vimClient, err := vim25.NewClient(verifyCtx, soapClient)
+	if err != nil {
+		return nil, err
+	}
+
+	client := &govmomi.Client{
+		SessionManager: session.NewManager(vimClient),
+		Client:         vimClient,
+	}
+
+	if err := client.Login(verifyCtx, u.User); err != nil {
+		return nil, srvErrors.NewVCenterError(err)
+	}
+	defer func() {
+		logoutCtx, logoutCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer logoutCancel()
+		_ = client.Logout(logoutCtx)
+		client.CloseIdleConnections()
+	}()
+
+	// Find default VM folder to check privileges against.
+	finder := find.NewFinder(vimClient, true)
+	dc, err := finder.DefaultDatacenter(verifyCtx)
+	if err != nil {
+		return nil, srvErrors.NewVCenterError(fmt.Errorf("failed to find datacenter: %w", err))
+	}
+	finder.SetDatacenter(dc)
+	vmFolder, err := finder.DefaultFolder(verifyCtx)
+	if err != nil {
+		return nil, srvErrors.NewVCenterError(fmt.Errorf("failed to find VM folder: %w", err))
+	}
+
+	ref := vmFolder.Reference()
+	status := &models.PermissionStatus{}
+
+	// Check each operation's privileges. An InsufficientPrivilegesError is NOT
+	// an error — it means the operation is not allowed and we capture the
+	// missing privileges.
+	type check struct {
+		privileges []string
+		target     *models.OperationPermission
+	}
+
+	checks := []check{
+		{models.CollectorRequiredPrivileges, &status.Collector},
+		{models.InspectorRequiredPrivileges, &status.Inspector},
+		{models.ForecasterRequiredPrivileges, &status.Forecaster},
+	}
+
+	for _, c := range checks {
+		if err := vmware.ValidateUserPrivilegesOnEntity(verifyCtx, vimClient, ref, c.privileges, creds.Username); err != nil {
+			if privErr := srvErrors.GetInsufficientPrivilegesError(err); privErr != nil {
+				c.target.Allowed = false
+				c.target.MissingPrivileges = privErr.Missing
+			} else {
+				return nil, err
+			}
+		} else {
+			c.target.Allowed = true
+		}
+	}
+
+	return status, nil
 }

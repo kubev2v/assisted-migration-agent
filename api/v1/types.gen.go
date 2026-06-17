@@ -190,6 +190,13 @@ type CreateGroupRequest struct {
 
 // CredentialStatus defines model for CredentialStatus.
 type CredentialStatus struct {
+	// Permissions vSphere permission status per operation
+	Permissions *struct {
+		Collector  *OperationPermission `json:"collector,omitempty"`
+		Forecaster *OperationPermission `json:"forecaster,omitempty"`
+		Inspector  *OperationPermission `json:"inspector,omitempty"`
+	} `json:"permissions,omitempty"`
+
 	// Url vCenter URL the credentials belong to
 	Url string `json:"url"`
 
@@ -416,6 +423,15 @@ type InspectorStatus struct {
 
 // InspectorStatusState Inspector state
 type InspectorStatusState string
+
+// OperationPermission defines model for OperationPermission.
+type OperationPermission struct {
+	// Allowed Whether the stored credentials have sufficient privileges for this operation
+	Allowed bool `json:"allowed"`
+
+	// MissingPrivileges List of specific vSphere privileges that are missing
+	MissingPrivileges *[]string `json:"missingPrivileges,omitempty"`
+}
 
 // PairCapability defines model for PairCapability.
 type PairCapability struct {

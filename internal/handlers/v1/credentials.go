@@ -7,6 +7,7 @@ import (
 	"go.uber.org/zap"
 
 	v1 "github.com/kubev2v/assisted-migration-agent/api/v1"
+	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
@@ -23,7 +24,7 @@ func (h *Handler) PutCredentials(c *gin.Context) {
 		return
 	}
 
-	url, err := h.credentialsSrv.Store(c.Request.Context(), creds)
+	url, perms, err := h.credentialsSrv.Store(c.Request.Context(), creds)
 	if err != nil {
 		if srvErrors.IsVCenterError(err) || srvErrors.IsValidationError(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -34,11 +35,11 @@ func (h *Handler) PutCredentials(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, v1.CredentialStatus{Url: url, Valid: true})
+	c.JSON(http.StatusOK, credentialStatusResponse(url, true, perms))
 }
 
 func (h *Handler) GetCredentials(c *gin.Context) {
-	url, err := h.credentialsSrv.Status(c.Request.Context())
+	url, perms, err := h.credentialsSrv.Status(c.Request.Context())
 	if err != nil {
 		if srvErrors.IsResourceNotFoundError(err) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "no credentials stored"})
@@ -49,7 +50,7 @@ func (h *Handler) GetCredentials(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, v1.CredentialStatus{Url: url, Valid: true})
+	c.JSON(http.StatusOK, credentialStatusResponse(url, true, perms))
 }
 
 func (h *Handler) DeleteCredentials(c *gin.Context) {
@@ -60,4 +61,43 @@ func (h *Handler) DeleteCredentials(c *gin.Context) {
 	}
 
 	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) RefreshCredentials(c *gin.Context) {
+	url, perms, err := h.credentialsSrv.RefreshCredentials(c.Request.Context())
+	if err != nil {
+		if srvErrors.IsResourceNotFoundError(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "no credentials stored"})
+			return
+		}
+		zap.S().Errorw("failed to refresh credentials", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, credentialStatusResponse(url, true, perms))
+}
+
+func credentialStatusResponse(url string, valid bool, perms *models.PermissionStatus) v1.CredentialStatus {
+	resp := v1.CredentialStatus{Url: url, Valid: valid}
+	if perms != nil {
+		resp.Permissions = &struct {
+			Collector  *v1.OperationPermission `json:"collector,omitempty"`
+			Forecaster *v1.OperationPermission `json:"forecaster,omitempty"`
+			Inspector  *v1.OperationPermission `json:"inspector,omitempty"`
+		}{
+			Collector:  operationPermissionToAPI(&perms.Collector),
+			Inspector:  operationPermissionToAPI(&perms.Inspector),
+			Forecaster: operationPermissionToAPI(&perms.Forecaster),
+		}
+	}
+	return resp
+}
+
+func operationPermissionToAPI(p *models.OperationPermission) *v1.OperationPermission {
+	op := &v1.OperationPermission{Allowed: p.Allowed}
+	if len(p.MissingPrivileges) > 0 {
+		op.MissingPrivileges = &p.MissingPrivileges
+	}
+	return op
 }

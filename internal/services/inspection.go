@@ -281,7 +281,7 @@ func (i *inspectionService) buildInspectionWorkUnits(id string) []InspectionWork
 
 func (i *inspectionService) validate(ctx context.Context, id string) error {
 	zap.S().Named("inspection_service").Infow("validating VM privileges for inspection", "vmId", id)
-	if err := i.operator.ValidatePrivileges(ctx, id, models.RequiredPrivileges); err != nil {
+	if err := i.operator.ValidatePrivileges(ctx, id, models.InspectorRequiredPrivileges); err != nil {
 		zap.S().Named("inspection_service").Errorw("privilege validation failed", "vmId", id, "error", err)
 		return err
 	}
