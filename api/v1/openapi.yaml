@@ -508,6 +508,49 @@ paths:
         '500':
           description: Internal server error
 
+  /export:
+    get:
+      summary: Export VM inventory and migration planning data
+      operationId: exportInventory
+      description: >-
+        Exports selected data scopes as CSV files packaged in a ZIP archive.
+        Supports flexible scope selection for offline analysis in Excel or custom tools.
+      parameters:
+        - name: scope
+          in: query
+          required: false
+          description: "Comma-separated list of scopes to export (default: overview). Available scopes: overview, hosts, clusters, datastores, vms, network, utilization, storage-forecast, applications, groups, inspection"
+          schema:
+            type: string
+          example: "overview,hosts,vms"
+      responses:
+        '200':
+          description: ZIP archive containing CSV files for requested scopes
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Invalid scope name
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "invalid scope: unknown"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
   /version:
     get:
       summary: Get agent version information

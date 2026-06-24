@@ -91,6 +91,13 @@ type RightsizingService interface {
 	ListLatestClusterUtilization(ctx context.Context, filterExpr string) (string, []models.RightsizingClusterUtilization, error)
 }
 
+// ExportService defines the interface for export operations.
+type ExportService interface {
+	SupportedScopes() []string
+	IsValidScope(scope string) bool
+	WriteZip(ctx context.Context, scopes []string, w io.Writer) error
+}
+
 type Handler struct {
 	cfg            config.Configuration
 	consoleSrv     ConsoleService
@@ -104,6 +111,7 @@ type Handler struct {
 	forecasterSrv  ForecasterService
 	appSrv         ApplicationService
 	credentialsSrv CredentialsService
+	exportSrv      ExportService
 }
 
 func NewHandler(cfg config.Configuration) *Handler {
@@ -162,5 +170,10 @@ func (h *Handler) WithApplicationService(srv ApplicationService) *Handler {
 
 func (h *Handler) WithCredentialsService(srv CredentialsService) *Handler {
 	h.credentialsSrv = srv
+	return h
+}
+
+func (h *Handler) WithExportService(srv ExportService) *Handler {
+	h.exportSrv = srv
 	return h
 }

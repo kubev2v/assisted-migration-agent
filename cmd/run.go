@@ -134,7 +134,8 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 				WithRightsizingService(svcMgr.RightsizingService()).
 				WithForecasterService(svcMgr.ForecasterService()).
 				WithApplicationService(svcMgr.ApplicationService()).
-				WithCredentialsService(svcMgr.CredentialsService())
+				WithCredentialsService(svcMgr.CredentialsService()).
+				WithExportService(svcMgr.ExportService())
 
 			srv, err := server.NewServer(cfg, map[string]func(router *gin.RouterGroup){
 				apiV1: func(router *gin.RouterGroup) {

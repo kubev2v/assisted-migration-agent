@@ -33,6 +33,7 @@ type ServiceManager struct {
 	group       *GroupService
 	rightsizing *RightsizingService
 	application *ApplicationService
+	export      *ExportService
 }
 
 type ServiceManagerOption func(*ServiceManager)
@@ -124,6 +125,8 @@ func (m *ServiceManager) Initialize() error {
 		return err
 	}
 
+	m.export = NewExportService(m.store)
+
 	factory.WithPostCollectionBuilder(m.rightsizing.BuildCollectorWorkUnits(
 		rightsizingDefaultLookbackHours,
 		rightsizingDefaultIntervalSeconds,
@@ -180,6 +183,10 @@ func (m *ServiceManager) ApplicationService() *ApplicationService {
 
 func (m *ServiceManager) CredentialsService() *CredentialsService {
 	return m.credentials
+}
+
+func (m *ServiceManager) ExportService() *ExportService {
+	return m.export
 }
 
 func (m *ServiceManager) Stop(ctx context.Context) {

@@ -26,6 +26,7 @@ type Store struct {
 	application   *ApplicationStore
 	credentials   *CredentialsStore
 	collection    *CollectionStore
+	export        *ExportStore
 }
 
 func NewStore(db *sql.DB, validator duckdb_parser.Validator) *Store {
@@ -48,6 +49,7 @@ func NewStore(db *sql.DB, validator duckdb_parser.Validator) *Store {
 		application:   NewApplicationStore(qi),
 		credentials:   NewCredentialsStore(qi),
 		collection:    NewCollectionStore(qi),
+		export:        NewExportStore(qi),
 	}
 }
 
@@ -113,6 +115,10 @@ func (s *Store) Credentials() *CredentialsStore {
 
 func (s *Store) Collection() *CollectionStore {
 	return s.collection
+}
+
+func (s *Store) Export() *ExportStore {
+	return s.export
 }
 
 func (s *Store) WithTx(ctx context.Context, fn func(ctx context.Context) error) error {

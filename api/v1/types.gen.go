@@ -1021,6 +1021,12 @@ type GetRightsizingReportClustersParams struct {
 	ByExpression *string `form:"byExpression,omitempty" json:"byExpression,omitempty"`
 }
 
+// ExportInventoryParams defines parameters for ExportInventory.
+type ExportInventoryParams struct {
+	// Scope Comma-separated list of scopes to export (default: overview). Available scopes: overview, hosts, clusters, datastores, vms, network, utilization, storage-forecast, applications, groups, inspection
+	Scope *string `form:"scope,omitempty" json:"scope,omitempty"`
+}
+
 // GetForecasterRunsParams defines parameters for GetForecasterRuns.
 type GetForecasterRunsParams struct {
 	// PairName Filter runs by pair name
