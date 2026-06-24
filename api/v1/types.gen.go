@@ -163,6 +163,15 @@ type BenchmarkRun struct {
 	ThroughputMbps  float64  `json:"throughputMbps"`
 }
 
+// CapabilityStatus defines model for CapabilityStatus.
+type CapabilityStatus struct {
+	Capabilities struct {
+		Collector  OperationCapability `json:"collector"`
+		Forecaster OperationCapability `json:"forecaster"`
+		Inspector  OperationCapability `json:"inspector"`
+	} `json:"capabilities"`
+}
+
 // CollectorStartRequest defines model for CollectorStartRequest.
 type CollectorStartRequest = VcenterCredentials
 
@@ -416,6 +425,15 @@ type InspectorStatus struct {
 
 // InspectorStatusState Inspector state
 type InspectorStatusState string
+
+// OperationCapability defines model for OperationCapability.
+type OperationCapability struct {
+	// Enabled Whether stored credentials have sufficient privileges
+	Enabled bool `json:"enabled"`
+
+	// MissingPrivileges Specific vSphere privileges that are missing
+	MissingPrivileges *[]string `json:"missingPrivileges,omitempty"`
+}
 
 // PairCapability defines model for PairCapability.
 type PairCapability struct {

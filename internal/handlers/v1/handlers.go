@@ -15,7 +15,9 @@ import (
 type CredentialsService interface {
 	Store(ctx context.Context, creds models.Credentials) (url string, err error)
 	Status(ctx context.Context) (url string, err error)
+	GetCapabilities(ctx context.Context) (*models.CapabilityStatus, error)
 	DeleteAll(ctx context.Context) error
+	Resolve(ctx context.Context) (models.Credentials, error)
 }
 
 // CollectorService defines the interface for collector operations.

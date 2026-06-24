@@ -489,6 +489,25 @@ paths:
         '500':
           description: Internal server error
 
+  /credentials/capabilities:
+    get:
+      summary: Check vSphere operation capabilities
+      operationId: getCredentialCapabilities
+      description: >-
+        Checks vSphere privileges for all operations (collector, inspector,
+        forecaster) using stored credentials. Single live vSphere check, no caching.
+      responses:
+        '200':
+          description: Capability status per operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapabilityStatus'
+        '404':
+          description: No credentials stored
+        '500':
+          description: Internal server error
+
   /version:
     get:
       summary: Get agent version information
@@ -1686,6 +1705,39 @@ components:
         vddk:
           allOf:
             - $ref: '#/components/schemas/VddkProperties'
+
+    OperationCapability:
+      type: object
+      required:
+        - enabled
+      properties:
+        enabled:
+          type: boolean
+          description: Whether stored credentials have sufficient privileges
+        missingPrivileges:
+          type: array
+          items:
+            type: string
+          description: Specific vSphere privileges that are missing
+
+    CapabilityStatus:
+      type: object
+      required:
+        - capabilities
+      properties:
+        capabilities:
+          type: object
+          required:
+            - collector
+            - inspector
+            - forecaster
+          properties:
+            collector:
+              $ref: '#/components/schemas/OperationCapability'
+            inspector:
+              $ref: '#/components/schemas/OperationCapability'
+            forecaster:
+              $ref: '#/components/schemas/OperationCapability'
 
     CredentialStatus:
       type: object

@@ -4,6 +4,15 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"time"
+
+	"github.com/vmware/govmomi"
+	"github.com/vmware/govmomi/find"
+	"github.com/vmware/govmomi/object"
+	"github.com/vmware/govmomi/session"
+	"github.com/vmware/govmomi/vim25"
+	"github.com/vmware/govmomi/vim25/types"
+	"go.uber.org/zap"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
@@ -133,6 +142,9 @@ func (s *CredentialsService) Store(ctx context.Context, creds models.Credentials
 		return creds.URL, fmt.Errorf("key manager is not configured")
 	}
 	if err := vmware.VerifyCredentials(ctx, &creds, "credentials_mgmt"); err != nil {
+		if !srvErrors.IsVCenterError(err) {
+			return creds.URL, srvErrors.NewVCenterError(err)
+		}
 		return creds.URL, err
 	}
 	if err := s.Save(ctx, s.keyMgr.Key(), credentialsRecordID, creds); err != nil {
@@ -143,11 +155,136 @@ func (s *CredentialsService) Store(ctx context.Context, creds models.Credentials
 }
 
 func (s *CredentialsService) Status(ctx context.Context) (string, error) {
-	url, err := s.GetURL(ctx, credentialsRecordID)
+	creds, err := s.store.Credentials().Get(ctx, credentialsRecordID)
 	if err != nil {
-		return "", fmt.Errorf("getting credentials: %w", err)
+		return "", err
 	}
-	return url, nil
+	return creds.URL, nil
+}
+
+func (s *CredentialsService) Resolve(ctx context.Context) (models.Credentials, error) {
+	if s.keyMgr == nil {
+		return models.Credentials{}, srvErrors.NewCredentialsNotSetError()
+	}
+	creds, err := s.Get(ctx, s.keyMgr.Key(), credentialsRecordID)
+	if err != nil {
+		if srvErrors.IsResourceNotFoundError(err) {
+			return models.Credentials{}, srvErrors.NewCredentialsNotSetError()
+		}
+		return models.Credentials{}, err
+	}
+	return creds, nil
+}
+
+func (s *CredentialsService) GetCapabilities(ctx context.Context) (*models.CapabilityStatus, error) {
+	if s.keyMgr == nil {
+		return nil, srvErrors.NewCredentialsNotSetError()
+	}
+	creds, err := s.Get(ctx, s.keyMgr.Key(), credentialsRecordID)
+	if err != nil {
+		return nil, err
+	}
+
+	u, err := url.ParseRequestURI(creds.URL)
+	if err != nil {
+		return nil, fmt.Errorf("parsing credential URL: %w", err)
+	}
+	u.User = url.UserPassword(creds.Username, creds.Password)
+
+	connCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	soapClient, err := vmware.NewSoapClient(u, creds.SkipTLS, creds.CACert)
+	if err != nil {
+		return nil, fmt.Errorf("creating soap client: %w", err)
+	}
+
+	vimClient, err := vim25.NewClient(connCtx, soapClient)
+	if err != nil {
+		return nil, srvErrors.NewVCenterError(fmt.Errorf("connecting to vCenter: %w", err))
+	}
+
+	client := &govmomi.Client{
+		SessionManager: session.NewManager(vimClient),
+		Client:         vimClient,
+	}
+	if err := client.Login(connCtx, u.User); err != nil {
+		return nil, srvErrors.NewVCenterError(err)
+	}
+	defer func() {
+		logoutCtx, logoutCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer logoutCancel()
+		_ = client.Logout(logoutCtx)
+		client.CloseIdleConnections()
+	}()
+
+	finder := find.NewFinder(vimClient, false)
+	dc, err := finder.DefaultDatacenter(connCtx)
+	if err != nil {
+		return nil, srvErrors.NewVCenterError(fmt.Errorf("finding default datacenter: %w", err))
+	}
+
+	folders, err := dc.Folders(connCtx)
+	if err != nil {
+		return nil, srvErrors.NewVCenterError(fmt.Errorf("getting datacenter folders: %w", err))
+	}
+
+	allRefs := []types.ManagedObjectReference{
+		folders.VmFolder.Reference(),
+		folders.HostFolder.Reference(),
+		folders.DatastoreFolder.Reference(),
+		folders.NetworkFolder.Reference(),
+	}
+
+	authManager := object.NewAuthorizationManager(vimClient)
+	results, err := authManager.FetchUserPrivilegeOnEntities(connCtx, allRefs, creds.Username)
+	if err != nil {
+		return nil, srvErrors.NewVCenterError(fmt.Errorf("fetching privileges: %w", err))
+	}
+
+	grantedPerRef := make(map[types.ManagedObjectReference]map[string]bool, len(results))
+	for _, r := range results {
+		m := make(map[string]bool, len(r.Privileges))
+		for _, p := range r.Privileges {
+			m[p] = true
+		}
+		grantedPerRef[r.Entity] = m
+	}
+
+	checkPrivileges := func(refs []types.ManagedObjectReference, required []string) models.OperationCapability {
+		missingSet := make(map[string]bool)
+		for _, ref := range refs {
+			granted := grantedPerRef[ref]
+			for _, priv := range required {
+				if !granted[priv] {
+					missingSet[priv] = true
+				}
+			}
+		}
+		if len(missingSet) == 0 {
+			return models.OperationCapability{Enabled: true}
+		}
+		missing := make([]string, 0, len(missingSet))
+		for p := range missingSet {
+			missing = append(missing, p)
+		}
+		return models.OperationCapability{Enabled: false, MissingPrivileges: missing}
+	}
+
+	vmFolderRef := folders.VmFolder.Reference()
+	status := &models.CapabilityStatus{
+		Collector:  checkPrivileges(allRefs, models.CollectorRequiredPrivileges),
+		Inspector:  checkPrivileges([]types.ManagedObjectReference{vmFolderRef}, models.InspectorRequiredPrivileges),
+		Forecaster: checkPrivileges(allRefs, models.ForecasterRequiredPrivileges),
+	}
+
+	zap.S().Named("credentials").Infow("capability check complete",
+		"collector", status.Collector.Enabled,
+		"inspector", status.Inspector.Enabled,
+		"forecaster", status.Forecaster.Enabled,
+	)
+
+	return status, nil
 }
 
 func (s *CredentialsService) List(ctx context.Context) ([]string, error) {
@@ -178,10 +315,6 @@ func (s *CredentialsService) Get(ctx context.Context, hash []byte, id string) (m
 	}
 
 	return decrypted, nil
-}
-
-func (s *CredentialsService) GetURL(ctx context.Context, id string) (string, error) {
-	return s.store.Credentials().GetURL(ctx, id)
 }
 
 func (s *CredentialsService) Delete(ctx context.Context, id string) error {

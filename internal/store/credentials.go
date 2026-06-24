@@ -86,27 +86,6 @@ func (s *CredentialsStore) Get(ctx context.Context, id string) (models.Credentia
 	return creds, nil
 }
 
-func (s *CredentialsStore) GetURL(ctx context.Context, id string) (string, error) {
-	query, args, err := sq.Select(credentialsColURL).
-		From(credentialsTable).
-		Where(sq.Eq{credentialsColID: id}).
-		ToSql()
-	if err != nil {
-		return "", fmt.Errorf("building get url query: %w", err)
-	}
-
-	var url string
-	err = s.db.QueryRowContext(ctx, query, args...).Scan(&url)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", srvErrors.NewCredentialsNotFoundError(id)
-	}
-	if err != nil {
-		return "", fmt.Errorf("scanning credential url: %w", err)
-	}
-
-	return url, nil
-}
-
 func (s *CredentialsStore) Save(ctx context.Context, id string, creds models.Credentials) error {
 	query, args, err := sq.Insert(credentialsTable).
 		Columns(credentialsColID, credentialsColURL, credentialsColUsername, credentialsColPassword, credentialsColSkipTLS, credentialsColCACert).

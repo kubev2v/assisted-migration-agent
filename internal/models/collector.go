@@ -1,5 +1,10 @@
 package models
 
+var CollectorRequiredPrivileges = []string{
+	"System.Read",
+	"System.View",
+}
+
 // CollectorStateType represents the current state of the collector.
 type CollectorStateType string
 

@@ -2,11 +2,8 @@ package models
 
 const InspectionSnapshotName = "assisted-migration-deep-inspector"
 
-// RequiredPrivileges Todo:
-// This list should represent the lease permissions required for the inspection.
-// The goal is to pass this array to the ValidateUserPrivilegesOnEntity function
-// in order to determine whether the user has permission on the VM object.
-var RequiredPrivileges = []string{
+// InspectorRequiredPrivileges lists the vSphere privileges needed for deep inspection.
+var InspectorRequiredPrivileges = []string{
 	"VirtualMachine.State.CreateSnapshot",
 	"VirtualMachine.State.RemoveSnapshot",
 }
