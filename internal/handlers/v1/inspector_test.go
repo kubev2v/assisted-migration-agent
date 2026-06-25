@@ -35,7 +35,8 @@ var _ = Describe("Inspector Handler", func() {
 		mockVddk = &MockVddkService{}
 		handler = handlers.NewHandler(config.Configuration{}).
 			WithInspectorService(mockInspector).
-			WithVddkService(mockVddk)
+			WithVddkService(mockVddk).
+			WithCredentialsService(&MockCredentialsService{})
 		apiWrapper = v1.ServerInterfaceWrapper{
 			Handler: handler,
 			ErrorHandler: func(c *gin.Context, err error, statusCode int) {
@@ -242,7 +243,8 @@ var _ = Describe("VDDK", func() {
 		mockInspector = &MockInspectorService{}
 		handler = handlers.NewHandler(config.Configuration{}).
 			WithVddkService(mockVddk).
-			WithInspectorService(mockInspector)
+			WithInspectorService(mockInspector).
+			WithCredentialsService(&MockCredentialsService{})
 		router = gin.New()
 		wrapper := v1.ServerInterfaceWrapper{
 			Handler:      handler,

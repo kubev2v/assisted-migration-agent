@@ -38,19 +38,33 @@ func (h *Handler) StartInspection(c *gin.Context) {
 		return
 	}
 
-	creds, err := v1.CredsFromAPI(req.Credentials)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	if err := creds.Validate(); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+	if req.Credentials != nil {
+		creds, err := v1.CredsFromAPI(*req.Credentials)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if err := creds.Validate(); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if _, err := h.credentialsSrv.Store(c.Request.Context(), creds); err != nil {
+			if srvErrors.IsVCenterError(err) || srvErrors.IsValidationError(err) {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store credentials"})
+			return
+		}
 	}
 
-	if err := h.inspectorSrv.Start(c.Request.Context(), creds, req.VmIds); err != nil {
+	if err := h.inspectorSrv.Start(c.Request.Context(), req.VmIds); err != nil {
 		if srvErrors.IsOperationInProgressError(err) {
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			return
+		}
+		if srvErrors.IsCredentialsNotSetError(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "credentials required: provide inline or store via PUT /credentials"})
 			return
 		}
 		if srvErrors.IsInspectionLimitReachedError(err) || srvErrors.IsVCenterError(err) {

@@ -49,13 +49,7 @@ func TestForecasterService_StartWithEmptyPairs(t *testing.T) {
 	s := setupTestStore(t)
 	svc := services.NewForecasterService(s, 10)
 
-	req := models.ForecastRequest{
-		Credentials: models.Credentials{
-			URL:      "https://vcenter.example.com",
-			Username: "admin",
-			Password: "pass",
-		},
-	}
+	req := models.ForecastRequest{}
 
 	err := svc.Start(context.Background(), req)
 	if err == nil {
@@ -78,11 +72,6 @@ func TestForecasterService_PairLimitEnforced(t *testing.T) {
 	svc := services.NewForecasterService(s, 2)
 
 	req := models.ForecastRequest{
-		Credentials: models.Credentials{
-			URL:      "https://vcenter.example.com",
-			Username: "admin",
-			Password: "pass",
-		},
 		Pairs: []models.DatastorePair{
 			{Name: "p1", SourceDatastore: "ds1", TargetDatastore: "ds2"},
 			{Name: "p2", SourceDatastore: "ds3", TargetDatastore: "ds4"},

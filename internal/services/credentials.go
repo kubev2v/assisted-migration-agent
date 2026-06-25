@@ -142,12 +142,12 @@ func (s *CredentialsService) Store(ctx context.Context, creds models.Credentials
 	return creds.URL, nil
 }
 
-func (s *CredentialsService) Status(ctx context.Context) (string, error) {
-	url, err := s.GetURL(ctx, credentialsRecordID)
+func (s *CredentialsService) Status(ctx context.Context) (url, username string, err error) {
+	creds, err := s.store.Credentials().Get(ctx, credentialsRecordID)
 	if err != nil {
-		return "", fmt.Errorf("getting credentials: %w", err)
+		return "", "", err
 	}
-	return url, nil
+	return creds.URL, creds.Username, nil
 }
 
 func (s *CredentialsService) List(ctx context.Context) ([]string, error) {
@@ -178,6 +178,22 @@ func (s *CredentialsService) Get(ctx context.Context, hash []byte, id string) (m
 	}
 
 	return decrypted, nil
+}
+
+// Resolve retrieves stored encrypted credentials using the configured key manager.
+// Returns CredentialsNotSetError if no key manager is configured or no credentials are stored.
+func (s *CredentialsService) Resolve(ctx context.Context) (models.Credentials, error) {
+	if s.keyMgr == nil {
+		return models.Credentials{}, srvErrors.NewCredentialsNotSetError()
+	}
+	creds, err := s.Get(ctx, s.keyMgr.Key(), credentialsRecordID)
+	if err != nil {
+		if srvErrors.IsResourceNotFoundError(err) {
+			return models.Credentials{}, srvErrors.NewCredentialsNotSetError()
+		}
+		return models.Credentials{}, err
+	}
+	return creds, nil
 }
 
 func (s *CredentialsService) GetURL(ctx context.Context, id string) (string, error) {

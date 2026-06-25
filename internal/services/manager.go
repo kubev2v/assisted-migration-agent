@@ -7,6 +7,7 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/pkg/console"
+	"github.com/kubev2v/assisted-migration-agent/pkg/crypto"
 )
 
 const (
@@ -18,8 +19,10 @@ type ServiceManager struct {
 	cfg           *config.Configuration
 	store         *store.Store
 	consoleClient *console.Client
+	keyMgr        *crypto.KeyManager
 
 	console     *Console
+	credentials *CredentialsService
 	collector   *CollectorService
 	inspector   *InspectorService
 	forecaster  *ForecasterService
@@ -49,6 +52,12 @@ func WithStore(st *store.Store) ServiceManagerOption {
 func WithConsoleClient(c *console.Client) ServiceManagerOption {
 	return func(m *ServiceManager) {
 		m.consoleClient = c
+	}
+}
+
+func WithKeyManager(km *crypto.KeyManager) ServiceManagerOption {
+	return func(m *ServiceManager) {
+		m.keyMgr = km
 	}
 }
 
@@ -85,6 +94,14 @@ func (m *ServiceManager) Initialize() error {
 	}
 
 	m.forecaster = NewForecasterService(m.store, maxPairsPerRun)
+
+	m.credentials = NewCredentialsService(m.store)
+	if m.keyMgr != nil {
+		m.credentials.WithKeyManager(m.keyMgr)
+		m.collector.WithCredentialsService(m.credentials)
+		m.inspector.WithCredentialsService(m.credentials)
+		m.forecaster.WithCredentialsService(m.credentials)
+	}
 
 	m.vddk = NewVddkService(m.cfg.Agent.DataFolder, m.store)
 
@@ -163,6 +180,10 @@ func (m *ServiceManager) ForecasterService() *ForecasterService {
 
 func (m *ServiceManager) ApplicationService() *ApplicationService {
 	return m.application
+}
+
+func (m *ServiceManager) CredentialsService() *CredentialsService {
+	return m.credentials
 }
 
 func (m *ServiceManager) Stop(ctx context.Context) {

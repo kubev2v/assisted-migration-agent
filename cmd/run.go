@@ -101,10 +101,17 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 				return fmt.Errorf("failed to create console client: %w", err)
 			}
 
+			// init credential management
+			km, err := crypto.NewKeyManager(cfg.Agent.DataFolder)
+			if err != nil {
+				return fmt.Errorf("failed to initialize key manager: %w", err)
+			}
+
 			svcMgr := services.NewServiceManager(
 				services.WithConfig(cfg),
 				services.WithStore(st),
 				services.WithConsoleClient(consoleClient),
+				services.WithKeyManager(km),
 			)
 			if err := svcMgr.Initialize(); err != nil {
 				return fmt.Errorf("failed to initialize services: %w", err)
@@ -113,12 +120,6 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 			// register custom validators
 			if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 				v1Handlers.RegisterValidators(v)
-			}
-
-			// init credential management
-			keyMgr, err := crypto.NewKeyManager(cfg.Agent.DataFolder)
-			if err != nil {
-				return fmt.Errorf("failed to initialize key manager: %w", err)
 			}
 
 			// init handlers
@@ -133,7 +134,7 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 				WithRightsizingService(svcMgr.RightsizingService()).
 				WithForecasterService(svcMgr.ForecasterService()).
 				WithApplicationService(svcMgr.ApplicationService()).
-				WithCredentialsService(services.NewCredentialsService(st).WithKeyManager(keyMgr))
+				WithCredentialsService(svcMgr.CredentialsService())
 
 			srv, err := server.NewServer(cfg, map[string]func(router *gin.RouterGroup){
 				apiV1: func(router *gin.RouterGroup) {

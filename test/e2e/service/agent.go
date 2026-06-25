@@ -30,6 +30,10 @@ type AgentStatus struct {
 }
 
 type CollectorStartRequest struct {
+	Credentials *CollectorCredentials `json:"credentials,omitempty"`
+}
+
+type CollectorCredentials struct {
 	URL      string `json:"url"`
 	Username string `json:"username"`
 	Password string `json:"password"`
@@ -174,9 +178,11 @@ func (a *AgentSvc) SetAgentMode(mode string) (*AgentStatus, error) {
 // StartCollector starts the collector with the given vCenter credentials
 func (a *AgentSvc) StartCollector(vcenterURL, username, password string) (*CollectorStatus, error) {
 	body := CollectorStartRequest{
-		URL:      vcenterURL,
-		Username: username,
-		Password: password,
+		Credentials: &CollectorCredentials{
+			URL:      vcenterURL,
+			Username: username,
+			Password: password,
+		},
 	}
 	data, err := json.Marshal(body)
 	if err != nil {

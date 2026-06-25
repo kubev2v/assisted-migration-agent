@@ -23,6 +23,7 @@ type CollectorService struct {
 	workSrv      *work.Service[models.CollectorStatus, models.CollectorResult]
 	inventorySrv *InventoryService
 	buildFn      collectorWorkBuilderFunc
+	credsSvc     *CredentialsService
 }
 
 func NewCollectorService(inventorySrv *InventoryService, buildFn collectorWorkBuilderFunc) *CollectorService {
@@ -55,7 +56,7 @@ func (c *CollectorService) GetStatus() models.CollectorStatus {
 	return models.CollectorStatus{State: models.CollectorStateReady}
 }
 
-func (c *CollectorService) Start(ctx context.Context, creds models.Credentials) error {
+func (c *CollectorService) Start(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -66,6 +67,14 @@ func (c *CollectorService) Start(ctx context.Context, creds models.Credentials) 
 	inv, err := c.inventorySrv.GetInventory(ctx)
 	if err == nil && inv != nil {
 		return nil
+	}
+
+	if c.credsSvc == nil {
+		return srvErrors.NewCredentialsNotSetError()
+	}
+	creds, err := c.credsSvc.Resolve(ctx)
+	if err != nil {
+		return err
 	}
 
 	url, err := vmware.NormalizeAndValidateURL(creds.URL)
@@ -95,5 +104,10 @@ func (c *CollectorService) Stop() {
 
 func (c *CollectorService) WithWorkBuilder(fn collectorWorkBuilderFunc) *CollectorService {
 	c.buildFn = fn
+	return c
+}
+
+func (c *CollectorService) WithCredentialsService(svc *CredentialsService) *CollectorService {
+	c.credsSvc = svc
 	return c
 }

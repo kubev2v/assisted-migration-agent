@@ -93,9 +93,11 @@ var _ = Describe("API validation e2e tests", Ordered, func() {
 		})
 
 		It("should reject missing url", func() {
-			body, _ := json.Marshal(map[string]string{
-				"username": "admin",
-				"password": "secret",
+			body, _ := json.Marshal(map[string]any{
+				"credentials": map[string]string{
+					"username": "admin",
+					"password": "secret",
+				},
 			})
 			status, err := agentSvc.StartCollectorRaw(body)
 			Expect(err).ToNot(HaveOccurred())
@@ -103,9 +105,11 @@ var _ = Describe("API validation e2e tests", Ordered, func() {
 		})
 
 		It("should reject missing username", func() {
-			body, _ := json.Marshal(map[string]string{
-				"url":      "https://vcenter.example.com/sdk",
-				"password": "secret",
+			body, _ := json.Marshal(map[string]any{
+				"credentials": map[string]string{
+					"url":      "https://vcenter.example.com/sdk",
+					"password": "secret",
+				},
 			})
 			status, err := agentSvc.StartCollectorRaw(body)
 			Expect(err).ToNot(HaveOccurred())
@@ -113,9 +117,11 @@ var _ = Describe("API validation e2e tests", Ordered, func() {
 		})
 
 		It("should reject missing password", func() {
-			body, _ := json.Marshal(map[string]string{
-				"url":      "https://vcenter.example.com/sdk",
-				"username": "admin",
+			body, _ := json.Marshal(map[string]any{
+				"credentials": map[string]string{
+					"url":      "https://vcenter.example.com/sdk",
+					"username": "admin",
+				},
 			})
 			status, err := agentSvc.StartCollectorRaw(body)
 			Expect(err).ToNot(HaveOccurred())
@@ -123,10 +129,12 @@ var _ = Describe("API validation e2e tests", Ordered, func() {
 		})
 
 		It("should reject invalid URL format", func() {
-			body, _ := json.Marshal(map[string]string{
-				"url":      "not-a-valid-url",
-				"username": "admin",
-				"password": "secret",
+			body, _ := json.Marshal(map[string]any{
+				"credentials": map[string]string{
+					"url":      "not-a-valid-url",
+					"username": "admin",
+					"password": "secret",
+				},
 			})
 			status, err := agentSvc.StartCollectorRaw(body)
 			Expect(err).ToNot(HaveOccurred())
@@ -146,7 +154,7 @@ var _ = Describe("API validation e2e tests", Ordered, func() {
 
 		It("should reject empty credentials", func() {
 			body, _ := json.Marshal(map[string]any{
-				"VcenterCredentials": map[string]string{
+				"credentials": map[string]string{
 					"url": "", "username": "", "password": "",
 				},
 				"vmIds": []string{"vm-1"},
@@ -158,7 +166,7 @@ var _ = Describe("API validation e2e tests", Ordered, func() {
 
 		It("should reject empty vmIds", func() {
 			body, _ := json.Marshal(map[string]any{
-				"VcenterCredentials": map[string]string{
+				"credentials": map[string]string{
 					"url": "https://vcenter.example.com/sdk", "username": "admin", "password": "pass",
 				},
 				"vmIds": []string{},
@@ -170,7 +178,7 @@ var _ = Describe("API validation e2e tests", Ordered, func() {
 
 		It("should reject invalid URL in credentials", func() {
 			body, _ := json.Marshal(map[string]any{
-				"VcenterCredentials": map[string]string{
+				"credentials": map[string]string{
 					"url": "not-a-url", "username": "admin", "password": "pass",
 				},
 				"vmIds": []string{"vm-1"},

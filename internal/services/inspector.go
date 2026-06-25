@@ -32,6 +32,7 @@ type InspectorService struct {
 	store           *store.Store
 	inspectionLimit int
 	vddkLibDir      string
+	credsSvc        *CredentialsService
 }
 
 // NewInspectorService returns an idle inspector using the default inspection work units
@@ -61,7 +62,7 @@ func (i *InspectorService) IsBusy() bool {
 }
 
 // Start connects to vSphere, starts pipelines for each vmIDs entry, and launches the pool.
-func (i *InspectorService) Start(ctx context.Context, creds models.Credentials, vmIDs []string) (err error) {
+func (i *InspectorService) Start(ctx context.Context, vmIDs []string) (err error) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
@@ -74,6 +75,14 @@ func (i *InspectorService) Start(ctx context.Context, creds models.Credentials, 
 
 	if len(vmIDs) > i.inspectionLimit {
 		return srvErrors.NewInspectionLimitReachedError(i.inspectionLimit)
+	}
+
+	if i.credsSvc == nil {
+		return srvErrors.NewCredentialsNotSetError()
+	}
+	creds, err := i.credsSvc.Resolve(ctx)
+	if err != nil {
+		return err
 	}
 
 	zap.S().Infow("starting inspector", "vmCount", len(vmIDs))
@@ -199,5 +208,10 @@ func (i *InspectorService) Cancel(virtualMachineID string) error {
 // WithInspectionBuilder replaces the default per-VM work builder factory.
 func (i *InspectorService) WithInspectionBuilder(builder inspectionBuilderFactory) *InspectorService {
 	i.buildFn = builder
+	return i
+}
+
+func (i *InspectorService) WithCredentialsService(svc *CredentialsService) *InspectorService {
+	i.credsSvc = svc
 	return i
 }

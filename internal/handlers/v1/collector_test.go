@@ -21,6 +21,7 @@ import (
 var _ = Describe("Collector Handlers", func() {
 	var (
 		mockCollector *MockCollectorService
+		mockCreds     *MockCredentialsService
 		handler       *handlers.Handler
 		router        *gin.Engine
 	)
@@ -30,7 +31,8 @@ var _ = Describe("Collector Handlers", func() {
 		mockCollector = &MockCollectorService{
 			StatusResult: models.CollectorStatus{State: models.CollectorStateReady},
 		}
-		handler = handlers.NewHandler(config.Configuration{}).WithCollectorService(mockCollector)
+		mockCreds = &MockCredentialsService{}
+		handler = handlers.NewHandler(config.Configuration{}).WithCollectorService(mockCollector).WithCredentialsService(mockCreds)
 		router = gin.New()
 		router.GET("/collector", handler.GetCollectorStatus)
 		router.POST("/collector", handler.StartCollector)
@@ -124,14 +126,16 @@ var _ = Describe("Collector Handlers", func() {
 			Expect(response["error"]).To(ContainSubstring("invalid request body"))
 		})
 
-		// Given a request missing the URL field
+		// Given a request with credentials missing the URL field
 		// When we try to start the collector
 		// Then it should return 400 Bad Request
 		It("should return 400 when url is missing", func() {
 			// Arrange
 			body := v1.CollectorStartRequest{
-				Username: "admin",
-				Password: "secret",
+				Credentials: &v1.VcenterCredentials{
+					Username: "admin",
+					Password: "secret",
+				},
 			}
 			bodyBytes, _ := json.Marshal(body)
 			req := httptest.NewRequest(http.MethodPost, "/collector", bytes.NewReader(bodyBytes))
@@ -149,14 +153,16 @@ var _ = Describe("Collector Handlers", func() {
 			Expect(response["error"]).To(ContainSubstring("Url"))
 		})
 
-		// Given a request missing the username field
+		// Given a request with credentials missing the username field
 		// When we try to start the collector
 		// Then it should return 400 Bad Request
 		It("should return 400 when username is missing", func() {
 			// Arrange
 			body := v1.CollectorStartRequest{
-				Url:      "https://vcenter.example.com",
-				Password: "secret",
+				Credentials: &v1.VcenterCredentials{
+					Url:      "https://vcenter.example.com",
+					Password: "secret",
+				},
 			}
 			bodyBytes, _ := json.Marshal(body)
 			req := httptest.NewRequest(http.MethodPost, "/collector", bytes.NewReader(bodyBytes))
@@ -173,14 +179,16 @@ var _ = Describe("Collector Handlers", func() {
 			Expect(response["error"]).To(ContainSubstring("Username is required"))
 		})
 
-		// Given a request missing the password field
+		// Given a request with credentials missing the password field
 		// When we try to start the collector
 		// Then it should return 400 Bad Request
 		It("should return 400 when password is missing", func() {
 			// Arrange
 			body := v1.CollectorStartRequest{
-				Url:      "https://vcenter.example.com",
-				Username: "admin",
+				Credentials: &v1.VcenterCredentials{
+					Url:      "https://vcenter.example.com",
+					Username: "admin",
+				},
 			}
 			bodyBytes, _ := json.Marshal(body)
 			req := httptest.NewRequest(http.MethodPost, "/collector", bytes.NewReader(bodyBytes))
@@ -197,15 +205,17 @@ var _ = Describe("Collector Handlers", func() {
 			Expect(response["error"]).To(ContainSubstring("Password is required"))
 		})
 
-		// Given a request with an invalid URL format
+		// Given a request with an invalid URL format in credentials
 		// When we try to start the collector
 		// Then it should return 400 Bad Request with invalid url format error
 		It("should return 400 for invalid URL format", func() {
 			// Arrange
 			body := v1.CollectorStartRequest{
-				Url:      "not-a-valid-url",
-				Username: "admin",
-				Password: "secret",
+				Credentials: &v1.VcenterCredentials{
+					Url:      "not-a-valid-url",
+					Username: "admin",
+					Password: "secret",
+				},
 			}
 			bodyBytes, _ := json.Marshal(body)
 			req := httptest.NewRequest(http.MethodPost, "/collector", bytes.NewReader(bodyBytes))
@@ -229,9 +239,11 @@ var _ = Describe("Collector Handlers", func() {
 		It("should start collector with valid credentials", func() {
 			// Arrange
 			body := v1.CollectorStartRequest{
-				Url:      "https://vcenter.example.com",
-				Username: "admin",
-				Password: "secret",
+				Credentials: &v1.VcenterCredentials{
+					Url:      "https://vcenter.example.com",
+					Username: "admin",
+					Password: "secret",
+				},
 			}
 			bodyBytes, _ := json.Marshal(body)
 			req := httptest.NewRequest(http.MethodPost, "/collector", bytes.NewReader(bodyBytes))
@@ -253,9 +265,11 @@ var _ = Describe("Collector Handlers", func() {
 			// Arrange
 			mockCollector.StartError = srvErrors.NewCollectionInProgressError()
 			body := v1.CollectorStartRequest{
-				Url:      "https://vcenter.example.com",
-				Username: "admin",
-				Password: "secret",
+				Credentials: &v1.VcenterCredentials{
+					Url:      "https://vcenter.example.com",
+					Username: "admin",
+					Password: "secret",
+				},
 			}
 			bodyBytes, _ := json.Marshal(body)
 			req := httptest.NewRequest(http.MethodPost, "/collector", bytes.NewReader(bodyBytes))
@@ -279,9 +293,11 @@ var _ = Describe("Collector Handlers", func() {
 			// Arrange
 			mockCollector.StartError = errors.New("unexpected error")
 			body := v1.CollectorStartRequest{
-				Url:      "https://vcenter.example.com",
-				Username: "admin",
-				Password: "secret",
+				Credentials: &v1.VcenterCredentials{
+					Url:      "https://vcenter.example.com",
+					Username: "admin",
+					Password: "secret",
+				},
 			}
 			bodyBytes, _ := json.Marshal(body)
 			req := httptest.NewRequest(http.MethodPost, "/collector", bytes.NewReader(bodyBytes))
@@ -301,10 +317,12 @@ var _ = Describe("Collector Handlers", func() {
 		It("should wire cacert from the request body", func() {
 			caCert := generateCACertPEM()
 			body, _ := json.Marshal(map[string]interface{}{
-				"url":      "https://vcenter.example.com/sdk",
-				"username": "admin",
-				"password": "secret",
-				"cacert":   caCert,
+				"credentials": map[string]interface{}{
+					"url":      "https://vcenter.example.com/sdk",
+					"username": "admin",
+					"password": "secret",
+					"cacert":   caCert,
+				},
 			})
 			req := httptest.NewRequest(http.MethodPost, "/collector", bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
@@ -313,16 +331,18 @@ var _ = Describe("Collector Handlers", func() {
 			router.ServeHTTP(w, req)
 
 			Expect(w.Code).To(Equal(http.StatusAccepted))
-			Expect(mockCollector.LastCreds.CACert).To(Equal([]byte(caCert)))
-			Expect(mockCollector.LastCreds.SkipTLS).To(BeFalse())
+			Expect(mockCreds.LastCreds.CACert).To(Equal([]byte(caCert)))
+			Expect(mockCreds.LastCreds.SkipTLS).To(BeFalse())
 		})
 
 		It("should wire skipTls=true from the request body", func() {
 			body, _ := json.Marshal(map[string]interface{}{
-				"url":      "https://vcenter.example.com/sdk",
-				"username": "admin",
-				"password": "secret",
-				"skipTls":  true,
+				"credentials": map[string]interface{}{
+					"url":      "https://vcenter.example.com/sdk",
+					"username": "admin",
+					"password": "secret",
+					"skipTls":  true,
+				},
 			})
 			req := httptest.NewRequest(http.MethodPost, "/collector", bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
@@ -331,17 +351,19 @@ var _ = Describe("Collector Handlers", func() {
 			router.ServeHTTP(w, req)
 
 			Expect(w.Code).To(Equal(http.StatusAccepted))
-			Expect(mockCollector.LastCreds.SkipTLS).To(BeTrue())
-			Expect(mockCollector.LastCreds.CACert).To(BeNil())
+			Expect(mockCreds.LastCreds.SkipTLS).To(BeTrue())
+			Expect(mockCreds.LastCreds.CACert).To(BeNil())
 		})
 
 		It("should return 400 when both cacert and skipTls=true are provided", func() {
 			body, _ := json.Marshal(map[string]interface{}{
-				"url":      "https://vcenter.example.com/sdk",
-				"username": "admin",
-				"password": "secret",
-				"cacert":   generateCACertPEM(),
-				"skipTls":  true,
+				"credentials": map[string]interface{}{
+					"url":      "https://vcenter.example.com/sdk",
+					"username": "admin",
+					"password": "secret",
+					"cacert":   generateCACertPEM(),
+					"skipTls":  true,
+				},
 			})
 			req := httptest.NewRequest(http.MethodPost, "/collector", bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
@@ -358,9 +380,11 @@ var _ = Describe("Collector Handlers", func() {
 
 		It("should default SkipTLS to true when neither field is provided (backwards compat)", func() {
 			body, _ := json.Marshal(map[string]interface{}{
-				"url":      "https://vcenter.example.com/sdk",
-				"username": "admin",
-				"password": "secret",
+				"credentials": map[string]interface{}{
+					"url":      "https://vcenter.example.com/sdk",
+					"username": "admin",
+					"password": "secret",
+				},
 			})
 			req := httptest.NewRequest(http.MethodPost, "/collector", bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
@@ -369,8 +393,8 @@ var _ = Describe("Collector Handlers", func() {
 			router.ServeHTTP(w, req)
 
 			Expect(w.Code).To(Equal(http.StatusAccepted))
-			Expect(mockCollector.LastCreds.SkipTLS).To(BeTrue())
-			Expect(mockCollector.LastCreds.CACert).To(BeNil())
+			Expect(mockCreds.LastCreds.SkipTLS).To(BeTrue())
+			Expect(mockCreds.LastCreds.CACert).To(BeNil())
 		})
 	})
 

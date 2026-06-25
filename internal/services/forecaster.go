@@ -40,7 +40,7 @@ type ForecasterService struct {
 	store       *store.Store
 	pairLimit   int
 	registry    *offload.Registry
-	savedCreds  *models.Credentials // saved after successful inline credential verification (POST)
+	credsSvc    *CredentialsService
 }
 
 // NewForecasterService returns an idle forecaster.
@@ -103,7 +103,7 @@ func (f *ForecasterService) Start(ctx context.Context, req models.ForecastReques
 
 	f.mu.Unlock()
 
-	cred, err := f.resolveCredentials(ctx, req.Credentials)
+	cred, err := f.resolveCredentials(ctx)
 	if err != nil {
 		return err
 	}
@@ -242,35 +242,25 @@ func (f *ForecasterService) verifyCredentialsAndPrivileges(ctx context.Context, 
 	return nil
 }
 
-// resolveCredentials returns inline credentials if provided (after verifying
-// privileges and saving them), otherwise falls back to previously verified
-// saved credentials, or returns CredentialsNotSetError.
-func (f *ForecasterService) resolveCredentials(ctx context.Context, creds models.Credentials) (models.Credentials, error) {
-	u, err := vmware.NormalizeAndValidateURL(creds.URL)
+// resolveCredentials returns stored credentials from the credentials service
+// after verifying forecaster-specific vSphere privileges.
+func (f *ForecasterService) resolveCredentials(ctx context.Context) (models.Credentials, error) {
+	if f.credsSvc == nil {
+		return models.Credentials{}, srvErrors.NewCredentialsNotSetError()
+	}
+	creds, err := f.credsSvc.Resolve(ctx)
 	if err != nil {
+		return models.Credentials{}, srvErrors.NewCredentialsNotSetError()
+	}
+	if err := f.verifyCredentialsAndPrivileges(ctx, &creds, models.ForecasterRequiredPrivileges); err != nil {
 		return models.Credentials{}, err
 	}
-	creds.URL = u
+	return creds, nil
+}
 
-	if creds.URL != "" {
-		if err := creds.Validate(); err != nil {
-			return models.Credentials{}, err
-		}
-		if err := f.verifyCredentialsAndPrivileges(ctx, &creds, models.ForecasterRequiredPrivileges); err != nil {
-			return models.Credentials{}, err
-		}
-		f.mu.Lock()
-		saved := creds
-		f.savedCreds = &saved
-		f.mu.Unlock()
-		return creds, nil
-	}
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if f.savedCreds != nil {
-		return *f.savedCreds, nil
-	}
-	return models.Credentials{}, srvErrors.NewCredentialsNotSetError()
+func (f *ForecasterService) WithCredentialsService(svc *CredentialsService) *ForecasterService {
+	f.credsSvc = svc
+	return f
 }
 
 // Stop requests cancellation of all pair benchmarks and waits for cleanup.

@@ -164,7 +164,9 @@ type BenchmarkRun struct {
 }
 
 // CollectorStartRequest defines model for CollectorStartRequest.
-type CollectorStartRequest = VcenterCredentials
+type CollectorStartRequest struct {
+	Credentials *VcenterCredentials `json:"credentials,omitempty"`
+}
 
 // CollectorStatus defines model for CollectorStatus.
 type CollectorStatus struct {
@@ -192,6 +194,9 @@ type CreateGroupRequest struct {
 type CredentialStatus struct {
 	// Url vCenter URL the credentials belong to
 	Url string `json:"url"`
+
+	// Username vCenter username
+	Username string `json:"username"`
 
 	// Valid Whether credentials are stored for the returned URL.
 	Valid bool `json:"valid"`
@@ -1044,8 +1049,8 @@ type GetInspectorStatusParams struct {
 
 // StartInspectionJSONBody defines parameters for StartInspection.
 type StartInspectionJSONBody struct {
-	Credentials VcenterCredentials `json:"credentials"`
-	VmIds       []string           `json:"vmIds"`
+	Credentials *VcenterCredentials `json:"credentials,omitempty"`
+	VmIds       []string            `json:"vmIds"`
 }
 
 // PutInspectorVddkMultipartBody defines parameters for PutInspectorVddk.
