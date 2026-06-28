@@ -14,21 +14,11 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/services"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
+	"github.com/kubev2v/assisted-migration-agent/pkg/crypto"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 	"github.com/kubev2v/assisted-migration-agent/pkg/work"
 	"github.com/kubev2v/assisted-migration-agent/test"
 )
-
-// getVCenterCredentials returns test credentials for vCenter.
-// vcsim accepts any username/password, but we use standard test values.
-func getVCenterCredentials() models.Credentials {
-	return models.Credentials{
-		URL:      "https://localhost:8989/sdk",
-		Username: "user",
-		Password: "pass",
-		SkipTLS:  true,
-	}
-}
 
 // testInspectionBuilder implements work.WorkBuilder2 for inspector-level tests.
 type testInspectionBuilder struct {
@@ -160,14 +150,15 @@ func newMockInspectionBuilder() *mockInspectionBuilder {
 
 var _ = Describe("InspectorService", func() {
 	var (
-		ctx context.Context
-		db  *sql.DB
-		st  *store.Store
-		srv *services.InspectorService
+		ctx      context.Context
+		db       *sql.DB
+		st       *store.Store
+		srv      *services.InspectorService
+		credsSvc *services.CredentialsService
 	)
 
-	mustNewInspectorService := func(s *store.Store, limit int, dir string) *services.InspectorService {
-		svc, err := services.NewInspectorService(s, limit, dir)
+	mustNewInspectorService := func(s *store.Store, limit int, dir string, cSvc *services.CredentialsService) *services.InspectorService {
+		svc, err := services.NewInspectorService(s, limit, dir, cSvc)
 		Expect(err).NotTo(HaveOccurred())
 		return svc
 	}
@@ -203,12 +194,25 @@ var _ = Describe("InspectorService", func() {
 
 		st = store.NewStore(db, test.NewMockValidator())
 
+		// Set up a CredentialsService with stored test credentials
+		km, err := crypto.NewKeyManager("")
+		Expect(err).NotTo(HaveOccurred())
+		credsSvc = services.NewCredentialsService(st).WithKeyManager(km)
+		creds := models.Credentials{
+			URL:      "https://localhost:8989/sdk",
+			Username: "user",
+			Password: "pass",
+			SkipTLS:  true,
+		}
+		err = credsSvc.Save(ctx, km.Key(), "credentials", creds)
+		Expect(err).NotTo(HaveOccurred())
+
 		// Insert test VMs into vinfo (required for foreign key constraint)
 		insertVM("vm-1", "test-vm-1")
 		insertVM("vm-2", "test-vm-2")
 		insertVM("vm-3", "test-vm-3")
 
-		srv = mustNewInspectorService(st, 10, "")
+		srv = mustNewInspectorService(st, 10, "", credsSvc)
 	})
 
 	AfterEach(func() {
@@ -255,10 +259,10 @@ var _ = Describe("InspectorService", func() {
 			BeforeEach(func() {
 				// Use mock inspection service with delay to keep inspector running
 				builder := newMockInspectionBuilder().withStore(st).withWorkDelay(1 * time.Second)
-				srv = mustNewInspectorService(st, 10, "").WithInspectionBuilder(builder.builder())
+				srv = mustNewInspectorService(st, 10, "", credsSvc).WithInspectionBuilder(builder.builder())
 
 				// Start inspector with all VMs (will stay running due to delay)
-				err := srv.Start(ctx, getVCenterCredentials(), []string{"vm-1", "vm-2", "vm-3"})
+				err := srv.Start(ctx, []string{"vm-1", "vm-2", "vm-3"})
 				Expect(err).NotTo(HaveOccurred())
 
 				// Wait for inspector to be in running state
@@ -289,9 +293,9 @@ var _ = Describe("InspectorService", func() {
 				{Category: "disk", Label: "L1", Msg: "m1"},
 				{Category: "net", Label: "L2", Msg: "m2"},
 			})
-			srv = mustNewInspectorService(st, 10, "").WithInspectionBuilder(builder.builder())
+			srv = mustNewInspectorService(st, 10, "", credsSvc).WithInspectionBuilder(builder.builder())
 
-			err := srv.Start(ctx, getVCenterCredentials(), []string{"vm-1"})
+			err := srv.Start(ctx, []string{"vm-1"})
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() models.InspectorState {
@@ -316,9 +320,9 @@ var _ = Describe("InspectorService", func() {
 
 		It("should complete inspection successfully for multiple VMs", func() {
 			builder := newMockInspectionBuilder().withStore(st)
-			srv = mustNewInspectorService(st, 10, "").WithInspectionBuilder(builder.builder())
+			srv = mustNewInspectorService(st, 10, "", credsSvc).WithInspectionBuilder(builder.builder())
 
-			err := srv.Start(ctx, getVCenterCredentials(), []string{"vm-1", "vm-2", "vm-3"})
+			err := srv.Start(ctx, []string{"vm-1", "vm-2", "vm-3"})
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() models.InspectorState {
@@ -332,26 +336,32 @@ var _ = Describe("InspectorService", func() {
 		})
 
 		It("should return VCenterError for invalid credentials", func() {
+			// Store invalid credentials to trigger a VCenterError
 			invalidCreds := models.Credentials{
-				URL:      "https://invalid-host:8989/sdk",
-				Username: "invalid",
-				Password: "invalid",
+				URL:      "https://invalid-vcenter:9999/sdk",
+				Username: "bad",
+				Password: "bad",
+				SkipTLS:  true,
 			}
+			km, err := crypto.NewKeyManager("")
+			Expect(err).NotTo(HaveOccurred())
+			badCredsSvc := services.NewCredentialsService(st).WithKeyManager(km)
+			Expect(badCredsSvc.Save(ctx, km.Key(), "credentials", invalidCreds)).To(Succeed())
+			srv = mustNewInspectorService(st, 10, "", badCredsSvc)
 
-			err := srv.Start(ctx, invalidCreds, []string{"vm-1"})
+			err = srv.Start(ctx, []string{"vm-1"})
 			Expect(err).To(HaveOccurred())
 			Expect(srvErrors.IsVCenterError(err)).To(BeTrue())
 
-			// Bad request from the user, hence the Inspector should remain in ready state.
 			status := srv.GetStatus()
 			Expect(status.State).To(Equal(models.InspectorStateReady))
 		})
 
 		It("should mark VM as error when inspection fails and continue with next VM", func() {
 			builder := newMockInspectionBuilder().withStore(st).withVmError("vm-1", errors.New("inspection failed"))
-			srv = mustNewInspectorService(st, 10, "").WithInspectionBuilder(builder.builder())
+			srv = mustNewInspectorService(st, 10, "", credsSvc).WithInspectionBuilder(builder.builder())
 
-			err := srv.Start(ctx, getVCenterCredentials(), []string{"vm-1", "vm-2"})
+			err := srv.Start(ctx, []string{"vm-1", "vm-2"})
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() models.InspectorState {
@@ -367,17 +377,17 @@ var _ = Describe("InspectorService", func() {
 
 		It("should preserve completed status from previous run when starting a new inspection", func() {
 			builder := newMockInspectionBuilder().withStore(st)
-			srv = mustNewInspectorService(st, 10, "").WithInspectionBuilder(builder.builder())
+			srv = mustNewInspectorService(st, 10, "", credsSvc).WithInspectionBuilder(builder.builder())
 
 			// First run
-			err := srv.Start(ctx, getVCenterCredentials(), []string{"vm-1"})
+			err := srv.Start(ctx, []string{"vm-1"})
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() models.InspectorState {
 				return srv.GetStatus().State
 			}, time.Second*10).Should(Equal(models.InspectorStateReady))
 
-			err = srv.Start(ctx, getVCenterCredentials(), []string{"vm-2", "vm-3"})
+			err = srv.Start(ctx, []string{"vm-2", "vm-3"})
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() models.InspectorState {
@@ -392,9 +402,9 @@ var _ = Describe("InspectorService", func() {
 
 		It("should be busy while running", func() {
 			builder := newMockInspectionBuilder().withStore(st).withWorkDelay(100 * time.Millisecond)
-			srv = mustNewInspectorService(st, 10, "").WithInspectionBuilder(builder.builder())
+			srv = mustNewInspectorService(st, 10, "", credsSvc).WithInspectionBuilder(builder.builder())
 
-			err := srv.Start(ctx, getVCenterCredentials(), []string{"vm-1"})
+			err := srv.Start(ctx, []string{"vm-1"})
 			Expect(err).NotTo(HaveOccurred())
 
 			// Should be busy while running
@@ -415,9 +425,9 @@ var _ = Describe("InspectorService", func() {
 	Describe("Stop", func() {
 		It("should stop inspector and cancel all pending VMs", func() {
 			builder := newMockInspectionBuilder().withStore(st).withWorkDelay(1 * time.Second)
-			srv = mustNewInspectorService(st, 10, "").WithInspectionBuilder(builder.builder())
+			srv = mustNewInspectorService(st, 10, "", credsSvc).WithInspectionBuilder(builder.builder())
 
-			err := srv.Start(ctx, getVCenterCredentials(), []string{"vm-1", "vm-2", "vm-3"})
+			err := srv.Start(ctx, []string{"vm-1", "vm-2", "vm-3"})
 			Expect(err).NotTo(HaveOccurred())
 
 			// Wait for running state
@@ -442,10 +452,10 @@ var _ = Describe("InspectorService", func() {
 	Describe("Inspection limit", func() {
 		It("should return InspectionLimitReachedError when Start receives more VM IDs than the limit", func() {
 			builder := newMockInspectionBuilder().withStore(st)
-			srv = mustNewInspectorService(st, 2, "").
+			srv = mustNewInspectorService(st, 2, "", credsSvc).
 				WithInspectionBuilder(builder.builder())
 
-			err := srv.Start(ctx, getVCenterCredentials(), []string{"vm-1", "vm-2", "vm-3"})
+			err := srv.Start(ctx, []string{"vm-1", "vm-2", "vm-3"})
 			Expect(err).To(HaveOccurred())
 			Expect(srvErrors.IsInspectionLimitReachedError(err)).To(BeTrue())
 
@@ -458,10 +468,10 @@ var _ = Describe("InspectorService", func() {
 
 		It("should allow Start when VM count equals the limit", func() {
 			builder := newMockInspectionBuilder().withStore(st)
-			srv = mustNewInspectorService(st, 2, "").
+			srv = mustNewInspectorService(st, 2, "", credsSvc).
 				WithInspectionBuilder(builder.builder())
 
-			err := srv.Start(ctx, getVCenterCredentials(), []string{"vm-1", "vm-2"})
+			err := srv.Start(ctx, []string{"vm-1", "vm-2"})
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() models.InspectorState {
@@ -471,10 +481,10 @@ var _ = Describe("InspectorService", func() {
 
 		It("should return InspectionLimitReachedError when Start receives more VMs than remaining limit", func() {
 			builder := newMockInspectionBuilder().withStore(st).withWorkDelay(1 * time.Second)
-			srv = mustNewInspectorService(st, 2, "").
+			srv = mustNewInspectorService(st, 2, "", credsSvc).
 				WithInspectionBuilder(builder.builder())
 
-			err := srv.Start(ctx, getVCenterCredentials(), []string{"vm-1", "vm-2", "vm-3"})
+			err := srv.Start(ctx, []string{"vm-1", "vm-2", "vm-3"})
 			Expect(err).To(HaveOccurred())
 			Expect(srvErrors.IsInspectionLimitReachedError(err)).To(BeTrue())
 		})
@@ -486,9 +496,9 @@ var _ = Describe("InspectorService", func() {
 			builder := newMockInspectionBuilder().withStore(st).withVmConcerns("vm-1", []models.VmInspectionConcern{
 				{Category: "old", Label: "a", Msg: "first-run"},
 			})
-			srv = mustNewInspectorService(st, 10, "").WithInspectionBuilder(builder.builder())
+			srv = mustNewInspectorService(st, 10, "", credsSvc).WithInspectionBuilder(builder.builder())
 
-			err := srv.Start(ctx, getVCenterCredentials(), []string{"vm-1"})
+			err := srv.Start(ctx, []string{"vm-1"})
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() models.InspectorState {
@@ -501,7 +511,7 @@ var _ = Describe("InspectorService", func() {
 				{Category: "n3", Label: "d", Msg: "r2"},
 			})
 
-			err = srv.Start(ctx, getVCenterCredentials(), []string{"vm-1"})
+			err = srv.Start(ctx, []string{"vm-1"})
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() models.InspectorState {

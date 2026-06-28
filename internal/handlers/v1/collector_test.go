@@ -21,6 +21,7 @@ import (
 var _ = Describe("Collector Handlers", func() {
 	var (
 		mockCollector *MockCollectorService
+		mockCreds     *MockCredentialsService
 		handler       *handlers.Handler
 		router        *gin.Engine
 	)
@@ -30,7 +31,8 @@ var _ = Describe("Collector Handlers", func() {
 		mockCollector = &MockCollectorService{
 			StatusResult: models.CollectorStatus{State: models.CollectorStateReady},
 		}
-		handler = handlers.NewHandler(config.Configuration{}).WithCollectorService(mockCollector)
+		mockCreds = &MockCredentialsService{}
+		handler = handlers.NewHandler(config.Configuration{}).WithCollectorService(mockCollector).WithCredentialsService(mockCreds)
 		router = gin.New()
 		router.GET("/collector", handler.GetCollectorStatus)
 		router.POST("/collector", handler.StartCollector)
@@ -124,11 +126,12 @@ var _ = Describe("Collector Handlers", func() {
 			Expect(response["error"]).To(ContainSubstring("invalid request body"))
 		})
 
-		// Given a request missing the URL field
+		// Given a request without credentials (no url) and no stored credentials
 		// When we try to start the collector
 		// Then it should return 400 Bad Request
-		It("should return 400 when url is missing", func() {
+		It("should return 400 when no credentials are provided and none are stored", func() {
 			// Arrange
+			mockCollector.StartError = srvErrors.NewCredentialsNotSetError()
 			body := v1.CollectorStartRequest{
 				Username: "admin",
 				Password: "secret",
@@ -146,10 +149,10 @@ var _ = Describe("Collector Handlers", func() {
 			var response map[string]any
 			err := json.Unmarshal(w.Body.Bytes(), &response)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(response["error"]).To(ContainSubstring("Url"))
+			Expect(response["error"]).To(ContainSubstring("credentials required"))
 		})
 
-		// Given a request missing the username field
+		// Given a request with credentials missing the username field
 		// When we try to start the collector
 		// Then it should return 400 Bad Request
 		It("should return 400 when username is missing", func() {
@@ -173,7 +176,7 @@ var _ = Describe("Collector Handlers", func() {
 			Expect(response["error"]).To(ContainSubstring("Username is required"))
 		})
 
-		// Given a request missing the password field
+		// Given a request with credentials missing the password field
 		// When we try to start the collector
 		// Then it should return 400 Bad Request
 		It("should return 400 when password is missing", func() {
@@ -197,7 +200,7 @@ var _ = Describe("Collector Handlers", func() {
 			Expect(response["error"]).To(ContainSubstring("Password is required"))
 		})
 
-		// Given a request with an invalid URL format
+		// Given a request with an invalid URL format in credentials
 		// When we try to start the collector
 		// Then it should return 400 Bad Request with invalid url format error
 		It("should return 400 for invalid URL format", func() {
@@ -313,8 +316,8 @@ var _ = Describe("Collector Handlers", func() {
 			router.ServeHTTP(w, req)
 
 			Expect(w.Code).To(Equal(http.StatusAccepted))
-			Expect(mockCollector.LastCreds.CACert).To(Equal([]byte(caCert)))
-			Expect(mockCollector.LastCreds.SkipTLS).To(BeFalse())
+			Expect(mockCreds.LastCreds.CACert).To(Equal([]byte(caCert)))
+			Expect(mockCreds.LastCreds.SkipTLS).To(BeFalse())
 		})
 
 		It("should wire skipTls=true from the request body", func() {
@@ -331,8 +334,8 @@ var _ = Describe("Collector Handlers", func() {
 			router.ServeHTTP(w, req)
 
 			Expect(w.Code).To(Equal(http.StatusAccepted))
-			Expect(mockCollector.LastCreds.SkipTLS).To(BeTrue())
-			Expect(mockCollector.LastCreds.CACert).To(BeNil())
+			Expect(mockCreds.LastCreds.SkipTLS).To(BeTrue())
+			Expect(mockCreds.LastCreds.CACert).To(BeNil())
 		})
 
 		It("should return 400 when both cacert and skipTls=true are provided", func() {
@@ -369,8 +372,8 @@ var _ = Describe("Collector Handlers", func() {
 			router.ServeHTTP(w, req)
 
 			Expect(w.Code).To(Equal(http.StatusAccepted))
-			Expect(mockCollector.LastCreds.SkipTLS).To(BeTrue())
-			Expect(mockCollector.LastCreds.CACert).To(BeNil())
+			Expect(mockCreds.LastCreds.SkipTLS).To(BeTrue())
+			Expect(mockCreds.LastCreds.CACert).To(BeNil())
 		})
 	})
 

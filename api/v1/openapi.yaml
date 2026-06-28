@@ -375,13 +375,13 @@ paths:
               description: Start inspection request
               required:
                   - vmIds
-                  - credentials
               properties:
                 vmIds:
                   type: array
                   items:
                     type: string
                 credentials:
+                  description: Optional if previously stored via PUT /credentials.
                   $ref: '#/components/schemas/VcenterCredentials'
       responses:
         '202':
@@ -1743,11 +1743,15 @@ components:
       type: object
       required:
         - url
+        - username
         - valid
       properties:
         url:
           type: string
           description: vCenter URL the credentials belong to
+        username:
+          type: string
+          description: vCenter username
         valid:
           type: boolean
           description: Whether credentials are stored for the returned URL.

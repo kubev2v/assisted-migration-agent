@@ -139,7 +139,7 @@
 //	collector := NewCollectorService(inventorySrv, factory.Build)
 //
 //	// At runtime:
-//	err := collector.Start(ctx, credentials)
+//	err := collector.Start(ctx)
 //	status := collector.GetStatus()
 //	collector.Stop()
 //
@@ -200,7 +200,7 @@
 //
 //	inspector, err := services.NewInspectorService(store, 10, dataDir)
 //	err = inspector.Credentials(ctx, creds) // optional preflight check
-//	err = inspector.Start(ctx, creds, []string{“vm-1”, “vm-2”})
+//	err = inspector.Start(ctx, []string{“vm-1”, “vm-2”})
 //	status := inspector.GetStatus()       // Ready or Running
 //	err = inspector.Cancel(“vm-2”)        // cancel a single VM’s pipeline
 //	err = inspector.Stop()                // cancel entire run, wait for cleanup

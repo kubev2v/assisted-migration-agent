@@ -58,7 +58,6 @@ type ForecastPairStatus struct {
 
 // ForecastRequest defines the input for starting a forecast.
 type ForecastRequest struct {
-	Credentials Credentials
 	Pairs       []DatastorePair
 	DiskSizeGB  int // default: 10
 	Iterations  int // default: 5

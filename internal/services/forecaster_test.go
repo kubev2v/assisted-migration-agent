@@ -33,7 +33,7 @@ func setupTestStore(t *testing.T) *store.Store {
 
 func TestForecasterService_InitialState(t *testing.T) {
 	s := setupTestStore(t)
-	svc := services.NewForecasterService(s, 10)
+	svc := services.NewForecasterService(s, 10, nil)
 
 	status := svc.GetStatus()
 	if status.State != models.ForecasterStateReady {
@@ -47,15 +47,9 @@ func TestForecasterService_InitialState(t *testing.T) {
 
 func TestForecasterService_StartWithEmptyPairs(t *testing.T) {
 	s := setupTestStore(t)
-	svc := services.NewForecasterService(s, 10)
+	svc := services.NewForecasterService(s, 10, nil)
 
-	req := models.ForecastRequest{
-		Credentials: models.Credentials{
-			URL:      "https://vcenter.example.com",
-			Username: "admin",
-			Password: "pass",
-		},
-	}
+	req := models.ForecastRequest{}
 
 	err := svc.Start(context.Background(), req)
 	if err == nil {
@@ -65,7 +59,7 @@ func TestForecasterService_StartWithEmptyPairs(t *testing.T) {
 
 func TestForecasterService_StopWhenNotRunning(t *testing.T) {
 	s := setupTestStore(t)
-	svc := services.NewForecasterService(s, 10)
+	svc := services.NewForecasterService(s, 10, nil)
 
 	err := svc.Stop()
 	if err == nil {
@@ -75,14 +69,9 @@ func TestForecasterService_StopWhenNotRunning(t *testing.T) {
 
 func TestForecasterService_PairLimitEnforced(t *testing.T) {
 	s := setupTestStore(t)
-	svc := services.NewForecasterService(s, 2)
+	svc := services.NewForecasterService(s, 2, nil)
 
 	req := models.ForecastRequest{
-		Credentials: models.Credentials{
-			URL:      "https://vcenter.example.com",
-			Username: "admin",
-			Password: "pass",
-		},
 		Pairs: []models.DatastorePair{
 			{Name: "p1", SourceDatastore: "ds1", TargetDatastore: "ds2"},
 			{Name: "p2", SourceDatastore: "ds3", TargetDatastore: "ds4"},

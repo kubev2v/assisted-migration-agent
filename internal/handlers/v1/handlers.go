@@ -14,7 +14,7 @@ import (
 // CredentialsService defines the interface for /credentials API operations.
 type CredentialsService interface {
 	Store(ctx context.Context, creds models.Credentials) (url string, err error)
-	Status(ctx context.Context) (url string, err error)
+	Status(ctx context.Context) (url, username string, err error)
 	GetCapabilities(ctx context.Context) (*models.CapabilityStatus, error)
 	DeleteAll(ctx context.Context) error
 	Resolve(ctx context.Context) (models.Credentials, error)
@@ -23,7 +23,7 @@ type CredentialsService interface {
 // CollectorService defines the interface for collector operations.
 type CollectorService interface {
 	GetStatus() models.CollectorStatus
-	Start(ctx context.Context, creds models.Credentials) error
+	Start(ctx context.Context) error
 	Stop()
 }
 
@@ -52,7 +52,7 @@ type VMService interface {
 
 // InspectorService defines the interface for deep inspector operations.
 type InspectorService interface {
-	Start(ctx context.Context, creds models.Credentials, vmIDs []string) error
+	Start(ctx context.Context, vmIDs []string) error
 	Credentials(ctx context.Context, creds models.Credentials) error
 	GetStatus() models.InspectorStatus
 	IsBusy() bool

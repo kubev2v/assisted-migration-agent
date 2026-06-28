@@ -61,7 +61,14 @@ func (h *Handler) StartForecaster(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		forecastReq.Credentials = creds
+		if _, err := h.credentialsSrv.Store(c.Request.Context(), creds); err != nil {
+			if srvErrors.IsVCenterError(err) || srvErrors.IsValidationError(err) {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store credentials"})
+			return
+		}
 	}
 	if req.DiskSizeGb != nil {
 		forecastReq.DiskSizeGB = *req.DiskSizeGb
@@ -79,7 +86,7 @@ func (h *Handler) StartForecaster(c *gin.Context) {
 			return
 		}
 		if srvErrors.IsCredentialsNotSetError(err) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "credentials required: provide credentials inline"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "credentials required: provide inline or store via PUT /credentials"})
 			return
 		}
 		if srvErrors.IsForecasterLimitReachedError(err) || srvErrors.IsValidationError(err) {

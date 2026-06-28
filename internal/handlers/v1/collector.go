@@ -1,7 +1,9 @@
 package v1
 
 import (
+	"encoding/json"
 	"net/http"
+	"net/url"
 
 	"github.com/gin-gonic/gin"
 
@@ -20,24 +22,50 @@ func (h *Handler) GetCollectorStatus(c *gin.Context) {
 // (POST /collector)
 func (h *Handler) StartCollector(c *gin.Context) {
 	var req v1.CollectorStartRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": validationErrorMessage(err)})
+	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 
-	creds, err := v1.CredsFromAPI(req)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	if err := creds.Validate(); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+	if req.Url != "" {
+		if _, err := url.ParseRequestURI(req.Url); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Url must be a valid URL"})
+			return
+		}
+		if req.Username == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Username is required"})
+			return
+		}
+		if req.Password == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Password is required"})
+			return
+		}
+		creds, err := v1.CredsFromAPI(req)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if err := creds.Validate(); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if _, err := h.credentialsSrv.Store(c.Request.Context(), creds); err != nil {
+			if srvErrors.IsVCenterError(err) || srvErrors.IsValidationError(err) {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store credentials"})
+			return
+		}
 	}
 
-	if err := h.collectorSrv.Start(c.Request.Context(), creds); err != nil {
+	if err := h.collectorSrv.Start(c.Request.Context()); err != nil {
 		if srvErrors.IsOperationInProgressError(err) {
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			return
+		}
+		if srvErrors.IsCredentialsNotSetError(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "credentials required: provide inline or store via PUT /credentials"})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

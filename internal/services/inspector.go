@@ -32,16 +32,18 @@ type InspectorService struct {
 	store           *store.Store
 	inspectionLimit int
 	vddkLibDir      string
+	credsSvc        *CredentialsService
 }
 
 // NewInspectorService returns an idle inspector using the default inspection work units
 // (validate, snapshot, inspect+save).
 // inspectionLimit is the maximum distinct VMs per cycle.
-func NewInspectorService(s *store.Store, inspectionLimit int, dateDir string) (*InspectorService, error) {
+func NewInspectorService(s *store.Store, inspectionLimit int, dateDir string, credsSvc *CredentialsService) (*InspectorService, error) {
 	return &InspectorService{
 		store:           s,
 		inspectionLimit: inspectionLimit,
 		vddkLibDir:      filepath.Join(dateDir, vddkFolder, vddkLibPath),
+		credsSvc:        credsSvc,
 	}, nil
 }
 
@@ -61,7 +63,7 @@ func (i *InspectorService) IsBusy() bool {
 }
 
 // Start connects to vSphere, starts pipelines for each vmIDs entry, and launches the pool.
-func (i *InspectorService) Start(ctx context.Context, creds models.Credentials, vmIDs []string) (err error) {
+func (i *InspectorService) Start(ctx context.Context, vmIDs []string) (err error) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
@@ -74,6 +76,11 @@ func (i *InspectorService) Start(ctx context.Context, creds models.Credentials, 
 
 	if len(vmIDs) > i.inspectionLimit {
 		return srvErrors.NewInspectionLimitReachedError(i.inspectionLimit)
+	}
+
+	creds, err := i.credsSvc.Resolve(ctx)
+	if err != nil {
+		return err
 	}
 
 	zap.S().Infow("starting inspector", "vmCount", len(vmIDs))

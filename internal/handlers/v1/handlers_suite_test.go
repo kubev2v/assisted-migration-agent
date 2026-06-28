@@ -55,21 +55,50 @@ type MockCollectorService struct {
 	StartError     error
 	StartCallCount int
 	StopCallCount  int
-	LastCreds      models.Credentials
 }
 
 func (m *MockCollectorService) GetStatus() models.CollectorStatus {
 	return m.StatusResult
 }
 
-func (m *MockCollectorService) Start(ctx context.Context, creds models.Credentials) error {
+func (m *MockCollectorService) Start(ctx context.Context) error {
 	m.StartCallCount++
-	m.LastCreds = creds
 	return m.StartError
 }
 
 func (m *MockCollectorService) Stop() {
 	m.StopCallCount++
+}
+
+// MockCredentialsService is a mock implementation of CredentialsService.
+type MockCredentialsService struct {
+	StoreError     error
+	StoreURL       string
+	LastCreds      models.Credentials
+	StatusURL      string
+	StatusUsername string
+	StatusErr      error
+}
+
+func (m *MockCredentialsService) Store(ctx context.Context, creds models.Credentials) (string, error) {
+	m.LastCreds = creds
+	return m.StoreURL, m.StoreError
+}
+
+func (m *MockCredentialsService) Status(ctx context.Context) (string, string, error) {
+	return m.StatusURL, m.StatusUsername, m.StatusErr
+}
+
+func (m *MockCredentialsService) GetCapabilities(ctx context.Context) (*models.CapabilityStatus, error) {
+	return nil, nil
+}
+
+func (m *MockCredentialsService) Resolve(ctx context.Context) (models.Credentials, error) {
+	return models.Credentials{}, nil
+}
+
+func (m *MockCredentialsService) DeleteAll(ctx context.Context) error {
+	return nil
 }
 
 // MockInventoryService is a mock implementation of InventoryService.
@@ -179,22 +208,19 @@ type MockInspectorService struct {
 	CancelVmsInspectionCallCount int
 	StopCallCount                int
 	IsBusyResult                 bool
-	LastCreds                    models.Credentials
 }
 
 func (m *MockInspectorService) IsBusy() bool {
 	return m.IsBusyResult
 }
 
-func (m *MockInspectorService) Start(ctx context.Context, creds models.Credentials, vmIDs []string) error {
+func (m *MockInspectorService) Start(ctx context.Context, vmIDs []string) error {
 	m.StartCallCount++
-	m.LastCreds = creds
 	return m.StartError
 }
 
 func (m *MockInspectorService) Credentials(ctx context.Context, creds models.Credentials) error {
 	_, _ = ctx, creds
-	m.LastCreds = creds
 	return m.CredentialsError
 }
 

@@ -154,12 +154,12 @@ func (s *CredentialsService) Store(ctx context.Context, creds models.Credentials
 	return creds.URL, nil
 }
 
-func (s *CredentialsService) Status(ctx context.Context) (string, error) {
-	creds, err := s.store.Credentials().Get(ctx, credentialsRecordID)
+func (s *CredentialsService) Status(ctx context.Context) (url, username string, err error) {
+	creds, err := s.Resolve(ctx)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	return creds.URL, nil
+	return creds.URL, creds.Username, nil
 }
 
 func (s *CredentialsService) Resolve(ctx context.Context) (models.Credentials, error) {

@@ -7,6 +7,7 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/pkg/console"
+	"github.com/kubev2v/assisted-migration-agent/pkg/crypto"
 )
 
 const (
@@ -18,8 +19,10 @@ type ServiceManager struct {
 	cfg           *config.Configuration
 	store         *store.Store
 	consoleClient *console.Client
+	keyMgr        *crypto.KeyManager
 
 	console     *Console
+	credentials *CredentialsService
 	collector   *CollectorService
 	inspector   *InspectorService
 	forecaster  *ForecasterService
@@ -52,6 +55,12 @@ func WithConsoleClient(c *console.Client) ServiceManagerOption {
 	}
 }
 
+func WithKeyManager(km *crypto.KeyManager) ServiceManagerOption {
+	return func(m *ServiceManager) {
+		m.keyMgr = km
+	}
+}
+
 func NewServiceManager(opts ...ServiceManagerOption) *ServiceManager {
 	m := &ServiceManager{}
 	for _, opt := range opts {
@@ -74,17 +83,21 @@ func (m *ServiceManager) Initialize() error {
 	m.inventory = NewInventoryService(m.store)
 	m.event = NewEventService(m.store)
 
+	m.credentials = NewCredentialsService(m.store)
+	if m.keyMgr != nil {
+		m.credentials.WithKeyManager(m.keyMgr)
+	}
+
 	factory := newCollectorWorkFactory(m.store, m.event, m.cfg.Agent.DataFolder, m.cfg.Agent.OpaPoliciesFolder)
-	m.collector = NewCollectorService(m.inventory, factory.Build)
-	// rightsizing is wired below after m.rightsizing is constructed
+	m.collector = NewCollectorService(m.inventory, factory.Build, m.credentials)
 
 	var err error
-	m.inspector, err = NewInspectorService(m.store, maxVMsPerCycle, m.cfg.Agent.DataFolder)
+	m.inspector, err = NewInspectorService(m.store, maxVMsPerCycle, m.cfg.Agent.DataFolder, m.credentials)
 	if err != nil {
 		return err
 	}
 
-	m.forecaster = NewForecasterService(m.store, maxPairsPerRun)
+	m.forecaster = NewForecasterService(m.store, maxPairsPerRun, m.credentials)
 
 	m.vddk = NewVddkService(m.cfg.Agent.DataFolder, m.store)
 
@@ -163,6 +176,10 @@ func (m *ServiceManager) ForecasterService() *ForecasterService {
 
 func (m *ServiceManager) ApplicationService() *ApplicationService {
 	return m.application
+}
+
+func (m *ServiceManager) CredentialsService() *CredentialsService {
+	return m.credentials
 }
 
 func (m *ServiceManager) Stop(ctx context.Context) {

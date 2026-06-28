@@ -35,11 +35,11 @@ func (h *Handler) PutCredentials(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, v1.CredentialStatus{Url: url, Valid: true})
+	c.JSON(http.StatusOK, v1.CredentialStatus{Url: url, Username: creds.Username, Valid: true})
 }
 
 func (h *Handler) GetCredentials(c *gin.Context) {
-	url, err := h.credentialsSrv.Status(c.Request.Context())
+	url, username, err := h.credentialsSrv.Status(c.Request.Context())
 	if err != nil {
 		if srvErrors.IsResourceNotFoundError(err) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "no credentials stored"})
@@ -50,7 +50,7 @@ func (h *Handler) GetCredentials(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, v1.CredentialStatus{Url: url, Valid: true})
+	c.JSON(http.StatusOK, v1.CredentialStatus{Url: url, Username: username, Valid: true})
 }
 
 func (h *Handler) GetCredentialCapabilities(c *gin.Context) {

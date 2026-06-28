@@ -12,6 +12,7 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/services"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
+	"github.com/kubev2v/assisted-migration-agent/pkg/crypto"
 	"github.com/kubev2v/assisted-migration-agent/pkg/work"
 	"github.com/kubev2v/assisted-migration-agent/test"
 )
@@ -96,6 +97,7 @@ var _ = Describe("CollectorService", func() {
 		srv      *services.CollectorService
 		eventSrv *services.EventService
 		invSrv   *services.InventoryService
+		credsSvc *services.CredentialsService
 	)
 
 	BeforeEach(func() {
@@ -111,7 +113,20 @@ var _ = Describe("CollectorService", func() {
 		st = store.NewStore(db, test.NewMockValidator())
 		invSrv = services.NewInventoryService(st)
 		eventSrv = services.NewEventService(st)
-		srv = services.NewCollectorService(invSrv, mockCollectorBuilder(st, eventSrv, nil, nil, nil))
+
+		// Set up a CredentialsService with stored test credentials
+		km, err := crypto.NewKeyManager("")
+		Expect(err).NotTo(HaveOccurred())
+		credsSvc = services.NewCredentialsService(st).WithKeyManager(km)
+		creds := models.Credentials{
+			URL:      "https://vcenter.example.com",
+			Username: "admin",
+			Password: "secret",
+		}
+		err = credsSvc.Save(ctx, km.Key(), "credentials", creds)
+		Expect(err).NotTo(HaveOccurred())
+
+		srv = services.NewCollectorService(invSrv, mockCollectorBuilder(st, eventSrv, nil, nil, nil), credsSvc)
 	})
 
 	AfterEach(func() {
@@ -168,15 +183,8 @@ var _ = Describe("CollectorService", func() {
 		// When Start is called with valid credentials
 		// Then the pipeline should complete and state should be collected
 		It("should verify credentials and start collection", func() {
-			// Arrange
-			creds := models.Credentials{
-				URL:      "https://vcenter.example.com",
-				Username: "admin",
-				Password: "secret",
-			}
-
 			// Act
-			err := srv.Start(ctx, creds)
+			err := srv.Start(ctx)
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
@@ -194,15 +202,8 @@ var _ = Describe("CollectorService", func() {
 		// When Start is called and collection completes
 		// Then an inventory update event should be written to the outbox
 		It("should write an inventory update event to the outbox on successful collection", func() {
-			// Arrange
-			creds := models.Credentials{
-				URL:      "https://vcenter.example.com",
-				Username: "admin",
-				Password: "secret",
-			}
-
 			// Act
-			err := srv.Start(ctx, creds)
+			err := srv.Start(ctx)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Assert
@@ -223,15 +224,10 @@ var _ = Describe("CollectorService", func() {
 		It("should set error state when connection fails", func() {
 			// Arrange
 			srv = services.NewCollectorService(invSrv,
-				mockCollectorBuilder(st, eventSrv, errors.New("connection failed"), nil, nil))
-			creds := models.Credentials{
-				URL:      "https://vcenter.example.com",
-				Username: "admin",
-				Password: "secret",
-			}
+				mockCollectorBuilder(st, eventSrv, errors.New("connection failed"), nil, nil), credsSvc)
 
 			// Act
-			err := srv.Start(ctx, creds)
+			err := srv.Start(ctx)
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
@@ -250,15 +246,10 @@ var _ = Describe("CollectorService", func() {
 		It("should set error state when collection fails", func() {
 			// Arrange
 			srv = services.NewCollectorService(invSrv,
-				mockCollectorBuilder(st, eventSrv, nil, errors.New("collection failed"), nil))
-			creds := models.Credentials{
-				URL:      "https://vcenter.example.com",
-				Username: "admin",
-				Password: "secret",
-			}
+				mockCollectorBuilder(st, eventSrv, nil, errors.New("collection failed"), nil), credsSvc)
 
 			// Act
-			err := srv.Start(ctx, creds)
+			err := srv.Start(ctx)
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
@@ -277,15 +268,10 @@ var _ = Describe("CollectorService", func() {
 		It("should set error state when processor fails", func() {
 			// Arrange
 			srv = services.NewCollectorService(invSrv,
-				mockCollectorBuilder(st, eventSrv, nil, nil, errors.New("processing failed")))
-			creds := models.Credentials{
-				URL:      "https://vcenter.example.com",
-				Username: "admin",
-				Password: "secret",
-			}
+				mockCollectorBuilder(st, eventSrv, nil, nil, errors.New("processing failed")), credsSvc)
 
 			// Act
-			err := srv.Start(ctx, creds)
+			err := srv.Start(ctx)
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
@@ -307,16 +293,11 @@ var _ = Describe("CollectorService", func() {
 			defer close(gate)
 
 			srv = services.NewCollectorService(invSrv,
-				blockingCollectorBuilder(gate))
-			creds := models.Credentials{
-				URL:      "https://vcenter.example.com",
-				Username: "admin",
-				Password: "secret",
-			}
-			Expect(srv.Start(ctx, creds)).To(Succeed())
+				blockingCollectorBuilder(gate), credsSvc)
+			Expect(srv.Start(ctx)).To(Succeed())
 
 			// Act
-			err := srv.Start(ctx, creds)
+			err := srv.Start(ctx)
 
 			// Assert
 			Expect(err).To(HaveOccurred())
@@ -327,12 +308,7 @@ var _ = Describe("CollectorService", func() {
 		// Then it should be a no-op and remain in collected state
 		It("should be a no-op when already in collected state", func() {
 			// Arrange
-			creds := models.Credentials{
-				URL:      "https://vcenter.example.com",
-				Username: "admin",
-				Password: "secret",
-			}
-			err := srv.Start(ctx, creds)
+			err := srv.Start(ctx)
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() models.CollectorStateType {
@@ -340,7 +316,7 @@ var _ = Describe("CollectorService", func() {
 			}).Should(Equal(models.CollectorStateCollected))
 
 			// Act
-			err = srv.Start(ctx, creds)
+			err = srv.Start(ctx)
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
@@ -358,7 +334,7 @@ var _ = Describe("CollectorService", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act
-			collectorSrv := services.NewCollectorService(invSrv, nil)
+			collectorSrv := services.NewCollectorService(invSrv, nil, credsSvc)
 
 			// Assert
 			Expect(collectorSrv.GetStatus().State).To(Equal(models.CollectorStateCollected))
@@ -373,13 +349,8 @@ var _ = Describe("CollectorService", func() {
 			// Arrange
 			gate := make(chan struct{})
 			srv = services.NewCollectorService(invSrv,
-				blockingCollectorBuilder(gate))
-			creds := models.Credentials{
-				URL:      "https://vcenter.example.com",
-				Username: "admin",
-				Password: "secret",
-			}
-			err := srv.Start(ctx, creds)
+				blockingCollectorBuilder(gate), credsSvc)
+			err := srv.Start(ctx)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Act

@@ -419,7 +419,7 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 			// Given an agent in disconnected mode with vcsim running
 			// When invalid credentials are provided to the collector
 			// Then the collector should reach "error" status
-			ginkgo.It("should report error with bad credentials", func() {
+			ginkgo.It("should reject bad credentials at store time", func() {
 				// Arrange
 				agentID := uuid.NewString()
 				_, err := infraManager.StartAgent(infra.AgentConfig{
@@ -437,25 +437,18 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 					return err
 				}, 30*time.Second, 1*time.Second).Should(gm.BeNil())
 
-				// Act
+				// Act — bad credentials are rejected when the handler saves them
 				_, err = agentSvc.StartCollector("https://localhost:8989/sdk", "baduser", "badpass")
-				gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to start collector")
 
-				// Assert
-				gm.Eventually(func() string {
-					status, err := agentSvc.GetCollectorStatus()
-					if err != nil {
-						return ""
-					}
-					ginkgo.GinkgoWriter.Printf("Collector status: %s\n", status.Status)
-					return status.Status
-				}, 30*time.Second, 2*time.Second).Should(gm.Equal("error"))
+				// Assert — handler returns 400 (credential verification fails at store time)
+				gm.Expect(err).To(gm.HaveOccurred(), "expected bad credentials to be rejected")
+				gm.Expect(err.Error()).To(gm.ContainSubstring("400"), "expected HTTP 400 for invalid credentials")
 			})
 
 			// Given an agent in disconnected mode
 			// When an unreachable vCenter URL is provided to the collector
 			// Then the collector should reach "error" status
-			ginkgo.It("should report error with bad vCenter URL", func() {
+			ginkgo.It("should reject unreachable vCenter URL at store time", func() {
 				// Arrange
 				agentID := uuid.NewString()
 				_, err := infraManager.StartAgent(infra.AgentConfig{
@@ -473,19 +466,12 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 					return err
 				}, 30*time.Second, 1*time.Second).Should(gm.BeNil())
 
-				// Act
+				// Act — unreachable URL is rejected when the handler saves credentials
 				_, err = agentSvc.StartCollector("https://localhost:9999/sdk", "user", "pass")
-				gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to start collector")
 
-				// Assert
-				gm.Eventually(func() string {
-					status, err := agentSvc.GetCollectorStatus()
-					if err != nil {
-						return ""
-					}
-					ginkgo.GinkgoWriter.Printf("Collector status: %s\n", status.Status)
-					return status.Status
-				}, 30*time.Second, 2*time.Second).Should(gm.Equal("error"))
+				// Assert — handler returns 400 (credential verification fails at store time)
+				gm.Expect(err).To(gm.HaveOccurred(), "expected unreachable URL to be rejected")
+				gm.Expect(err.Error()).To(gm.ContainSubstring("400"), "expected HTTP 400 for unreachable URL")
 			})
 
 			// Given an agent in disconnected mode that failed collection with bad credentials
@@ -509,18 +495,12 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 					return err
 				}, 30*time.Second, 1*time.Second).Should(gm.BeNil())
 
+				// Bad credentials are rejected at store time
 				_, err = agentSvc.StartCollector("https://localhost:8989/sdk", "baduser", "badpass")
-				gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to start collector")
+				gm.Expect(err).To(gm.HaveOccurred(), "expected bad credentials to be rejected")
+				gm.Expect(err.Error()).To(gm.ContainSubstring("400"), "expected HTTP 400 for invalid credentials")
 
-				gm.Eventually(func() string {
-					status, err := agentSvc.GetCollectorStatus()
-					if err != nil {
-						return ""
-					}
-					return status.Status
-				}, 30*time.Second, 2*time.Second).Should(gm.Equal("error"))
-
-				// Act
+				// Act — retry with valid credentials
 				_, err = agentSvc.StartCollector("https://localhost:8989/sdk", infra.VcsimUsername, infra.VcsimPassword)
 				gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to start collector")
 
@@ -1000,7 +980,7 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 			// Given an agent in connected mode with vcsim running
 			// When invalid credentials are provided to the collector
 			// Then the backend should have statusInfo containing the error message
-			ginkgo.It("should report error with statusInfo on backend for bad credentials", func() {
+			ginkgo.It("should reject bad credentials at store time in connected mode", func() {
 				// Arrange
 				agentID := uuid.NewString()
 				_, err := infraManager.StartAgent(infra.AgentConfig{
@@ -1018,32 +998,12 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 					return err
 				}, 30*time.Second, 1*time.Second).Should(gm.BeNil())
 
-				// Act
-				ginkgo.GinkgoWriter.Println("Starting collector with invalid credentials...")
+				// Act — bad credentials are rejected when the handler saves them
 				_, err = agentSvc.StartCollector("https://localhost:8989/sdk", "baduser", "badpass")
-				gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to start collector")
 
-				// Wait for collector to reach error state
-				gm.Eventually(func() string {
-					status, err := agentSvc.GetCollectorStatus()
-					if err != nil {
-						return ""
-					}
-					ginkgo.GinkgoWriter.Printf("Collector status: %s %s\n", status.Status, status.Error)
-					return status.Status
-				}, 30*time.Second, 2*time.Second).Should(gm.Equal("error"))
-
-				// Give time for status to be pushed to backend
-				time.Sleep(3 * time.Second)
-
-				// Assert - check statusInfo on backend
-				source, err := userSvc.GetSource(sourceID)
-				gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to get source")
-
-				ginkgo.GinkgoWriter.Printf("Source agent: %+v\n", source.Agent)
-				gm.Expect(source.Agent).ToNot(gm.BeNil(), "gm.Expected agent to be present on source")
-				gm.Expect(string(source.Agent.Status)).To(gm.Equal("error"), "gm.Expected agent status to be error")
-				gm.Expect(source.Agent.StatusInfo).To(gm.ContainSubstring("invalid credentials"), "gm.Expected statusInfo to contain error message")
+				// Assert — handler returns 400 (credential verification fails at store time)
+				gm.Expect(err).To(gm.HaveOccurred(), "expected bad credentials to be rejected")
+				gm.Expect(err.Error()).To(gm.ContainSubstring("400"), "expected HTTP 400 for invalid credentials")
 			})
 
 			// Given an agent in connected mode that has collected and pushed inventory
