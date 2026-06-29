@@ -34,7 +34,7 @@ func (h *Handler) PutCredentials(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, v1.CredentialStatus{Url: url, Username: creds.Username, Valid: true})
+	c.JSON(http.StatusOK, v1.StoredCredentials{Url: url, Username: creds.Username})
 }
 
 func (h *Handler) GetCredentials(c *gin.Context) {
@@ -49,7 +49,7 @@ func (h *Handler) GetCredentials(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, v1.CredentialStatus{Url: url, Username: username, Valid: true})
+	c.JSON(http.StatusOK, v1.StoredCredentials{Url: url, Username: username})
 }
 
 func (h *Handler) DeleteCredentials(c *gin.Context) {

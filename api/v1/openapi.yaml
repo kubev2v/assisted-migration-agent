@@ -450,13 +450,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CredentialStatus'
+                $ref: '#/components/schemas/StoredCredentials'
         '200':
           description: Credentials validated and stored
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CredentialStatus'
+                $ref: '#/components/schemas/StoredCredentials'
         '400':
           description: Invalid credentials or unreachable vCenter
         '500':
@@ -465,16 +465,15 @@ paths:
       summary: Get stored credential status
       operationId: getCredentials
       description: >-
-        Returns stored credential metadata (URL only). Never exposes
-        username or password. This endpoint does not revalidate credentials
-        against vSphere.
+        Returns stored credential metadata (URL and username). Never
+        exposes password. Does not revalidate against vSphere.
       responses:
         '200':
           description: Credential status
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CredentialStatus'
+                $ref: '#/components/schemas/StoredCredentials'
         '404':
           description: No credentials stored
         '500':
@@ -1690,12 +1689,11 @@ components:
           allOf:
             - $ref: '#/components/schemas/VddkProperties'
 
-    CredentialStatus:
+    StoredCredentials:
       type: object
       required:
         - url
         - username
-        - valid
       properties:
         url:
           type: string
@@ -1703,9 +1701,6 @@ components:
         username:
           type: string
           description: vCenter username
-        valid:
-          type: boolean
-          description: Whether credentials are stored for the returned URL.
 
     VcenterCredentials:
       required:
