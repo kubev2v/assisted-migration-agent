@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - main
+      - stable
 
 jobs:
   notify:
@@ -28,6 +29,7 @@ jobs:
               "event_type": "agent_repo_updated",
               "client_payload": {
                 "sha": "${{ github.sha }}",
-                "repo": "${{ github.repository }}"
+                "repo": "${{ github.repository }}",
+                "target_branch": "${{ github.ref_name }}"
               }
             }'
