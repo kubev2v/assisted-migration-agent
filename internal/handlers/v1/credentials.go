@@ -60,6 +60,11 @@ func (h *Handler) GetCredentialCapabilities(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "no credentials stored"})
 			return
 		}
+		if srvErrors.IsVCenterError(err) {
+			zap.S().Warnw("vCenter unreachable, capabilities unavailable", "error", err)
+			c.JSON(http.StatusNotFound, gin.H{"error": "vCenter unreachable: " + err.Error()})
+			return
+		}
 		zap.S().Errorw("failed to get capabilities", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return

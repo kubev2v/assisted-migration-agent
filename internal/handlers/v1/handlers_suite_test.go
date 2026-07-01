@@ -38,6 +38,8 @@ func generateCACertPEM() string {
 	return string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}))
 }
 
+func strPtr(s string) *string { return &s }
+
 func TestHandlers(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Handlers Suite")
@@ -72,12 +74,15 @@ func (m *MockCollectorService) Stop() {
 
 // MockCredentialsService is a mock implementation of CredentialsService.
 type MockCredentialsService struct {
-	StoreError     error
-	StoreURL       string
-	LastCreds      models.Credentials
-	StatusURL      string
-	StatusUsername string
-	StatusErr      error
+	StoreError         error
+	StoreURL           string
+	LastCreds          models.Credentials
+	StatusURL          string
+	StatusUsername     string
+	StatusErr          error
+	CapabilitiesResult *models.CapabilityStatus
+	CapabilitiesErr    error
+	DeleteAllErr       error
 }
 
 func (m *MockCredentialsService) Store(ctx context.Context, creds models.Credentials) (string, error) {
@@ -90,7 +95,7 @@ func (m *MockCredentialsService) Status(ctx context.Context) (string, string, er
 }
 
 func (m *MockCredentialsService) GetCapabilities(ctx context.Context) (*models.CapabilityStatus, error) {
-	return nil, nil
+	return m.CapabilitiesResult, m.CapabilitiesErr
 }
 
 func (m *MockCredentialsService) Resolve(ctx context.Context) (models.Credentials, error) {
@@ -98,7 +103,7 @@ func (m *MockCredentialsService) Resolve(ctx context.Context) (models.Credential
 }
 
 func (m *MockCredentialsService) DeleteAll(ctx context.Context) error {
-	return nil
+	return m.DeleteAllErr
 }
 
 // MockInventoryService is a mock implementation of InventoryService.
