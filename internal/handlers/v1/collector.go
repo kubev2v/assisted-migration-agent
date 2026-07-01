@@ -27,20 +27,27 @@ func (h *Handler) StartCollector(c *gin.Context) {
 		return
 	}
 
-	if req.Url != "" {
-		if _, err := url.ParseRequestURI(req.Url); err != nil {
+	if req.Url != nil {
+		if _, err := url.ParseRequestURI(*req.Url); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Url must be a valid URL"})
 			return
 		}
-		if req.Username == "" {
+		if req.Username == nil || *req.Username == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Username is required"})
 			return
 		}
-		if req.Password == "" {
+		if req.Password == nil || *req.Password == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Password is required"})
 			return
 		}
-		creds, err := v1.CredsFromAPI(req)
+		vcCreds := v1.VcenterCredentials{
+			Url:      *req.Url,
+			Username: *req.Username,
+			Password: *req.Password,
+			SkipTls:  req.SkipTls,
+			Cacert:   req.Cacert,
+		}
+		creds, err := v1.CredsFromAPI(vcCreds)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return

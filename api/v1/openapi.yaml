@@ -1251,8 +1251,26 @@ components:
           description: Git commit SHA of the UI used to build the agent
 
     CollectorStartRequest:
-      allOf:
-        - $ref: '#/components/schemas/VcenterCredentials'
+      type: object
+      description: Start collection. Credentials are optional if previously stored via PUT /credentials.
+      properties:
+        url:
+          type: string
+          format: uri
+          description: vCenter URL
+        username:
+          type: string
+          description: vCenter username
+        password:
+          type: string
+          format: password
+          description: vCenter password
+        skipTls:
+          type: boolean
+          description: Skip TLS certificate verification
+        cacert:
+          type: string
+          description: PEM-encoded CA certificate bundle
 
     CollectorStatus:
       type: object

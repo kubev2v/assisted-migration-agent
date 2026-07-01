@@ -133,8 +133,8 @@ var _ = Describe("Collector Handlers", func() {
 			// Arrange
 			mockCollector.StartError = srvErrors.NewCredentialsNotSetError()
 			body := v1.CollectorStartRequest{
-				Username: "admin",
-				Password: "secret",
+				Username: strPtr("admin"),
+				Password: strPtr("secret"),
 			}
 			bodyBytes, _ := json.Marshal(body)
 			req := httptest.NewRequest(http.MethodPost, "/collector", bytes.NewReader(bodyBytes))
@@ -158,8 +158,8 @@ var _ = Describe("Collector Handlers", func() {
 		It("should return 400 when username is missing", func() {
 			// Arrange
 			body := v1.CollectorStartRequest{
-				Url:      "https://vcenter.example.com",
-				Password: "secret",
+				Url:      strPtr("https://vcenter.example.com"),
+				Password: strPtr("secret"),
 			}
 			bodyBytes, _ := json.Marshal(body)
 			req := httptest.NewRequest(http.MethodPost, "/collector", bytes.NewReader(bodyBytes))
@@ -182,8 +182,8 @@ var _ = Describe("Collector Handlers", func() {
 		It("should return 400 when password is missing", func() {
 			// Arrange
 			body := v1.CollectorStartRequest{
-				Url:      "https://vcenter.example.com",
-				Username: "admin",
+				Url:      strPtr("https://vcenter.example.com"),
+				Username: strPtr("admin"),
 			}
 			bodyBytes, _ := json.Marshal(body)
 			req := httptest.NewRequest(http.MethodPost, "/collector", bytes.NewReader(bodyBytes))
@@ -206,9 +206,9 @@ var _ = Describe("Collector Handlers", func() {
 		It("should return 400 for invalid URL format", func() {
 			// Arrange
 			body := v1.CollectorStartRequest{
-				Url:      "not-a-valid-url",
-				Username: "admin",
-				Password: "secret",
+				Url:      strPtr("not-a-valid-url"),
+				Username: strPtr("admin"),
+				Password: strPtr("secret"),
 			}
 			bodyBytes, _ := json.Marshal(body)
 			req := httptest.NewRequest(http.MethodPost, "/collector", bytes.NewReader(bodyBytes))
@@ -232,9 +232,9 @@ var _ = Describe("Collector Handlers", func() {
 		It("should start collector with valid credentials", func() {
 			// Arrange
 			body := v1.CollectorStartRequest{
-				Url:      "https://vcenter.example.com",
-				Username: "admin",
-				Password: "secret",
+				Url:      strPtr("https://vcenter.example.com"),
+				Username: strPtr("admin"),
+				Password: strPtr("secret"),
 			}
 			bodyBytes, _ := json.Marshal(body)
 			req := httptest.NewRequest(http.MethodPost, "/collector", bytes.NewReader(bodyBytes))
@@ -256,9 +256,9 @@ var _ = Describe("Collector Handlers", func() {
 			// Arrange
 			mockCollector.StartError = srvErrors.NewCollectionInProgressError()
 			body := v1.CollectorStartRequest{
-				Url:      "https://vcenter.example.com",
-				Username: "admin",
-				Password: "secret",
+				Url:      strPtr("https://vcenter.example.com"),
+				Username: strPtr("admin"),
+				Password: strPtr("secret"),
 			}
 			bodyBytes, _ := json.Marshal(body)
 			req := httptest.NewRequest(http.MethodPost, "/collector", bytes.NewReader(bodyBytes))
@@ -282,9 +282,9 @@ var _ = Describe("Collector Handlers", func() {
 			// Arrange
 			mockCollector.StartError = errors.New("unexpected error")
 			body := v1.CollectorStartRequest{
-				Url:      "https://vcenter.example.com",
-				Username: "admin",
-				Password: "secret",
+				Url:      strPtr("https://vcenter.example.com"),
+				Username: strPtr("admin"),
+				Password: strPtr("secret"),
 			}
 			bodyBytes, _ := json.Marshal(body)
 			req := httptest.NewRequest(http.MethodPost, "/collector", bytes.NewReader(bodyBytes))

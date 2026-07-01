@@ -172,8 +172,23 @@ type CapabilityStatus struct {
 	} `json:"capabilities"`
 }
 
-// CollectorStartRequest defines model for CollectorStartRequest.
-type CollectorStartRequest = VcenterCredentials
+// CollectorStartRequest Start collection. Credentials are optional if previously stored via PUT /credentials.
+type CollectorStartRequest struct {
+	// Cacert PEM-encoded CA certificate bundle
+	Cacert *string `json:"cacert,omitempty"`
+
+	// Password vCenter password
+	Password *string `json:"password,omitempty"`
+
+	// SkipTls Skip TLS certificate verification
+	SkipTls *bool `json:"skipTls,omitempty"`
+
+	// Url vCenter URL
+	Url *string `json:"url,omitempty"`
+
+	// Username vCenter username
+	Username *string `json:"username,omitempty"`
+}
 
 // CollectorStatus defines model for CollectorStatus.
 type CollectorStatus struct {
