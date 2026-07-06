@@ -31,7 +31,7 @@ type (
 
 	// RightsizingCollectionHandle bundles the work builder with a cleanup function
 	// that logs out of vCenter when the pipeline finishes (success or error).
-	// Exported so tests in package services_test can construct fake handles.
+	// Exported so tests in package v1_test can construct fake handles.
 	RightsizingCollectionHandle struct {
 		Builder  work.WorkBuilder[models.RightsizingCollectionStatus, models.RightsizingCollectionResult]
 		LogoutFn func()

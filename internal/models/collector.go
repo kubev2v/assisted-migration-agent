@@ -63,7 +63,11 @@ type CollectorStatus struct {
 }
 
 // CollectorResult is the shared result struct threaded through collector work units.
+// Completed is false by default; the last work unit sets it to true on success.
+// Finalize uses it to distinguish cancel (pipeline stopped before last unit) from completion.
 type CollectorResult struct {
+	Err        error
+	Completed  bool
 	SQLitePath string
 	Inventory  []byte
 }

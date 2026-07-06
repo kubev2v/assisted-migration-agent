@@ -296,7 +296,7 @@ func (c *Console) createPipeline(s *scheduler.Scheduler[any]) (*work.Pipeline[st
 		}}
 
 	events, err := c.eventSrv.Events(context.Background())
-	if err != nil {
+	if err != nil && !errors.IsCollectionNotFoundError(err) {
 		return nil, fmt.Errorf("failed to read events: %w", err)
 	}
 

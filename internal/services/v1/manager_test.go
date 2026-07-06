@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
@@ -13,7 +15,6 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
 	v1 "github.com/kubev2v/assisted-migration-agent/internal/services/v1"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
-	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	"github.com/kubev2v/assisted-migration-agent/pkg/console"
 	"github.com/kubev2v/assisted-migration-agent/test"
 )
@@ -25,17 +26,20 @@ var _ = Describe("ServiceManager", func() {
 		cfg           *config.Configuration
 		consoleClient *console.Client
 		server        *httptest.Server
+		tmpDir        string
 	)
 
 	BeforeEach(func() {
 		var err error
-		db, err = store.NewDB(nil, ":memory:")
+		tmpDir, err = os.MkdirTemp("", "manager-test-*")
 		Expect(err).NotTo(HaveOccurred())
 
-		err = migrations.Run(context.Background(), db)
+		db, err = store.NewConnection(nil, filepath.Join(tmpDir, "agent.duckdb"))
 		Expect(err).NotTo(HaveOccurred())
 
 		st = store.NewStore(db, test.NewMockValidator())
+		Expect(st.Migrate(context.Background(), "")).To(Succeed())
+		Expect(st.InitCollection(context.Background())).To(Succeed())
 
 		server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
@@ -56,6 +60,9 @@ var _ = Describe("ServiceManager", func() {
 	AfterEach(func() {
 		server.Close()
 		_ = db.Close()
+		if tmpDir != "" {
+			_ = os.RemoveAll(tmpDir)
+		}
 	})
 
 	Describe("NewServiceManager", func() {

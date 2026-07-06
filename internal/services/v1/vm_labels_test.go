@@ -8,16 +8,15 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	v1 "github.com/kubev2v/assisted-migration-agent/internal/services/v1"
+	"github.com/kubev2v/assisted-migration-agent/internal/services"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
-	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	"github.com/kubev2v/assisted-migration-agent/test"
 )
 
 var _ = Describe("VMService Labels", func() {
 	var (
 		ctx context.Context
-		svc *v1.VMService
+		svc *services.VMService
 		st  *store.Store
 		db  *sql.DB
 	)
@@ -26,14 +25,12 @@ var _ = Describe("VMService Labels", func() {
 		ctx = context.Background()
 
 		var err error
-		db, err = store.NewDB(nil, ":memory:")
-		Expect(err).NotTo(HaveOccurred())
-
-		err = migrations.Run(ctx, db)
+		db, err = store.NewConnection(nil, ":memory:")
 		Expect(err).NotTo(HaveOccurred())
 
 		st = store.NewStore(db, test.NewMockValidator())
-		svc = v1.NewVMService(st)
+		Expect(st.InitCollection(ctx)).To(Succeed())
+		svc = services.NewVMService(st)
 	})
 
 	AfterEach(func() {
@@ -66,7 +63,7 @@ var _ = Describe("VMService Labels", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify via List
-			params := v1.VMListParams{}
+			params := services.VMListParams{}
 			vms, _, err := svc.List(ctx, params)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vms).To(HaveLen(1))

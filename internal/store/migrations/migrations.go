@@ -11,39 +11,50 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
-
 	"go.uber.org/zap"
 )
 
-//go:embed sql/*.sql
-var migrationFiles embed.FS
+const (
+	mainDatabase = "agent.main"
+)
 
-// Run executes all pending migrations in order.
-func Run(ctx context.Context, db *sql.DB) error {
-	if err := duckdb_parser.New(db, nil).Init(); err != nil {
+//go:embed main/*.sql
+var mainMigrationFiles embed.FS
+
+//go:embed collection/*.sql
+var collectionMigrationFiles embed.FS
+
+func RunMain(ctx context.Context, db *sql.DB) error {
+	return run(ctx, db, mainMigrationFiles, "main", fmt.Sprintf("%s.schema_migrations", mainDatabase))
+}
+
+func RunCollection(ctx context.Context, db *sql.DB, database string) error {
+	return run(ctx, db, collectionMigrationFiles, "collection", fmt.Sprintf("%s.main.collection_schema_migrations", database))
+}
+
+func Run(ctx context.Context, db *sql.DB, database string) error {
+	if err := RunMain(ctx, db); err != nil {
 		return err
 	}
+	return RunCollection(ctx, db, database)
+}
 
-	// Ensure migrations tracking table exists
-	if err := createMigrationsTable(ctx, db); err != nil {
+func run(ctx context.Context, db *sql.DB, files embed.FS, dir, migrationsTable string) error {
+	if err := createMigrationsTable(ctx, db, migrationsTable); err != nil {
 		return fmt.Errorf("creating migrations table: %w", err)
 	}
 
-	// Get already applied versions
-	applied, err := getAppliedVersions(ctx, db)
+	applied, err := getAppliedVersions(ctx, db, migrationsTable)
 	if err != nil {
 		return fmt.Errorf("getting applied versions: %w", err)
 	}
 
-	// Get migration files
-	files, err := getMigrationFiles()
+	sqlFiles, err := getMigrationFiles(files, dir)
 	if err != nil {
 		return fmt.Errorf("getting migration files: %w", err)
 	}
 
-	// Run pending migrations
-	for _, file := range files {
+	for _, file := range sqlFiles {
 		version := extractVersion(file)
 		if version == 0 {
 			zap.S().Warnf("skipping invalid migration file: %s", file)
@@ -55,7 +66,7 @@ func Run(ctx context.Context, db *sql.DB) error {
 			continue
 		}
 
-		if err := runMigration(ctx, db, file, version); err != nil {
+		if err := runMigration(ctx, db, files, file, version, migrationsTable); err != nil {
 			return fmt.Errorf("migration %s failed: %w", file, err)
 		}
 		zap.S().Infof("applied migration: %s", file)
@@ -64,18 +75,18 @@ func Run(ctx context.Context, db *sql.DB) error {
 	return nil
 }
 
-func createMigrationsTable(ctx context.Context, db *sql.DB) error {
-	_, err := db.ExecContext(ctx, `
-		CREATE TABLE IF NOT EXISTS schema_migrations (
+func createMigrationsTable(ctx context.Context, db *sql.DB, table string) error {
+	_, err := db.ExecContext(ctx, fmt.Sprintf(`
+		CREATE TABLE IF NOT EXISTS %s (
 			version INTEGER PRIMARY KEY,
 			applied_at TIMESTAMP DEFAULT now()
 		)
-	`)
+	`, table))
 	return err
 }
 
-func getAppliedVersions(ctx context.Context, db *sql.DB) (map[int]bool, error) {
-	rows, err := db.QueryContext(ctx, `SELECT version FROM schema_migrations`)
+func getAppliedVersions(ctx context.Context, db *sql.DB, table string) (map[int]bool, error) {
+	rows, err := db.QueryContext(ctx, fmt.Sprintf(`SELECT version FROM %s`, table))
 	if err != nil {
 		return nil, err
 	}
@@ -92,22 +103,22 @@ func getAppliedVersions(ctx context.Context, db *sql.DB) (map[int]bool, error) {
 	return applied, rows.Err()
 }
 
-func getMigrationFiles() ([]string, error) {
-	var files []string
-	err := fs.WalkDir(migrationFiles, "sql", func(path string, d fs.DirEntry, err error) error {
+func getMigrationFiles(files embed.FS, dir string) ([]string, error) {
+	var result []string
+	err := fs.WalkDir(files, dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 		if !d.IsDir() && strings.HasSuffix(path, ".sql") {
-			files = append(files, path)
+			result = append(result, path)
 		}
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	sort.Strings(files)
-	return files, nil
+	sort.Strings(result)
+	return result, nil
 }
 
 func extractVersion(filename string) int {
@@ -123,8 +134,8 @@ func extractVersion(filename string) int {
 	return v
 }
 
-func runMigration(ctx context.Context, db *sql.DB, file string, version int) error {
-	content, err := migrationFiles.ReadFile(file)
+func runMigration(ctx context.Context, db *sql.DB, files embed.FS, file string, version int, migrationsTable string) error {
+	content, err := files.ReadFile(file)
 	if err != nil {
 		return fmt.Errorf("reading migration file: %w", err)
 	}
@@ -135,13 +146,11 @@ func runMigration(ctx context.Context, db *sql.DB, file string, version int) err
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	// Execute migration SQL
 	if _, err := tx.ExecContext(ctx, string(content)); err != nil {
 		return fmt.Errorf("executing migration: %w", err)
 	}
 
-	// Record migration as applied
-	if _, err := tx.ExecContext(ctx, `INSERT INTO schema_migrations (version) VALUES (?)`, version); err != nil {
+	if _, err := tx.ExecContext(ctx, fmt.Sprintf(`INSERT INTO %s (version) VALUES (?)`, migrationsTable), version); err != nil {
 		return fmt.Errorf("recording migration: %w", err)
 	}
 

@@ -21,7 +21,7 @@ func NewConfigurationStore(db QueryInterceptor) *ConfigurationStore {
 
 func (s *ConfigurationStore) Get(ctx context.Context) (*models.Configuration, error) {
 	query, args, err := sq.Select("agent_mode").
-		From("configuration").
+		From("agent.main.configuration").
 		Where(sq.Eq{"id": 1}).
 		ToSql()
 	if err != nil {
@@ -43,7 +43,7 @@ func (s *ConfigurationStore) Get(ctx context.Context) (*models.Configuration, er
 }
 
 func (s *ConfigurationStore) Save(ctx context.Context, cfg *models.Configuration) error {
-	query, args, err := sq.Insert("configuration").
+	query, args, err := sq.Insert("agent.main.configuration").
 		Columns("id", "agent_mode").
 		Values(1, string(cfg.AgentMode)).
 		Suffix("ON CONFLICT (id) DO UPDATE SET agent_mode = EXCLUDED.agent_mode").

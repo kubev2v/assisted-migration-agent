@@ -17,7 +17,6 @@ import (
 
 	v1 "github.com/kubev2v/assisted-migration-agent/internal/services/v1"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
-	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 	"github.com/kubev2v/assisted-migration-agent/test"
 )
@@ -35,21 +34,21 @@ var _ = Describe("VddkService", func() {
 		dataDir, err = os.MkdirTemp("", "vddk-test-*")
 		Expect(err).NotTo(HaveOccurred())
 
-		db, err = store.NewDB(nil, ":memory:")
-		Expect(err).NotTo(HaveOccurred())
-		err = migrations.Run(context.Background(), db)
+		db, err = store.NewConnection(nil, filepath.Join(dataDir, "agent.duckdb"))
 		Expect(err).NotTo(HaveOccurred())
 		st = store.NewStore(db, test.NewMockValidator())
+		Expect(st.Migrate(context.Background(), "")).To(Succeed())
+		Expect(st.InitCollection(context.Background())).To(Succeed())
 
 		srv = v1.NewVddkService(dataDir, st)
 	})
 
 	AfterEach(func() {
-		if dataDir != "" {
-			_ = os.RemoveAll(dataDir)
-		}
 		if db != nil {
 			_ = db.Close()
+		}
+		if dataDir != "" {
+			_ = os.RemoveAll(dataDir)
 		}
 	})
 

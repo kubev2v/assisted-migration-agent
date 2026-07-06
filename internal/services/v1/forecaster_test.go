@@ -1,31 +1,27 @@
 package v1_test
 
 import (
+	"context"
+	"path/filepath"
 	"testing"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	v1 "github.com/kubev2v/assisted-migration-agent/internal/services/v1"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
-
-	"context"
-	"database/sql"
-
-	"github.com/duckdb/duckdb-go/v2"
 )
 
 func setupTestStore(t *testing.T) *store.Store {
 	t.Helper()
-	connector, err := duckdb.NewConnector("", nil)
+	dir := t.TempDir()
+	db, err := store.NewConnection(nil, filepath.Join(dir, "agent.duckdb"))
 	if err != nil {
-		t.Fatalf("failed to create duckdb connector: %v", err)
+		t.Fatalf("failed to create duckdb: %v", err)
 	}
-
-	db := sql.OpenDB(connector)
 	t.Cleanup(func() { _ = db.Close() })
 
 	s := store.NewStore(db, nil)
-	if err := migrations.Run(context.Background(), db); err != nil {
+	if err := migrations.RunMain(context.Background(), db); err != nil {
 		t.Fatalf("failed to run migrations: %v", err)
 	}
 	return s

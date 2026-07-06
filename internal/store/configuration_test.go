@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -11,34 +13,39 @@ import (
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
-	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 	"github.com/kubev2v/assisted-migration-agent/test"
 )
 
 var _ = Describe("ConfigurationStore", func() {
 	var (
-		ctx context.Context
-		s   *store.Store
-		db  *sql.DB
+		ctx    context.Context
+		s      *store.Store
+		db     *sql.DB
+		tmpDir string
 	)
 
 	BeforeEach(func() {
 		ctx = context.Background()
 
 		var err error
-		db, err = store.NewDB(nil, ":memory:")
+		tmpDir, err = os.MkdirTemp("", "config-store-test-*")
 		Expect(err).NotTo(HaveOccurred())
 
-		err = migrations.Run(ctx, db)
+		db, err = store.NewConnection(nil, filepath.Join(tmpDir, "agent.duckdb"))
 		Expect(err).NotTo(HaveOccurred())
 
 		s = store.NewStore(db, test.NewMockValidator())
+		Expect(s.Migrate(ctx, "")).To(Succeed())
+		Expect(s.InitCollection(ctx)).To(Succeed())
 	})
 
 	AfterEach(func() {
 		if db != nil {
 			_ = db.Close()
+		}
+		if tmpDir != "" {
+			_ = os.RemoveAll(tmpDir)
 		}
 	})
 

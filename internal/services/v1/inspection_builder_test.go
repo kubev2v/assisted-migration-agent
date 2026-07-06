@@ -10,7 +10,6 @@ import (
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
-	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	"github.com/kubev2v/assisted-migration-agent/pkg/work"
 	"github.com/kubev2v/assisted-migration-agent/test"
 )
@@ -63,13 +62,11 @@ var _ = Describe("inspectionBuilder", func() {
 	BeforeEach(func() {
 		var err error
 
-		db, err = store.NewDB(nil, ":memory:")
-		Expect(err).NotTo(HaveOccurred())
-
-		err = migrations.Run(context.Background(), db)
+		db, err = store.NewConnection(nil, ":memory:")
 		Expect(err).NotTo(HaveOccurred())
 
 		st = store.NewStore(db, test.NewMockValidator())
+		Expect(st.InitCollection(context.Background())).To(Succeed())
 
 		insertVM("vm-1", "test-vm-1")
 		insertVM("vm-2", "test-vm-2")

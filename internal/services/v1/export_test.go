@@ -7,389 +7,223 @@ import (
 	"database/sql"
 	"encoding/csv"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
-	"testing"
 
-	v1 "github.com/kubev2v/assisted-migration-agent/internal/services/v1"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	"github.com/kubev2v/assisted-migration-agent/internal/services"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/test"
 )
 
-func newTestService(t *testing.T) (context.Context, *v1.ExportService, *sql.DB) {
-	t.Helper()
+var _ = Describe("ExportService", func() {
+	var (
+		ctx    context.Context
+		db     *sql.DB
+		svc    *services.ExportService
+		tmpDir string
+	)
 
-	ctx := context.Background()
-	db, err := store.NewDB(nil, ":memory:")
-	if err != nil {
-		t.Fatalf("create db: %v", err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
+	BeforeEach(func() {
+		ctx = context.Background()
 
-	st := store.NewStore(db, test.NewMockValidator())
-	if err := st.Migrate(ctx); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
-	if err := test.InsertVMs(ctx, db); err != nil {
-		t.Fatalf("insert vms: %v", err)
-	}
+		var err error
+		tmpDir, err = os.MkdirTemp("", "export-test-*")
+		Expect(err).NotTo(HaveOccurred())
 
-	return ctx, v1.NewExportService(st), db
-}
+		db, err = store.NewConnection(nil, filepath.Join(tmpDir, "agent.duckdb"))
+		Expect(err).NotTo(HaveOccurred())
 
-func TestWriteZip_scopeFiles(t *testing.T) {
-	tests := []struct {
-		scope string
-		files []string
-	}{
-		{scope: "overview", files: []string{"overview.csv"}},
-		{scope: "hosts", files: []string{"hosts.csv"}},
-		{scope: "clusters", files: []string{"clusters.csv"}},
-		{scope: "datastores", files: []string{"datastores.csv"}},
-		{scope: "vms", files: []string{"vms.csv"}},
-		{scope: "network", files: []string{"networks.csv"}},
-		{scope: "utilization", files: []string{"vm_utilization.csv", "cluster_utilization.csv"}},
-		{scope: "applications", files: []string{"applications.csv"}},
-		{scope: "groups", files: []string{"groups.csv"}},
-		{scope: "inspection", files: []string{"inspection.csv"}},
-		{scope: "storage-forecast", files: []string{"storage-forecast.csv"}},
-	}
+		st := store.NewStore(db, test.NewMockValidator())
+		Expect(st.Migrate(ctx, "")).To(Succeed())
+		Expect(st.InitCollection(ctx)).To(Succeed())
+		Expect(test.InsertVMs(ctx, db)).To(Succeed())
 
-	ctx, svc, _ := newTestService(t)
+		svc = services.NewExportService(st)
+	})
 
-	for _, tt := range tests {
-		t.Run(tt.scope, func(t *testing.T) {
-			zipFiles, err := writeZip(ctx, svc, []string{tt.scope})
-			if err != nil {
-				t.Fatalf("WriteZip: %v", err)
-			}
-
-			files, err := readZip(zipFiles)
-			if err != nil {
-				t.Fatalf("readZip: %v", err)
-			}
-
-			for _, name := range tt.files {
-				body, ok := files[name]
-				if !ok {
-					t.Fatalf("missing %q in zip", name)
-				}
-				if len(body) == 0 {
-					t.Fatalf("%q is empty", name)
-				}
-			}
-		})
-	}
-}
-
-func TestWriteZip_allScopes(t *testing.T) {
-	allScopes := []string{
-		"overview", "hosts", "clusters", "datastores", "vms", "network",
-		"utilization", "applications", "groups", "inspection", "storage-forecast",
-	}
-	wantFiles := []string{
-		"overview.csv", "hosts.csv", "clusters.csv", "datastores.csv", "vms.csv",
-		"networks.csv", "vm_utilization.csv", "cluster_utilization.csv",
-		"applications.csv", "groups.csv", "inspection.csv", "storage-forecast.csv",
-	}
-
-	ctx, svc, _ := newTestService(t)
-
-	zipFiles, err := writeZip(ctx, svc, allScopes)
-	if err != nil {
-		t.Fatalf("WriteZip: %v", err)
-	}
-
-	files, err := readZip(zipFiles)
-	if err != nil {
-		t.Fatalf("readZip: %v", err)
-	}
-	if len(files) != len(wantFiles) {
-		t.Fatalf("got %d zip entries, want %d", len(files), len(wantFiles))
-	}
-	for _, name := range wantFiles {
-		if _, ok := files[name]; !ok {
-			t.Fatalf("missing %q in zip", name)
+	AfterEach(func() {
+		if db != nil {
+			_ = db.Close()
 		}
-	}
-}
+		if tmpDir != "" {
+			_ = os.RemoveAll(tmpDir)
+		}
+	})
 
-func TestWriteZip_validArchive(t *testing.T) {
-	ctx, svc, _ := newTestService(t)
-
-	data, err := writeZip(ctx, svc, []string{"overview"})
-	if err != nil {
-		t.Fatalf("WriteZip: %v", err)
-	}
-	if len(data) < 2 || data[0] != 0x50 || data[1] != 0x4b {
-		t.Fatalf("expected ZIP magic bytes PK, got %v", data[:min(2, len(data))])
-	}
-}
-
-func TestWriteZip_errors(t *testing.T) {
-	tests := []struct {
-		name    string
-		scopes  []string
-		setup   func(context.Context, *sql.DB) context.Context
-		wantErr string
-	}{
-		{
-			name:   "cancelled context",
-			scopes: []string{"overview"},
-			setup: func(ctx context.Context, _ *sql.DB) context.Context {
-				cancelled, cancel := context.WithCancel(ctx)
-				cancel()
-				return cancelled
+	Context("WriteZip scope files", func() {
+		DescribeTable("should produce expected files for scope",
+			func(scope string, files []string) {
+				zipData := exportZip(ctx, svc, []string{scope})
+				entries := readZipEntries(zipData)
+				for _, name := range files {
+					Expect(entries).To(HaveKey(name))
+					Expect(entries[name]).NotTo(BeEmpty())
+				}
 			},
-			wantErr: context.Canceled.Error(),
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctx, svc, db := newTestService(t)
-			if tt.setup != nil {
-				ctx = tt.setup(ctx, db)
-			}
-
-			err := svc.WriteZip(ctx, tt.scopes, &bytes.Buffer{})
-			if err == nil {
-				t.Fatal("expected error, got nil")
-			}
-			if !strings.Contains(err.Error(), tt.wantErr) {
-				t.Fatalf("error %q should contain %q", err.Error(), tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestWriteZip_overview(t *testing.T) {
-	ctx, svc, _ := newTestService(t)
-
-	files, err := readZipFromService(ctx, svc, []string{"overview"})
-	if err != nil {
-		t.Fatalf("export overview: %v", err)
-	}
-
-	t.Run("row count", func(t *testing.T) {
-		count, err := csvDataRowCount(files["overview.csv"])
-		if err != nil {
-			t.Fatalf("parse csv: %v", err)
-		}
-		if count != len(test.VMs) {
-			t.Fatalf("got %d data rows, want %d", count, len(test.VMs))
-		}
+			Entry("overview", "overview", []string{"overview.csv"}),
+			Entry("hosts", "hosts", []string{"hosts.csv"}),
+			Entry("clusters", "clusters", []string{"clusters.csv"}),
+			Entry("datastores", "datastores", []string{"datastores.csv"}),
+			Entry("vms", "vms", []string{"vms.csv"}),
+			Entry("network", "network", []string{"networks.csv"}),
+			Entry("utilization", "utilization", []string{"vm_utilization.csv", "cluster_utilization.csv"}),
+			Entry("applications", "applications", []string{"applications.csv"}),
+			Entry("groups", "groups", []string{"groups.csv"}),
+			Entry("inspection", "inspection", []string{"inspection.csv"}),
+			Entry("storage-forecast", "storage-forecast", []string{"storage-forecast.csv"}),
+		)
 	})
 
-	t.Run("migration_status", func(t *testing.T) {
-		tests := []struct {
-			vmID   string
-			status string
-		}{
-			{vmID: "vm-001", status: "Ready"},
-			{vmID: "vm-003", status: "Review"},
-			{vmID: "vm-007", status: "Blocked"},
-		}
-
-		rows, err := csvRowsByColumn(files["overview.csv"], "id")
-		if err != nil {
-			t.Fatalf("parse csv: %v", err)
-		}
-
-		for _, tt := range tests {
-			t.Run(tt.vmID, func(t *testing.T) {
-				row, ok := rows[tt.vmID]
-				if !ok {
-					t.Fatalf("vm %q not found in overview.csv", tt.vmID)
-				}
-				if row["migration_status"] != tt.status {
-					t.Fatalf("migration_status = %q, want %q", row["migration_status"], tt.status)
-				}
-			})
-		}
-	})
-}
-
-func TestWriteZip_csvInjection(t *testing.T) {
-	ctx, svc, db := newTestService(t)
-	if _, err := db.ExecContext(ctx, `UPDATE vinfo SET "VM" = '=1+1' WHERE "VM ID" = 'vm-001'`); err != nil {
-		t.Fatalf("update vm name: %v", err)
-	}
-
-	files, err := readZipFromService(ctx, svc, []string{"overview"})
-	if err != nil {
-		t.Fatalf("export overview: %v", err)
-	}
-
-	rows, err := csvRowsByColumn(files["overview.csv"], "id")
-	if err != nil {
-		t.Fatalf("parse csv: %v", err)
-	}
-	row, ok := rows["vm-001"]
-	if !ok {
-		t.Fatal("vm-001 not found in overview.csv")
-	}
-	if row["name"] != "'=1+1" {
-		t.Fatalf("name = %q, want %q", row["name"], "'=1+1")
-	}
-}
-
-func TestWriteZip_network(t *testing.T) {
-	ctx, svc, _ := newTestService(t)
-
-	files, err := readZipFromService(ctx, svc, []string{"network"})
-	if err != nil {
-		t.Fatalf("export network: %v", err)
-	}
-
-	count, err := csvDataRowCount(files["networks.csv"])
-	if err != nil {
-		t.Fatalf("parse csv: %v", err)
-	}
-	if count != len(test.NICs) {
-		t.Fatalf("got %d NIC rows, want %d", count, len(test.NICs))
-	}
-}
-
-func TestWriteZip_utilization(t *testing.T) {
-	tests := []struct {
-		name               string
-		seedUtilization    bool
-		wantVMRows         int
-		wantClusterRowsMin int
-	}{
-		{
-			name:               "no rightsizing report",
-			wantVMRows:         0,
-			wantClusterRowsMin: 0,
-		},
-		{
-			name:               "with rightsizing report",
-			seedUtilization:    true,
-			wantVMRows:         len(test.Utilizations),
-			wantClusterRowsMin: 1,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctx, svc, db := newTestService(t)
-			if tt.seedUtilization {
-				if err := test.InsertVMUtilization(ctx, db); err != nil {
-					t.Fatalf("insert utilization: %v", err)
-				}
+	Context("WriteZip all scopes", func() {
+		It("should produce all expected files", func() {
+			allScopes := []string{
+				"overview", "hosts", "clusters", "datastores", "vms", "network",
+				"utilization", "applications", "groups", "inspection", "storage-forecast",
+			}
+			wantFiles := []string{
+				"overview.csv", "hosts.csv", "clusters.csv", "datastores.csv", "vms.csv",
+				"networks.csv", "vm_utilization.csv", "cluster_utilization.csv",
+				"applications.csv", "groups.csv", "inspection.csv", "storage-forecast.csv",
 			}
 
-			files, err := readZipFromService(ctx, svc, []string{"utilization"})
-			if err != nil {
-				t.Fatalf("export utilization: %v", err)
-			}
-
-			for _, name := range []string{"vm_utilization.csv", "cluster_utilization.csv"} {
-				if _, ok := files[name]; !ok {
-					t.Fatalf("missing %q", name)
-				}
-			}
-
-			vmRows, err := csvDataRowCount(files["vm_utilization.csv"])
-			if err != nil {
-				t.Fatalf("parse vm_utilization.csv: %v", err)
-			}
-			if vmRows != tt.wantVMRows {
-				t.Fatalf("vm_utilization rows = %d, want %d", vmRows, tt.wantVMRows)
-			}
-
-			clusterRows, err := csvDataRowCount(files["cluster_utilization.csv"])
-			if err != nil {
-				t.Fatalf("parse cluster_utilization.csv: %v", err)
-			}
-			if clusterRows < tt.wantClusterRowsMin {
-				t.Fatalf("cluster_utilization rows = %d, want at least %d", clusterRows, tt.wantClusterRowsMin)
-			}
-
-			if !tt.seedUtilization && !strings.Contains(string(files["vm_utilization.csv"]), "vm_name") {
-				t.Fatal("vm_utilization.csv missing header")
+			zipData := exportZip(ctx, svc, allScopes)
+			entries := readZipEntries(zipData)
+			Expect(entries).To(HaveLen(len(wantFiles)))
+			for _, name := range wantFiles {
+				Expect(entries).To(HaveKey(name))
 			}
 		})
-	}
-}
+	})
 
-func readZipFromService(ctx context.Context, svc *v1.ExportService, scopes []string) (map[string][]byte, error) {
-	data, err := writeZip(ctx, svc, scopes)
-	if err != nil {
-		return nil, err
-	}
-	return readZip(data)
-}
+	Context("WriteZip valid archive", func() {
+		It("should produce valid ZIP magic bytes", func() {
+			data := exportZip(ctx, svc, []string{"overview"})
+			Expect(len(data)).To(BeNumerically(">", 2))
+			Expect(data[0]).To(Equal(byte(0x50)))
+			Expect(data[1]).To(Equal(byte(0x4b)))
+		})
+	})
 
-func writeZip(ctx context.Context, svc *v1.ExportService, scopes []string) ([]byte, error) {
+	Context("WriteZip errors", func() {
+		It("should fail with cancelled context", func() {
+			cancelled, cancel := context.WithCancel(ctx)
+			cancel()
+
+			err := svc.WriteZip(cancelled, []string{"overview"}, &bytes.Buffer{})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring(context.Canceled.Error()))
+		})
+	})
+
+	Context("WriteZip overview", func() {
+		It("should have correct row count", func() {
+			entries := readZipEntries(exportZip(ctx, svc, []string{"overview"}))
+			count := csvRowCount(entries["overview.csv"])
+			Expect(count).To(Equal(len(test.VMs)))
+		})
+
+		DescribeTable("should have correct migration_status",
+			func(vmID, status string) {
+				entries := readZipEntries(exportZip(ctx, svc, []string{"overview"}))
+				rows := csvRowsByCol(entries["overview.csv"], "id")
+				Expect(rows).To(HaveKey(vmID))
+				Expect(rows[vmID]["migration_status"]).To(Equal(status))
+			},
+			Entry("vm-001 Ready", "vm-001", "Ready"),
+			Entry("vm-003 Review", "vm-003", "Review"),
+			Entry("vm-007 Blocked", "vm-007", "Blocked"),
+		)
+	})
+
+	Context("WriteZip CSV injection", func() {
+		It("should escape formula-like values", func() {
+			_, err := db.ExecContext(ctx, `UPDATE vinfo SET "VM" = '=1+1' WHERE "VM ID" = 'vm-001'`)
+			Expect(err).NotTo(HaveOccurred())
+
+			entries := readZipEntries(exportZip(ctx, svc, []string{"overview"}))
+			rows := csvRowsByCol(entries["overview.csv"], "id")
+			Expect(rows).To(HaveKey("vm-001"))
+			Expect(rows["vm-001"]["name"]).To(Equal("'=1+1"))
+		})
+	})
+
+	Context("WriteZip network", func() {
+		It("should have correct NIC row count", func() {
+			entries := readZipEntries(exportZip(ctx, svc, []string{"network"}))
+			count := csvRowCount(entries["networks.csv"])
+			Expect(count).To(Equal(len(test.NICs)))
+		})
+	})
+
+	Context("WriteZip utilization", func() {
+		It("should produce empty utilization without rightsizing report", func() {
+			entries := readZipEntries(exportZip(ctx, svc, []string{"utilization"}))
+			Expect(entries).To(HaveKey("vm_utilization.csv"))
+			Expect(entries).To(HaveKey("cluster_utilization.csv"))
+			Expect(csvRowCount(entries["vm_utilization.csv"])).To(Equal(0))
+			Expect(string(entries["vm_utilization.csv"])).To(ContainSubstring("vm_name"))
+		})
+
+		It("should produce utilization rows with rightsizing report", func() {
+			Expect(test.InsertVMUtilization(ctx, db)).To(Succeed())
+
+			entries := readZipEntries(exportZip(ctx, svc, []string{"utilization"}))
+			Expect(csvRowCount(entries["vm_utilization.csv"])).To(Equal(len(test.Utilizations)))
+			Expect(csvRowCount(entries["cluster_utilization.csv"])).To(BeNumerically(">=", 1))
+		})
+	})
+})
+
+func exportZip(ctx context.Context, svc *services.ExportService, scopes []string) []byte {
 	var buf bytes.Buffer
-	if err := svc.WriteZip(ctx, scopes, &buf); err != nil {
-		return nil, err
-	}
-	if buf.Len() == 0 {
-		return nil, io.ErrUnexpectedEOF
-	}
-	return buf.Bytes(), nil
+	ExpectWithOffset(1, svc.WriteZip(ctx, scopes, &buf)).To(Succeed())
+	ExpectWithOffset(1, buf.Len()).To(BeNumerically(">", 0))
+	return buf.Bytes()
 }
 
-func readZip(data []byte) (map[string][]byte, error) {
+func readZipEntries(data []byte) map[string][]byte {
 	reader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
-	if err != nil {
-		return nil, err
-	}
+	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
 	files := make(map[string][]byte, len(reader.File))
 	for _, f := range reader.File {
 		rc, err := f.Open()
-		if err != nil {
-			return nil, err
-		}
-
+		ExpectWithOffset(1, err).NotTo(HaveOccurred())
 		body, err := io.ReadAll(rc)
-		closeErr := rc.Close()
-		if err != nil {
-			return nil, err
-		}
-		if closeErr != nil {
-			return nil, closeErr
-		}
-
+		_ = rc.Close()
+		ExpectWithOffset(1, err).NotTo(HaveOccurred())
 		files[f.Name] = body
 	}
-	return files, nil
+	return files
 }
 
-func csvDataRowCount(data []byte) (int, error) {
+func csvRowCount(data []byte) int {
 	records, err := csv.NewReader(strings.NewReader(string(data))).ReadAll()
-	if err != nil {
-		return 0, err
-	}
+	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 	if len(records) <= 1 {
-		return 0, nil
+		return 0
 	}
-	return len(records) - 1, nil
+	return len(records) - 1
 }
 
-func csvRowsByColumn(data []byte, keyColumn string) (map[string]map[string]string, error) {
+func csvRowsByCol(data []byte, keyCol string) map[string]map[string]string {
 	records, err := csv.NewReader(strings.NewReader(string(data))).ReadAll()
-	if err != nil {
-		return nil, err
-	}
-	if len(records) == 0 {
-		return nil, io.ErrUnexpectedEOF
-	}
+	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+	ExpectWithOffset(1, records).NotTo(BeEmpty())
 
 	header := records[0]
-	keyIndex := -1
+	keyIdx := -1
 	for i, col := range header {
-		if col == keyColumn {
-			keyIndex = i
+		if col == keyCol {
+			keyIdx = i
 			break
 		}
 	}
-	if keyIndex < 0 {
-		return nil, io.ErrUnexpectedEOF
-	}
+	ExpectWithOffset(1, keyIdx).To(BeNumerically(">=", 0))
 
 	rows := make(map[string]map[string]string, len(records)-1)
 	for _, record := range records[1:] {
@@ -397,7 +231,7 @@ func csvRowsByColumn(data []byte, keyColumn string) (map[string]map[string]strin
 		for i, col := range header {
 			row[col] = record[i]
 		}
-		rows[record[keyIndex]] = row
+		rows[record[keyIdx]] = row
 	}
-	return rows, nil
+	return rows
 }

@@ -1,1 +1,0 @@
-ALTER TABLE groups ADD COLUMN tags VARCHAR[] DEFAULT [];

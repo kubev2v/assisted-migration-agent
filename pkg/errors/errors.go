@@ -48,6 +48,10 @@ func NewCredentialsNotFoundError(id string) *ResourceNotFoundError {
 	return NewResourceNotFoundError("credentials", id)
 }
 
+func NewCollectionNotFoundError() *ResourceNotFoundError {
+	return NewResourceNotFoundError("collection", "")
+}
+
 func (e *ResourceNotFoundError) Error() string {
 	if e.ID != "" {
 		return fmt.Sprintf("%s '%s' not found", e.Kind, e.ID)
@@ -382,4 +386,17 @@ func (e *InvalidVersionError) Error() string {
 func IsInvalidVersionError(err error) bool {
 	var e *InvalidVersionError
 	return errors.As(err, &e)
+}
+
+func IsCollectionNotFoundError(err error) bool {
+	var e *ResourceNotFoundError
+	if errors.As(err, &e) {
+		return e.Kind == "collection"
+	}
+	return false
+}
+
+func IsCollectionCatalogError(err error) bool {
+	msg := err.Error()
+	return strings.Contains(msg, "Catalog Error") && strings.Contains(msg, "does not exist")
 }

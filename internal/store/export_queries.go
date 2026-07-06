@@ -442,7 +442,7 @@ const storageForecastQuery = `
 				COALESCE(error, '') AS error,
 				COALESCE(created_at::VARCHAR, '') AS created_at
 
-			FROM forecast_runs
+			FROM agent.main.forecast_runs
 
 			ORDER BY session_id, pair_name, iteration
 		) TO ? (FORMAT CSV, HEADER TRUE)

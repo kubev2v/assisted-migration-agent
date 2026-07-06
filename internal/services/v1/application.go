@@ -43,47 +43,36 @@ func (s *ApplicationService) List(ctx context.Context) ([]models.ApplicationOver
 
 // BuildCollectorWorkUnits returns a postCollectionBuilderFn that precomputes
 // application matches and persists them to the database after each collection.
-func (s *ApplicationService) BuildCollectorWorkUnits() postCollectionBuilderFn {
-	return func(_ models.Credentials) []collectorWorkUnit {
-		return []collectorWorkUnit{
-			{
-				Status: func() models.CollectorStatus {
-					return models.CollectorStatus{State: models.CollectorStateParsing}
-				},
-				Work: func(ctx context.Context, r models.CollectorResult) (models.CollectorResult, error) {
-					zap.S().Named("application_service").Info("detecting applications from guest apps")
+func (s *ApplicationService) MatchApplications(ctx context.Context) error {
+	zap.S().Named("application_service").Info("detecting applications from guest apps")
 
-					guestApps, err := s.store.VM().GetGuestApps(ctx)
-					if err != nil {
-						return r, fmt.Errorf("fetching guest apps for application detection: %w", err)
-					}
+	guestApps, err := s.store.VM().GetGuestApps(ctx)
+	if err != nil {
+		return fmt.Errorf("fetching guest apps for application detection: %w", err)
+	}
 
-					overviews := matchApplications(s.defs, guestApps)
+	overviews := matchApplications(s.defs, guestApps)
 
-					var records []models.ApplicationVMRecord
-					for _, app := range overviews {
-						for _, vm := range app.VMs {
-							records = append(records, models.ApplicationVMRecord{
-								AppName: app.Name,
-								AppDesc: app.Description,
-								VMID:    vm.ID,
-								VMName:  vm.Name,
-							})
-						}
-					}
-
-					if err := s.store.WithTx(ctx, func(txCtx context.Context) error {
-						return s.store.Application().ReplaceAll(txCtx, records)
-					}); err != nil {
-						return r, fmt.Errorf("persisting application matches: %w", err)
-					}
-
-					zap.S().Named("application_service").Infof("detected %d applications across %d VMs", len(overviews), len(records))
-					return r, nil
-				},
-			},
+	var records []models.ApplicationVMRecord
+	for _, app := range overviews {
+		for _, vm := range app.VMs {
+			records = append(records, models.ApplicationVMRecord{
+				AppName: app.Name,
+				AppDesc: app.Description,
+				VMID:    vm.ID,
+				VMName:  vm.Name,
+			})
 		}
 	}
+
+	if err := s.store.WithTx(ctx, func(txCtx context.Context) error {
+		return s.store.Application().ReplaceAll(txCtx, records)
+	}); err != nil {
+		return fmt.Errorf("persisting application matches: %w", err)
+	}
+
+	zap.S().Named("application_service").Infof("detected %d applications across %d VMs", len(overviews), len(records))
+	return nil
 }
 
 // matchApplications matches application definitions against VM guest apps,

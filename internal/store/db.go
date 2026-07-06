@@ -72,9 +72,8 @@ func (l *ExtensionLoader) loadExtension(conn *sql.DB, extDir string, ext Extensi
 	return nil
 }
 
-// NewDB opens a DuckDB database at the given path.
-// Use ":memory:" for an in-memory database (useful for testing).
-func NewDB(loader *ExtensionLoader, path string) (*sql.DB, error) {
+// NewConnection opens a DuckDB database at the given path.
+func NewConnection(loader *ExtensionLoader, path string) (*sql.DB, error) {
 	conn, err := sql.Open("duckdb", path)
 	if err != nil {
 		return nil, err
@@ -88,10 +87,6 @@ func NewDB(loader *ExtensionLoader, path string) (*sql.DB, error) {
 	if err := conn.Ping(); err != nil {
 		_ = conn.Close()
 		return nil, err
-	}
-
-	if path == ":memory:" {
-		return conn, nil
 	}
 
 	// Configure extension directory to the same folder as the database

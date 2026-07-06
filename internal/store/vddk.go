@@ -13,7 +13,7 @@ import (
 
 // Constants for vddk table
 const (
-	vddkTable      = "vddk"
+	vddkTable      = "agent.main.vddk"
 	vddkColId      = "id"
 	vddkColVersion = "version"
 	vddkColMD5     = "md5"

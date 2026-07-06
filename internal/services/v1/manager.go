@@ -89,7 +89,7 @@ func (m *ServiceManager) Initialize() error {
 		m.credentials.WithKeyManager(m.keyMgr)
 	}
 
-	factory := newCollectorWorkFactory(m.store, m.event, m.cfg.Agent.DataFolder, m.cfg.Agent.OpaPoliciesFolder)
+	factory := newCollectorWorkFactory(m.store, m.cfg.Agent.DataFolder, m.cfg.Agent.OpaPoliciesFolder)
 	m.collector = NewCollectorService(m.inventory, factory.Build, m.credentials)
 
 	var err error
@@ -126,13 +126,6 @@ func (m *ServiceManager) Initialize() error {
 	}
 
 	m.export = NewExportService(m.store)
-
-	factory.WithPostCollectionBuilder(m.rightsizing.BuildCollectorWorkUnits(
-		rightsizingDefaultLookbackHours,
-		rightsizingDefaultIntervalSeconds,
-		rightsizingDefaultBatchSize,
-	))
-	factory.WithPostCollectionBuilder(m.application.BuildCollectorWorkUnits())
 
 	return nil
 }

@@ -6,6 +6,7 @@ import (
 	sq "github.com/Masterminds/squirrel"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
+	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
 type OutboxStore struct {
@@ -27,6 +28,9 @@ func (s *OutboxStore) Get(ctx context.Context) ([]models.Event, error) {
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
+		if srvErrors.IsCollectionCatalogError(err) {
+			return nil, srvErrors.NewCollectionNotFoundError()
+		}
 		return nil, err
 	}
 	defer func() { _ = rows.Close() }()

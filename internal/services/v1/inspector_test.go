@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -11,9 +13,8 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
-	v1 "github.com/kubev2v/assisted-migration-agent/internal/services/v1"
+	"github.com/kubev2v/assisted-migration-agent/internal/services"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
-	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	"github.com/kubev2v/assisted-migration-agent/pkg/crypto"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 	"github.com/kubev2v/assisted-migration-agent/pkg/work"
@@ -153,12 +154,13 @@ var _ = Describe("InspectorService", func() {
 		ctx      context.Context
 		db       *sql.DB
 		st       *store.Store
-		srv      *v1.InspectorService
-		credsSvc *v1.CredentialsService
+		srv      *services.InspectorService
+		credsSvc *services.CredentialsService
+		tmpDir   string
 	)
 
-	mustNewInspectorService := func(s *store.Store, limit int, dir string, cSvc *v1.CredentialsService) *v1.InspectorService {
-		svc, err := v1.NewInspectorService(s, limit, dir, cSvc)
+	mustNewInspectorService := func(s *store.Store, limit int, dir string, cSvc *services.CredentialsService) *services.InspectorService {
+		svc, err := services.NewInspectorService(s, limit, dir, cSvc)
 		Expect(err).NotTo(HaveOccurred())
 		return svc
 	}
@@ -186,18 +188,20 @@ var _ = Describe("InspectorService", func() {
 		ctx = context.Background()
 
 		var err error
-		db, err = store.NewDB(nil, ":memory:")
+		tmpDir, err = os.MkdirTemp("", "inspector-test-*")
 		Expect(err).NotTo(HaveOccurred())
 
-		err = migrations.Run(ctx, db)
+		db, err = store.NewConnection(nil, filepath.Join(tmpDir, "agent.duckdb"))
 		Expect(err).NotTo(HaveOccurred())
 
 		st = store.NewStore(db, test.NewMockValidator())
+		Expect(st.Migrate(ctx, "")).To(Succeed())
+		Expect(st.InitCollection(ctx)).To(Succeed())
 
 		// Set up a CredentialsService with stored test credentials
 		km, err := crypto.NewKeyManager("")
 		Expect(err).NotTo(HaveOccurred())
-		credsSvc = v1.NewCredentialsService(st).WithKeyManager(km)
+		credsSvc = services.NewCredentialsService(st).WithKeyManager(km)
 		creds := models.Credentials{
 			URL:      "https://localhost:8989/sdk",
 			Username: "user",
@@ -221,6 +225,9 @@ var _ = Describe("InspectorService", func() {
 		}
 		if db != nil {
 			_ = db.Close()
+		}
+		if tmpDir != "" {
+			_ = os.RemoveAll(tmpDir)
 		}
 	})
 
@@ -345,7 +352,7 @@ var _ = Describe("InspectorService", func() {
 			}
 			km, err := crypto.NewKeyManager("")
 			Expect(err).NotTo(HaveOccurred())
-			badCredsSvc := v1.NewCredentialsService(st).WithKeyManager(km)
+			badCredsSvc := services.NewCredentialsService(st).WithKeyManager(km)
 			Expect(badCredsSvc.Save(ctx, km.Key(), "credentials", invalidCreds)).To(Succeed())
 			srv = mustNewInspectorService(st, 10, "", badCredsSvc)
 

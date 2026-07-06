@@ -2,28 +2,23 @@ package store_test
 
 import (
 	"context"
-	"database/sql"
+	"path/filepath"
 	"testing"
-
-	"github.com/duckdb/duckdb-go/v2"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
-	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 )
 
 func setupForecastStore(t *testing.T) *store.Store {
 	t.Helper()
-	connector, err := duckdb.NewConnector("", nil)
+	db, err := store.NewConnection(nil, filepath.Join(t.TempDir(), "agent.duckdb"))
 	if err != nil {
-		t.Fatalf("failed to create duckdb connector: %v", err)
+		t.Fatalf("failed to create db: %v", err)
 	}
-
-	db := sql.OpenDB(connector)
 	t.Cleanup(func() { _ = db.Close() })
 
 	s := store.NewStore(db, nil)
-	if err := migrations.Run(context.Background(), db); err != nil {
+	if err := s.Migrate(context.Background(), ""); err != nil {
 		t.Fatalf("failed to run migrations: %v", err)
 	}
 	return s

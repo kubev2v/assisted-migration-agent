@@ -923,13 +923,12 @@ var _ = Describe("VMs Handlers Integration", func() {
 		gin.SetMode(gin.TestMode)
 
 		var err error
-		db, err = store.NewDB(nil, ":memory:")
+		db, err = store.NewConnection(nil, ":memory:")
 		Expect(err).NotTo(HaveOccurred())
 
 		st = store.NewStore(db, test.NewMockValidator())
 
-		// Migrate the store (creates vinfo, vdisk, concerns tables via parser.Init())
-		err = st.Migrate(ctx)
+		err = st.InitCollection(ctx)
 		Expect(err).NotTo(HaveOccurred())
 
 		// Insert test data

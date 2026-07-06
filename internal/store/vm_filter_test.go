@@ -34,13 +34,12 @@ var _ = Describe("VMStore cross-table filters", func() {
 		ctx = context.Background()
 		var err error
 
-		db, err = store.NewDB(nil, ":memory:")
+		db, err = store.NewConnection(nil, ":memory:")
 		Expect(err).NotTo(HaveOccurred())
 
 		s = store.NewStore(db, test.NewMockValidator())
 
-		err = s.Migrate(ctx)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(s.InitCollection(ctx)).To(Succeed())
 
 		err = test.InsertVMs(ctx, db)
 		Expect(err).NotTo(HaveOccurred())

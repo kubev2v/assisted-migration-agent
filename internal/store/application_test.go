@@ -2,29 +2,23 @@ package store_test
 
 import (
 	"context"
-	"database/sql"
 	"testing"
-
-	"github.com/duckdb/duckdb-go/v2"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
-	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 )
 
 func setupApplicationStore(t *testing.T) *store.Store {
 	t.Helper()
-	connector, err := duckdb.NewConnector("", nil)
+	db, err := store.NewConnection(nil, ":memory:")
 	if err != nil {
-		t.Fatalf("failed to create duckdb connector: %v", err)
+		t.Fatalf("failed to create db: %v", err)
 	}
-
-	db := sql.OpenDB(connector)
 	t.Cleanup(func() { _ = db.Close() })
 
 	s := store.NewStore(db, nil)
-	if err := migrations.Run(context.Background(), db); err != nil {
-		t.Fatalf("failed to run migrations: %v", err)
+	if err := s.InitCollection(context.Background()); err != nil {
+		t.Fatalf("failed to init collection: %v", err)
 	}
 	return s
 }

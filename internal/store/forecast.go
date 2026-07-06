@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	forecastRunsTable  = "forecast_runs"
-	forecastSessionSeq = "forecast_session_seq"
+	forecastRunsTable  = "agent.main.forecast_runs"
+	forecastSessionSeq = "agent.main.forecast_session_seq"
 )
 
 // ForecastStore provides data access for forecast benchmark runs and

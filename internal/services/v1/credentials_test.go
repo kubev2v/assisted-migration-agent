@@ -3,14 +3,15 @@ package v1_test
 import (
 	"context"
 	"database/sql"
+	"os"
+	"path/filepath"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
-	v1 "github.com/kubev2v/assisted-migration-agent/internal/services/v1"
+	"github.com/kubev2v/assisted-migration-agent/internal/services"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
-	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	"github.com/kubev2v/assisted-migration-agent/pkg/crypto"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 	"github.com/kubev2v/assisted-migration-agent/test"
@@ -18,10 +19,11 @@ import (
 
 var _ = Describe("CredentialsService", func() {
 	var (
-		ctx context.Context
-		db  *sql.DB
-		srv *v1.CredentialsService
-		cr  *crypto.Crypto
+		ctx    context.Context
+		db     *sql.DB
+		srv    *services.CredentialsService
+		cr     *crypto.Crypto
+		tmpDir string
 	)
 
 	BeforeEach(func() {
@@ -29,19 +31,23 @@ var _ = Describe("CredentialsService", func() {
 		cr = crypto.NewCrypto()
 
 		var err error
-		db, err = store.NewDB(nil, ":memory:")
+		tmpDir, err = os.MkdirTemp("", "credentials-test-*")
 		Expect(err).NotTo(HaveOccurred())
 
-		err = migrations.Run(ctx, db)
+		db, err = store.NewConnection(nil, filepath.Join(tmpDir, "agent.duckdb"))
 		Expect(err).NotTo(HaveOccurred())
 
 		st := store.NewStore(db, test.NewMockValidator())
-		srv = v1.NewCredentialsService(st)
+		Expect(st.Migrate(ctx, "")).To(Succeed())
+		srv = services.NewCredentialsService(st)
 	})
 
 	AfterEach(func() {
 		if db != nil {
 			_ = db.Close()
+		}
+		if tmpDir != "" {
+			_ = os.RemoveAll(tmpDir)
 		}
 	})
 

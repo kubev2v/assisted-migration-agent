@@ -29,11 +29,11 @@ var _ = Describe("RightsizingService", func() {
 		ctx = context.Background()
 
 		var err error
-		db, err = store.NewDB(nil, ":memory:")
+		db, err = store.NewConnection(nil, ":memory:")
 		Expect(err).NotTo(HaveOccurred())
 
 		st = store.NewStore(db, test.NewMockValidator())
-		Expect(st.Migrate(ctx)).To(Succeed())
+		Expect(st.InitCollection(ctx)).To(Succeed())
 
 		svc = v1.NewRightsizingService(st)
 	})

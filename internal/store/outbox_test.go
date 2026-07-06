@@ -11,7 +11,6 @@ import (
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
-	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	"github.com/kubev2v/assisted-migration-agent/test"
 )
 
@@ -26,13 +25,11 @@ var _ = Describe("OutboxStore", func() {
 		ctx = context.Background()
 
 		var err error
-		db, err = store.NewDB(nil, ":memory:")
-		Expect(err).NotTo(HaveOccurred())
-
-		err = migrations.Run(ctx, db)
+		db, err = store.NewConnection(nil, ":memory:")
 		Expect(err).NotTo(HaveOccurred())
 
 		s = store.NewStore(db, test.NewMockValidator())
+		Expect(s.InitCollection(ctx)).To(Succeed())
 	})
 
 	AfterEach(func() {

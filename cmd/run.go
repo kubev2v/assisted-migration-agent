@@ -76,7 +76,7 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 				return err
 			}
 
-			if err := st.Migrate(context.Background()); err != nil {
+			if err := st.Migrate(context.Background(), cfg.Agent.DataFolder); err != nil {
 				zap.S().Errorw("failed to run migrations", "error", err)
 				return err
 			}
@@ -248,7 +248,7 @@ func initStore(cfg *config.Configuration) (*store.Store, error) {
 		dbPath = ":memory:"
 		zap.S().Warn("data-folder not set, using in-memory database (data will not persist)")
 	}
-	db, err := store.NewDB(store.NewDefaultExtentionLoader(), dbPath)
+	db, err := store.NewConnection(store.NewDefaultExtentionLoader(), dbPath)
 	if err != nil {
 		zap.S().Errorw("failed to initialize database", "error", err)
 		return nil, err

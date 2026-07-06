@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	credentialsTable       = "credentials"
+	credentialsTable       = "agent.main.credentials"
 	credentialsColID       = "id"
 	credentialsColURL      = "url"
 	credentialsColUsername = "username"
@@ -21,7 +21,7 @@ const (
 	credentialsColSkipTLS  = "skip_tls"
 	credentialsColCACert   = "ca_cert"
 
-	masterPasswordTable       = "master_password"
+	masterPasswordTable       = "agent.main.master_password"
 	masterPasswordColPassword = "password"
 )
 
