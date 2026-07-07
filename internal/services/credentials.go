@@ -218,26 +218,13 @@ func (s *CredentialsService) GetCapabilities(ctx context.Context) (*models.Capab
 		client.CloseIdleConnections()
 	}()
 
-	finder := find.NewFinder(vimClient, false)
-	dc, err := finder.DefaultDatacenter(connCtx)
+	dcFolders, err := collectDatacenterFolders(connCtx, vimClient)
 	if err != nil {
-		return nil, srvErrors.NewVCenterError(fmt.Errorf("finding default datacenter: %w", err))
-	}
-
-	folders, err := dc.Folders(connCtx)
-	if err != nil {
-		return nil, srvErrors.NewVCenterError(fmt.Errorf("getting datacenter folders: %w", err))
-	}
-
-	allRefs := []types.ManagedObjectReference{
-		folders.VmFolder.Reference(),
-		folders.HostFolder.Reference(),
-		folders.DatastoreFolder.Reference(),
-		folders.NetworkFolder.Reference(),
+		return nil, err
 	}
 
 	authManager := object.NewAuthorizationManager(vimClient)
-	results, err := authManager.FetchUserPrivilegeOnEntities(connCtx, allRefs, creds.Username)
+	results, err := authManager.FetchUserPrivilegeOnEntities(connCtx, dcFolders.allRefs, creds.Username)
 	if err != nil {
 		return nil, srvErrors.NewVCenterError(fmt.Errorf("fetching privileges: %w", err))
 	}
@@ -271,11 +258,10 @@ func (s *CredentialsService) GetCapabilities(ctx context.Context) (*models.Capab
 		return models.OperationCapability{Enabled: false, MissingPrivileges: missing}
 	}
 
-	vmFolderRef := folders.VmFolder.Reference()
 	status := &models.CapabilityStatus{
-		Collector:  checkPrivileges(allRefs, models.CollectorRequiredPrivileges),
-		Inspector:  checkPrivileges([]types.ManagedObjectReference{vmFolderRef}, models.InspectorRequiredPrivileges),
-		Forecaster: checkPrivileges(allRefs, models.ForecasterRequiredPrivileges),
+		Collector:  checkPrivileges(dcFolders.allRefs, models.CollectorRequiredPrivileges),
+		Inspector:  checkPrivileges(dcFolders.vmFolderRefs, models.InspectorRequiredPrivileges),
+		Forecaster: checkPrivileges(dcFolders.vmFolderRefs, models.ForecasterRequiredPrivileges),
 	}
 
 	zap.S().Named("credentials").Infow("capability check complete",
@@ -323,4 +309,36 @@ func (s *CredentialsService) Delete(ctx context.Context, id string) error {
 
 func (s *CredentialsService) DeleteAll(ctx context.Context) error {
 	return s.store.Credentials().DeleteAll(ctx)
+}
+
+type datacenterFolders struct {
+	allRefs      []types.ManagedObjectReference
+	vmFolderRefs []types.ManagedObjectReference
+}
+
+func collectDatacenterFolders(ctx context.Context, client *vim25.Client) (*datacenterFolders, error) {
+	finder := find.NewFinder(client, false)
+	datacenters, err := finder.DatacenterList(ctx, "*")
+	if err != nil {
+		return nil, srvErrors.NewVCenterError(fmt.Errorf("listing datacenters: %w", err))
+	}
+	if len(datacenters) == 0 {
+		return nil, srvErrors.NewVCenterError(fmt.Errorf("no datacenters found"))
+	}
+
+	result := &datacenterFolders{}
+	for _, dc := range datacenters {
+		folders, err := dc.Folders(ctx)
+		if err != nil {
+			return nil, srvErrors.NewVCenterError(fmt.Errorf("getting datacenter folders for %s: %w", dc.Name(), err))
+		}
+		result.allRefs = append(result.allRefs,
+			folders.VmFolder.Reference(),
+			folders.HostFolder.Reference(),
+			folders.DatastoreFolder.Reference(),
+			folders.NetworkFolder.Reference(),
+		)
+		result.vmFolderRefs = append(result.vmFolderRefs, folders.VmFolder.Reference())
+	}
+	return result, nil
 }

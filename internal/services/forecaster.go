@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/vmware/govmomi"
-	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/session"
 	"github.com/vmware/govmomi/vim25"
 
@@ -222,21 +221,14 @@ func (f *ForecasterService) verifyCredentialsAndPrivileges(ctx context.Context, 
 
 	zap.S().Named("forecaster_service").Info("vCenter credentials verified, checking privileges")
 
-	// Check privileges on the default VM folder (under the datacenter), since
-	// vSphere privileges are typically granted at this level rather than root.
-	finder := find.NewFinder(vimClient, true)
-	dc, err := finder.DefaultDatacenter(verifyCtx)
+	dcFolders, err := collectDatacenterFolders(verifyCtx, vimClient)
 	if err != nil {
-		return srvErrors.NewVCenterError(fmt.Errorf("failed to find datacenter: %w", err))
-	}
-	finder.SetDatacenter(dc)
-	vmFolder, err := finder.DefaultFolder(verifyCtx)
-	if err != nil {
-		return srvErrors.NewVCenterError(fmt.Errorf("failed to find VM folder: %w", err))
-	}
-
-	if err := vmware.ValidateUserPrivilegesOnEntity(verifyCtx, vimClient, vmFolder.Reference(), requiredPrivileges, creds.Username); err != nil {
 		return err
+	}
+	for _, ref := range dcFolders.vmFolderRefs {
+		if err := vmware.ValidateUserPrivilegesOnEntity(verifyCtx, vimClient, ref, requiredPrivileges, creds.Username); err != nil {
+			return err
+		}
 	}
 
 	zap.S().Named("forecaster_service").Info("vCenter credentials and privileges verified successfully")
