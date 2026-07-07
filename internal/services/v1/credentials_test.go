@@ -285,6 +285,24 @@ var _ = Describe("CredentialsService", func() {
 		})
 	})
 
+	Context("Status", func() {
+		It("should return ResourceNotFoundError when no credentials stored", func() {
+			keyMgr, err := crypto.NewKeyManager("")
+			Expect(err).NotTo(HaveOccurred())
+			srv = srv.WithKeyManager(keyMgr)
+
+			_, _, err = srv.Status(ctx)
+			Expect(err).To(HaveOccurred())
+			Expect(srvErrors.IsResourceNotFoundError(err)).To(BeTrue())
+		})
+
+		It("should return ResourceNotFoundError when key manager not set", func() {
+			_, _, err := srv.Status(ctx)
+			Expect(err).To(HaveOccurred())
+			Expect(srvErrors.IsResourceNotFoundError(err)).To(BeTrue())
+		})
+	})
+
 	Context("Delete", func() {
 		// Given saved credentials
 		// When we delete them

@@ -157,6 +157,9 @@ func (s *CredentialsService) Store(ctx context.Context, creds models.Credentials
 func (s *CredentialsService) Status(ctx context.Context) (url, username string, err error) {
 	creds, err := s.Resolve(ctx)
 	if err != nil {
+		if srvErrors.IsCredentialsNotSetError(err) {
+			return "", "", srvErrors.NewResourceNotFoundError("credentials", credentialsRecordID)
+		}
 		return "", "", err
 	}
 	return creds.URL, creds.Username, nil
@@ -178,7 +181,7 @@ func (s *CredentialsService) Resolve(ctx context.Context) (models.Credentials, e
 
 func (s *CredentialsService) GetCapabilities(ctx context.Context) (*models.CapabilityStatus, error) {
 	if s.keyMgr == nil {
-		return nil, srvErrors.NewCredentialsNotSetError()
+		return nil, srvErrors.NewResourceNotFoundError("credentials", credentialsRecordID)
 	}
 	creds, err := s.Get(ctx, s.keyMgr.Key(), credentialsRecordID)
 	if err != nil {

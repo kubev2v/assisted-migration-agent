@@ -17,6 +17,40 @@ import (
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
+var _ = Describe("GetCredentials Handler", func() {
+	var (
+		mockCreds *MockCredentialsService
+		handler   *handlers.Handler
+		router    *gin.Engine
+	)
+
+	BeforeEach(func() {
+		gin.SetMode(gin.TestMode)
+		mockCreds = &MockCredentialsService{}
+		handler = handlers.NewHandler(config.Configuration{}).WithCredentialsService(mockCreds)
+		router = gin.New()
+		router.GET("/credentials", handler.GetCredentials)
+	})
+
+	It("should return 404 when no credentials stored", func() {
+		mockCreds.StatusErr = srvErrors.NewResourceNotFoundError("credentials", "id")
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/credentials", nil))
+
+		Expect(w.Code).To(Equal(http.StatusNotFound))
+	})
+
+	It("should return 500 for unexpected errors", func() {
+		mockCreds.StatusErr = fmt.Errorf("database connection lost")
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/credentials", nil))
+
+		Expect(w.Code).To(Equal(http.StatusInternalServerError))
+	})
+})
+
 var _ = Describe("Credential Capabilities Handler", func() {
 	var (
 		mockCreds *MockCredentialsService
