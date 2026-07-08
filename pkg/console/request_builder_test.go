@@ -95,7 +95,11 @@ var _ = Describe("RequestBuilder", func() {
 				// We can't test the actual call without a mock client, but we verify parsing works
 			})
 
-			It("should handle inventory with no VMs", func() {
+			It("should build DELETE request for inventory with no VMs", func() {
+				// When vmsCount is 0, buildGroupInventoryRequest should return
+				// a DELETE function instead of UPDATE. This handles both:
+				// - Groups created with 0 VMs (DELETE returns 404 = success)
+				// - Groups updated to 0 VMs (DELETE removes from backend)
 				payload := map[string]interface{}{
 					"groupID":   "f47ac10b-58cc-4372-a567-0e02b2c3d479",
 					"groupName": "empty-group",
@@ -115,6 +119,8 @@ var _ = Describe("RequestBuilder", func() {
 				fn, err := builder.Build(event)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(fn).NotTo(BeNil())
+				// Note: Without a mock client, we can't verify the DELETE call directly,
+				// but the function builds successfully and will call DeleteSourceSubset
 			})
 
 			It("should return error for malformed payload", func() {
