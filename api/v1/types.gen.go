@@ -140,6 +140,15 @@ type ApplicationVM struct {
 	Name string `json:"name"`
 }
 
+// BatchUpdateExclusionRequest defines model for BatchUpdateExclusionRequest.
+type BatchUpdateExclusionRequest struct {
+	// MigrationExcluded Exclusion state to set for all VMs
+	MigrationExcluded bool `json:"migrationExcluded"`
+
+	// VmIds VM IDs to update
+	VmIds []string `binding:"required,min=1,dive,required" json:"vmIds"`
+}
+
 // BenchmarkRun defines model for BenchmarkRun.
 type BenchmarkRun struct {
 	CreatedAt   time.Time `json:"createdAt"`
@@ -1164,6 +1173,9 @@ type PutInspectorVddkMultipartRequestBody PutInspectorVddkMultipartBody
 
 // TriggerRightsizingCollectionJSONRequestBody defines body for TriggerRightsizingCollection for application/json ContentType.
 type TriggerRightsizingCollectionJSONRequestBody = RightsizingCollectRequest
+
+// BatchUpdateVMExclusionJSONRequestBody defines body for BatchUpdateVMExclusion for application/json ContentType.
+type BatchUpdateVMExclusionJSONRequestBody = BatchUpdateExclusionRequest
 
 // UpdateLabelVMsJSONRequestBody defines body for UpdateLabelVMs for application/json ContentType.
 type UpdateLabelVMsJSONRequestBody = UpdateLabelVMsRequest

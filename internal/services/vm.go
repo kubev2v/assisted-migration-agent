@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/pkg/inventory"
@@ -279,6 +280,250 @@ func (s *VMService) UpdateMigrationExcluded(ctx context.Context, id string, excl
 
 	// Success - all changes are now atomic (VM + inventories + outbox events)
 	return nil
+}
+
+// UpdateMigrationExcludedBatch updates the migration exclusion status for multiple VMs.
+// This operation updates all VMs and rebuilds the main inventory and all
+// affected group inventories to reflect the new exclusion state.
+//
+// To maintain atomicity between VM mutations and outbox events, the VM updates
+// are performed in the same transaction as inventory saves and outbox inserts.
+// Inventory building happens outside the transaction (reading committed state),
+// then all writes occur atomically in one transaction.
+func (s *VMService) UpdateMigrationExcludedBatch(ctx context.Context, vmIDs []string, excluded bool) error {
+	// Deduplicate VM IDs
+	uniqueIDs := deduplicateStrings(vmIDs)
+	if len(uniqueIDs) == 0 {
+		return nil
+	}
+
+	// Get original states for rollback + validate all VMs exist
+	originalStates, err := s.store.VM().GetMigrationExcludedStates(ctx, uniqueIDs)
+	if err != nil {
+		return err
+	}
+
+	// Find all groups containing any of these VMs (before updating)
+	groupIDsMap := make(map[uuid.UUID]bool)
+	for _, vmID := range uniqueIDs {
+		vmGroups, err := s.store.Group().GetGroupsContainingVM(ctx, vmID)
+		if err != nil {
+			return fmt.Errorf("finding groups containing VM %s: %w", vmID, err)
+		}
+		for _, gid := range vmGroups {
+			groupIDsMap[gid] = true
+		}
+	}
+
+	// Convert map to slice for iteration
+	groupIDs := make([]uuid.UUID, 0, len(groupIDsMap))
+	for gid := range groupIDsMap {
+		groupIDs = append(groupIDs, gid)
+	}
+
+	// Transaction 1: Batch update all VMs' migration_excluded field
+	// If inventory building or Transaction 2 fails, this will be rolled back in the deferred cleanup
+	err = s.store.WithTx(ctx, func(txCtx context.Context) error {
+		if err := s.store.VM().UpdateMigrationExcludedBatch(txCtx, uniqueIDs, excluded); err != nil {
+			return fmt.Errorf("updating VMs migration_excluded: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// Track whether we need to rollback the VM updates if subsequent operations fail
+	vmUpdateSucceeded := true
+	defer func() {
+		// If inventory building or Transaction 2 failed, rollback to the ORIGINAL values
+		if !vmUpdateSucceeded {
+			s.rollbackBatchUpdate(originalStates)
+		}
+	}()
+
+	// Now build inventories with the updated VM states
+	// BuildInventory will read from the database where the VMs are now updated
+
+	// Build main inventory (for all VMs)
+	mainInventory, err := s.store.Parser().BuildInventory(ctx, nil)
+	if err != nil {
+		vmUpdateSucceeded = false
+		return fmt.Errorf("building main inventory: %w", err)
+	}
+
+	// Marshal main inventory to JSON
+	mainInventoryData, err := json.Marshal(converters.ToAPI(mainInventory))
+	if err != nil {
+		vmUpdateSucceeded = false
+		return fmt.Errorf("marshaling main inventory: %w", err)
+	}
+
+	// Build group inventories
+	type groupInventory struct {
+		groupID   uuid.UUID
+		inventory *inventory.Inventory
+	}
+	newInventories := make([]groupInventory, 0, len(groupIDs))
+
+	for _, groupID := range groupIDs {
+		// Get current VM matches for this group
+		vmIDsInGroup, err := s.store.Group().GetMatchedIDs(ctx, groupID)
+		if err != nil {
+			vmUpdateSucceeded = false
+			return fmt.Errorf("getting matched VM IDs for group %s: %w", groupID, err)
+		}
+
+		// Build scoped inventory for this group's VMs
+		// This reads the current DB state where the VMs are now updated
+		var inv *inventory.Inventory
+		if len(vmIDsInGroup) > 0 {
+			inv, err = s.store.Parser().BuildInventory(ctx, vmIDsInGroup)
+			if err != nil {
+				vmUpdateSucceeded = false
+				return fmt.Errorf("building inventory for group %s: %w", groupID, err)
+			}
+		}
+
+		newInventories = append(newInventories, groupInventory{
+			groupID:   groupID,
+			inventory: inv,
+		})
+	}
+
+	// Transaction 2: Update main inventory and all affected group inventories + add outbox events
+	// If this fails, the deferred rollback will restore the original VM states
+	err = s.store.WithTx(ctx, func(txCtx context.Context) error {
+		// Update main inventory
+		if err := s.store.Inventory().Save(txCtx, mainInventoryData); err != nil {
+			return fmt.Errorf("updating main inventory: %w", err)
+		}
+
+		// Add outbox event for main inventory update
+		mainEvent := models.Event{
+			Kind: models.InventoryUpdateEvent,
+			Data: mainInventoryData,
+		}
+		if err := s.store.Outbox().Insert(txCtx, mainEvent); err != nil {
+			return fmt.Errorf("adding main inventory event: %w", err)
+		}
+
+		// Update group inventories and add outbox events
+		for _, gi := range newInventories {
+			if err := s.store.Group().UpdateInventory(txCtx, gi.groupID, gi.inventory); err != nil {
+				return fmt.Errorf("updating inventory for group %s: %w", gi.groupID, err)
+			}
+
+			// Add outbox event for group inventory update
+			// Need to fetch group name from database for event payload
+			group, err := s.store.Group().Get(txCtx, gi.groupID)
+			if err != nil {
+				return fmt.Errorf("getting group %s: %w", gi.groupID, err)
+			}
+
+			// Prepare inventory as JSON (always emit event, even for empty groups)
+			var invJSON json.RawMessage
+			if gi.inventory != nil {
+				// Convert domain inventory to API type before marshaling
+				apiInventory := converters.ToAPI(gi.inventory)
+				invBytes, err := json.Marshal(apiInventory)
+				if err != nil {
+					return fmt.Errorf("marshaling inventory for group %s: %w", gi.groupID, err)
+				}
+				invJSON = invBytes
+			} else {
+				// Empty inventory - use JSON null to indicate the group has no VMs
+				invJSON = json.RawMessage("null")
+			}
+
+			// Create typed event payload
+			payload := models.GroupInventoryEventPayload{
+				GroupID:   gi.groupID.String(),
+				GroupName: group.Name,
+				Inventory: invJSON,
+			}
+
+			payloadBytes, err := json.Marshal(payload)
+			if err != nil {
+				return fmt.Errorf("marshaling event payload for group %s: %w", gi.groupID, err)
+			}
+
+			groupEvent := models.Event{
+				Kind: models.GroupInventoryUpsertEvent,
+				Data: payloadBytes,
+			}
+			if err := s.store.Outbox().Insert(txCtx, groupEvent); err != nil {
+				return fmt.Errorf("adding group inventory event for group %s: %w", gi.groupID, err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		vmUpdateSucceeded = false
+		return err
+	}
+
+	// Success - all changes are now atomic (VMs + inventories + outbox events)
+	return nil
+}
+
+// rollbackBatchUpdate restores VMs to their original migration_excluded states.
+// This is called from a deferred function when batch update fails after VM updates.
+func (s *VMService) rollbackBatchUpdate(originalStates map[string]bool) {
+	// Group VMs by their original state for efficient rollback
+	excludedVMs := make([]string, 0)
+	includedVMs := make([]string, 0)
+
+	for vmID, wasExcluded := range originalStates {
+		if wasExcluded {
+			excludedVMs = append(excludedVMs, vmID)
+		} else {
+			includedVMs = append(includedVMs, vmID)
+		}
+	}
+
+	// Rollback in single transaction using background context
+	// Use background context to ensure rollback isn't blocked by cancelled/timed-out request context
+	// But bound it with a timeout to prevent indefinite hangs
+	rollbackCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	err := s.store.WithTx(rollbackCtx, func(txCtx context.Context) error {
+		if len(excludedVMs) > 0 {
+			if err := s.store.VM().UpdateMigrationExcludedBatch(txCtx, excludedVMs, true); err != nil {
+				return fmt.Errorf("rolling back excluded VMs: %w", err)
+			}
+		}
+		if len(includedVMs) > 0 {
+			if err := s.store.VM().UpdateMigrationExcludedBatch(txCtx, includedVMs, false); err != nil {
+				return fmt.Errorf("rolling back included VMs: %w", err)
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		// Log rollback failure critically - VMs are now inconsistent
+		zap.S().Named("vm_service").Errorw(
+			"failed to rollback batch VM migration_excluded after operation failure - VM states may be inconsistent",
+			"vmCount", len(originalStates),
+			"error", err,
+		)
+	}
+}
+
+// deduplicateStrings removes duplicate strings from a slice while preserving order.
+func deduplicateStrings(input []string) []string {
+	seen := make(map[string]bool)
+	result := make([]string, 0, len(input))
+
+	for _, s := range input {
+		if !seen[s] {
+			seen[s] = true
+			result = append(result, s)
+		}
+	}
+
+	return result
 }
 
 // UpdateLabels updates the labels for a VM.

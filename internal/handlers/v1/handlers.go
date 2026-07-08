@@ -44,6 +44,7 @@ type VMService interface {
 	Get(ctx context.Context, id string) (*models.VM, error)
 	GetFilterOptions(ctx context.Context) (models.VMFilterOptions, error)
 	UpdateMigrationExcluded(ctx context.Context, id string, excluded bool) error
+	UpdateMigrationExcludedBatch(ctx context.Context, vmIDs []string, excluded bool) error
 	UpdateLabels(ctx context.Context, id string, labels []string) error
 	GetAllLabels(ctx context.Context) ([]string, []int, error)
 	RemoveLabelFromAllVMs(ctx context.Context, label string) (int, error)

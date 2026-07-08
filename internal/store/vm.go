@@ -540,6 +540,105 @@ func (s *VMStore) UpdateMigrationExcluded(ctx context.Context, vmID string, excl
 	return nil
 }
 
+// GetMigrationExcludedStates returns the current migration_excluded state for a list of VMs.
+// This is used for rollback purposes in batch update operations.
+// Returns an error if any VM is not found.
+func (s *VMStore) GetMigrationExcludedStates(ctx context.Context, vmIDs []string) (map[string]bool, error) {
+	if len(vmIDs) == 0 {
+		return make(map[string]bool), nil
+	}
+
+	query, args, err := sq.Select(`"VM ID"`, `"migration_excluded"`).
+		From("vinfo").
+		Where(sq.Expr(`"VM ID" IN (SELECT unnest(?))`, vmIDs)).
+		ToSql()
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	states := make(map[string]bool)
+	for rows.Next() {
+		var vmID string
+		var excluded bool
+		if err := rows.Scan(&vmID, &excluded); err != nil {
+			return nil, err
+		}
+		states[vmID] = excluded
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Validate all VMs were found
+	if len(states) != len(vmIDs) {
+		missing, err := s.validateVMsExist(ctx, vmIDs)
+		if err != nil {
+			return nil, err
+		}
+		if len(missing) > 0 {
+			return nil, srvErrors.NewResourceNotFoundError("VM", missing[0])
+		}
+	}
+
+	return states, nil
+}
+
+// UpdateMigrationExcludedBatch sets the migration_excluded flag for multiple VMs in a single UPDATE statement.
+// Validates all VMs exist only on failure (lazy validation for performance).
+// Returns an error if any VM is not found.
+func (s *VMStore) UpdateMigrationExcludedBatch(ctx context.Context, vmIDs []string, excluded bool) error {
+	// Deduplicate VM IDs to ensure accurate row count validation
+	vmIDs = deduplicateVMIDs(vmIDs)
+
+	if len(vmIDs) == 0 {
+		return nil
+	}
+
+	query, args, err := sq.Update("vinfo").
+		Set(`"migration_excluded"`, excluded).
+		Where(sq.Expr(`"VM ID" IN (SELECT unnest(?))`, vmIDs)).
+		ToSql()
+	if err != nil {
+		return err
+	}
+
+	result, err := s.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	// Verify all VMs were updated
+	if int(rowsAffected) != len(vmIDs) {
+		// Only query for missing VMs when we detect a mismatch
+		missing, err := s.validateVMsExist(ctx, vmIDs)
+		if err != nil {
+			return err
+		}
+		if len(missing) > 0 {
+			return srvErrors.NewResourceNotFoundError("VM", missing[0])
+		}
+		// Edge case: rows affected doesn't match but no VMs are missing
+		// This could happen due to concurrent deletion or other race conditions
+		return fmt.Errorf("expected to update %d VMs but only updated %d", len(vmIDs), rowsAffected)
+	}
+
+	return nil
+}
+
 // UpdateLabels sets the labels array for a VM in vinfo table.
 func (s *VMStore) UpdateLabels(ctx context.Context, vmID string, labels []string) error {
 	if labels == nil {
@@ -823,4 +922,19 @@ func (s *VMStore) RemoveLabelBatch(ctx context.Context, vmIDs []string, label st
 	}
 
 	return nil
+}
+
+// deduplicateVMIDs removes duplicate VM IDs from a slice while preserving order.
+func deduplicateVMIDs(input []string) []string {
+	seen := make(map[string]bool)
+	result := make([]string, 0, len(input))
+
+	for _, id := range input {
+		if !seen[id] {
+			seen[id] = true
+			result = append(result, id)
+		}
+	}
+
+	return result
 }

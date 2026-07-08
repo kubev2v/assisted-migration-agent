@@ -227,6 +227,26 @@ paths:
         '500':
           description: Internal server error
 
+  /vms/batch-update-exclusion:
+    post:
+      summary: Batch update VM exclusion status
+      operationId: batchUpdateVMExclusion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchUpdateExclusionRequest'
+      responses:
+        '200':
+          description: All VMs updated successfully
+        '400':
+          description: Invalid request
+        '404':
+          description: One or more VMs not found
+        '500':
+          description: Internal server error
+
   /vms/{id}/inspection:
     delete:
       summary: Remove VirtualMachine from inspection queue
@@ -2350,6 +2370,24 @@ components:
           example: ["production", "critical"]
           x-oapi-codegen-extra-tags:
             binding: "omitempty,dive,notblank,min=1,max=100"
+
+    BatchUpdateExclusionRequest:
+      type: object
+      required:
+        - vmIds
+        - migrationExcluded
+      properties:
+        vmIds:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          description: VM IDs to update
+          x-oapi-codegen-extra-tags:
+            binding: "required,min=1,dive,required"
+        migrationExcluded:
+          type: boolean
+          description: Exclusion state to set for all VMs
 
     VMLabelsResponse:
       type: object

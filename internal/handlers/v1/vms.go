@@ -194,6 +194,32 @@ func (h *Handler) UpdateVM(c *gin.Context, id string) {
 	c.Status(http.StatusOK)
 }
 
+// BatchUpdateVMExclusion updates migration exclusion for multiple VMs
+// (POST /vms/batch-update-exclusion)
+func (h *Handler) BatchUpdateVMExclusion(c *gin.Context) {
+	var req v1.BatchUpdateExclusionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": validationErrorMessage(err)})
+		return
+	}
+
+	if len(req.VmIds) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "vmIds array cannot be empty"})
+		return
+	}
+
+	if err := h.vmSrv.UpdateMigrationExcludedBatch(c.Request.Context(), req.VmIds, req.MigrationExcluded); err != nil {
+		if srvErrors.IsResourceNotFoundError(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Status(http.StatusOK)
+}
+
 // GetVMLabels returns all distinct labels in use across VMs along with their counts
 // (GET /vms/labels)
 func (h *Handler) GetVMLabels(c *gin.Context) {
