@@ -189,7 +189,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 		&uMoid, &uVmName, &uProvCpus, &uProvMemMb, &uProvDiskKb,
 		&uCpuAvg, &uCpuP95, &uCpuMax, &uCpuLatest,
 		&uMemAvg, &uMemP95, &uMemMax, &uMemLatest,
-		&uDisk, &uConfidence,
+		&uDisk, &uConfidence, &pvm.GuestApps,
 	); err != nil {
 		return nil, fmt.Errorf("scanning VM %s: %w", id, err)
 	}
@@ -354,6 +354,14 @@ func fromDB(pvm duckdb_models.VM) models.VM {
 		})
 	}
 
+	guestApps := make([]models.GuestApp, 0, len(pvm.GuestApps))
+	for _, g := range pvm.GuestApps {
+		guestApps = append(guestApps, models.GuestApp{
+			Name:    g.Name,
+			Version: g.Version,
+		})
+	}
+
 	return models.VM{
 		ID:                    pvm.ID,
 		Name:                  pvm.Name,
@@ -381,6 +389,7 @@ func fromDB(pvm duckdb_models.VM) models.VM {
 		NICs:                  nics,
 		Issues:                issues,
 		Labels:                pvm.Labels,
+		GuestApps:             guestApps,
 	}
 }
 

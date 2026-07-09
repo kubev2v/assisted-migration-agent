@@ -251,6 +251,18 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 		details.Issues = &issues
 	}
 
+	if len(vm.GuestApps) > 0 {
+		apps := make([]Process, 0, len(vm.GuestApps))
+		for _, g := range vm.GuestApps {
+			app := Process{Name: g.Name}
+			if g.Version != "" {
+				app.Version = &g.Version
+			}
+			apps = append(apps, app)
+		}
+		details.Processes = &apps
+	}
+
 	return details
 }
 

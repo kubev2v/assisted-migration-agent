@@ -1586,6 +1586,11 @@ components:
           $ref: '#/components/schemas/VmInspectionResults'
         utilization:
           $ref: '#/components/schemas/VmUtilizationDetails'
+        processes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Process'
+          description: List of processes detected on this VM
 
     VMDisk:
       type: object
@@ -2192,6 +2197,18 @@ components:
           type: number
           format: double
           description: Data confidence — sample_count / expected_sample_count × 100
+
+    Process:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: Name of the process
+        version:
+          type: string
+          description: Version of the process
 
     RightsizingClusterUtilization:
       type: object

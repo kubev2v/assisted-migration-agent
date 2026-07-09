@@ -408,6 +408,69 @@ var _ = Describe("VMs Handlers", func() {
 			Expect(response.CpuCount).To(Equal(int32(4)))
 		})
 
+		It("should include guest apps in VM details", func() {
+			// Arrange
+			mockVM.GetResult = &models.VM{
+				ID:              "vm-1",
+				Name:            "Test VM",
+				PowerState:      "poweredOn",
+				ConnectionState: "connected",
+				CpuCount:        4,
+				CoresPerSocket:  2,
+				MemoryMB:        8192,
+				GuestApps: []models.GuestApp{
+					{Name: "nginx", Version: "1.25.0"},
+					{Name: "postgres", Version: "15.2"},
+				},
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "/vms/vm-1", nil)
+			w := httptest.NewRecorder()
+
+			// Act
+			router.ServeHTTP(w, req)
+
+			// Assert
+			Expect(w.Code).To(Equal(http.StatusOK))
+
+			var response v1.VirtualMachineDetail
+			err := json.Unmarshal(w.Body.Bytes(), &response)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(response.Processes).NotTo(BeNil())
+			Expect(*response.Processes).To(HaveLen(2))
+			Expect((*response.Processes)[0].Name).To(Equal("nginx"))
+			Expect(*(*response.Processes)[0].Version).To(Equal("1.25.0"))
+			Expect((*response.Processes)[1].Name).To(Equal("postgres"))
+			Expect(*(*response.Processes)[1].Version).To(Equal("15.2"))
+		})
+
+		It("should omit guest apps when VM has none", func() {
+			// Arrange
+			mockVM.GetResult = &models.VM{
+				ID:              "vm-1",
+				Name:            "Test VM",
+				PowerState:      "poweredOn",
+				ConnectionState: "connected",
+				CpuCount:        4,
+				CoresPerSocket:  2,
+				MemoryMB:        8192,
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "/vms/vm-1", nil)
+			w := httptest.NewRecorder()
+
+			// Act
+			router.ServeHTTP(w, req)
+
+			// Assert
+			Expect(w.Code).To(Equal(http.StatusOK))
+
+			var response v1.VirtualMachineDetail
+			err := json.Unmarshal(w.Body.Bytes(), &response)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(response.Processes).To(BeNil())
+		})
+
 		// Given a VM does not exist with the requested ID
 		// When we request the VM details
 		// Then it should return 404 Not Found
@@ -816,6 +879,7 @@ var _ = Describe("VMs Handlers", func() {
 			})
 		})
 	})
+
 })
 
 var _ = Describe("Version Handler", func() {
@@ -1323,4 +1387,5 @@ var _ = Describe("VMs Handlers Integration", func() {
 			}
 		})
 	})
+
 })

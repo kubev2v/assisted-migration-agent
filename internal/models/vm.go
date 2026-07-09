@@ -74,6 +74,13 @@ type VM struct {
 
 	Labels []string
 	Groups []string
+
+	GuestApps []GuestApp
+}
+
+type GuestApp struct {
+	Name    string
+	Version string
 }
 
 type Issue struct {

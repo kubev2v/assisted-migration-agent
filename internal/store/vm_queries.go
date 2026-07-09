@@ -126,7 +126,8 @@ SELECT
     u.mem_max_pct,
     u.mem_latest_pct,
     u.disk_pct,
-    u.confidence_pct
+    u.confidence_pct,
+    COALESCE(i."guest_apps", '[]') AS "GuestApps"
 FROM vinfo i
 LEFT JOIN vcpu c ON i."VM ID" = c."VM ID"
 LEFT JOIN vmemory m ON i."VM ID" = m."VM ID"

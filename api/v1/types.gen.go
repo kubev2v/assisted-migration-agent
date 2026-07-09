@@ -480,6 +480,15 @@ type PairCapabilityRequest struct {
 	Pairs       []DatastorePair     `json:"pairs"`
 }
 
+// Process defines model for Process.
+type Process struct {
+	// Name Name of the process
+	Name string `json:"name"`
+
+	// Version Version of the process
+	Version *string `json:"version,omitempty"`
+}
+
 // RightsizingClusterListResponse defines model for RightsizingClusterListResponse.
 type RightsizingClusterListResponse struct {
 	Clusters []RightsizingClusterUtilization `json:"clusters"`
@@ -929,6 +938,9 @@ type VirtualMachineDetail struct {
 
 	// PowerState Current power state of the VirtualMachine (poweredOn, poweredOff, or suspended)
 	PowerState string `json:"powerState"`
+
+	// Processes List of processes detected on this VM
+	Processes *[]Process `json:"processes,omitempty"`
 
 	// StorageUsed Total storage space consumed by the VirtualMachine in bytes
 	StorageUsed *int64 `json:"storageUsed,omitempty"`
