@@ -365,12 +365,18 @@ func NewVddkInvalidVersionError(expected, actual string) *InvalidVersionError {
 }
 
 func (e *InvalidVersionError) Error() string {
-	parts := strings.Split(e.Actual, ".")
+	actual := e.Actual
+	parts := strings.Split(actual, ".")
 	if len(parts) > 2 {
-		e.Actual = strings.Join(parts[:2], ".")
+		actual = strings.Join(parts[:2], ".")
 	}
 
-	return fmt.Sprintf("major.minor version mismatch: expected %s, got %s", e.Expected, e.Actual)
+	return fmt.Sprintf(
+		"vCenter version from your environment: %s. "+
+			"VDDK version uploaded: %s. "+
+			"The VDDK must match the vCenter major.minor version. Upload a compatible VDDK package.",
+		e.Expected, actual,
+	)
 }
 
 func IsInvalidVersionError(err error) bool {
