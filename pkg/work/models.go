@@ -30,6 +30,29 @@ func (b *SliceWorkBuilder[S, R]) Next() (WorkUnit[S, R], bool) {
 	return u, true
 }
 
+type SliceWorkBuilder2[S any, R any] struct {
+	units    []WorkUnit[S, R]
+	idx      int
+	finalize func(ctx context.Context, result R) error
+}
+
+func NewSliceWorkBuilder2[S any, R any](units []WorkUnit[S, R], finalize func(ctx context.Context, result R) error) *SliceWorkBuilder2[S, R] {
+	return &SliceWorkBuilder2[S, R]{units: units, finalize: finalize}
+}
+
+func (b *SliceWorkBuilder2[S, R]) Next() (WorkUnit[S, R], bool) {
+	if b.idx >= len(b.units) {
+		return WorkUnit[S, R]{}, false
+	}
+	u := b.units[b.idx]
+	b.idx++
+	return u, true
+}
+
+func (b *SliceWorkBuilder2[S, R]) Finalize(ctx context.Context, result R) error {
+	return b.finalize(ctx, result)
+}
+
 // WorkUnit represents a single step in a work pipeline.
 // S is the status type reported before execution.
 // R is the result type threaded through the pipeline.

@@ -1,17 +1,18 @@
 package store
 
 import (
-	"crypto/sha256"
+	"context"
 	"database/sql"
-	"encoding/hex"
+	"iter"
+	"path/filepath"
+	"slices"
 	"sync"
 	"time"
 
-	"github.com/kubev2v/migration-planner/pkg/opa"
+	"github.com/kubev2v/assisted-migration-agent/pkg/errors"
+
 	pkgstore "github.com/kubev2v/migration-planner/pkg/store"
 	"go.uber.org/zap"
-
-	"github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
 // Pool manages multiple isolated DuckDB database connections. Each database
@@ -43,8 +44,10 @@ import (
 //
 //	// Register the main agent database (eager, always connected).
 //	mainDB, _ := pool.NewDatabase(
-//	    "/data/agent.duckdb", validator,
-//	    store.EagerConnectionInitilization, 512, store.ReadWriteDatabase,
+//	    "/data/agent.duckdb",
+//	    store.EagerConnectionInitilization,
+//		512,
+//		store.ReadWriteDatabase,
 //	)
 //	pool.Add(mainDB)
 //
@@ -64,6 +67,8 @@ import (
 //	db, _ := pool.Get(mainDB.ID)
 //	st, _ := db.Store()
 //	cfg, _ := st.Configuration().Get(ctx)
+const MainDatabaseID = "main"
+
 type ConnectionInitilizationType int
 
 const (
@@ -86,7 +91,6 @@ type Database struct {
 	store       *Store2
 	accessMode  DatabaseAccessMode
 	connection  *sql.DB
-	validator   *opa.Validator
 	memoryLimit int
 }
 
@@ -104,7 +108,7 @@ func (d *Database) Store() (*Store2, error) {
 	}
 
 	d.connection = conn
-	d.store = NewStore2(pkgstore.NewQueryInterceptor(conn), pkgstore.NewTransactor(conn), d.validator)
+	d.store = newStore2(filepath.Base(d.Path), pkgstore.NewQueryInterceptor(conn), pkgstore.NewTransactor(conn))
 
 	return d.store, nil
 }
@@ -139,11 +143,19 @@ func (d *Database) LastAccess() int64 {
 
 // Migrate migrates the database.
 // The migration schema depends on the target database: main or collection therefore it is caller responsibility to pass the right migration fn
-func (d *Database) Migrate(fn func(db *sql.DB) error) error {
+func (d *Database) Migrate(ctx context.Context, fn func(ctx context.Context, db *sql.DB) error) error {
+	d.mu.Lock()
 	if d.connection == nil {
-		return nil
+		conn, err := newDatabase(NewDefaultExtentionLoader(), d.Path, d.memoryLimit, d.accessMode)
+		if err != nil {
+			d.mu.Unlock()
+			return err
+		}
+		d.connection = conn
 	}
-	return fn(d.connection)
+	d.mu.Unlock()
+
+	return fn(ctx, d.connection)
 }
 
 type Pool struct {
@@ -162,17 +174,13 @@ func NewPool(cleanupInterval time.Duration) *Pool {
 	}
 }
 
-func (p *Pool) NewDatabase(dbPath string, createdAt time.Time, opaValidator *opa.Validator, initType ConnectionInitilizationType, memoryLimit int, accessMode DatabaseAccessMode) (*Database, error) {
-	hash := sha256.Sum256([]byte(dbPath))
-	id := hex.EncodeToString(hash[:])[:6]
-
+func (p *Pool) NewDatabase(id string, dbPath string, createdAt time.Time, initType ConnectionInitilizationType, memoryLimit int, accessMode DatabaseAccessMode) (*Database, error) {
 	db := &Database{
 		ID:          id,
 		Path:        dbPath,
 		CreatedAt:   createdAt,
 		memoryLimit: memoryLimit,
 		accessMode:  accessMode,
-		validator:   opaValidator,
 	}
 
 	if initType == EagerConnectionInitilization {
@@ -181,7 +189,7 @@ func (p *Pool) NewDatabase(dbPath string, createdAt time.Time, opaValidator *opa
 			return nil, err
 		}
 		db.connection = conn
-		db.store = NewStore2(pkgstore.NewQueryInterceptor(conn), pkgstore.NewTransactor(conn), opaValidator)
+		db.store = newStore2(filepath.Base(dbPath), pkgstore.NewQueryInterceptor(conn), pkgstore.NewTransactor(conn))
 	}
 
 	return db, nil
@@ -199,8 +207,11 @@ func (p *Pool) Get(id string) (*Database, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	if p.shouldCleanup() {
+	select {
+	case <-p.cleanupTimer.C:
+		p.cleanupTimer.Reset(p.cleanupInterval)
 		p.cleanup()
+	default:
 	}
 
 	db, ok := p.databases[id]
@@ -220,6 +231,22 @@ func (p *Pool) List() []*Database {
 		databases = append(databases, db)
 	}
 	return databases
+}
+
+// All returns an iterator on sorted list of databases based on createdAt
+func (p *Pool) All() iter.Seq[*Database] {
+	dbs := p.List()
+	slices.SortFunc(dbs, func(a *Database, b *Database) int {
+		return b.CreatedAt.Compare(a.CreatedAt)
+	})
+
+	return func(yield func(*Database) bool) {
+		for _, db := range dbs {
+			if !yield(db) {
+				return
+			}
+		}
+	}
 }
 
 func (p *Pool) Close() {
@@ -248,15 +275,5 @@ func (p *Pool) cleanup() {
 		if err := db.Close(); err != nil {
 			zap.S().Errorw("failed to close idle db connection", "db_id", id, "error", err)
 		}
-	}
-}
-
-func (p *Pool) shouldCleanup() bool {
-	select {
-	case <-p.cleanupTimer.C:
-		p.cleanupTimer.Reset(p.cleanupInterval)
-		return true
-	default:
-		return false
 	}
 }

@@ -15,6 +15,8 @@ const (
 	CollectorStateConnecting CollectorStateType = "connecting"
 	// CollectorStateCollecting - async collection in progress
 	CollectorStateCollecting CollectorStateType = "collecting"
+	// Collectinc metrics
+	CollectorStateMetricsCollecting CollectorStateType = "collecting metrics"
 	// CollectorStateParsing - parsing collected data into duckdb
 	CollectorStateParsing CollectorStateType = "parsing"
 	// CollectorStateCollected - collection complete (auto-transitions to ready)
@@ -36,6 +38,8 @@ const (
 	CollectorLegacyStateCollected             CollectorStateType = "up-to-date"
 )
 
+// TODO: Need to agree on how to solve this mess
+// We need to revisit the saas states like "waiting-for-credentials" which is not pertinent anymore
 func (c CollectorStateType) ToV1() CollectorStateType {
 	switch c {
 	case CollectorStateReady:
@@ -46,6 +50,8 @@ func (c CollectorStateType) ToV1() CollectorStateType {
 		return CollectorLegacyStateCollected
 	case CollectorLegacyStateError:
 		return CollectorLegacyStateError
+	case CollectorStateMetricsCollecting:
+		return CollectorLegacyStateCollecting
 	case CollectorStateRightsizingConnecting,
 		CollectorStateRightsizingDiscovering,
 		CollectorStateRightsizingQuerying,
@@ -58,6 +64,7 @@ func (c CollectorStateType) ToV1() CollectorStateType {
 
 // CollectorStatus holds the current collector state and metadata.
 type CollectorStatus struct {
+	ID    string
 	State CollectorStateType
 	Error error
 }

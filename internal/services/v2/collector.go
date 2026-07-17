@@ -1,4 +1,4 @@
-package v1
+package v2
 
 import (
 	"context"
@@ -19,29 +19,23 @@ type (
 )
 
 type CollectorService struct {
-	mu           sync.Mutex
-	pipeline     *work.Pipeline2[models.CollectorStatus, models.CollectorResult]
-	sched        *scheduler.Scheduler[models.CollectorResult]
-	done         chan struct{}
-	inventorySrv *InventoryService
-	buildFn      collectorWorkBuilderFunc
-	credsSvc     *CredentialsService
+	ID       string
+	mu       sync.Mutex
+	pipeline *work.Pipeline2[models.CollectorStatus, models.CollectorResult]
+	sched    *scheduler.Scheduler[models.CollectorResult]
+	done     chan struct{}
+	buildFn  collectorWorkBuilderFunc
+	credsSvc *CredentialsService
 }
 
-func NewCollectorService(inventorySrv *InventoryService, buildFn collectorWorkBuilderFunc, credsSvc *CredentialsService) *CollectorService {
+func NewCollectorService(buildFn collectorWorkBuilderFunc, credsSvc *CredentialsService) *CollectorService {
 	return &CollectorService{
-		inventorySrv: inventorySrv,
-		buildFn:      buildFn,
-		credsSvc:     credsSvc,
+		buildFn:  buildFn,
+		credsSvc: credsSvc,
 	}
 }
 
 func (c *CollectorService) GetStatus() models.CollectorStatus {
-	inv, err := c.inventorySrv.GetInventory(context.Background())
-	if err == nil && inv != nil {
-		return models.CollectorStatus{State: models.CollectorStateCollected}
-	}
-
 	c.mu.Lock()
 	p := c.pipeline
 	c.mu.Unlock()
@@ -49,25 +43,22 @@ func (c *CollectorService) GetStatus() models.CollectorStatus {
 	if p != nil {
 		result, err := p.Result()
 		if err != nil {
-			return models.CollectorStatus{State: models.CollectorStateError, Error: err}
+			return models.CollectorStatus{ID: c.ID, State: models.CollectorStateError, Error: err}
 		}
 		if result.Err != nil {
-			return models.CollectorStatus{State: models.CollectorStateError, Error: result.Err}
+			return models.CollectorStatus{ID: c.ID, State: models.CollectorStateError, Error: result.Err}
 		}
-		return p.State()
+		s := p.State()
+		s.ID = c.ID
+		return s
 	}
 
-	return models.CollectorStatus{State: models.CollectorStateReady}
+	return models.CollectorStatus{ID: c.ID, State: models.CollectorStateReady}
 }
 
 func (c *CollectorService) Start(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-
-	inv, err := c.inventorySrv.GetInventory(ctx)
-	if err == nil && inv != nil {
-		return nil
-	}
 
 	if c.done != nil {
 		select {

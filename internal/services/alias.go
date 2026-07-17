@@ -1,7 +1,10 @@
 // internal/services/alias.go
 package services
 
-import v1 "github.com/kubev2v/assisted-migration-agent/internal/services/v1"
+import (
+	v1 "github.com/kubev2v/assisted-migration-agent/internal/services/v1"
+	v2 "github.com/kubev2v/assisted-migration-agent/internal/services/v2"
+)
 
 // Types — true Go type aliases; methods, embedding, and type assertions all work.
 type ApplicationService = v1.ApplicationService
@@ -49,4 +52,38 @@ var (
 	WithConsoleClient                   = v1.WithConsoleClient
 	WithKeyManager                      = v1.WithKeyManager
 	WithStore                           = v1.WithStore
+)
+
+// ── V2 type aliases ─────────────────────────────────────────────────────
+type V2ApplicationService = v2.ApplicationService
+type V2CollectorService = v2.CollectorService
+type V2Console = v2.Console
+type V2CredentialsService = v2.CredentialsService
+type V2EventService = v2.EventService
+type V2GroupService = v2.GroupService
+type V2GroupGetParams = v2.GroupGetParams
+type V2GroupListParams = v2.GroupListParams
+type V2InventoryService = v2.InventoryService
+type V2RightsizingService = v2.RightsizingService
+type V2ServiceManager = v2.ServiceManager
+type V2ServiceManagerOption = v2.ServiceManagerOption
+type V2SortField = v2.SortField
+type V2VMListParams = v2.VMListParams
+type V2VMService = v2.VMService
+
+// ── V2 constructors and option funcs ────────────────────────────────────
+var (
+	V2NewCollectorService   = v2.NewCollectorService
+	V2NewConsoleService     = v2.NewConsoleService
+	V2NewCredentialsService = v2.NewCredentialsService
+	V2NewEventService       = v2.NewEventService
+	V2NewInventoryService   = v2.NewInventoryService
+	V2NewRightsizingService = v2.NewRightsizingService
+	V2NewServiceManager     = v2.NewServiceManager
+	V2NewVMService          = v2.NewVMService
+	V2WithConfig            = v2.WithConfig
+	V2WithConsoleClient     = v2.WithConsoleClient
+	V2WithKeyManager        = v2.WithKeyManager
+	V2WithPool              = v2.WithPool
+	V2WithOpaValidator      = v2.WithOpaValidatior
 )

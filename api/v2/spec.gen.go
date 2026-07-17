@@ -4,10 +4,18 @@
 package v2
 
 import (
+	"bytes"
+	"compress/gzip"
+	"encoding/base64"
 	"fmt"
 	"net/http"
+	"net/url"
+	"path"
+	"strings"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gin-gonic/gin"
+	externalRef0 "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/oapi-codegen/runtime"
 )
 
@@ -19,72 +27,87 @@ type ServerInterface interface {
 	// Change agent mode
 	// (POST /agent)
 	SetAgentMode(c *gin.Context)
+	// List all collections
+	// (GET /collections)
+	ListCollections(c *gin.Context)
+	// Delete a collection
+	// (DELETE /collections/{id})
+	DeleteCollection(c *gin.Context, id string)
+	// List detected applications in a collection
+	// (GET /collections/{id}/applications)
+	ListApplications(c *gin.Context, id string)
+	// Export collection data as CSV ZIP archive
+	// (GET /collections/{id}/export)
+	ExportCollection(c *gin.Context, id string, params ExportCollectionParams)
+	// List all groups in a collection
+	// (GET /collections/{id}/groups)
+	ListGroups(c *gin.Context, id string, params ListGroupsParams)
+	// Create a new group in a collection
+	// (POST /collections/{id}/groups)
+	CreateGroup(c *gin.Context, id string)
+	// Delete group
+	// (DELETE /collections/{id}/groups/{groupId})
+	DeleteGroup(c *gin.Context, id string, groupId string)
+	// Get group by ID with its VirtualMachines
+	// (GET /collections/{id}/groups/{groupId})
+	GetGroup(c *gin.Context, id string, groupId string, params GetGroupParams)
+	// Update group
+	// (PATCH /collections/{id}/groups/{groupId})
+	UpdateGroup(c *gin.Context, id string, groupId string)
+	// Get collected inventory for a collection
+	// (GET /collections/{id}/inventory)
+	GetInventory(c *gin.Context, id string)
+	// List VirtualMachines in a collection
+	// (GET /collections/{id}/virtualmachines)
+	ListVirtualMachines(c *gin.Context, id string, params ListVirtualMachinesParams)
+	// Batch update migration exclusion for multiple VMs
+	// (POST /collections/{id}/virtualmachines/batch-update-exclusion)
+	BatchUpdateVMExclusion(c *gin.Context, id string)
+	// Get available filter option values
+	// (GET /collections/{id}/virtualmachines/filter-options)
+	GetVMFilterOptions(c *gin.Context, id string)
+	// Get all distinct labels with counts
+	// (GET /collections/{id}/virtualmachines/labels)
+	GetVMLabels(c *gin.Context, id string)
+	// Remove a label from all VMs
+	// (DELETE /collections/{id}/virtualmachines/labels/{label})
+	DeleteLabelGlobally(c *gin.Context, id string, label string)
+	// Add or remove a label from multiple VMs
+	// (PATCH /collections/{id}/virtualmachines/labels/{label})
+	UpdateLabelVMs(c *gin.Context, id string, label string)
+	// Get VirtualMachine details
+	// (GET /collections/{id}/virtualmachines/{vmId})
+	GetVirtualMachine(c *gin.Context, id string, vmId string)
+	// Update VirtualMachine properties
+	// (PATCH /collections/{id}/virtualmachines/{vmId})
+	UpdateVirtualMachine(c *gin.Context, id string, vmId string)
 	// List all collectors with status
 	// (GET /collectors)
 	ListCollectors(c *gin.Context)
-	// Start collection for a vCenter
+	// Start a collection
 	// (POST /collectors)
 	StartCollector(c *gin.Context)
-	// Stop collector for a vCenter
-	// (DELETE /collectors/{vCenterID})
-	StopCollector(c *gin.Context, vCenterID VCenterID)
-	// Get collector status for a vCenter
-	// (GET /collectors/{vCenterID})
-	GetCollectorStatus(c *gin.Context, vCenterID VCenterID)
-	// List all groups
-	// (GET /groups)
-	ListGroups(c *gin.Context, params ListGroupsParams)
-	// Create a new group
-	// (POST /groups)
-	CreateGroup(c *gin.Context)
-	// Delete group
-	// (DELETE /groups/{id})
-	DeleteGroup(c *gin.Context, id string)
-	// Get group by ID with its VirtualMachines
-	// (GET /groups/{id})
-	GetGroup(c *gin.Context, id string, params GetGroupParams)
-	// Update group
-	// (PATCH /groups/{id})
-	UpdateGroup(c *gin.Context, id string)
-	// List all inspectors with status
-	// (GET /inspectors)
-	ListInspectors(c *gin.Context)
-	// Start inspection for VirtualMachines
-	// (POST /inspectors)
-	StartInspector(c *gin.Context)
-	// Stop inspector for a vCenter
-	// (DELETE /inspectors/{vCenterID})
-	StopInspector(c *gin.Context, vCenterID VCenterID)
-	// Get inspector status for a vCenter
-	// (GET /inspectors/{vCenterID})
-	GetInspectorStatus(c *gin.Context, vCenterID VCenterID)
-	// Get VDDK status for a vCenter
-	// (GET /inspectors/{vCenterID}/vddk)
-	GetInspectorVddkStatus(c *gin.Context, vCenterID VCenterID)
-	// Upload VDDK tarball for a vCenter
-	// (PUT /inspectors/{vCenterID}/vddk)
-	PutInspectorVddk(c *gin.Context, vCenterID VCenterID)
-	// List all collected inventories
-	// (GET /inventories)
-	ListInventories(c *gin.Context)
-	// Get collected inventory for a vCenter
-	// (GET /inventories/{vCenterID})
-	GetInventory(c *gin.Context, vCenterID VCenterID)
-	// Get collected inventory for a vCenter scoped to a group
-	// (GET /inventories/{vCenterID}/groups/{groupId})
-	GetInventoryByGroup(c *gin.Context, vCenterID VCenterID, groupId string)
+	// Stop collector
+	// (DELETE /collectors/{id})
+	StopCollector(c *gin.Context, id string)
+	// Get collector status
+	// (GET /collectors/{id})
+	GetCollectorStatus(c *gin.Context, id string)
+	// Delete stored credentials
+	// (DELETE /credentials)
+	DeleteCredentials(c *gin.Context)
+	// Get stored credential status
+	// (GET /credentials)
+	GetCredentials(c *gin.Context)
+	// Store vCenter credentials
+	// (PUT /credentials)
+	PutCredentials(c *gin.Context)
+	// Check vSphere operation capabilities
+	// (GET /credentials/capabilities)
+	GetCredentialCapabilities(c *gin.Context)
 	// Get agent version information
 	// (GET /version)
 	GetVersion(c *gin.Context)
-	// List all VirtualMachines from all vCenters
-	// (GET /virtualmachines)
-	ListVirtualMachines(c *gin.Context, params ListVirtualMachinesParams)
-	// Get VirtualMachine details
-	// (GET /virtualmachines/{id})
-	GetVirtualMachine(c *gin.Context, id string)
-	// Remove VirtualMachine from inspection queue
-	// (DELETE /virtualmachines/{id}/inspection)
-	RemoveVirtualMachineFromInspection(c *gin.Context, id string)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -122,8 +145,8 @@ func (siw *ServerInterfaceWrapper) SetAgentMode(c *gin.Context) {
 	siw.Handler.SetAgentMode(c)
 }
 
-// ListCollectors operation middleware
-func (siw *ServerInterfaceWrapper) ListCollectors(c *gin.Context) {
+// ListCollections operation middleware
+func (siw *ServerInterfaceWrapper) ListCollections(c *gin.Context) {
 
 	for _, middleware := range siw.HandlerMiddlewares {
 		middleware(c)
@@ -132,33 +155,20 @@ func (siw *ServerInterfaceWrapper) ListCollectors(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.ListCollectors(c)
+	siw.Handler.ListCollections(c)
 }
 
-// StartCollector operation middleware
-func (siw *ServerInterfaceWrapper) StartCollector(c *gin.Context) {
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.StartCollector(c)
-}
-
-// StopCollector operation middleware
-func (siw *ServerInterfaceWrapper) StopCollector(c *gin.Context) {
+// DeleteCollection operation middleware
+func (siw *ServerInterfaceWrapper) DeleteCollection(c *gin.Context) {
 
 	var err error
 
-	// ------------- Path parameter "vCenterID" -------------
-	var vCenterID VCenterID
+	// ------------- Path parameter "id" -------------
+	var id string
 
-	err = runtime.BindStyledParameterWithOptions("simple", "vCenterID", c.Param("vCenterID"), &vCenterID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter vCenterID: %w", err), http.StatusBadRequest)
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
 		return
 	}
 
@@ -169,20 +179,20 @@ func (siw *ServerInterfaceWrapper) StopCollector(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.StopCollector(c, vCenterID)
+	siw.Handler.DeleteCollection(c, id)
 }
 
-// GetCollectorStatus operation middleware
-func (siw *ServerInterfaceWrapper) GetCollectorStatus(c *gin.Context) {
+// ListApplications operation middleware
+func (siw *ServerInterfaceWrapper) ListApplications(c *gin.Context) {
 
 	var err error
 
-	// ------------- Path parameter "vCenterID" -------------
-	var vCenterID VCenterID
+	// ------------- Path parameter "id" -------------
+	var id string
 
-	err = runtime.BindStyledParameterWithOptions("simple", "vCenterID", c.Param("vCenterID"), &vCenterID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter vCenterID: %w", err), http.StatusBadRequest)
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
 		return
 	}
 
@@ -193,13 +203,57 @@ func (siw *ServerInterfaceWrapper) GetCollectorStatus(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.GetCollectorStatus(c, vCenterID)
+	siw.Handler.ListApplications(c, id)
+}
+
+// ExportCollection operation middleware
+func (siw *ServerInterfaceWrapper) ExportCollection(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ExportCollectionParams
+
+	// ------------- Optional query parameter "scope" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "scope", c.Request.URL.Query(), &params.Scope)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter scope: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ExportCollection(c, id, params)
 }
 
 // ListGroups operation middleware
 func (siw *ServerInterfaceWrapper) ListGroups(c *gin.Context) {
 
 	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params ListGroupsParams
@@ -235,24 +289,11 @@ func (siw *ServerInterfaceWrapper) ListGroups(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.ListGroups(c, params)
+	siw.Handler.ListGroups(c, id, params)
 }
 
 // CreateGroup operation middleware
 func (siw *ServerInterfaceWrapper) CreateGroup(c *gin.Context) {
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.CreateGroup(c)
-}
-
-// DeleteGroup operation middleware
-func (siw *ServerInterfaceWrapper) DeleteGroup(c *gin.Context) {
 
 	var err error
 
@@ -272,7 +313,40 @@ func (siw *ServerInterfaceWrapper) DeleteGroup(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.DeleteGroup(c, id)
+	siw.Handler.CreateGroup(c, id)
+}
+
+// DeleteGroup operation middleware
+func (siw *ServerInterfaceWrapper) DeleteGroup(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Path parameter "groupId" -------------
+	var groupId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "groupId", c.Param("groupId"), &groupId, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter groupId: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.DeleteGroup(c, id, groupId)
 }
 
 // GetGroup operation middleware
@@ -286,6 +360,15 @@ func (siw *ServerInterfaceWrapper) GetGroup(c *gin.Context) {
 	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {
 		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Path parameter "groupId" -------------
+	var groupId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "groupId", c.Param("groupId"), &groupId, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter groupId: %w", err), http.StatusBadRequest)
 		return
 	}
 
@@ -323,7 +406,7 @@ func (siw *ServerInterfaceWrapper) GetGroup(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.GetGroup(c, id, params)
+	siw.Handler.GetGroup(c, id, groupId, params)
 }
 
 // UpdateGroup operation middleware
@@ -337,189 +420,6 @@ func (siw *ServerInterfaceWrapper) UpdateGroup(c *gin.Context) {
 	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
 	if err != nil {
 		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.UpdateGroup(c, id)
-}
-
-// ListInspectors operation middleware
-func (siw *ServerInterfaceWrapper) ListInspectors(c *gin.Context) {
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.ListInspectors(c)
-}
-
-// StartInspector operation middleware
-func (siw *ServerInterfaceWrapper) StartInspector(c *gin.Context) {
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.StartInspector(c)
-}
-
-// StopInspector operation middleware
-func (siw *ServerInterfaceWrapper) StopInspector(c *gin.Context) {
-
-	var err error
-
-	// ------------- Path parameter "vCenterID" -------------
-	var vCenterID VCenterID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "vCenterID", c.Param("vCenterID"), &vCenterID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter vCenterID: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.StopInspector(c, vCenterID)
-}
-
-// GetInspectorStatus operation middleware
-func (siw *ServerInterfaceWrapper) GetInspectorStatus(c *gin.Context) {
-
-	var err error
-
-	// ------------- Path parameter "vCenterID" -------------
-	var vCenterID VCenterID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "vCenterID", c.Param("vCenterID"), &vCenterID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter vCenterID: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.GetInspectorStatus(c, vCenterID)
-}
-
-// GetInspectorVddkStatus operation middleware
-func (siw *ServerInterfaceWrapper) GetInspectorVddkStatus(c *gin.Context) {
-
-	var err error
-
-	// ------------- Path parameter "vCenterID" -------------
-	var vCenterID VCenterID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "vCenterID", c.Param("vCenterID"), &vCenterID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter vCenterID: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.GetInspectorVddkStatus(c, vCenterID)
-}
-
-// PutInspectorVddk operation middleware
-func (siw *ServerInterfaceWrapper) PutInspectorVddk(c *gin.Context) {
-
-	var err error
-
-	// ------------- Path parameter "vCenterID" -------------
-	var vCenterID VCenterID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "vCenterID", c.Param("vCenterID"), &vCenterID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter vCenterID: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.PutInspectorVddk(c, vCenterID)
-}
-
-// ListInventories operation middleware
-func (siw *ServerInterfaceWrapper) ListInventories(c *gin.Context) {
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.ListInventories(c)
-}
-
-// GetInventory operation middleware
-func (siw *ServerInterfaceWrapper) GetInventory(c *gin.Context) {
-
-	var err error
-
-	// ------------- Path parameter "vCenterID" -------------
-	var vCenterID VCenterID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "vCenterID", c.Param("vCenterID"), &vCenterID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter vCenterID: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.GetInventory(c, vCenterID)
-}
-
-// GetInventoryByGroup operation middleware
-func (siw *ServerInterfaceWrapper) GetInventoryByGroup(c *gin.Context) {
-
-	var err error
-
-	// ------------- Path parameter "vCenterID" -------------
-	var vCenterID VCenterID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "vCenterID", c.Param("vCenterID"), &vCenterID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter vCenterID: %w", err), http.StatusBadRequest)
 		return
 	}
 
@@ -539,11 +439,22 @@ func (siw *ServerInterfaceWrapper) GetInventoryByGroup(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.GetInventoryByGroup(c, vCenterID, groupId)
+	siw.Handler.UpdateGroup(c, id, groupId)
 }
 
-// GetVersion operation middleware
-func (siw *ServerInterfaceWrapper) GetVersion(c *gin.Context) {
+// GetInventory operation middleware
+func (siw *ServerInterfaceWrapper) GetInventory(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
 
 	for _, middleware := range siw.HandlerMiddlewares {
 		middleware(c)
@@ -552,13 +463,22 @@ func (siw *ServerInterfaceWrapper) GetVersion(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.GetVersion(c)
+	siw.Handler.GetInventory(c, id)
 }
 
 // ListVirtualMachines operation middleware
 func (siw *ServerInterfaceWrapper) ListVirtualMachines(c *gin.Context) {
 
 	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params ListVirtualMachinesParams
@@ -602,7 +522,145 @@ func (siw *ServerInterfaceWrapper) ListVirtualMachines(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.ListVirtualMachines(c, params)
+	siw.Handler.ListVirtualMachines(c, id, params)
+}
+
+// BatchUpdateVMExclusion operation middleware
+func (siw *ServerInterfaceWrapper) BatchUpdateVMExclusion(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.BatchUpdateVMExclusion(c, id)
+}
+
+// GetVMFilterOptions operation middleware
+func (siw *ServerInterfaceWrapper) GetVMFilterOptions(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetVMFilterOptions(c, id)
+}
+
+// GetVMLabels operation middleware
+func (siw *ServerInterfaceWrapper) GetVMLabels(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetVMLabels(c, id)
+}
+
+// DeleteLabelGlobally operation middleware
+func (siw *ServerInterfaceWrapper) DeleteLabelGlobally(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Path parameter "label" -------------
+	var label string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "label", c.Param("label"), &label, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter label: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.DeleteLabelGlobally(c, id, label)
+}
+
+// UpdateLabelVMs operation middleware
+func (siw *ServerInterfaceWrapper) UpdateLabelVMs(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Path parameter "label" -------------
+	var label string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "label", c.Param("label"), &label, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter label: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.UpdateLabelVMs(c, id, label)
 }
 
 // GetVirtualMachine operation middleware
@@ -619,6 +677,15 @@ func (siw *ServerInterfaceWrapper) GetVirtualMachine(c *gin.Context) {
 		return
 	}
 
+	// ------------- Path parameter "vmId" -------------
+	var vmId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "vmId", c.Param("vmId"), &vmId, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter vmId: %w", err), http.StatusBadRequest)
+		return
+	}
+
 	for _, middleware := range siw.HandlerMiddlewares {
 		middleware(c)
 		if c.IsAborted() {
@@ -626,11 +693,70 @@ func (siw *ServerInterfaceWrapper) GetVirtualMachine(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.GetVirtualMachine(c, id)
+	siw.Handler.GetVirtualMachine(c, id, vmId)
 }
 
-// RemoveVirtualMachineFromInspection operation middleware
-func (siw *ServerInterfaceWrapper) RemoveVirtualMachineFromInspection(c *gin.Context) {
+// UpdateVirtualMachine operation middleware
+func (siw *ServerInterfaceWrapper) UpdateVirtualMachine(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Path parameter "vmId" -------------
+	var vmId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "vmId", c.Param("vmId"), &vmId, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter vmId: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.UpdateVirtualMachine(c, id, vmId)
+}
+
+// ListCollectors operation middleware
+func (siw *ServerInterfaceWrapper) ListCollectors(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.ListCollectors(c)
+}
+
+// StartCollector operation middleware
+func (siw *ServerInterfaceWrapper) StartCollector(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.StartCollector(c)
+}
+
+// StopCollector operation middleware
+func (siw *ServerInterfaceWrapper) StopCollector(c *gin.Context) {
 
 	var err error
 
@@ -650,7 +776,96 @@ func (siw *ServerInterfaceWrapper) RemoveVirtualMachineFromInspection(c *gin.Con
 		}
 	}
 
-	siw.Handler.RemoveVirtualMachineFromInspection(c, id)
+	siw.Handler.StopCollector(c, id)
+}
+
+// GetCollectorStatus operation middleware
+func (siw *ServerInterfaceWrapper) GetCollectorStatus(c *gin.Context) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", c.Param("id"), &id, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetCollectorStatus(c, id)
+}
+
+// DeleteCredentials operation middleware
+func (siw *ServerInterfaceWrapper) DeleteCredentials(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.DeleteCredentials(c)
+}
+
+// GetCredentials operation middleware
+func (siw *ServerInterfaceWrapper) GetCredentials(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetCredentials(c)
+}
+
+// PutCredentials operation middleware
+func (siw *ServerInterfaceWrapper) PutCredentials(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.PutCredentials(c)
+}
+
+// GetCredentialCapabilities operation middleware
+func (siw *ServerInterfaceWrapper) GetCredentialCapabilities(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetCredentialCapabilities(c)
+}
+
+// GetVersion operation middleware
+func (siw *ServerInterfaceWrapper) GetVersion(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetVersion(c)
 }
 
 // GinServerOptions provides options for the Gin server.
@@ -682,26 +897,247 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 
 	router.GET(options.BaseURL+"/agent", wrapper.GetAgentStatus)
 	router.POST(options.BaseURL+"/agent", wrapper.SetAgentMode)
+	router.GET(options.BaseURL+"/collections", wrapper.ListCollections)
+	router.DELETE(options.BaseURL+"/collections/:id", wrapper.DeleteCollection)
+	router.GET(options.BaseURL+"/collections/:id/applications", wrapper.ListApplications)
+	router.GET(options.BaseURL+"/collections/:id/export", wrapper.ExportCollection)
+	router.GET(options.BaseURL+"/collections/:id/groups", wrapper.ListGroups)
+	router.POST(options.BaseURL+"/collections/:id/groups", wrapper.CreateGroup)
+	router.DELETE(options.BaseURL+"/collections/:id/groups/:groupId", wrapper.DeleteGroup)
+	router.GET(options.BaseURL+"/collections/:id/groups/:groupId", wrapper.GetGroup)
+	router.PATCH(options.BaseURL+"/collections/:id/groups/:groupId", wrapper.UpdateGroup)
+	router.GET(options.BaseURL+"/collections/:id/inventory", wrapper.GetInventory)
+	router.GET(options.BaseURL+"/collections/:id/virtualmachines", wrapper.ListVirtualMachines)
+	router.POST(options.BaseURL+"/collections/:id/virtualmachines/batch-update-exclusion", wrapper.BatchUpdateVMExclusion)
+	router.GET(options.BaseURL+"/collections/:id/virtualmachines/filter-options", wrapper.GetVMFilterOptions)
+	router.GET(options.BaseURL+"/collections/:id/virtualmachines/labels", wrapper.GetVMLabels)
+	router.DELETE(options.BaseURL+"/collections/:id/virtualmachines/labels/:label", wrapper.DeleteLabelGlobally)
+	router.PATCH(options.BaseURL+"/collections/:id/virtualmachines/labels/:label", wrapper.UpdateLabelVMs)
+	router.GET(options.BaseURL+"/collections/:id/virtualmachines/:vmId", wrapper.GetVirtualMachine)
+	router.PATCH(options.BaseURL+"/collections/:id/virtualmachines/:vmId", wrapper.UpdateVirtualMachine)
 	router.GET(options.BaseURL+"/collectors", wrapper.ListCollectors)
 	router.POST(options.BaseURL+"/collectors", wrapper.StartCollector)
-	router.DELETE(options.BaseURL+"/collectors/:vCenterID", wrapper.StopCollector)
-	router.GET(options.BaseURL+"/collectors/:vCenterID", wrapper.GetCollectorStatus)
-	router.GET(options.BaseURL+"/groups", wrapper.ListGroups)
-	router.POST(options.BaseURL+"/groups", wrapper.CreateGroup)
-	router.DELETE(options.BaseURL+"/groups/:id", wrapper.DeleteGroup)
-	router.GET(options.BaseURL+"/groups/:id", wrapper.GetGroup)
-	router.PATCH(options.BaseURL+"/groups/:id", wrapper.UpdateGroup)
-	router.GET(options.BaseURL+"/inspectors", wrapper.ListInspectors)
-	router.POST(options.BaseURL+"/inspectors", wrapper.StartInspector)
-	router.DELETE(options.BaseURL+"/inspectors/:vCenterID", wrapper.StopInspector)
-	router.GET(options.BaseURL+"/inspectors/:vCenterID", wrapper.GetInspectorStatus)
-	router.GET(options.BaseURL+"/inspectors/:vCenterID/vddk", wrapper.GetInspectorVddkStatus)
-	router.PUT(options.BaseURL+"/inspectors/:vCenterID/vddk", wrapper.PutInspectorVddk)
-	router.GET(options.BaseURL+"/inventories", wrapper.ListInventories)
-	router.GET(options.BaseURL+"/inventories/:vCenterID", wrapper.GetInventory)
-	router.GET(options.BaseURL+"/inventories/:vCenterID/groups/:groupId", wrapper.GetInventoryByGroup)
+	router.DELETE(options.BaseURL+"/collectors/:id", wrapper.StopCollector)
+	router.GET(options.BaseURL+"/collectors/:id", wrapper.GetCollectorStatus)
+	router.DELETE(options.BaseURL+"/credentials", wrapper.DeleteCredentials)
+	router.GET(options.BaseURL+"/credentials", wrapper.GetCredentials)
+	router.PUT(options.BaseURL+"/credentials", wrapper.PutCredentials)
+	router.GET(options.BaseURL+"/credentials/capabilities", wrapper.GetCredentialCapabilities)
 	router.GET(options.BaseURL+"/version", wrapper.GetVersion)
-	router.GET(options.BaseURL+"/virtualmachines", wrapper.ListVirtualMachines)
-	router.GET(options.BaseURL+"/virtualmachines/:id", wrapper.GetVirtualMachine)
-	router.DELETE(options.BaseURL+"/virtualmachines/:id/inspection", wrapper.RemoveVirtualMachineFromInspection)
+}
+
+// Base64 encoded, gzipped, json marshaled Swagger object
+var swaggerSpec = []string{
+
+	"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",
+	"AA==",
+}
+
+// GetSwagger returns the content of the embedded swagger specification file
+// or error if failed to decode
+func decodeSpec() ([]byte, error) {
+	zipped, err := base64.StdEncoding.DecodeString(strings.Join(swaggerSpec, ""))
+	if err != nil {
+		return nil, fmt.Errorf("error base64 decoding spec: %w", err)
+	}
+	zr, err := gzip.NewReader(bytes.NewReader(zipped))
+	if err != nil {
+		return nil, fmt.Errorf("error decompressing spec: %w", err)
+	}
+	var buf bytes.Buffer
+	_, err = buf.ReadFrom(zr)
+	if err != nil {
+		return nil, fmt.Errorf("error decompressing spec: %w", err)
+	}
+
+	return buf.Bytes(), nil
+}
+
+var rawSpec = decodeSpecCached()
+
+// a naive cached of a decoded swagger spec
+func decodeSpecCached() func() ([]byte, error) {
+	data, err := decodeSpec()
+	return func() ([]byte, error) {
+		return data, err
+	}
+}
+
+// Constructs a synthetic filesystem for resolving external references when loading openapi specifications.
+func PathToRawSpec(pathToFile string) map[string]func() ([]byte, error) {
+	res := make(map[string]func() ([]byte, error))
+	if len(pathToFile) > 0 {
+		res[pathToFile] = rawSpec
+	}
+
+	pathPrefix := path.Dir(pathToFile)
+
+	for rawPath, rawFunc := range externalRef0.PathToRawSpec(path.Join(pathPrefix, "https://raw.githubusercontent.com/kubev2v/migration-planner/main/api/v1alpha1/openapi.yaml")) {
+		if _, ok := res[rawPath]; ok {
+			// it is not possible to compare functions in golang, so always overwrite the old value
+		}
+		res[rawPath] = rawFunc
+	}
+	return res
+}
+
+// GetSwagger returns the Swagger specification corresponding to the generated code
+// in this file. The external references of Swagger specification are resolved.
+// The logic of resolving external references is tightly connected to "import-mapping" feature.
+// Externally referenced files must be embedded in the corresponding golang packages.
+// Urls can be supported but this task was out of the scope.
+func GetSwagger() (swagger *openapi3.T, err error) {
+	resolvePath := PathToRawSpec("")
+
+	loader := openapi3.NewLoader()
+	loader.IsExternalRefsAllowed = true
+	loader.ReadFromURIFunc = func(loader *openapi3.Loader, url *url.URL) ([]byte, error) {
+		pathToFile := url.String()
+		pathToFile = path.Clean(pathToFile)
+		getSpec, ok := resolvePath[pathToFile]
+		if !ok {
+			err1 := fmt.Errorf("path not found: %s", pathToFile)
+			return nil, err1
+		}
+		return getSpec()
+	}
+	var specData []byte
+	specData, err = rawSpec()
+	if err != nil {
+		return
+	}
+	swagger, err = loader.LoadFromData(specData)
+	if err != nil {
+		return
+	}
+	return
 }

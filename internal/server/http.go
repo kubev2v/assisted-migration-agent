@@ -17,8 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
-	api "github.com/kubev2v/assisted-migration-agent/api/v1"
-
+	"github.com/getkin/kin-openapi/openapi3"
 	oapimiddleware "github.com/oapi-codegen/gin-middleware"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
@@ -35,25 +34,18 @@ type Server struct {
 	srv *http.Server
 }
 
-func NewServer(cfg *config.Configuration, registerHandlerFn map[string]func(router *gin.RouterGroup)) (*Server, error) {
+type APIGroup struct {
+	Swagger    *openapi3.T
+	RegisterFn func(router *gin.RouterGroup)
+}
+
+func NewServer(cfg *config.Configuration, groups map[string]APIGroup) (*Server, error) {
 	gin.SetMode(gin.DebugMode)
 	if cfg.Server.ServerMode == ProductionServer {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	engine := gin.New()
 	engine.MaxMultipartMemory = 64 << 20 // max 64Mb
-
-	swagger, err := api.GetSwagger()
-	if err != nil {
-		return nil, fmt.Errorf("failed to load swagger spec: %w", err)
-	}
-	oapiOpts := oapimiddleware.Options{
-		SilenceServersWarning: true,
-		ErrorHandler: func(c *gin.Context, message string, statusCode int) {
-			c.JSON(statusCode, gin.H{"error": message})
-			c.Abort()
-		},
-	}
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf("0.0.0.0:%d", cfg.Server.HTTPPort),
@@ -62,7 +54,6 @@ func NewServer(cfg *config.Configuration, registerHandlerFn map[string]func(rout
 
 	if cfg.Server.ServerMode == ProductionServer {
 		engine.Static("/static", cfg.Server.StaticsFolder)
-		// Serve assets at /assets/ to match HTML references
 		engine.Static("/assets", path.Join(cfg.Server.StaticsFolder, "assets"))
 		engine.StaticFile("/", path.Join(cfg.Server.StaticsFolder, "index.html"))
 		engine.StaticFile("/favicon.ico", path.Join(cfg.Server.StaticsFolder, "favicon.ico"))
@@ -90,16 +81,27 @@ func NewServer(cfg *config.Configuration, registerHandlerFn map[string]func(rout
 		srv.TLSConfig = tlsConfig
 	}
 
-	for apiVersion, handlersFn := range registerHandlerFn {
-		router := engine.Group(apiVersion)
+	for prefix, group := range groups {
+		router := engine.Group(prefix)
 
-		router.Use(
+		mws := []gin.HandlerFunc{
 			middlewares.Logger(),
 			ginzap.RecoveryWithZap(zap.S().Desugar(), true),
-			oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),
-		)
+		}
 
-		handlersFn(router)
+		if group.Swagger != nil {
+			oapiOpts := oapimiddleware.Options{
+				SilenceServersWarning: true,
+				ErrorHandler: func(c *gin.Context, message string, statusCode int) {
+					c.JSON(statusCode, gin.H{"error": message})
+					c.Abort()
+				},
+			}
+			mws = append(mws, oapimiddleware.OapiRequestValidatorWithOptions(group.Swagger, &oapiOpts))
+		}
+
+		router.Use(mws...)
+		group.RegisterFn(router)
 	}
 
 	return &Server{srv: srv}, nil

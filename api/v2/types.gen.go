@@ -7,7 +7,6 @@ import (
 	"time"
 
 	externalRef0 "github.com/kubev2v/migration-planner/api/v1alpha1"
-	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // Defines values for AgentModeRequestMode.
@@ -44,12 +43,6 @@ const (
 	InspectionStatusStateError     InspectionStatusState = "error"
 	InspectionStatusStatePending   InspectionStatusState = "pending"
 	InspectionStatusStateRunning   InspectionStatusState = "running"
-)
-
-// Defines values for InspectorStatusState.
-const (
-	InspectorStatusStateReady   InspectorStatusState = "ready"
-	InspectorStatusStateRunning InspectorStatusState = "running"
 )
 
 // Defines values for VirtualMachineIssueCategory.
@@ -90,6 +83,68 @@ type AgentStatusConsoleConnectionStatus string
 // AgentStatusMode Target mode for the agent
 type AgentStatusMode string
 
+// ApplicationListResponse defines model for ApplicationListResponse.
+type ApplicationListResponse struct {
+	Applications []ApplicationOverview `json:"applications"`
+}
+
+// ApplicationOverview defines model for ApplicationOverview.
+type ApplicationOverview struct {
+	// Description Application description
+	Description string `json:"description"`
+
+	// Name Application name
+	Name string `json:"name"`
+
+	// VmCount Number of VMs running this application
+	VmCount int             `json:"vmCount"`
+	Vms     []ApplicationVM `json:"vms"`
+}
+
+// ApplicationVM defines model for ApplicationVM.
+type ApplicationVM struct {
+	// Id VM ID
+	Id string `json:"id"`
+
+	// Name VM name
+	Name string `json:"name"`
+}
+
+// BatchUpdateExclusionRequest defines model for BatchUpdateExclusionRequest.
+type BatchUpdateExclusionRequest struct {
+	// MigrationExcluded Exclusion state to set for all VMs
+	MigrationExcluded bool `json:"migrationExcluded"`
+
+	// VmIds VM IDs to update
+	VmIds []string `binding:"required,min=1,dive,required" json:"vmIds"`
+}
+
+// CapabilityStatus defines model for CapabilityStatus.
+type CapabilityStatus struct {
+	Capabilities struct {
+		Collector  OperationCapability `json:"collector"`
+		Forecaster OperationCapability `json:"forecaster"`
+		Inspector  OperationCapability `json:"inspector"`
+	} `json:"capabilities"`
+}
+
+// Collection defines model for Collection.
+type Collection struct {
+	// CreatedAt When the collection was created
+	CreatedAt time.Time `json:"createdAt"`
+
+	// Id Collection identifier
+	Id string `json:"id"`
+
+	// Name Collection name
+	Name string `json:"name"`
+}
+
+// CollectionListResponse defines model for CollectionListResponse.
+type CollectionListResponse struct {
+	Collections []Collection `json:"collections"`
+}
+
 // CollectorListResponse defines model for CollectorListResponse.
 type CollectorListResponse struct {
 	Collectors []CollectorStatus `json:"collectors"`
@@ -98,11 +153,11 @@ type CollectorListResponse struct {
 // CollectorStatus defines model for CollectorStatus.
 type CollectorStatus struct {
 	// Error Error message when status is error
-	Error  *string               `json:"error,omitempty"`
-	Status CollectorStatusStatus `json:"status"`
+	Error *string `json:"error,omitempty"`
 
-	// VCenterID Computed hash of the vCenter URL
-	VCenterID string `json:"vCenterID"`
+	// Id Collector identifier
+	Id     string                `json:"id"`
+	Status CollectorStatusStatus `json:"status"`
 }
 
 // CollectorStatusStatus defines model for CollectorStatus.Status.
@@ -114,6 +169,27 @@ type CreateGroupRequest struct {
 	Filter      string    `binding:"required,min=1" json:"filter"`
 	Name        string    `binding:"required,min=1,max=100" json:"name"`
 	Tags        *[]string `binding:"omitempty,dive,tag_format" json:"tags,omitempty"`
+}
+
+// CredentialStatus defines model for CredentialStatus.
+type CredentialStatus struct {
+	// Url vCenter URL the credentials belong to
+	Url string `json:"url"`
+
+	// Username vCenter username
+	Username string `json:"username"`
+
+	// Valid Whether credentials are stored for the returned URL.
+	Valid bool `json:"valid"`
+}
+
+// DeleteLabelGloballyResponse defines model for DeleteLabelGloballyResponse.
+type DeleteLabelGloballyResponse struct {
+	// Affected Number of VMs that had the label removed
+	Affected int `json:"affected"`
+
+	// Label The label that was removed
+	Label string `json:"label"`
 }
 
 // Group defines model for Group.
@@ -184,42 +260,18 @@ type InspectionStatus struct {
 // InspectionStatusState Current inspection state
 type InspectionStatusState string
 
-// InspectorListResponse defines model for InspectorListResponse.
-type InspectorListResponse struct {
-	Inspectors []InspectorStatus `json:"inspectors"`
-}
-
-// InspectorStartRequest defines model for InspectorStartRequest.
-type InspectorStartRequest struct {
-	Credentials VcenterCredentials `json:"credentials"`
-
-	// VirtualMachines Array of VirtualMachine IDs to inspect
-	VirtualMachines []string `json:"virtualMachines"`
-}
-
-// InspectorStatus defines model for InspectorStatus.
-type InspectorStatus struct {
-	// State Inspector state
-	State InspectorStatusState `json:"state"`
-
-	// VCenterID Computed hash of the vCenter URL
-	VCenterID string `json:"vCenterID"`
-}
-
-// InspectorStatusState Inspector state
-type InspectorStatusState string
-
 // Inventory defines model for Inventory.
 type Inventory struct {
 	Inventory externalRef0.UpdateInventory `json:"inventory"`
-
-	// VCenterID Computed hash of the vCenter URL
-	VCenterID string `json:"vCenterID"`
 }
 
-// InventoryListResponse defines model for InventoryListResponse.
-type InventoryListResponse struct {
-	Inventories []Inventory `json:"inventories"`
+// OperationCapability defines model for OperationCapability.
+type OperationCapability struct {
+	// Enabled Whether stored credentials have sufficient privileges
+	Enabled bool `json:"enabled"`
+
+	// MissingPrivileges Specific vSphere privileges that are missing
+	MissingPrivileges *[]string `json:"missingPrivileges,omitempty"`
 }
 
 // UpdateGroupRequest defines model for UpdateGroupRequest.
@@ -228,6 +280,42 @@ type UpdateGroupRequest struct {
 	Filter      *string   `binding:"omitempty,min=1" json:"filter,omitempty"`
 	Name        *string   `binding:"omitempty,min=1,max=100" json:"name,omitempty"`
 	Tags        *[]string `binding:"omitempty,dive,tag_format" json:"tags,omitempty"`
+}
+
+// UpdateLabelVMsRequest defines model for UpdateLabelVMsRequest.
+type UpdateLabelVMsRequest struct {
+	// Add VMs to add the label to
+	Add *[]string `binding:"omitempty,dive,required" json:"add,omitempty"`
+
+	// Remove VMs to remove the label from
+	Remove *[]string `binding:"omitempty,dive,required" json:"remove,omitempty"`
+}
+
+// VMFilterOptionsResponse defines model for VMFilterOptionsResponse.
+type VMFilterOptionsResponse struct {
+	// Applications Distinct detected application names
+	Applications []string `json:"applications"`
+
+	// Clusters Distinct cluster names
+	Clusters []string `json:"clusters"`
+
+	// ConcernCategories Distinct concern categories
+	ConcernCategories []string `json:"concernCategories"`
+
+	// ConcernLabels Distinct concern labels
+	ConcernLabels []string `json:"concernLabels"`
+
+	// Datacenters Distinct datacenter names
+	Datacenters []string `json:"datacenters"`
+}
+
+// VMLabelsResponse defines model for VMLabelsResponse.
+type VMLabelsResponse struct {
+	// Counts Number of VMs with each label (same order as labels array)
+	Counts []int `json:"counts"`
+
+	// Labels Distinct labels currently in use
+	Labels []string `json:"labels"`
 }
 
 // VcenterCredentials defines model for VcenterCredentials.
@@ -242,18 +330,6 @@ type VcenterCredentials struct {
 	// Url vCenter URL
 	Url      string `binding:"required,url" json:"url"`
 	Username string `binding:"required,min=1" json:"username"`
-}
-
-// VddkProperties defines model for VddkProperties.
-type VddkProperties struct {
-	// Bytes Provided tarball bytes
-	Bytes *int64 `json:"bytes,omitempty"`
-
-	// Md5 md5 sum of the uploaded tarball
-	Md5 string `json:"md5"`
-
-	// Version The matching vSphere Client version
-	Version string `json:"version"`
 }
 
 // VersionInfo defines model for VersionInfo.
@@ -483,8 +559,20 @@ type VirtualMachineNIC struct {
 	Network *string `json:"network,omitempty"`
 }
 
-// VCenterID defines model for vCenterID.
-type VCenterID = string
+// VirtualMachineUpdateRequest defines model for VirtualMachineUpdateRequest.
+type VirtualMachineUpdateRequest struct {
+	// Labels User-defined labels (replaces existing labels)
+	Labels *[]string `binding:"omitempty,dive,notblank,min=1,max=100" json:"labels,omitempty"`
+
+	// MigrationExcluded Whether to exclude this VM from migration
+	MigrationExcluded *bool `binding:"omitempty" json:"migrationExcluded,omitempty"`
+}
+
+// ExportCollectionParams defines parameters for ExportCollection.
+type ExportCollectionParams struct {
+	// Scope Comma-separated export scopes (e.g., "overview,vms,groups"). Defaults to "overview".
+	Scope *string `form:"scope,omitempty" json:"scope,omitempty"`
+}
 
 // ListGroupsParams defines parameters for ListGroups.
 type ListGroupsParams struct {
@@ -500,7 +588,7 @@ type ListGroupsParams struct {
 
 // GetGroupParams defines parameters for GetGroup.
 type GetGroupParams struct {
-	// Sort Sort fields with direction (e.g., "name:asc", "cluster:desc"). Valid fields are name, vCenterState, cluster, diskSize, memory, issues.
+	// Sort Sort fields with direction (e.g., "name:asc", "cluster:desc"). Valid fields are name, vCenterState, cluster, diskSize, memory, issues, cpuUsage, diskUsage, ramUsage, cpuAvg, memAvg.
 	Sort *[]string `form:"sort,omitempty" json:"sort,omitempty"`
 
 	// Page Page number for pagination
@@ -510,18 +598,12 @@ type GetGroupParams struct {
 	PageSize *int `form:"pageSize,omitempty" json:"pageSize,omitempty"`
 }
 
-// PutInspectorVddkMultipartBody defines parameters for PutInspectorVddk.
-type PutInspectorVddkMultipartBody struct {
-	// File VDDK tarball
-	File openapi_types.File `json:"file"`
-}
-
 // ListVirtualMachinesParams defines parameters for ListVirtualMachines.
 type ListVirtualMachinesParams struct {
 	// ByExpression Filter by expression
 	ByExpression *string `form:"byExpression,omitempty" json:"byExpression,omitempty"`
 
-	// Sort Sort fields with direction (e.g., "name:asc", "cluster:desc"). Valid fields are name, vCenterState, cluster, diskSize, memory, issues.
+	// Sort Sort fields with direction (e.g., "name:asc", "cluster:desc"). Valid fields are name, vCenterState, cluster, diskSize, memory, issues, cpuUsage, diskUsage, ramUsage, cpuAvg, memAvg.
 	Sort *[]string `form:"sort,omitempty" json:"sort,omitempty"`
 
 	// Page Page number for pagination
@@ -534,17 +616,20 @@ type ListVirtualMachinesParams struct {
 // SetAgentModeJSONRequestBody defines body for SetAgentMode for application/json ContentType.
 type SetAgentModeJSONRequestBody = AgentModeRequest
 
-// StartCollectorJSONRequestBody defines body for StartCollector for application/json ContentType.
-type StartCollectorJSONRequestBody = VcenterCredentials
-
 // CreateGroupJSONRequestBody defines body for CreateGroup for application/json ContentType.
 type CreateGroupJSONRequestBody = CreateGroupRequest
 
 // UpdateGroupJSONRequestBody defines body for UpdateGroup for application/json ContentType.
 type UpdateGroupJSONRequestBody = UpdateGroupRequest
 
-// StartInspectorJSONRequestBody defines body for StartInspector for application/json ContentType.
-type StartInspectorJSONRequestBody = InspectorStartRequest
+// BatchUpdateVMExclusionJSONRequestBody defines body for BatchUpdateVMExclusion for application/json ContentType.
+type BatchUpdateVMExclusionJSONRequestBody = BatchUpdateExclusionRequest
 
-// PutInspectorVddkMultipartRequestBody defines body for PutInspectorVddk for multipart/form-data ContentType.
-type PutInspectorVddkMultipartRequestBody PutInspectorVddkMultipartBody
+// UpdateLabelVMsJSONRequestBody defines body for UpdateLabelVMs for application/json ContentType.
+type UpdateLabelVMsJSONRequestBody = UpdateLabelVMsRequest
+
+// UpdateVirtualMachineJSONRequestBody defines body for UpdateVirtualMachine for application/json ContentType.
+type UpdateVirtualMachineJSONRequestBody = VirtualMachineUpdateRequest
+
+// PutCredentialsJSONRequestBody defines body for PutCredentials for application/json ContentType.
+type PutCredentialsJSONRequestBody = VcenterCredentials

@@ -4,6 +4,7 @@ package models
 type VirtualMachineSummary struct {
 	ID                     string
 	Name                   string
+	VCenterID              string
 	PowerState             string
 	Cluster                string
 	Datacenter             string
@@ -23,11 +24,13 @@ type VirtualMachineSummary struct {
 	UtilizationConfidence  *float64 // Data confidence (%); nil when no utilization data
 	MigrationExcluded      bool
 	Labels                 []string
+	Tags                   []string
 }
 
 type VM struct {
 	ID              string
 	Name            string
+	VCenterID       string
 	UUID            string
 	Firmware        string
 	PowerState      string

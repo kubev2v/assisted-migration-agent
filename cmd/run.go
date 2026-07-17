@@ -2,12 +2,16 @@ package cmd
 
 import (
 	"context"
+	"crypto/sha256"
+	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -29,18 +33,22 @@ import (
 	"github.com/kubev2v/migration-planner/pkg/opa"
 
 	v1 "github.com/kubev2v/assisted-migration-agent/api/v1"
+	v2 "github.com/kubev2v/assisted-migration-agent/api/v2"
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
 	v1Handlers "github.com/kubev2v/assisted-migration-agent/internal/handlers/v1"
+	v2Handlers "github.com/kubev2v/assisted-migration-agent/internal/handlers/v2"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/server"
 	"github.com/kubev2v/assisted-migration-agent/internal/services"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
+	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	"github.com/kubev2v/assisted-migration-agent/pkg/console"
 	"github.com/kubev2v/assisted-migration-agent/pkg/crypto"
 )
 
 const (
 	apiV1 string = "/api/v1"
+	apiV2 string = "/api/v2"
 )
 
 func NewRunCommand(cfg *config.Configuration) *cobra.Command {
@@ -71,81 +79,20 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 			wg := sync.WaitGroup{}
 			wg.Add(1)
 
-			st, err := initStore(cfg)
+			var srv *server.Server
+			var cleanup func()
+			var err error
+
+			switch cfg.Server.API {
+			case "v2":
+				srv, cleanup, err = initV2(cfg)
+			default:
+				srv, cleanup, err = initV1(cfg)
+			}
 			if err != nil {
 				return err
 			}
-
-			if err := st.Migrate(context.Background(), cfg.Agent.DataFolder); err != nil {
-				zap.S().Errorw("failed to run migrations", "error", err)
-				return err
-			}
-			zap.S().Info("database initialized successfully")
-
-			// read jwt token for agent
-			jwt := ""
-			if cfg.Auth.Enabled {
-				data, err := os.ReadFile(cfg.Auth.JWTFilePath)
-				if err != nil {
-					return fmt.Errorf("failed to read agent's jwt: %w", err)
-				}
-				if len(data) == 0 {
-					return errors.New("failed to read agent's jwt. the JWT is empty")
-				}
-				jwt = strings.TrimSpace(string(data)) // we assume the jwt is valid at this point
-			}
-
-			// init console client
-			consoleClient, err := console.NewConsoleClient(cfg.Console.URL, jwt)
-			if err != nil {
-				return fmt.Errorf("failed to create console client: %w", err)
-			}
-
-			// init credential management
-			km, err := crypto.NewKeyManager(cfg.Agent.DataFolder)
-			if err != nil {
-				return fmt.Errorf("failed to initialize key manager: %w", err)
-			}
-
-			svcMgr := services.NewServiceManager(
-				services.WithConfig(cfg),
-				services.WithStore(st),
-				services.WithConsoleClient(consoleClient),
-				services.WithKeyManager(km),
-			)
-			if err := svcMgr.Initialize(); err != nil {
-				return fmt.Errorf("failed to initialize services: %w", err)
-			}
-
-			// register custom validators
-			if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
-				v1Handlers.RegisterValidators(v)
-			}
-
-			// init handlers
-			v1H := v1Handlers.NewHandler(*cfg).
-				WithConsoleService(svcMgr.ConsoleService()).
-				WithCollectorService(svcMgr.CollectorService()).
-				WithInventoryService(svcMgr.InventoryService()).
-				WithVMService(svcMgr.VirtualMachineService()).
-				WithInspectorService(svcMgr.InspectorService()).
-				WithVddkService(svcMgr.VddkService()).
-				WithGroupService(svcMgr.GroupService()).
-				WithRightsizingService(svcMgr.RightsizingService()).
-				WithForecasterService(svcMgr.ForecasterService()).
-				WithApplicationService(svcMgr.ApplicationService()).
-				WithCredentialsService(svcMgr.CredentialsService()).
-				WithExportService(svcMgr.ExportService())
-
-			srv, err := server.NewServer(cfg, map[string]func(router *gin.RouterGroup){
-				apiV1: func(router *gin.RouterGroup) {
-					v1.RegisterHandlers(router, v1H)
-				}},
-			)
-			if err != nil {
-				zap.S().Errorw("failed to create http server", "error", err)
-				return err
-			}
+			defer cleanup()
 
 			go func() {
 				defer func() {
@@ -173,11 +120,6 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 
 			zap.S().Info("server shutdown")
 
-			svcMgr.Stop(context.Background())
-			_ = st.Close()
-
-			zap.S().Info("services and scheduler closed")
-
 			return nil
 		},
 	}
@@ -186,6 +128,224 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 	cobraflags.CobraOnInitialize("AGENT", runCmd)
 
 	return runCmd
+}
+
+func initV1(cfg *config.Configuration) (*server.Server, func(), error) {
+	st, err := initStore(cfg)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if err := st.Migrate(context.Background(), cfg.Agent.DataFolder); err != nil {
+		return nil, nil, fmt.Errorf("failed to run migrations: %w", err)
+	}
+	zap.S().Info("database initialized successfully")
+
+	consoleClient, km, err := initShared(cfg)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	svcMgr := services.NewServiceManager(
+		services.WithConfig(cfg),
+		services.WithStore(st),
+		services.WithConsoleClient(consoleClient),
+		services.WithKeyManager(km),
+	)
+	if err := svcMgr.Initialize(); err != nil {
+		return nil, nil, fmt.Errorf("failed to initialize services: %w", err)
+	}
+
+	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
+		v1Handlers.RegisterValidators(v)
+	}
+
+	v1H := v1Handlers.NewHandler(*cfg).
+		WithConsoleService(svcMgr.ConsoleService()).
+		WithCollectorService(svcMgr.CollectorService()).
+		WithInventoryService(svcMgr.InventoryService()).
+		WithVMService(svcMgr.VirtualMachineService()).
+		WithInspectorService(svcMgr.InspectorService()).
+		WithVddkService(svcMgr.VddkService()).
+		WithGroupService(svcMgr.GroupService()).
+		WithRightsizingService(svcMgr.RightsizingService()).
+		WithForecasterService(svcMgr.ForecasterService()).
+		WithApplicationService(svcMgr.ApplicationService()).
+		WithCredentialsService(svcMgr.CredentialsService()).
+		WithExportService(svcMgr.ExportService())
+
+	swagger, err := v1.GetSwagger()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to load v1 swagger spec: %w", err)
+	}
+
+	srv, err := server.NewServer(cfg, map[string]server.APIGroup{
+		apiV1: {
+			Swagger: swagger,
+			RegisterFn: func(router *gin.RouterGroup) {
+				v1.RegisterHandlers(router, v1H)
+			},
+		},
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create http server: %w", err)
+	}
+
+	cleanup := func() {
+		svcMgr.Stop(context.Background())
+		_ = st.Close()
+		zap.S().Info("v1 services and store closed")
+	}
+
+	return srv, cleanup, nil
+}
+
+func initV2(cfg *config.Configuration) (*server.Server, func(), error) {
+	opaValidator, err := opa.NewValidatorFromDir(cfg.Agent.OpaPoliciesFolder)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to initialize OPA validator: %w", err)
+	}
+
+	pool, err := initPool(cfg)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	_, km, err := initShared(cfg)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	v2SvcMgr := services.V2NewServiceManager(
+		services.V2WithConfig(cfg),
+		services.V2WithPool(pool),
+		services.V2WithKeyManager(km),
+		services.V2WithOpaValidator(opaValidator),
+	)
+	if err := v2SvcMgr.Initialize(); err != nil {
+		return nil, nil, fmt.Errorf("failed to initialize v2 services: %w", err)
+	}
+
+	v2H := v2Handlers.NewHandler(*cfg, v2SvcMgr)
+
+	swagger, err := v2.GetSwagger()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to load v2 swagger spec: %w", err)
+	}
+
+	srv, err := server.NewServer(cfg, map[string]server.APIGroup{
+		apiV2: {
+			Swagger: swagger,
+			RegisterFn: func(router *gin.RouterGroup) {
+				v2.RegisterHandlers(router, v2H)
+			},
+		},
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create http server: %w", err)
+	}
+
+	cleanup := func() {
+		v2SvcMgr.Stop(context.Background())
+		pool.Close()
+		zap.S().Info("v2 services and pool closed")
+	}
+
+	return srv, cleanup, nil
+}
+
+func initShared(cfg *config.Configuration) (*console.Client, *crypto.KeyManager, error) {
+	jwt := ""
+	if cfg.Auth.Enabled {
+		data, err := os.ReadFile(cfg.Auth.JWTFilePath)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to read agent's jwt: %w", err)
+		}
+		if len(data) == 0 {
+			return nil, nil, errors.New("failed to read agent's jwt. the JWT is empty")
+		}
+		jwt = strings.TrimSpace(string(data))
+	}
+
+	consoleClient, err := console.NewConsoleClient(cfg.Console.URL, jwt)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create console client: %w", err)
+	}
+
+	keyManager, err := crypto.NewKeyManager(cfg.Agent.DataFolder)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to initialize key manager: %w", err)
+	}
+
+	return consoleClient, keyManager, nil
+}
+
+func initStore(cfg *config.Configuration) (*store.Store, error) {
+	dbPath := filepath.Join(cfg.Agent.DataFolder, "agent.duckdb")
+	if cfg.Agent.DataFolder == "" {
+		dbPath = ":memory:"
+		zap.S().Warn("data-folder not set, using in-memory database (data will not persist)")
+	}
+	db, err := store.NewConnection(store.NewDefaultExtentionLoader(), dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize database: %w", err)
+	}
+
+	opaValidator, err := opa.NewValidatorFromDir(cfg.Agent.OpaPoliciesFolder)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize OPA validator: %w", err)
+	}
+
+	return store.NewStore(db, opaValidator), nil
+}
+
+func initPool(cfg *config.Configuration) (*store.Pool, error) {
+	pool := store.NewPool(5 * time.Minute)
+
+	agentPath := filepath.Join(cfg.Agent.DataFolder, "agent.duckdb")
+	mainDB, err := pool.NewDatabase(store.MainDatabaseID, agentPath, time.Now(), store.EagerConnectionInitilization, 256, store.ReadWriteDatabase)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create main database: %w", err)
+	}
+
+	if err := mainDB.Migrate(context.Background(), migrations.RunMain); err != nil {
+		return nil, fmt.Errorf("failed to migrate main database: %w", err)
+	}
+
+	pool.Add(mainDB)
+	zap.S().Infow("registered main database", "path", mainDB.Path)
+
+	matches, _ := filepath.Glob(filepath.Join(cfg.Agent.DataFolder, "collection_*.duckdb"))
+	for _, match := range matches {
+		name := strings.TrimSuffix(filepath.Base(match), ".duckdb")
+		tsStr := strings.TrimPrefix(name, "collection_")
+		ts, err := strconv.ParseInt(tsStr, 10, 64)
+		if err != nil {
+			zap.S().Warnw("skipping collection with unparseable timestamp", "file", match)
+			continue
+		}
+
+		createdAt := time.Unix(ts, 0)
+		hash := sha256.Sum256([]byte(match))
+		id := hex.EncodeToString(hash[:])[:6]
+		db, err := pool.NewDatabase(id, match, createdAt, store.LazyConnectionInitilization, 256, store.ReadOnlyDatabase)
+		if err != nil {
+			zap.S().Warnw("skipping collection database", "file", match, "error", err)
+			continue
+		}
+
+		if err := db.Migrate(context.Background(), func(ctx context.Context, db *sql.DB) error {
+			return migrations.RunCollection(ctx, db, "main")
+		}); err != nil {
+			zap.S().Errorw("failed to migrate collection database %s: %w", name, err)
+			continue
+		}
+
+		pool.Add(db)
+		zap.S().Infow("registered collection database", "name", name, "path", match)
+	}
+
+	return pool, nil
 }
 
 func registerFlags(cmd *cobra.Command, config *config.Configuration) {
@@ -241,28 +401,6 @@ func validateConfiguration(cfg *config.Configuration) error {
 	return nil
 }
 
-func initStore(cfg *config.Configuration) (*store.Store, error) {
-	// init store
-	dbPath := filepath.Join(cfg.Agent.DataFolder, "agent.duckdb")
-	if cfg.Agent.DataFolder == "" {
-		dbPath = ":memory:"
-		zap.S().Warn("data-folder not set, using in-memory database (data will not persist)")
-	}
-	db, err := store.NewConnection(store.NewDefaultExtentionLoader(), dbPath)
-	if err != nil {
-		zap.S().Errorw("failed to initialize database", "error", err)
-		return nil, err
-	}
-
-	opaValidator, err := opa.NewValidatorFromDir(cfg.Agent.OpaPoliciesFolder)
-	if err != nil {
-		zap.S().Errorw("failed to initialize OPA validator", "error", err)
-		return nil, err
-	}
-
-	return store.NewStore(db, opaValidator), nil
-}
-
 func validateUUID(value, name string) error {
 	if value == "" {
 		return fmt.Errorf("%s cannot be empty", name)
@@ -277,6 +415,7 @@ func registerServerFlags(flagSet *pflag.FlagSet, config *config.Configuration) {
 	flagSet.IntVar(&config.Server.HTTPPort, "server-http-port", config.Server.HTTPPort, "Port on which the HTTP server is listening")
 	flagSet.StringVar(&config.Server.StaticsFolder, "server-statics-folder", config.Server.StaticsFolder, "Path to statics folder")
 	flagSet.StringVar(&config.Server.ServerMode, "server-mode", config.Server.ServerMode, "Server mode: either prod or dev. If prod the statics folder must be set")
+	flagSet.StringVar(&config.Server.API, "api", config.Server.API, "API version to serve: v1 or v2")
 }
 
 func registerAuthenticationFlags(flagSet *pflag.FlagSet, config *config.Configuration) {

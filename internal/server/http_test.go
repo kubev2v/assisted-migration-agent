@@ -19,10 +19,10 @@ import (
 
 var _ = Describe("HTTP Server", func() {
 	var (
-		cfg               *config.Configuration
-		registerHandlerFn map[string]func(router *gin.RouterGroup)
-		tempDir           string
-		srv               *server.Server
+		cfg     *config.Configuration
+		groups  map[string]server.APIGroup
+		tempDir string
+		srv     *server.Server
 	)
 
 	BeforeEach(func() {
@@ -42,11 +42,13 @@ var _ = Describe("HTTP Server", func() {
 		err = os.MkdirAll(staticDir, 0o755)
 		Expect(err).ToNot(HaveOccurred())
 
-		registerHandlerFn = map[string]func(router *gin.RouterGroup){
-			"/api/v1": func(router *gin.RouterGroup) {
-				router.GET("/vms", func(c *gin.Context) {
-					c.JSON(200, gin.H{"vms": []any{}, "total": 0, "page": 1, "pageCount": 1})
-				})
+		groups = map[string]server.APIGroup{
+			"/api/v1": {
+				RegisterFn: func(router *gin.RouterGroup) {
+					router.GET("/vms", func(c *gin.Context) {
+						c.JSON(200, gin.H{"vms": []any{}, "total": 0, "page": 1, "pageCount": 1})
+					})
+				},
 			},
 		}
 	})
@@ -74,7 +76,7 @@ var _ = Describe("HTTP Server", func() {
 
 		It("serves over HTTP", func() {
 			var err error
-			srv, err = server.NewServer(cfg, registerHandlerFn)
+			srv, err = server.NewServer(cfg, groups)
 			Expect(err).ToNot(HaveOccurred())
 
 			go func() {
@@ -108,7 +110,7 @@ var _ = Describe("HTTP Server", func() {
 
 		It("serves over HTTPS with TLS", func() {
 			var err error
-			srv, err = server.NewServer(cfg, registerHandlerFn)
+			srv, err = server.NewServer(cfg, groups)
 			Expect(err).ToNot(HaveOccurred())
 
 			go func() {
@@ -133,7 +135,7 @@ var _ = Describe("HTTP Server", func() {
 		// Then it should serve the index.html
 		It("serves static index.html at root", func() {
 			var err error
-			srv, err = server.NewServer(cfg, registerHandlerFn)
+			srv, err = server.NewServer(cfg, groups)
 			Expect(err).ToNot(HaveOccurred())
 
 			go func() {
@@ -158,7 +160,7 @@ var _ = Describe("HTTP Server", func() {
 		// Then it should return 404 with a JSON error
 		It("returns 404 JSON for unknown API routes", func() {
 			var err error
-			srv, err = server.NewServer(cfg, registerHandlerFn)
+			srv, err = server.NewServer(cfg, groups)
 			Expect(err).ToNot(HaveOccurred())
 
 			go func() {
@@ -183,7 +185,7 @@ var _ = Describe("HTTP Server", func() {
 		// Then it should serve index.html (SPA fallback)
 		It("serves index.html for non-API routes (SPA fallback)", func() {
 			var err error
-			srv, err = server.NewServer(cfg, registerHandlerFn)
+			srv, err = server.NewServer(cfg, groups)
 			Expect(err).ToNot(HaveOccurred())
 
 			go func() {
@@ -208,7 +210,7 @@ var _ = Describe("HTTP Server", func() {
 		// Then subsequent requests should fail
 		It("stops accepting requests after Stop", func() {
 			var err error
-			srv, err = server.NewServer(cfg, registerHandlerFn)
+			srv, err = server.NewServer(cfg, groups)
 			Expect(err).ToNot(HaveOccurred())
 
 			go func() {

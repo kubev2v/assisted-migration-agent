@@ -41,18 +41,18 @@ var _ = Describe("Pool", func() {
 	Context("NewDatabase", func() {
 		It("should register a database and return a stable ID", func() {
 			dbPath := filepath.Join(tmpDir, "test.duckdb")
-			db1, err := pool.NewDatabase(dbPath, time.Now(), nil, store.LazyConnectionInitilization, 0, store.ReadWriteDatabase)
+			db1, err := pool.NewDatabase("test", dbPath, time.Now(), store.LazyConnectionInitilization, 0, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(db1.ID).NotTo(BeEmpty())
 
-			db2, err := pool.NewDatabase(dbPath, time.Now(), nil, store.LazyConnectionInitilization, 0, store.ReadWriteDatabase)
+			db2, err := pool.NewDatabase("test", dbPath, time.Now(), store.LazyConnectionInitilization, 0, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(db1.ID).To(Equal(db2.ID))
 		})
 
 		It("should eagerly open a usable connection", func() {
 			dbPath := filepath.Join(tmpDir, "eager.duckdb")
-			db, err := pool.NewDatabase(dbPath, time.Now(), nil, store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			db, err := pool.NewDatabase("test", dbPath, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 
 			st, err := db.Store()
@@ -64,7 +64,7 @@ var _ = Describe("Pool", func() {
 	Context("Store", func() {
 		It("should lazily connect and execute queries", func() {
 			dbPath := filepath.Join(tmpDir, "lazy.duckdb")
-			db, err := pool.NewDatabase(dbPath, time.Now(), nil, store.LazyConnectionInitilization, 0, store.ReadWriteDatabase)
+			db, err := pool.NewDatabase("test", dbPath, time.Now(), store.LazyConnectionInitilization, 0, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			pool.Add(db)
 
@@ -75,7 +75,7 @@ var _ = Describe("Pool", func() {
 
 		It("should return the same store instance for the same database", func() {
 			dbPath := filepath.Join(tmpDir, "same.duckdb")
-			db, err := pool.NewDatabase(dbPath, time.Now(), nil, store.LazyConnectionInitilization, 0, store.ReadWriteDatabase)
+			db, err := pool.NewDatabase("test", dbPath, time.Now(), store.LazyConnectionInitilization, 0, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			pool.Add(db)
 
@@ -98,7 +98,7 @@ var _ = Describe("Pool", func() {
 			pool = store.NewPool(1 * time.Second)
 
 			dbPath := filepath.Join(tmpDir, "recent.duckdb")
-			db, err := pool.NewDatabase(dbPath, time.Now(), nil, store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			db, err := pool.NewDatabase("test", dbPath, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			pool.Add(db)
 
@@ -118,7 +118,7 @@ var _ = Describe("Pool", func() {
 			pool = store.NewPool(1 * time.Millisecond)
 
 			dbPath := filepath.Join(tmpDir, "idle.duckdb")
-			db, err := pool.NewDatabase(dbPath, time.Now(), nil, store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			db, err := pool.NewDatabase("test", dbPath, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			pool.Add(db)
 
@@ -141,7 +141,7 @@ var _ = Describe("Pool", func() {
 			pool = store.NewPool(50 * time.Millisecond)
 
 			longIdlePath := filepath.Join(tmpDir, "long.duckdb")
-			longDB, err := pool.NewDatabase(longIdlePath, time.Now(), nil, store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			longDB, err := pool.NewDatabase("long", longIdlePath, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			pool.Add(longDB)
 
@@ -152,7 +152,7 @@ var _ = Describe("Pool", func() {
 			time.Sleep(60 * time.Millisecond)
 
 			shortIdlePath := filepath.Join(tmpDir, "short.duckdb")
-			shortDB, err := pool.NewDatabase(shortIdlePath, time.Now(), nil, store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			shortDB, err := pool.NewDatabase("short", shortIdlePath, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			pool.Add(shortDB)
 
@@ -178,10 +178,10 @@ var _ = Describe("Pool", func() {
 
 	Context("List", func() {
 		It("should return all registered databases", func() {
-			dbA, err := pool.NewDatabase(filepath.Join(tmpDir, "a.duckdb"), time.Now(), nil, store.LazyConnectionInitilization, 0, store.ReadWriteDatabase)
+			dbA, err := pool.NewDatabase("a", filepath.Join(tmpDir, "a.duckdb"), time.Now(), store.LazyConnectionInitilization, 0, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			pool.Add(dbA)
-			dbB, err := pool.NewDatabase(filepath.Join(tmpDir, "b.duckdb"), time.Now(), nil, store.LazyConnectionInitilization, 0, store.ReadOnlyDatabase)
+			dbB, err := pool.NewDatabase("b", filepath.Join(tmpDir, "b.duckdb"), time.Now(), store.LazyConnectionInitilization, 0, store.ReadOnlyDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			pool.Add(dbB)
 
@@ -193,10 +193,45 @@ var _ = Describe("Pool", func() {
 		})
 	})
 
+	Context("AttachDatabase / DetachDatabase", func() {
+		It("should attach b to a as readonly after closing b", func() {
+			dbA, err := pool.NewDatabase("a", filepath.Join(tmpDir, "a.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			Expect(err).NotTo(HaveOccurred())
+			pool.Add(dbA)
+
+			dbB, err := pool.NewDatabase("b", filepath.Join(tmpDir, "b.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			Expect(err).NotTo(HaveOccurred())
+			pool.Add(dbB)
+
+			// Close B otherwise error occurs
+			stB, err := dbB.Store()
+			Expect(err).NotTo(HaveOccurred())
+
+			_, err = stB.Querier().ExecContext(ctx, "CREATE TABLE hello (id INTEGER)")
+			Expect(err).NotTo(HaveOccurred())
+			_, err = stB.Querier().ExecContext(ctx, "INSERT INTO hello VALUES (42)")
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(dbB.Close()).To(Succeed())
+
+			stA, err := dbA.Store()
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(stA.AttachDatabase(ctx, dbB, "b", store.ReadOnlyDatabase)).To(Succeed())
+
+			var val int
+			err = stA.Querier().QueryRowContext(ctx, "SELECT id FROM b.hello").Scan(&val)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(val).To(Equal(42))
+
+			Expect(stA.DetachDatabase(ctx, "b")).To(Succeed())
+		})
+	})
+
 	Context("Close", func() {
 		It("should close all connections without removing entries", func() {
 			dbPath := filepath.Join(tmpDir, "close.duckdb")
-			db, err := pool.NewDatabase(dbPath, time.Now(), nil, store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			db, err := pool.NewDatabase("test", dbPath, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			pool.Add(db)
 

@@ -7,16 +7,20 @@ servers:
 tags:
   - name: Agent
     description: Agent status and mode management
+  - name: Collections
+    description: Collection database management
   - name: Collectors
-    description: vCenter inventory collection operations
-  - name: Inspectors
-    description: VirtualMachine deep inspection operations
+    description: Inventory collection operations
   - name: Inventories
     description: Collected inventory resources
   - name: VirtualMachines
     description: Virtual machine queries across all vCenters
   - name: Groups
     description: VirtualMachine group management
+  - name: Applications
+    description: Detected application inventory
+  - name: Credentials
+    description: vCenter credential management
   - name: Version
     description: Agent version information
 paths:
@@ -59,18 +63,48 @@ paths:
         '500':
           description: Internal server error
 
+  # ── Collections ────────────────────────────────────────────────────────
+  /collections:
+    get:
+      tags: [Collections]
+      summary: List all collections
+      operationId: listCollections
+      responses:
+        '200':
+          description: List of collections
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectionListResponse'
+        '500':
+          description: Internal server error
+
+  /collections/{id}:
+    delete:
+      tags: [Collections]
+      summary: Delete a collection
+      operationId: deleteCollection
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Collection ID
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Collection deleted
+        '404':
+          description: Collection not found
+        '500':
+          description: Internal server error
+
   # ── Collectors ─────────────────────────────────────────────────────────
   /collectors:
     post:
       tags: [Collectors]
-      summary: Start collection for a vCenter
+      summary: Start a collection
       operationId: startCollector
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/VcenterCredentials'
       responses:
         '202':
           description: Collection started
@@ -81,7 +115,7 @@ paths:
         '400':
           description: Invalid request
         '409':
-          description: Collection already in progress for this vCenter
+          description: Collection already in progress
         '500':
           description: Internal server error
     get:
@@ -98,13 +132,18 @@ paths:
         '500':
           description: Internal server error
 
-  /collectors/{vCenterID}:
+  /collectors/{id}:
     get:
       tags: [Collectors]
-      summary: Get collector status for a vCenter
+      summary: Get collector status
       operationId: getCollectorStatus
       parameters:
-        - $ref: '#/components/parameters/vCenterID'
+        - name: id
+          in: path
+          required: true
+          description: Collector ID
+          schema:
+            type: string
       responses:
         '200':
           description: Collector status
@@ -118,10 +157,15 @@ paths:
           description: Internal server error
     delete:
       tags: [Collectors]
-      summary: Stop collector for a vCenter
+      summary: Stop collector
       operationId: stopCollector
       parameters:
-        - $ref: '#/components/parameters/vCenterID'
+        - name: id
+          in: path
+          required: true
+          description: Collector ID
+          schema:
+            type: string
       responses:
         '204':
           description: Collector stopped
@@ -130,153 +174,19 @@ paths:
         '500':
           description: Internal server error
 
-  # ── Inspectors ─────────────────────────────────────────────────────────
-  /inspectors:
-    post:
-      tags: [Inspectors]
-      summary: Start inspection for VirtualMachines
-      operationId: startInspector
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/InspectorStartRequest'
-      responses:
-        '202':
-          description: Inspection started
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/InspectorStatus'
-        '400':
-          description: Invalid request
-        '409':
-          description: Inspection already in progress for this vCenter
-        '500':
-          description: Internal server error
-    get:
-      tags: [Inspectors]
-      summary: List all inspectors with status
-      operationId: listInspectors
-      responses:
-        '200':
-          description: List of inspectors
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/InspectorListResponse'
-        '500':
-          description: Internal server error
-
-  /inspectors/{vCenterID}:
-    get:
-      tags: [Inspectors]
-      summary: Get inspector status for a vCenter
-      operationId: getInspectorStatus
-      parameters:
-        - $ref: '#/components/parameters/vCenterID'
-      responses:
-        '200':
-          description: Inspector status
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/InspectorStatus'
-        '404':
-          description: Inspector not found
-        '500':
-          description: Internal server error
-    delete:
-      tags: [Inspectors]
-      summary: Stop inspector for a vCenter
-      operationId: stopInspector
-      parameters:
-        - $ref: '#/components/parameters/vCenterID'
-      responses:
-        '204':
-          description: Inspector stopped
-        '404':
-          description: Inspector not found
-        '500':
-          description: Internal server error
-
-  /inspectors/{vCenterID}/vddk:
-    get:
-      tags: [Inspectors]
-      summary: Get VDDK status for a vCenter
-      operationId: getInspectorVddkStatus
-      parameters:
-        - $ref: '#/components/parameters/vCenterID'
-      responses:
-        '200':
-          description: VDDK properties
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VddkProperties'
-        '404':
-          description: VDDK not found
-        '500':
-          description: Internal server error
-    put:
-      tags: [Inspectors]
-      summary: Upload VDDK tarball for a vCenter
-      operationId: putInspectorVddk
-      parameters:
-        - $ref: '#/components/parameters/vCenterID'
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              required:
-                - file
-              properties:
-                file:
-                  type: string
-                  format: binary
-                  description: VDDK tarball
-      responses:
-        '200':
-          description: Upload successful
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VddkProperties'
-        '400':
-          description: Bad request
-        '409':
-          description: Inspector is running, VDDK upload not allowed
-        '413':
-          description: File exceeds 64MB limit
-        '500':
-          description: Internal server error
-
   # ── Inventories ─────────────────────────────────────────────────────────
-  /inventories:
+  /collections/{id}/inventory:
     get:
       tags: [Inventories]
-      summary: List all collected inventories
-      operationId: listInventories
-      responses:
-        '200':
-          description: List of inventories
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/InventoryListResponse'
-        '500':
-          description: Internal server error
-
-  /inventories/{vCenterID}:
-    get:
-      tags: [Inventories]
-      summary: Get collected inventory for a vCenter
+      summary: Get collected inventory for a collection
       operationId: getInventory
       parameters:
-        - $ref: '#/components/parameters/vCenterID'
+        - name: id
+          in: path
+          required: true
+          description: Collection ID
+          schema:
+            type: string
       responses:
         '200':
           description: Collected inventory
@@ -285,42 +195,23 @@ paths:
               schema:
                 $ref: '#/components/schemas/Inventory'
         '404':
-          description: Inventory not available
-        '500':
-          description: Internal server error
-
-  /inventories/{vCenterID}/groups/{groupId}:
-    get:
-      tags: [Inventories]
-      summary: Get collected inventory for a vCenter scoped to a group
-      operationId: getInventoryByGroup
-      parameters:
-        - $ref: '#/components/parameters/vCenterID'
-        - name: groupId
-          in: path
-          required: true
-          description: Group ID
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Collected inventory filtered by group
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Inventory'
-        '404':
-          description: Inventory or group not found
+          description: Collection or inventory not found
         '500':
           description: Internal server error
 
   # ── Virtual Machines ───────────────────────────────────────────────────
-  /virtualmachines:
+  /collections/{id}/virtualmachines:
     get:
       tags: [VirtualMachines]
-      summary: List all VirtualMachines from all vCenters
+      summary: List VirtualMachines in a collection
       operationId: listVirtualMachines
       parameters:
+        - name: id
+          in: path
+          required: true
+          description: Collection ID
+          schema:
+            type: string
         - name: byExpression
           in: query
           description: Filter by expression
@@ -328,7 +219,7 @@ paths:
             type: string
         - name: sort
           in: query
-          description: Sort fields with direction (e.g., "name:asc", "cluster:desc"). Valid fields are name, vCenterState, cluster, diskSize, memory, issues.
+          description: Sort fields with direction (e.g., "name:asc", "cluster:desc"). Valid fields are name, vCenterState, cluster, diskSize, memory, issues, cpuUsage, diskUsage, ramUsage, cpuAvg, memAvg.
           schema:
             type: array
             items:
@@ -358,16 +249,162 @@ paths:
                 $ref: '#/components/schemas/VirtualMachineListResponse'
         '400':
           description: Invalid request parameters
+        '404':
+          description: Collection not found
         '500':
           description: Internal server error
 
-  /virtualmachines/{id}:
+  /collections/{id}/virtualmachines/batch-update-exclusion:
+    post:
+      tags: [VirtualMachines]
+      summary: Batch update migration exclusion for multiple VMs
+      operationId: batchUpdateVMExclusion
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Collection ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchUpdateExclusionRequest'
+      responses:
+        '200':
+          description: Exclusion updated
+        '400':
+          description: Invalid request
+        '404':
+          description: Collection or VM not found
+        '500':
+          description: Internal server error
+
+  /collections/{id}/virtualmachines/filter-options:
+    get:
+      tags: [VirtualMachines]
+      summary: Get available filter option values
+      operationId: getVMFilterOptions
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Collection ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Filter options
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VMFilterOptionsResponse'
+        '404':
+          description: Collection not found
+        '500':
+          description: Internal server error
+
+  /collections/{id}/virtualmachines/labels:
+    get:
+      tags: [VirtualMachines]
+      summary: Get all distinct labels with counts
+      operationId: getVMLabels
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Collection ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Labels with counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VMLabelsResponse'
+        '404':
+          description: Collection not found
+        '500':
+          description: Internal server error
+
+  /collections/{id}/virtualmachines/labels/{label}:
+    patch:
+      tags: [VirtualMachines]
+      summary: Add or remove a label from multiple VMs
+      operationId: updateLabelVMs
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Collection ID
+          schema:
+            type: string
+        - name: label
+          in: path
+          required: true
+          description: Label name
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLabelVMsRequest'
+      responses:
+        '200':
+          description: Label updated
+        '400':
+          description: Invalid request
+        '404':
+          description: Collection or VM not found
+        '500':
+          description: Internal server error
+    delete:
+      tags: [VirtualMachines]
+      summary: Remove a label from all VMs
+      operationId: deleteLabelGlobally
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Collection ID
+          schema:
+            type: string
+        - name: label
+          in: path
+          required: true
+          description: Label name
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Label removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteLabelGloballyResponse'
+        '400':
+          description: Invalid request
+        '500':
+          description: Internal server error
+
+  /collections/{id}/virtualmachines/{vmId}:
     get:
       tags: [VirtualMachines]
       summary: Get VirtualMachine details
       operationId: getVirtualMachine
       parameters:
         - name: id
+          in: path
+          required: true
+          description: Collection ID
+          schema:
+            type: string
+        - name: vmId
           in: path
           required: true
           description: VirtualMachine ID
@@ -381,38 +418,114 @@ paths:
               schema:
                 $ref: '#/components/schemas/VirtualMachineDetail'
         '404':
-          description: VirtualMachine not found
+          description: Collection or VirtualMachine not found
         '500':
           description: Internal server error
-
-  /virtualmachines/{id}/inspection:
-    delete:
+    patch:
       tags: [VirtualMachines]
-      summary: Remove VirtualMachine from inspection queue
-      operationId: removeVirtualMachineFromInspection
+      summary: Update VirtualMachine properties
+      operationId: updateVirtualMachine
       parameters:
         - name: id
           in: path
           required: true
+          description: Collection ID
+          schema:
+            type: string
+        - name: vmId
+          in: path
+          required: true
+          description: VirtualMachine ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VirtualMachineUpdateRequest'
+      responses:
+        '200':
+          description: VirtualMachine updated
+        '400':
+          description: Invalid request
+        '404':
+          description: Collection or VirtualMachine not found
+        '500':
+          description: Internal server error
+
+  # ── Export ─────────────────────────────────────────────────────────────
+  /collections/{id}/export:
+    get:
+      tags: [Collections]
+      summary: Export collection data as CSV ZIP archive
+      operationId: exportCollection
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Collection ID
+          schema:
+            type: string
+        - name: scope
+          in: query
+          required: false
+          description: Comma-separated export scopes (e.g., "overview,vms,groups"). Defaults to "overview".
           schema:
             type: string
       responses:
-        '204':
-          description: VirtualMachine removed from queue
+        '200':
+          description: ZIP archive containing CSV files
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
         '400':
-          description: Inspector not running or VirtualMachine cannot be canceled
+          description: Invalid scope
         '404':
-          description: VirtualMachine not found or not in queue
+          description: Collection not found
+        '500':
+          description: Internal server error
+
+  # ── Applications ───────────────────────────────────────────────────────
+  /collections/{id}/applications:
+    get:
+      tags: [Applications]
+      summary: List detected applications in a collection
+      operationId: listApplications
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Collection ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of detected applications
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationListResponse'
+        '404':
+          description: Collection not found
         '500':
           description: Internal server error
 
   # ── Groups ─────────────────────────────────────────────────────────────
-  /groups:
+  /collections/{id}/groups:
     get:
       tags: [Groups]
-      summary: List all groups
+      summary: List all groups in a collection
       operationId: listGroups
       parameters:
+        - name: id
+          in: path
+          required: true
+          description: Collection ID
+          schema:
+            type: string
         - name: byName
           in: query
           required: false
@@ -445,12 +558,21 @@ paths:
                 $ref: '#/components/schemas/GroupListResponse'
         '400':
           description: Invalid filter expression
+        '404':
+          description: Collection not found
         '500':
           description: Internal server error
     post:
       tags: [Groups]
-      summary: Create a new group
+      summary: Create a new group in a collection
       operationId: createGroup
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Collection ID
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -466,10 +588,12 @@ paths:
                 $ref: '#/components/schemas/Group'
         '400':
           description: Invalid request
+        '404':
+          description: Collection not found
         '500':
           description: Internal server error
 
-  /groups/{id}:
+  /collections/{id}/groups/{groupId}:
     get:
       tags: [Groups]
       summary: Get group by ID with its VirtualMachines
@@ -478,12 +602,18 @@ paths:
         - name: id
           in: path
           required: true
+          description: Collection ID
+          schema:
+            type: string
+        - name: groupId
+          in: path
+          required: true
           description: Group ID
           schema:
             type: string
         - name: sort
           in: query
-          description: Sort fields with direction (e.g., "name:asc", "cluster:desc"). Valid fields are name, vCenterState, cluster, diskSize, memory, issues.
+          description: Sort fields with direction (e.g., "name:asc", "cluster:desc"). Valid fields are name, vCenterState, cluster, diskSize, memory, issues, cpuUsage, diskUsage, ramUsage, cpuAvg, memAvg.
           schema:
             type: array
             items:
@@ -512,7 +642,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/GroupResponse'
         '404':
-          description: Group not found
+          description: Collection or group not found
         '500':
           description: Internal server error
     patch:
@@ -521,6 +651,12 @@ paths:
       operationId: updateGroup
       parameters:
         - name: id
+          in: path
+          required: true
+          description: Collection ID
+          schema:
+            type: string
+        - name: groupId
           in: path
           required: true
           description: Group ID
@@ -542,7 +678,7 @@ paths:
         '400':
           description: Invalid request
         '404':
-          description: Group not found
+          description: Collection or group not found
         '500':
           description: Internal server error
     delete:
@@ -553,12 +689,103 @@ paths:
         - name: id
           in: path
           required: true
+          description: Collection ID
+          schema:
+            type: string
+        - name: groupId
+          in: path
+          required: true
           description: Group ID
           schema:
             type: string
       responses:
         '204':
           description: Group deleted
+        '404':
+          description: Collection or group not found
+        '500':
+          description: Internal server error
+
+  # ── Credentials ────────────────────────────────────────────────────────
+  /credentials:
+    put:
+      tags: [Credentials]
+      summary: Store vCenter credentials
+      operationId: putCredentials
+      description: >-
+        Validates credentials against vSphere, encrypts with disk-based key,
+        and stores in the local database as the active credential set.
+        A subsequent PUT overwrites the previously stored credentials.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VcenterCredentials'
+      responses:
+        '201':
+          description: Credentials created and stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CredentialStatus'
+        '200':
+          description: Credentials validated and stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CredentialStatus'
+        '400':
+          description: Invalid credentials or unreachable vCenter
+        '500':
+          description: Internal server error
+    get:
+      tags: [Credentials]
+      summary: Get stored credential status
+      operationId: getCredentials
+      description: >-
+        Returns stored credential metadata (URL only). Never exposes
+        username or password. This endpoint does not revalidate credentials
+        against vSphere.
+      responses:
+        '200':
+          description: Credential status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CredentialStatus'
+        '404':
+          description: No credentials stored
+        '500':
+          description: Internal server error
+    delete:
+      tags: [Credentials]
+      summary: Delete stored credentials
+      operationId: deleteCredentials
+      description: Removes all stored vCenter credentials from the database.
+      responses:
+        '204':
+          description: Credentials deleted
+        '500':
+          description: Internal server error
+
+  /credentials/capabilities:
+    get:
+      tags: [Credentials]
+      summary: Check vSphere operation capabilities
+      operationId: getCredentialCapabilities
+      description: >-
+        Checks vSphere privileges for all operations (collector, inspector,
+        forecaster) using stored credentials. Single live vSphere check, no caching.
+      responses:
+        '200':
+          description: Capability status per operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapabilityStatus'
+        '404':
+          description: No credentials stored
         '500':
           description: Internal server error
 
@@ -578,26 +805,46 @@ paths:
 
 # ══════════════════════════════════════════════════════════════════════════
 components:
-  parameters:
-    vCenterID:
-      name: vCenterID
-      in: path
-      required: true
-      description: vCenter identifier (computed hash of the vCenter URL)
-      schema:
-        type: string
-
   schemas:
+    # ── Collections ──────────────────────────────────────────────────────
+    Collection:
+      type: object
+      required:
+        - id
+        - name
+        - createdAt
+      properties:
+        id:
+          type: string
+          description: Collection identifier
+        name:
+          type: string
+          description: Collection name
+        createdAt:
+          type: string
+          format: date-time
+          description: When the collection was created
+
+    CollectionListResponse:
+      type: object
+      required:
+        - collections
+      properties:
+        collections:
+          type: array
+          items:
+            $ref: '#/components/schemas/Collection'
+
     # ── Collectors ───────────────────────────────────────────────────────
     CollectorStatus:
       type: object
       required:
-        - vCenterID
+        - id
         - status
       properties:
-        vCenterID:
+        id:
           type: string
-          description: Computed hash of the vCenter URL
+          description: Collector identifier
         status:
           type: string
           enum:
@@ -630,69 +877,10 @@ components:
     Inventory:
       type: object
       required:
-        - vCenterID
         - inventory
       properties:
-        vCenterID:
-          type: string
-          description: Computed hash of the vCenter URL
         inventory:
           $ref: 'https://raw.githubusercontent.com/kubev2v/migration-planner/main/api/v1alpha1/openapi.yaml#/components/schemas/UpdateInventory'
-
-    InventoryListResponse:
-      type: object
-      required:
-        - inventories
-      properties:
-        inventories:
-          type: array
-          items:
-            $ref: '#/components/schemas/Inventory'
-
-    # ── Inspectors ───────────────────────────────────────────────────────
-    InspectorStartRequest:
-      type: object
-      required:
-        - virtualMachines
-        - credentials
-      properties:
-        virtualMachines:
-          type: array
-          minItems: 1
-          items:
-            type: string
-          description: Array of VirtualMachine IDs to inspect
-        credentials:
-          $ref: '#/components/schemas/VcenterCredentials'
-
-    InspectorStatus:
-      type: object
-      required:
-        - vCenterID
-        - state
-      properties:
-        vCenterID:
-          type: string
-          description: Computed hash of the vCenter URL
-        state:
-          type: string
-          enum:
-            - ready
-            - running
-          x-enum-varnames:
-            - InspectorStatusStateReady
-            - InspectorStatusStateRunning
-          description: Inspector state
-
-    InspectorListResponse:
-      type: object
-      required:
-        - inspectors
-      properties:
-        inspectors:
-          type: array
-          items:
-            $ref: '#/components/schemas/InspectorStatus'
 
     # ── VCenter Credentials ──────────────────────────────────────────────
     VcenterCredentials:
@@ -734,23 +922,55 @@ components:
             (backwards compatibility); if cacert is provided the connection
             verifies TLS using that certificate — skipTls need not be sent.
 
-    # ── VDDK ─────────────────────────────────────────────────────────────
-    VddkProperties:
+    CredentialStatus:
       type: object
       required:
-        - version
-        - md5
+        - url
+        - username
+        - valid
       properties:
-        version:
+        url:
           type: string
-          description: The matching vSphere Client version
-        md5:
+          description: vCenter URL the credentials belong to
+        username:
           type: string
-          description: md5 sum of the uploaded tarball
-        bytes:
-          type: integer
-          format: int64
-          description: Provided tarball bytes
+          description: vCenter username
+        valid:
+          type: boolean
+          description: Whether credentials are stored for the returned URL.
+
+    OperationCapability:
+      type: object
+      required:
+        - enabled
+      properties:
+        enabled:
+          type: boolean
+          description: Whether stored credentials have sufficient privileges
+        missingPrivileges:
+          type: array
+          items:
+            type: string
+          description: Specific vSphere privileges that are missing
+
+    CapabilityStatus:
+      type: object
+      required:
+        - capabilities
+      properties:
+        capabilities:
+          type: object
+          required:
+            - collector
+            - inspector
+            - forecaster
+          properties:
+            collector:
+              $ref: '#/components/schemas/OperationCapability'
+            inspector:
+              $ref: '#/components/schemas/OperationCapability'
+            forecaster:
+              $ref: '#/components/schemas/OperationCapability'
 
     # ── Virtual Machines ─────────────────────────────────────────────────
     VirtualMachine:
@@ -1234,6 +1454,169 @@ components:
             pattern: "^[a-zA-Z0-9_.]+$"
           x-oapi-codegen-extra-tags:
             binding: "omitempty,dive,tag_format"
+
+    # ── Applications ─────────────────────────────────────────────────────
+    ApplicationListResponse:
+      type: object
+      required:
+        - applications
+      properties:
+        applications:
+          type: array
+          items:
+            $ref: '#/components/schemas/ApplicationOverview'
+
+    ApplicationOverview:
+      type: object
+      required:
+        - name
+        - description
+        - vmCount
+        - vms
+      properties:
+        name:
+          type: string
+          description: Application name
+        description:
+          type: string
+          description: Application description
+        vmCount:
+          type: integer
+          description: Number of VMs running this application
+        vms:
+          type: array
+          items:
+            $ref: '#/components/schemas/ApplicationVM'
+
+    ApplicationVM:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+          description: VM ID
+        name:
+          type: string
+          description: VM name
+
+    # ── VM Operations ───────────────────────────────────────────────────
+    VirtualMachineUpdateRequest:
+      type: object
+      properties:
+        migrationExcluded:
+          type: boolean
+          description: Whether to exclude this VM from migration
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty"
+        labels:
+          type: array
+          items:
+            type: string
+          description: User-defined labels (replaces existing labels)
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty,dive,notblank,min=1,max=100"
+
+    BatchUpdateExclusionRequest:
+      type: object
+      required:
+        - vmIds
+        - migrationExcluded
+      properties:
+        vmIds:
+          type: array
+          items:
+            type: string
+          description: VM IDs to update
+          x-oapi-codegen-extra-tags:
+            binding: "required,min=1,dive,required"
+        migrationExcluded:
+          type: boolean
+          description: Exclusion state to set for all VMs
+
+    VMFilterOptionsResponse:
+      type: object
+      required:
+        - clusters
+        - datacenters
+        - concernLabels
+        - concernCategories
+        - applications
+      properties:
+        clusters:
+          type: array
+          items:
+            type: string
+          description: Distinct cluster names
+        datacenters:
+          type: array
+          items:
+            type: string
+          description: Distinct datacenter names
+        concernLabels:
+          type: array
+          items:
+            type: string
+          description: Distinct concern labels
+        concernCategories:
+          type: array
+          items:
+            type: string
+          description: Distinct concern categories
+        applications:
+          type: array
+          items:
+            type: string
+          description: Distinct detected application names
+
+    VMLabelsResponse:
+      type: object
+      required:
+        - labels
+        - counts
+      properties:
+        labels:
+          type: array
+          items:
+            type: string
+          description: Distinct labels currently in use
+        counts:
+          type: array
+          items:
+            type: integer
+          description: Number of VMs with each label (same order as labels array)
+
+    UpdateLabelVMsRequest:
+      type: object
+      properties:
+        add:
+          type: array
+          items:
+            type: string
+          description: VMs to add the label to
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty,dive,required"
+        remove:
+          type: array
+          items:
+            type: string
+          description: VMs to remove the label from
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty,dive,required"
+
+    DeleteLabelGloballyResponse:
+      type: object
+      required:
+        - label
+        - affected
+      properties:
+        label:
+          type: string
+          description: The label that was removed
+        affected:
+          type: integer
+          description: Number of VMs that had the label removed
 
     # ── Agent ────────────────────────────────────────────────────────────
     AgentStatus:
