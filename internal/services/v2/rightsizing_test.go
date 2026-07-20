@@ -9,6 +9,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/vmware/govmomi/vim25/types"
 
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
 
@@ -17,8 +18,6 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
-	rsig "github.com/kubev2v/assisted-migration-agent/pkg/rightsizing"
-	"github.com/kubev2v/assisted-migration-agent/pkg/work"
 )
 
 var _ = Describe("RightsizingService", func() {
@@ -27,6 +26,7 @@ var _ = Describe("RightsizingService", func() {
 		pool     *store.Pool
 		database *store.Database
 		st       *store.Store2
+		sqlDB    *sql.DB
 		svc      *v2.RightsizingService
 		tmpDir   string
 	)
@@ -43,12 +43,20 @@ var _ = Describe("RightsizingService", func() {
 		database, err = pool.NewDatabase("test", dbPath, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
 		Expect(err).NotTo(HaveOccurred())
 
+		Expect(database.Migrate(ctx, func(ctx context.Context, d *sql.DB) error {
+			sqlDB = d
+			s, err := database.Store()
+			if err != nil {
+				return err
+			}
+			if err := duckdb_parser.New(s.Querier(), nil).Init(); err != nil {
+				return err
+			}
+			return migrations.RunCollection(ctx, d, "test")
+		})).To(Succeed())
+
 		st, err = database.Store()
 		Expect(err).NotTo(HaveOccurred())
-		Expect(duckdb_parser.New(st.Querier(), nil).Init()).To(Succeed())
-		Expect(database.Migrate(ctx, func(ctx context.Context, db *sql.DB) error {
-			return migrations.RunCollection(ctx, db, "test")
-		})).To(Succeed())
 
 		svc = v2.NewRightsizingService(st)
 	})
@@ -62,10 +70,19 @@ var _ = Describe("RightsizingService", func() {
 		}
 	})
 
-	// seedReport creates a report with one VM and one metric via the store.
-	seedReport := func(vcenter string) string {
+	seedVMs := func(vms ...struct{ id, name string }) {
+		for _, vm := range vms {
+			_, err := sqlDB.ExecContext(ctx, `
+				INSERT INTO vinfo ("VM ID", "VM", "Powerstate", "Cluster", "CPUs", "Memory", "Template")
+				VALUES (?, ?, 'poweredOn', 'cluster-a', 4, 4096, false)
+			`, vm.id, vm.name)
+			Expect(err).NotTo(HaveOccurred())
+		}
+	}
+
+	seedReportWithMetrics := func() string {
 		r := models.RightSizingReport{
-			VCenter:             vcenter,
+			VCenter:             "https://vcenter.example.com",
 			ClusterID:           "domain-c123",
 			IntervalID:          7200,
 			WindowStart:         time.Now().Add(-720 * time.Hour).UTC(),
@@ -78,152 +95,163 @@ var _ = Describe("RightsizingService", func() {
 		Expect(st.RightSizing().WriteBatch(ctx, id, []models.RightSizingMetric{
 			{VMName: "vm-a", MOID: "vm-100", MetricKey: "cpu.usagemhz.average",
 				SampleCount: 360, Average: 500, P95: 1200, P99: 1500, Max: 2000, Latest: 450},
+			{VMName: "vm-a", MOID: "vm-100", MetricKey: "cpu.usage.average",
+				SampleCount: 360, Average: 5000, P95: 8000, P99: 9000, Max: 9500, Latest: 4500},
+			{VMName: "vm-a", MOID: "vm-100", MetricKey: "mem.consumed.average",
+				SampleCount: 360, Average: 2048000, P95: 3072000, P99: 3500000, Max: 4000000, Latest: 2000000},
+			{VMName: "vm-a", MOID: "vm-100", MetricKey: "disk.used.latest",
+				SampleCount: 360, Average: 500000, P95: 600000, P99: 650000, Max: 700000, Latest: 500000},
+			{VMName: "vm-a", MOID: "vm-100", MetricKey: "disk.provisioned.latest",
+				SampleCount: 360, Average: 1000000, P95: 1000000, P99: 1000000, Max: 1000000, Latest: 1000000},
 		})).To(Succeed())
+		Expect(st.RightSizing().IncrementWrittenBatchCount(ctx, id)).To(Succeed())
 		return id
 	}
 
-	Describe("ListReports", func() {
-		It("should return an empty slice when no reports exist", func() {
-			reports, err := svc.ListReports(ctx)
+	Describe("GetVMUtilization", func() {
+		It("should return utilization details for a VM with computed data", func() {
+			seedVMs(struct{ id, name string }{"vm-100", "vm-a"})
+			reportID := seedReportWithMetrics()
+
+			Expect(st.RightSizing().ComputeAndStoreUtilization(ctx, reportID)).To(Succeed())
+
+			details, err := svc.GetVMUtilization(ctx, "vm-100")
 			Expect(err).NotTo(HaveOccurred())
-			Expect(reports).To(BeEmpty())
+			Expect(details.MOID).To(Equal("vm-100"))
+			Expect(details.VMName).To(Equal("vm-a"))
+			Expect(details.CpuAvg).To(BeNumerically(">", 0))
 		})
 
-		It("should return report metadata without VM metrics", func() {
-			id := seedReport("https://vcenter.example.com")
-
-			reports, err := svc.ListReports(ctx)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(reports).To(HaveLen(1))
-			Expect(reports[0].ID).To(Equal(id))
-		})
-	})
-
-	Describe("GetReport", func() {
-		It("should return the report with all VM metrics", func() {
-			id := seedReport("https://vcenter.example.com")
-
-			report, err := svc.GetReport(ctx, id)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(report.ID).To(Equal(id))
-			Expect(report.VMs).To(HaveLen(1))
-			Expect(report.VMs[0].Metrics["cpu.usagemhz.average"].SampleCount).To(Equal(360))
-		})
-
-		It("should return a ResourceNotFoundError for unknown IDs", func() {
-			_, err := svc.GetReport(ctx, "does-not-exist")
+		It("should return ResourceNotFoundError for unknown VM", func() {
+			_, err := svc.GetVMUtilization(ctx, "does-not-exist")
 			Expect(err).To(HaveOccurred())
 			Expect(srvErrors.IsResourceNotFoundError(err)).To(BeTrue())
 		})
 	})
 
-	Describe("TriggerCollection", func() {
-		It("should create a report shell in DuckDB and return it immediately", func() {
-			svc.WithWorkBuilder(func(reportID string, cfg rsig.Config, discoverVMs bool, st *store.Store2, start, end time.Time) *v2.RightsizingCollectionHandle {
-				return &v2.RightsizingCollectionHandle{
-					Builder: work.NewSliceWorkBuilder([]work.WorkUnit[models.RightsizingCollectionStatus, models.RightsizingCollectionResult]{
-						{
-							Status: func() models.RightsizingCollectionStatus {
-								return models.RightsizingCollectionStatus{State: models.RightsizingCollectionStateCompleted}
-							},
-							Work: func(ctx context.Context, result models.RightsizingCollectionResult) (models.RightsizingCollectionResult, error) {
-								return result, nil
-							},
-						},
-					}),
-					LogoutFn: func() {},
-				}
-			})
+	Describe("ListLatestClusterUtilization", func() {
+		It("should return empty when no reports exist", func() {
+			reportID, clusters, err := svc.ListLatestClusterUtilization(ctx, "")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(reportID).To(BeEmpty())
+			Expect(clusters).To(BeEmpty())
+		})
+	})
 
-			params := models.RightsizingParams{
-				Credentials: models.Credentials{URL: "https://vc.example.com", Username: "admin", Password: "secret"},
-				LookbackH:   720,
+	Describe("CreateReportFromInventory", func() {
+		It("should create a report and return VMs from inventory", func() {
+			seedVMs(
+				struct{ id, name string }{"vm-100", "web-server"},
+				struct{ id, name string }{"vm-200", "db-server"},
+			)
+
+			reportID, vms, start, end, err := svc.CreateReportFromInventory(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(reportID).NotTo(BeEmpty())
+			Expect(vms).To(HaveLen(2))
+			Expect(end).To(BeTemporally(">", start))
+		})
+
+		It("should return empty VM list when no inventory exists", func() {
+			reportID, vms, _, _, err := svc.CreateReportFromInventory(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(reportID).NotTo(BeEmpty())
+			Expect(vms).To(BeEmpty())
+		})
+	})
+
+	Describe("PersistMetrics", func() {
+		It("should persist metrics in batches", func() {
+			vms := []v2.VMInfo{
+				{Name: "vm-a", Ref: types.ManagedObjectReference{Type: "VirtualMachine", Value: "vm-100"}},
+			}
+			vmResults := map[string]v2.VMReport{
+				"vm-100": {
+					Name: "vm-a",
+					MOID: "vm-100",
+					Metrics: map[string]v2.MetricStats{
+						"cpu.usagemhz.average": {SampleCount: 360, Average: 500, P95: 1200, P99: 1500, Max: 2000, Latest: 450},
+					},
+				},
+			}
+
+			report := models.RightSizingReport{
+				VCenter:             "https://vcenter.example.com",
+				ClusterID:           "domain-c123",
+				IntervalID:          7200,
+				WindowStart:         time.Now().Add(-720 * time.Hour).UTC(),
+				WindowEnd:           time.Now().UTC(),
+				ExpectedSampleCount: 360,
+			}
+			reportID, _, err := st.RightSizing().CreateReport(ctx, report, 1, 25)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(svc.PersistMetrics(ctx, vms, vmResults, reportID)).To(Succeed())
+		})
+	})
+
+	Describe("PersistVMWarnings", func() {
+		It("should persist warnings for VMs with no metrics", func() {
+			vms := []v2.VMInfo{
+				{Name: "vm-a", Ref: types.ManagedObjectReference{Type: "VirtualMachine", Value: "vm-100"}},
+				{Name: "vm-b", Ref: types.ManagedObjectReference{Type: "VirtualMachine", Value: "vm-200"}},
+			}
+			vmResults := map[string]v2.VMReport{
+				"vm-100": {Name: "vm-a", MOID: "vm-100", Metrics: map[string]v2.MetricStats{}},
+				"vm-200": {Name: "vm-b", MOID: "vm-200", Warnings: []string{"specific warning"}},
+			}
+
+			report := models.RightSizingReport{
+				VCenter:             "https://vcenter.example.com",
+				ClusterID:           "domain-c123",
+				IntervalID:          7200,
+				WindowStart:         time.Now().Add(-720 * time.Hour).UTC(),
+				WindowEnd:           time.Now().UTC(),
+				ExpectedSampleCount: 360,
+			}
+			reportID, _, err := st.RightSizing().CreateReport(ctx, report, 2, 25)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(svc.PersistVMWarnings(ctx, vms, vmResults, reportID)).To(Succeed())
+		})
+
+		It("should be a no-op when all VMs have metrics", func() {
+			vms := []v2.VMInfo{
+				{Name: "vm-a", Ref: types.ManagedObjectReference{Type: "VirtualMachine", Value: "vm-100"}},
+			}
+			vmResults := map[string]v2.VMReport{
+				"vm-100": {
+					Name: "vm-a", MOID: "vm-100",
+					Metrics: map[string]v2.MetricStats{
+						"cpu.usagemhz.average": {SampleCount: 1, Average: 100},
+					},
+				},
+			}
+
+			report := models.RightSizingReport{
+				VCenter:     "https://vcenter.example.com",
 				IntervalID:  7200,
-				BatchSize:   5,
+				WindowStart: time.Now().Add(-720 * time.Hour).UTC(),
+				WindowEnd:   time.Now().UTC(),
 			}
-			report, err := svc.TriggerCollection(ctx, params)
+			reportID, _, err := st.RightSizing().CreateReport(ctx, report, 1, 25)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(report.ID).NotTo(BeEmpty())
-			Expect(report.VCenter).To(Equal("https://vc.example.com"))
 
-			// Shell must be persisted in the DB.
-			summaries, err := svc.ListReports(ctx)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(summaries).To(HaveLen(1))
-			Expect(summaries[0].ID).To(Equal(report.ID))
+			Expect(svc.PersistVMWarnings(ctx, vms, vmResults, reportID)).To(Succeed())
 		})
+	})
 
-		It("BuildCollectorWorkUnits returns a non-empty unit slice when invoked with credentials", func() {
-			builderFn := svc.BuildCollectorWorkUnits(720, 7200, 64)
-			creds := models.Credentials{URL: "https://vc.example.com", Username: "admin", Password: "secret"}
-			units := builderFn(creds)
-			Expect(units).NotTo(BeEmpty())
-		})
+	Describe("ComputeUtilization", func() {
+		It("should compute utilization from persisted metrics", func() {
+			seedVMs(struct{ id, name string }{"vm-100", "vm-a"})
+			reportID := seedReportWithMetrics()
 
-		It("BuildCollectorWorkUnits passes DiscoverVMs:false to TriggerCollection", func() {
-			var capturedDiscoverVMs bool
-			blockCh := make(chan struct{})
+			Expect(svc.ComputeUtilization(ctx, reportID)).To(Succeed())
 
-			svc.WithWorkBuilder(func(reportID string, cfg rsig.Config, discoverVMs bool, st *store.Store2, start, end time.Time) *v2.RightsizingCollectionHandle {
-				capturedDiscoverVMs = discoverVMs
-				return &v2.RightsizingCollectionHandle{
-					Builder: work.NewSliceWorkBuilder([]work.WorkUnit[models.RightsizingCollectionStatus, models.RightsizingCollectionResult]{
-						{
-							Status: func() models.RightsizingCollectionStatus {
-								return models.RightsizingCollectionStatus{State: models.RightsizingCollectionStateCompleted}
-							},
-							Work: func(ctx context.Context, result models.RightsizingCollectionResult) (models.RightsizingCollectionResult, error) {
-								close(blockCh)
-								return result, nil
-							},
-						},
-					}),
-					LogoutFn: func() {},
-				}
-			})
-
-			builderFn := svc.BuildCollectorWorkUnits(720, 7200, 64)
-			creds := models.Credentials{URL: "https://vc.example.com", Username: "admin", Password: "secret"}
-			units := builderFn(creds)
-			Expect(units).NotTo(BeEmpty())
-
-			// Run the work unit — it calls TriggerCollection internally.
-			_, err := units[0].Work(ctx, models.CollectorResult{})
+			details, err := svc.GetVMUtilization(ctx, "vm-100")
 			Expect(err).NotTo(HaveOccurred())
-			Eventually(blockCh).Should(BeClosed())
-			Expect(capturedDiscoverVMs).To(BeFalse())
-		})
-
-		It("should reject a second TriggerCollection while one is running", func() {
-			blockCh := make(chan struct{})
-			svc.WithWorkBuilder(func(reportID string, cfg rsig.Config, discoverVMs bool, st *store.Store2, start, end time.Time) *v2.RightsizingCollectionHandle {
-				return &v2.RightsizingCollectionHandle{
-					Builder: work.NewSliceWorkBuilder([]work.WorkUnit[models.RightsizingCollectionStatus, models.RightsizingCollectionResult]{
-						{
-							Status: func() models.RightsizingCollectionStatus {
-								return models.RightsizingCollectionStatus{State: models.RightsizingCollectionStateConnecting}
-							},
-							Work: func(ctx context.Context, result models.RightsizingCollectionResult) (models.RightsizingCollectionResult, error) {
-								<-blockCh
-								return result, nil
-							},
-						},
-					}),
-					LogoutFn: func() {},
-				}
-			})
-
-			params := models.RightsizingParams{
-				Credentials: models.Credentials{URL: "https://vc.example.com", Username: "admin", Password: "secret"},
-			}
-			_, err := svc.TriggerCollection(ctx, params)
-			Expect(err).NotTo(HaveOccurred())
-
-			_, err = svc.TriggerCollection(ctx, params)
-			Expect(err).To(HaveOccurred())
-			Expect(srvErrors.IsOperationInProgressError(err)).To(BeTrue())
-
-			close(blockCh)
+			Expect(details.MOID).To(Equal("vm-100"))
+			Expect(details.CpuAvg).To(BeNumerically(">", 0))
 		})
 	})
 })

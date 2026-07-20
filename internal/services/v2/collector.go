@@ -13,9 +13,7 @@ import (
 )
 
 type (
-	collectorWorkUnit        = work.WorkUnit[models.CollectorStatus, models.CollectorResult]
 	collectorWorkBuilderFunc func(creds models.Credentials) work.WorkBuilder2[models.CollectorStatus, models.CollectorResult]
-	postCollectionBuilderFn  func(creds models.Credentials) []collectorWorkUnit
 )
 
 type CollectorService struct {

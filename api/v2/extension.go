@@ -290,6 +290,47 @@ func NewInspectionStatus(status models.InspectionStatus) InspectionStatus {
 	return s
 }
 
+// NewRightsizingClusterUtilizationFromModel converts a models.RightsizingClusterUtilization to the API type.
+func NewRightsizingClusterUtilizationFromModel(c models.RightsizingClusterUtilization) RightsizingClusterUtilization {
+	return RightsizingClusterUtilization{
+		ClusterId:                c.ClusterID,
+		ClusterName:              c.ClusterName,
+		VmCount:                  c.VMCount,
+		CpuAvg:                   c.CpuAvg,
+		CpuP95:                   c.CpuP95,
+		CpuMax:                   c.CpuMax,
+		MemAvg:                   c.MemAvg,
+		MemP95:                   c.MemP95,
+		MemMax:                   c.MemMax,
+		Disk:                     c.Disk,
+		Confidence:               c.Confidence,
+		TotalProvisionedCpus:     int(c.TotalProvisionedCpus),
+		TotalProvisionedMemoryMb: int(c.TotalProvisionedMemoryMb),
+		TotalProvisionedDiskKb:   c.TotalProvisionedDiskKb,
+	}
+}
+
+// NewVmUtilizationDetailsFromModel converts a models.VmUtilizationDetails to the API type.
+func NewVmUtilizationDetailsFromModel(d models.VmUtilizationDetails) VmUtilizationDetails {
+	return VmUtilizationDetails{
+		Moid:                d.MOID,
+		VmName:              d.VMName,
+		ProvisionedCpus:     d.ProvisionedCpus,
+		ProvisionedMemoryMb: d.ProvisionedMemoryMb,
+		ProvisionedDiskKb:   d.ProvisionedDiskKb,
+		CpuAvg:              d.CpuAvg,
+		CpuP95:              d.CpuP95,
+		CpuMax:              d.CpuMax,
+		CpuLatest:           d.CpuLatest,
+		MemAvg:              d.MemAvg,
+		MemP95:              d.MemP95,
+		MemMax:              d.MemMax,
+		MemLatest:           d.MemLatest,
+		Disk:                d.Disk,
+		Confidence:          d.Confidence,
+	}
+}
+
 // NewGroupFromModel converts a models.Group to a v2 Group.
 func NewGroupFromModel(g models.Group) Group {
 	createdAt := g.CreatedAt

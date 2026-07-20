@@ -86,8 +86,10 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
 			switch cfg.Server.API {
 			case "v2":
 				srv, cleanup, err = initV2(cfg)
-			default:
+			case "v1":
 				srv, cleanup, err = initV1(cfg)
+			default:
+				return fmt.Errorf("invalid api version %q. Only v1 and v2 is accepted", cfg.Server.API)
 			}
 			if err != nil {
 				return err
@@ -328,16 +330,17 @@ func initPool(cfg *config.Configuration) (*store.Pool, error) {
 		createdAt := time.Unix(ts, 0)
 		hash := sha256.Sum256([]byte(match))
 		id := hex.EncodeToString(hash[:])[:6]
-		db, err := pool.NewDatabase(id, match, createdAt, store.LazyConnectionInitilization, 256, store.ReadOnlyDatabase)
+		db, err := pool.NewDatabase(id, match, createdAt, store.LazyConnectionInitilization, 256, store.ReadWriteDatabase)
 		if err != nil {
 			zap.S().Warnw("skipping collection database", "file", match, "error", err)
 			continue
 		}
 
 		if err := db.Migrate(context.Background(), func(ctx context.Context, db *sql.DB) error {
-			return migrations.RunCollection(ctx, db, "main")
+			return migrations.RunCollection(ctx, db, name)
 		}); err != nil {
-			zap.S().Errorw("failed to migrate collection database %s: %w", name, err)
+			zap.S().Errorw("failed to migrate collection database", "db_name", name, "error", err)
+			_ = db.Close()
 			continue
 		}
 

@@ -19,6 +19,8 @@ tags:
     description: VirtualMachine group management
   - name: Applications
     description: Detected application inventory
+  - name: Rightsizing
+    description: Rightsizing reports and cluster/VM utilization
   - name: Credentials
     description: vCenter credential management
   - name: Version
@@ -453,6 +455,37 @@ paths:
           description: Collection or VirtualMachine not found
         '500':
           description: Internal server error
+  
+  /collections/{id}/virtualmachines/{vmId}/utilization:
+    get:
+      tags: [VirtualMachines]
+      summary: Get utilization breakdown for a specific VM
+      operationId: getVMUtilization
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Collection ID
+          schema:
+            type: string
+        - name: vmId
+          in: path
+          required: true
+          description: VirtualMachine MoRef ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: VM utilization details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VmUtilizationDetails'
+        '404':
+          description: Collection not found or no utilization data for this VM
+        '500':
+          description: Internal server error
+
 
   # ── Export ─────────────────────────────────────────────────────────────
   /collections/{id}/export:
@@ -703,6 +736,39 @@ paths:
           description: Group deleted
         '404':
           description: Collection or group not found
+        '500':
+          description: Internal server error
+
+  /collections/{id}/clusters/{clusterId}/utilization:
+    get:
+      tags: [Rightsizing]
+      summary: Get latest cluster utilization by cluster ID
+      operationId: getClusterUtilization
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Collection ID
+          schema:
+            type: string
+        - name: clusterId
+          in: path
+          required: true
+          description: vSphere MoRef (e.g. "domain-c123") or generated cluster ID
+          schema:
+            type: string
+            pattern: '^(domain-c\d+|cluster-[0-9a-f]{16})$'
+      responses:
+        '200':
+          description: Cluster utilization data from the latest completed rightsizing report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RightsizingClusterResponse'
+        '400':
+          description: Invalid cluster_id format
+        '404':
+          description: Collection not found, no completed report, or cluster not found
         '500':
           description: Internal server error
 
@@ -1664,6 +1730,135 @@ components:
             - disconnected
           x-oapi-codegen-extra-tags:
             binding: "required,oneof=connected disconnected"
+
+    # ── Rightsizing ──────────────────────────────────────────────────────
+    RightsizingClusterUtilization:
+      type: object
+      required:
+        - cluster_id
+        - cluster_name
+        - vm_count
+        - cpu_avg
+        - cpu_p95
+        - cpu_max
+        - mem_avg
+        - mem_p95
+        - mem_max
+        - disk
+        - confidence
+        - total_provisioned_cpus
+        - total_provisioned_memory_mb
+        - total_provisioned_disk_kb
+      properties:
+        cluster_id:
+          type: string
+        cluster_name:
+          type: string
+        vm_count:
+          type: integer
+        cpu_avg:
+          type: number
+          format: double
+        cpu_p95:
+          type: number
+          format: double
+        cpu_max:
+          type: number
+          format: double
+        mem_avg:
+          type: number
+          format: double
+        mem_p95:
+          type: number
+          format: double
+        mem_max:
+          type: number
+          format: double
+        disk:
+          type: number
+          format: double
+        confidence:
+          type: number
+          format: double
+        total_provisioned_cpus:
+          type: integer
+        total_provisioned_memory_mb:
+          type: integer
+        total_provisioned_disk_kb:
+          type: number
+          format: double
+
+    RightsizingClusterResponse:
+      type: object
+      required:
+        - report_id
+        - cluster
+      properties:
+        report_id:
+          type: string
+        cluster:
+          $ref: '#/components/schemas/RightsizingClusterUtilization'
+
+    VmUtilizationDetails:
+      type: object
+      required:
+        - moid
+        - vm_name
+        - provisioned_cpus
+        - provisioned_memory_mb
+        - provisioned_disk_kb
+        - cpu_avg
+        - cpu_p95
+        - cpu_max
+        - cpu_latest
+        - mem_avg
+        - mem_p95
+        - mem_max
+        - mem_latest
+        - disk
+        - confidence
+      properties:
+        moid:
+          type: string
+        vm_name:
+          type: string
+        provisioned_cpus:
+          type: integer
+        provisioned_memory_mb:
+          type: integer
+        provisioned_disk_kb:
+          type: number
+          format: double
+        cpu_avg:
+          type: number
+          format: double
+        cpu_p95:
+          type: number
+          format: double
+        cpu_max:
+          type: number
+          format: double
+        cpu_latest:
+          type: number
+          format: double
+        mem_avg:
+          type: number
+          format: double
+        mem_p95:
+          type: number
+          format: double
+        mem_max:
+          type: number
+          format: double
+        mem_latest:
+          type: number
+          format: double
+        disk:
+          type: number
+          format: double
+        confidence:
+          type: number
+          format: double
 
     # ── Version ──────────────────────────────────────────────────────────
     VersionInfo:

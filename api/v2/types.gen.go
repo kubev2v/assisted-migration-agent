@@ -274,6 +274,30 @@ type OperationCapability struct {
 	MissingPrivileges *[]string `json:"missingPrivileges,omitempty"`
 }
 
+// RightsizingClusterResponse defines model for RightsizingClusterResponse.
+type RightsizingClusterResponse struct {
+	Cluster  RightsizingClusterUtilization `json:"cluster"`
+	ReportId string                        `json:"report_id"`
+}
+
+// RightsizingClusterUtilization defines model for RightsizingClusterUtilization.
+type RightsizingClusterUtilization struct {
+	ClusterId                string  `json:"cluster_id"`
+	ClusterName              string  `json:"cluster_name"`
+	Confidence               float64 `json:"confidence"`
+	CpuAvg                   float64 `json:"cpu_avg"`
+	CpuMax                   float64 `json:"cpu_max"`
+	CpuP95                   float64 `json:"cpu_p95"`
+	Disk                     float64 `json:"disk"`
+	MemAvg                   float64 `json:"mem_avg"`
+	MemMax                   float64 `json:"mem_max"`
+	MemP95                   float64 `json:"mem_p95"`
+	TotalProvisionedCpus     int     `json:"total_provisioned_cpus"`
+	TotalProvisionedDiskKb   float64 `json:"total_provisioned_disk_kb"`
+	TotalProvisionedMemoryMb int     `json:"total_provisioned_memory_mb"`
+	VmCount                  int     `json:"vm_count"`
+}
+
 // UpdateGroupRequest defines model for UpdateGroupRequest.
 type UpdateGroupRequest struct {
 	Description *string   `binding:"omitempty,max=500" json:"description,omitempty"`
@@ -566,6 +590,25 @@ type VirtualMachineUpdateRequest struct {
 
 	// MigrationExcluded Whether to exclude this VM from migration
 	MigrationExcluded *bool `binding:"omitempty" json:"migrationExcluded,omitempty"`
+}
+
+// VmUtilizationDetails defines model for VmUtilizationDetails.
+type VmUtilizationDetails struct {
+	Confidence          float64 `json:"confidence"`
+	CpuAvg              float64 `json:"cpu_avg"`
+	CpuLatest           float64 `json:"cpu_latest"`
+	CpuMax              float64 `json:"cpu_max"`
+	CpuP95              float64 `json:"cpu_p95"`
+	Disk                float64 `json:"disk"`
+	MemAvg              float64 `json:"mem_avg"`
+	MemLatest           float64 `json:"mem_latest"`
+	MemMax              float64 `json:"mem_max"`
+	MemP95              float64 `json:"mem_p95"`
+	Moid                string  `json:"moid"`
+	ProvisionedCpus     int     `json:"provisioned_cpus"`
+	ProvisionedDiskKb   float64 `json:"provisioned_disk_kb"`
+	ProvisionedMemoryMb int     `json:"provisioned_memory_mb"`
+	VmName              string  `json:"vm_name"`
 }
 
 // ExportCollectionParams defines parameters for ExportCollection.

@@ -175,6 +175,18 @@ func (m *ServiceManager) ApplicationService(collectionID string) (*ApplicationSe
 	return NewApplicationService(st)
 }
 
+func (m *ServiceManager) RightsizingService(collectionID string) (*RightsizingService, error) {
+	db, err := m.pool.Get(collectionID)
+	if err != nil {
+		return nil, err
+	}
+	st, err := db.Store()
+	if err != nil {
+		return nil, err
+	}
+	return NewRightsizingService(st), nil
+}
+
 func (m *ServiceManager) ExportService(collectionID string) (*ExportService, error) {
 	db, err := m.pool.Get(collectionID)
 	if err != nil {

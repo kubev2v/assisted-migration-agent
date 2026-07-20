@@ -1,5 +1,7 @@
 package models
 
+import "github.com/vmware/govmomi"
+
 var CollectorRequiredPrivileges = []string{
 	"System.Read",
 	"System.View",
@@ -77,4 +79,5 @@ type CollectorResult struct {
 	Completed  bool
 	SQLitePath string
 	Inventory  []byte
+	Client     *govmomi.Client
 }

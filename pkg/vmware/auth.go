@@ -64,37 +64,11 @@ func (m *VMManager) ValidatePrivileges(ctx context.Context, moid string, require
 }
 
 func VerifyCredentials(ctx context.Context, creds *models.Credentials, resourceName string) error {
-	if err := creds.Validate(); err != nil {
-		return err
-	}
-
-	u, err := url.ParseRequestURI(creds.URL)
-	if err != nil {
-		return err
-	}
-	u.User = url.UserPassword(creds.Username, creds.Password)
-
-	verifyCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	soapClient, err := NewSoapClient(u, creds.SkipTLS, creds.CACert)
-	if err != nil {
-		return err
-	}
-
-	vimClient, err := vim25.NewClient(verifyCtx, soapClient)
-	if err != nil {
-		return err
-	}
-
-	client := &govmomi.Client{
-		SessionManager: session.NewManager(vimClient),
-		Client:         vimClient,
-	}
-
 	zap.S().Named(resourceName).Info("verifying vCenter credentials")
-	if err := client.Login(verifyCtx, u.User); err != nil {
-		return srvErrors.NewVCenterError(err)
+
+	client, err := Connect(ctx, creds)
+	if err != nil {
+		return err
 	}
 
 	logoutCtx, logoutCancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -104,6 +78,42 @@ func VerifyCredentials(ctx context.Context, creds *models.Credentials, resourceN
 
 	zap.S().Named(resourceName).Info("vCenter credentials verified successfully")
 	return nil
+}
+
+func Connect(ctx context.Context, creds *models.Credentials) (*govmomi.Client, error) {
+	if err := creds.Validate(); err != nil {
+		return nil, err
+	}
+
+	u, err := url.ParseRequestURI(creds.URL)
+	if err != nil {
+		return nil, err
+	}
+	u.User = url.UserPassword(creds.Username, creds.Password)
+
+	verifyCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	soapClient, err := NewSoapClient(u, creds.SkipTLS, creds.CACert)
+	if err != nil {
+		return nil, err
+	}
+
+	vimClient, err := vim25.NewClient(verifyCtx, soapClient)
+	if err != nil {
+		return nil, err
+	}
+
+	client := &govmomi.Client{
+		SessionManager: session.NewManager(vimClient),
+		Client:         vimClient,
+	}
+
+	if err := client.Login(verifyCtx, u.User); err != nil {
+		return nil, srvErrors.NewVCenterError(fmt.Errorf("authentication failed: %w", err))
+	}
+
+	return client, nil
 }
 
 func NormalizeAndValidateURL(vUrl string) (string, error) {

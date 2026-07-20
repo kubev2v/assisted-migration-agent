@@ -24,6 +24,7 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	collector "github.com/kubev2v/assisted-migration-agent/pkg/collector"
+	"github.com/kubev2v/assisted-migration-agent/pkg/vmware"
 	"github.com/kubev2v/assisted-migration-agent/pkg/work"
 )
 
@@ -43,20 +44,24 @@ func newCollectorWorkFactory(pool *store.Pool, dataDir string, validator *opa.Va
 
 // Build creates the collector work pipeline for a single collection run.
 //
-// The pipeline executes 9 sequential work units against a dedicated collection
+// The pipeline executes 12 sequential work units against a dedicated collection
 // DuckDB database (one per run). On completion, Finalize either promotes the
 // collection DB into the pool (success), marks it failed (error), or cleans it
 // up (cancelled).
 //
 // Pipeline stages:
 //  1. Provision — record a collection marker, create and migrate the collection DB.
-//  2. Verify — validate vCenter credentials before committing to a full collection.
+//  2. Verify — validate vCenter credentials and open a govmomi client for rightsizing.
 //  3. Collect — run the vSphere collector, producing a SQLite database of raw inventory.
 //  4. Ingest — import the SQLite output into the collection DuckDB, validate schema.
 //  5. Applications — match guest processes against known application definitions.
-//  6. Rightsizing — query vCenter performance counters and persist utilization metrics.
+//  6. Rightsizing:
+//     6a. Rightsizing: create report — read VMs from inventory, create the report shell.
+//     6b. Rightsizing: query + persist — query vCenter metrics, persist batches in a loop.
+//     6c. Rightsizing: warnings — persist VMs that returned no metrics data.
+//     6d. Rightsizing: utilization — compute per-VM utilization percentages.
 //  7. Inventory — build the inventory JSON with embedded cluster utilization and persist.
-//  8. Sync with the previous collection - If a previous collection exists, copy the groups,labels and exclude_migrations user data to the new collection.
+//  8. Sync with the previous collection — copy groups, labels and exclusions from the previous collection.
 //  9. Publish — write an inventory-update event to the outbox.
 func (f *collectorWorkFactory) Build(creds models.Credentials) work.WorkBuilder2[models.CollectorStatus, models.CollectorResult] {
 	log := zap.S().Named("collector_service")
@@ -65,7 +70,13 @@ func (f *collectorWorkFactory) Build(creds models.Credentials) work.WorkBuilder2
 	var parser *duckdb_parser.Parser
 	database := fmt.Sprintf("collection_%d", time.Now().Unix())
 
-	units := []collectorWorkUnit{
+	var rsReportID string
+	var rsVMs []VMInfo
+	var rsVMResults map[string]VMReport
+	var rsSvc *RightsizingService
+	var rsWindowStart, rsWindowEnd time.Time
+
+	units := []work.WorkUnit[models.CollectorStatus, models.CollectorResult]{
 		// 1. Provision: record collection marker, create and migrate the collection DB.
 		{
 			Status: func() models.CollectorStatus {
@@ -140,6 +151,16 @@ func (f *collectorWorkFactory) Build(creds models.Credentials) work.WorkBuilder2
 					return r, err
 				}
 				log.Info("vCenter credentials verified")
+
+				// since forklift collector does not expose the client
+				// we need to create a separate client for rightsizing
+				client, err := vmware.Connect(ctx, &creds)
+				if err != nil {
+					r.Err = err
+					return r, err
+				}
+
+				r.Client = client
 				return r, nil
 			},
 		},
@@ -161,7 +182,7 @@ func (f *collectorWorkFactory) Build(creds models.Credentials) work.WorkBuilder2
 				if err := vc.Collect(ctx, &creds); err != nil {
 					log.Errorw("vSphere collection failed", "error", err)
 					r.Err = err
-					return r, nil
+					return r, err
 				}
 				log.Info("vSphere inventory collection completed")
 
@@ -245,29 +266,67 @@ func (f *collectorWorkFactory) Build(creds models.Credentials) work.WorkBuilder2
 				return r, nil
 			},
 		},
-		// 6. Rightsizing: query vCenter performance counters and persist utilization metrics.
+		// 6a. Rightsizing — create report shell.
 		{
 			Status: func() models.CollectorStatus {
-				return models.CollectorStatus{State: models.CollectorStateCollecting}
+				return models.CollectorStatus{State: models.CollectorStateMetricsCollecting}
 			},
 			Work: func(ctx context.Context, r models.CollectorResult) (models.CollectorResult, error) {
 				st, err := collectionDb.Store()
 				if err != nil {
-					r.Err = fmt.Errorf("getting collection store: %w", err)
-					return r, r.Err
+					return r, fmt.Errorf("getting collection store: %w", err)
 				}
-				rsSrv := NewRightsizingService(st)
-				var workErr error
-				for _, u := range rsSrv.BuildCollectorWorkUnits(
-					rightsizingDefaultLookbackHours,
-					rightsizingDefaultIntervalSeconds,
-					rightsizingDefaultBatchSize,
-				)(creds) {
-					r, workErr = u.Work(ctx, r)
-					if workErr != nil {
-						r.Err = workErr
-						return r, workErr
-					}
+				rsSvc = NewRightsizingService(st)
+
+				id, vms, start, end, err := rsSvc.CreateReportFromInventory(ctx)
+				if err != nil {
+					return r, err
+				}
+				rsReportID = id
+				rsVMs = vms
+				rsWindowStart = start
+				rsWindowEnd = end
+				return r, nil
+			},
+		},
+		// 6b. Rightsizing — query metrics, persist batches.
+		{
+			Status: func() models.CollectorStatus {
+				return models.CollectorStatus{State: models.CollectorStateMetricsCollecting}
+			},
+			Work: func(ctx context.Context, r models.CollectorResult) (models.CollectorResult, error) {
+				results, err := rsSvc.QueryMetrics(ctx, r.Client, rsVMs, rsWindowStart, rsWindowEnd)
+				if err != nil {
+					return r, err
+				}
+				rsVMResults = results
+
+				if err := rsSvc.PersistMetrics(ctx, rsVMs, rsVMResults, rsReportID); err != nil {
+					return r, err
+				}
+				return r, nil
+			},
+		},
+		// 6c. Rightsizing — persist VM warnings.
+		{
+			Status: func() models.CollectorStatus {
+				return models.CollectorStatus{State: models.CollectorStateMetricsCollecting}
+			},
+			Work: func(ctx context.Context, r models.CollectorResult) (models.CollectorResult, error) {
+				if err := rsSvc.PersistVMWarnings(ctx, rsVMs, rsVMResults, rsReportID); err != nil {
+					return r, err
+				}
+				return r, nil
+			},
+		},
+		// 6d. Rightsizing — compute per-VM utilization.
+		{
+			Status: func() models.CollectorStatus {
+				return models.CollectorStatus{State: models.CollectorStateMetricsCollecting}
+			},
+			Work: func(ctx context.Context, r models.CollectorResult) (models.CollectorResult, error) {
+				if err := rsSvc.ComputeUtilization(ctx, rsReportID); err != nil {
+					return r, err
 				}
 				return r, nil
 			},
@@ -408,6 +467,10 @@ func (f *collectorWorkFactory) Build(creds models.Credentials) work.WorkBuilder2
 	}
 
 	finalize := func(ctx context.Context, result models.CollectorResult) error {
+		if result.Client != nil {
+			_ = result.Client.Logout(context.Background())
+		}
+
 		if database == "" {
 			return nil
 		}
