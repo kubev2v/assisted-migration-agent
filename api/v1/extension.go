@@ -68,10 +68,7 @@ func NewVirtualMachineFromSummary(vm models.VirtualMachineSummary) VirtualMachin
 		result.Labels = &vm.Labels
 	}
 
-	if vm.InspectionStatus.State != models.InspectionStateNotStarted {
-		s := NewInspectionStatus(vm.InspectionStatus)
-		result.InspectionStatus = &s
-	}
+	result.InspectionStatus = newOptionalInspectionStatus(vm.InspectionStatus)
 	if vm.InspectionConcernCount > 0 {
 		result.InspectionConcernCount = &vm.InspectionConcernCount
 	}
@@ -187,6 +184,8 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 		details.Inspection = &VmInspectionResults{Concerns: &concerns}
 	}
 
+	details.InspectionStatus = newOptionalInspectionStatus(vm.InspectionStatus)
+
 	details.Template = &vm.IsTemplate
 	details.Migratable = &vm.IsMigratable
 	details.MigrationExcluded = &vm.MigrationExcluded
@@ -287,6 +286,14 @@ func (s *InspectorStatus) WithVddk(v *models.VddkStatus) *InspectorStatus {
 		}
 	}
 	return s
+}
+
+func newOptionalInspectionStatus(status models.InspectionStatus) *VmInspectionStatus {
+	if status.State == models.InspectionStateNotStarted {
+		return nil
+	}
+	s := NewInspectionStatus(status)
+	return &s
 }
 
 func NewInspectionStatus(status models.InspectionStatus) VmInspectionStatus {

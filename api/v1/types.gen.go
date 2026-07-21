@@ -913,7 +913,8 @@ type VirtualMachineDetail struct {
 	Id string `json:"id"`
 
 	// Inspection VirtualMachine Inspection results
-	Inspection *VmInspectionResults `json:"inspection,omitempty"`
+	Inspection       *VmInspectionResults `json:"inspection,omitempty"`
+	InspectionStatus *VmInspectionStatus  `json:"inspectionStatus,omitempty"`
 
 	// IpAddress Primary IP address of the guest OS as reported by VMware Tools
 	IpAddress *string `json:"ipAddress,omitempty"`

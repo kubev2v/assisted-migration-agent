@@ -127,7 +127,10 @@ SELECT
     u.mem_latest_pct,
     u.disk_pct,
     u.confidence_pct,
-    COALESCE(i."guest_apps", '[]') AS "GuestApps"
+    COALESCE(i."guest_apps", '[]') AS "GuestApps",
+    COALESCE(ins.status, 'not_started') AS "InspectionState",
+    COALESCE(ins.details, '') AS "InspectionDetails",
+    COALESCE(ins.error, '') AS "InspectionError"
 FROM vinfo i
 LEFT JOIN vcpu c ON i."VM ID" = c."VM ID"
 LEFT JOIN vmemory m ON i."VM ID" = m."VM ID"
@@ -142,6 +145,7 @@ LEFT JOIN rightsizing_vm_utilization u
         WHERE written_batch_count > 0
         ORDER BY created_at DESC LIMIT 1
     )
+LEFT JOIN vm_inspection_status ins ON i."VM ID" = ins."VM ID"
 WHERE i."VM ID" = ?;
 `
 

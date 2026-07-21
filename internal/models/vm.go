@@ -71,8 +71,7 @@ type VM struct {
 
 	Utilization *VmUtilizationDetails
 
-	InspectionState    string
-	InspectionError    string
+	InspectionStatus   InspectionStatus
 	InspectionConcerns []VmInspectionConcern
 
 	Labels []string

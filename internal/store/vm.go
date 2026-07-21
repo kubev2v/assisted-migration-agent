@@ -163,14 +163,15 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 	var pvm duckdb_models.VM
 	var groups StringArray
 	var (
-		uMoid                                 sql.NullString
-		uVmName                               sql.NullString
-		uProvCpus                             sql.NullInt64
-		uProvMemMb                            sql.NullInt64
-		uProvDiskKb                           sql.NullFloat64
-		uCpuAvg, uCpuP95, uCpuMax, uCpuLatest sql.NullFloat64
-		uMemAvg, uMemP95, uMemMax, uMemLatest sql.NullFloat64
-		uDisk, uConfidence                    sql.NullFloat64
+		uMoid                                               sql.NullString
+		uVmName                                             sql.NullString
+		uProvCpus                                           sql.NullInt64
+		uProvMemMb                                          sql.NullInt64
+		uProvDiskKb                                         sql.NullFloat64
+		uCpuAvg, uCpuP95, uCpuMax, uCpuLatest               sql.NullFloat64
+		uMemAvg, uMemP95, uMemMax, uMemLatest               sql.NullFloat64
+		uDisk, uConfidence                                  sql.NullFloat64
+		inspectionState, inspectionDetails, inspectionError string
 	)
 
 	if err := rows.Scan(
@@ -190,6 +191,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 		&uCpuAvg, &uCpuP95, &uCpuMax, &uCpuLatest,
 		&uMemAvg, &uMemP95, &uMemMax, &uMemLatest,
 		&uDisk, &uConfidence, &pvm.GuestApps,
+		&inspectionState, &inspectionDetails, &inspectionError,
 	); err != nil {
 		return nil, fmt.Errorf("scanning VM %s: %w", id, err)
 	}
@@ -200,6 +202,11 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 
 	result := fromDB(pvm)
 	result.Groups = groups
+	result.InspectionStatus.State = models.InspectionState(inspectionState)
+	result.InspectionStatus.Details = inspectionDetails
+	if inspectionError != "" {
+		result.InspectionStatus.Error = errors.New(inspectionError)
+	}
 
 	if uMoid.Valid {
 		result.Utilization = &models.VmUtilizationDetails{

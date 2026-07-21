@@ -942,6 +942,41 @@ var _ = Describe("VMStore", func() {
 				}
 			}
 		})
+
+		// Given a VM with an inspection status error row
+		// When we get it by ID
+		// Then InspectionStatus should be populated with state and error
+		It("should populate InspectionStatus from vm_inspection_status", func() {
+			// Arrange
+			_, err := db.ExecContext(ctx, `
+				INSERT INTO vm_inspection_status ("VM ID", status, details, error)
+				VALUES ('vm-001', 'error', 'VDDK connection failed', 'nbdkit-vddk-plugin: Unknown error')
+			`)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act
+			vm, err := s.VM().Get(ctx, "vm-001")
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vm.InspectionStatus.State).To(Equal(models.InspectionStateError))
+			Expect(vm.InspectionStatus.Details).To(Equal("VDDK connection failed"))
+			Expect(vm.InspectionStatus.Error).To(MatchError("nbdkit-vddk-plugin: Unknown error"))
+		})
+
+		// Given a VM with no inspection status row
+		// When we get it by ID
+		// Then InspectionStatus should default to not_started with no error
+		It("should default InspectionStatus to not_started when no row exists", func() {
+			// Act - vm-001 has no vm_inspection_status row
+			vm, err := s.VM().Get(ctx, "vm-001")
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vm.InspectionStatus.State).To(Equal(models.InspectionStateNotStarted))
+			Expect(vm.InspectionStatus.Details).To(BeEmpty())
+			Expect(vm.InspectionStatus.Error).To(BeNil())
+		})
 	})
 
 	Context("GetFolders", func() {

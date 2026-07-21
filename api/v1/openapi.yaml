@@ -1596,6 +1596,8 @@ components:
           description: List of issues affecting this VirtualMachine
         inspection:
           $ref: '#/components/schemas/VmInspectionResults'
+        inspectionStatus:
+          $ref: '#/components/schemas/VmInspectionStatus'
         utilization:
           $ref: '#/components/schemas/VmUtilizationDetails'
         processes:
