@@ -7,6 +7,7 @@ import (
 	"time"
 
 	externalRef0 "github.com/kubev2v/migration-planner/api/v1alpha1"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // Defines values for AgentModeRequestMode.
@@ -43,6 +44,12 @@ const (
 	InspectionStatusStateError     InspectionStatusState = "error"
 	InspectionStatusStatePending   InspectionStatusState = "pending"
 	InspectionStatusStateRunning   InspectionStatusState = "running"
+)
+
+// Defines values for InspectorStatusState.
+const (
+	InspectorStatusStateReady   InspectorStatusState = "ready"
+	InspectorStatusStateRunning InspectorStatusState = "running"
 )
 
 // Defines values for VirtualMachineIssueCategory.
@@ -260,6 +267,16 @@ type InspectionStatus struct {
 // InspectionStatusState Current inspection state
 type InspectionStatusState string
 
+// InspectorStatus defines model for InspectorStatus.
+type InspectorStatus struct {
+	// State Inspector state
+	State InspectorStatusState `json:"state"`
+	Vddk  *VddkProperties      `json:"vddk,omitempty"`
+}
+
+// InspectorStatusState Inspector state
+type InspectorStatusState string
+
 // Inventory defines model for Inventory.
 type Inventory struct {
 	Inventory externalRef0.UpdateInventory `json:"inventory"`
@@ -296,6 +313,12 @@ type RightsizingClusterUtilization struct {
 	TotalProvisionedDiskKb   float64 `json:"total_provisioned_disk_kb"`
 	TotalProvisionedMemoryMb int     `json:"total_provisioned_memory_mb"`
 	VmCount                  int     `json:"vm_count"`
+}
+
+// StartInspectionRequest defines model for StartInspectionRequest.
+type StartInspectionRequest struct {
+	// VmIds VM MoRef IDs to inspect
+	VmIds []string `binding:"required,min=1,dive,required" json:"vmIds"`
 }
 
 // UpdateGroupRequest defines model for UpdateGroupRequest.
@@ -354,6 +377,17 @@ type VcenterCredentials struct {
 	// Url vCenter URL
 	Url      string `binding:"required,url" json:"url"`
 	Username string `binding:"required,min=1" json:"username"`
+}
+
+// VddkProperties defines model for VddkProperties.
+type VddkProperties struct {
+	Bytes *int64 `json:"bytes,omitempty"`
+
+	// Md5 md5 sum of the uploaded tarball
+	Md5 string `json:"md5"`
+
+	// Version The matching vSphere Client version
+	Version string `json:"version"`
 }
 
 // VersionInfo defines model for VersionInfo.
@@ -680,6 +714,17 @@ type GetLatestGroupParams struct {
 	PageSize *int `form:"pageSize,omitempty" json:"pageSize,omitempty"`
 }
 
+// GetInspectorStatusParams defines parameters for GetInspectorStatus.
+type GetInspectorStatusParams struct {
+	// IncludeVddk Include VDDK metadata in the response
+	IncludeVddk *bool `form:"includeVddk,omitempty" json:"includeVddk,omitempty"`
+}
+
+// PutInspectorVddkMultipartBody defines parameters for PutInspectorVddk.
+type PutInspectorVddkMultipartBody struct {
+	File openapi_types.File `json:"file"`
+}
+
 // ListLatestVirtualMachinesParams defines parameters for ListLatestVirtualMachines.
 type ListLatestVirtualMachinesParams struct {
 	// ByExpression Filter by expression
@@ -721,6 +766,12 @@ type CreateLatestGroupJSONRequestBody = CreateGroupRequest
 
 // UpdateLatestGroupJSONRequestBody defines body for UpdateLatestGroup for application/json ContentType.
 type UpdateLatestGroupJSONRequestBody = UpdateGroupRequest
+
+// StartInspectionJSONRequestBody defines body for StartInspection for application/json ContentType.
+type StartInspectionJSONRequestBody = StartInspectionRequest
+
+// PutInspectorVddkMultipartRequestBody defines body for PutInspectorVddk for multipart/form-data ContentType.
+type PutInspectorVddkMultipartRequestBody PutInspectorVddkMultipartBody
 
 // BatchUpdateLatestVMExclusionJSONRequestBody defines body for BatchUpdateLatestVMExclusion for application/json ContentType.
 type BatchUpdateLatestVMExclusionJSONRequestBody = BatchUpdateExclusionRequest

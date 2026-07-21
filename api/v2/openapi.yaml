@@ -21,6 +21,8 @@ tags:
     description: Detected application inventory
   - name: Rightsizing
     description: Rightsizing reports and cluster/VM utilization
+  - name: Inspector
+    description: Deep VM inspection lifecycle and VDDK management
   - name: Credentials
     description: vCenter credential management
   - name: Version
@@ -1179,6 +1181,143 @@ paths:
         '500':
           description: Internal server error
 
+  # ── Inspector ───────────────────────────────────────────────────────────
+  /inspector:
+    post:
+      tags: [Inspector]
+      summary: Start deep inspection for VMs
+      operationId: startInspection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartInspectionRequest'
+      responses:
+        '202':
+          description: Inspection started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectorStatus'
+        '400':
+          description: Invalid request (no VMs, no VDDK, no credentials)
+        '409':
+          description: Inspector already running
+        '500':
+          description: Internal server error
+    get:
+      tags: [Inspector]
+      summary: Get inspector status
+      operationId: getInspectorStatus
+      parameters:
+        - name: includeVddk
+          in: query
+          required: false
+          description: Include VDDK metadata in the response
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Inspector status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectorStatus'
+        '500':
+          description: Internal server error
+    delete:
+      tags: [Inspector]
+      summary: Stop inspector
+      operationId: stopInspection
+      responses:
+        '200':
+          description: Inspector stopped
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectorStatus'
+        '404':
+          description: Inspector not running
+        '500':
+          description: Internal server error
+
+  /inspector/vddk:
+    put:
+      tags: [Inspector]
+      summary: Upload VDDK tarball
+      operationId: putInspectorVddk
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: VDDK uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VddkProperties'
+        '400':
+          description: Invalid VDDK
+        '409':
+          description: Upload already in progress
+        '413':
+          description: File too large (max 64MB)
+        '500':
+          description: Internal server error
+    get:
+      tags: [Inspector]
+      summary: Get VDDK upload status
+      operationId: getInspectorVddkStatus
+      responses:
+        '200':
+          description: VDDK metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VddkProperties'
+        '404':
+          description: No VDDK uploaded
+        '500':
+          description: Internal server error
+
+  /collections/{id}/virtualmachines/{vmId}/inspection:
+    delete:
+      tags: [Inspector]
+      summary: Remove VM from inspection queue
+      operationId: removeVMFromInspection
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Collection ID
+          schema:
+            type: string
+        - name: vmId
+          in: path
+          required: true
+          description: VirtualMachine MoRef ID
+          schema:
+            type: string
+      responses:
+        '204':
+          description: VM removed from inspection
+        '400':
+          description: Inspector not running
+        '404':
+          description: Collection or VM not found
+        '500':
+          description: Internal server error
+
   # ── Credentials ────────────────────────────────────────────────────────
   /credentials:
     put:
@@ -2266,6 +2405,53 @@ components:
         confidence:
           type: number
           format: double
+
+    # ── Inspector ────────────────────────────────────────────────────────
+    StartInspectionRequest:
+      type: object
+      required:
+        - vmIds
+      properties:
+        vmIds:
+          type: array
+          items:
+            type: string
+          description: VM MoRef IDs to inspect
+          x-oapi-codegen-extra-tags:
+            binding: "required,min=1,dive,required"
+
+    InspectorStatus:
+      type: object
+      required:
+        - state
+      properties:
+        state:
+          type: string
+          enum:
+            - ready
+            - running
+          x-enum-varnames:
+            - InspectorStatusStateReady
+            - InspectorStatusStateRunning
+          description: Inspector state
+        vddk:
+          $ref: '#/components/schemas/VddkProperties'
+
+    VddkProperties:
+      type: object
+      required:
+        - version
+        - md5
+      properties:
+        version:
+          type: string
+          description: The matching vSphere Client version
+        md5:
+          type: string
+          description: md5 sum of the uploaded tarball
+        bytes:
+          type: integer
+          format: int64
 
     # ── Version ──────────────────────────────────────────────────────────
     VersionInfo:

@@ -331,6 +331,15 @@ func NewVmUtilizationDetailsFromModel(d models.VmUtilizationDetails) VmUtilizati
 	}
 }
 
+func NewInspectorStatusFromModel(s models.InspectorStatus) InspectorStatus {
+	switch s.State {
+	case models.InspectorStateRunning:
+		return InspectorStatus{State: InspectorStatusStateRunning}
+	default:
+		return InspectorStatus{State: InspectorStatusStateReady}
+	}
+}
+
 // NewGroupFromModel converts a models.Group to a v2 Group.
 func NewGroupFromModel(g models.Group) Group {
 	createdAt := g.CreatedAt

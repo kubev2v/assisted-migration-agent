@@ -3,6 +3,7 @@ package v2
 import (
 	"context"
 	"errors"
+	"sync"
 
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
 	"github.com/kubev2v/migration-planner/pkg/opa"
@@ -23,6 +24,9 @@ type ServiceManager struct {
 	collection   *CollectionService
 	credentials  *CredentialsService
 	collectorMgr *CollectorManager
+	mu           sync.Mutex
+	inspector    *InspectorService
+	vddk         *VddkService
 	validator    *opa.Validator
 }
 
@@ -108,11 +112,45 @@ func (m *ServiceManager) Initialize() error {
 	}
 	m.collectorMgr = NewCollectorManager(factory, m.credentials)
 
+	m.vddk = NewVddkService(m.cfg.Agent.DataFolder, m.pool)
+
 	return nil
 }
 
 func (m *ServiceManager) CollectorManager() *CollectorManager {
 	return m.collectorMgr
+}
+
+// InspectorService must use the latest collection when returning the inspector
+// Therefore, this methods return the same inspector as long is busy.
+// When the inspector is done, to be sure we use the latest collection
+// the methods recreates a new one
+func (m *ServiceManager) InspectorService() (*InspectorService, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.inspector != nil && m.inspector.IsBusy() {
+		return m.inspector, nil
+	}
+
+	m.inspector = nil
+
+	db, err := m.pool.Latest()
+	if err != nil {
+		return nil, err
+	}
+	store, err := db.Store()
+	if err != nil {
+		return nil, err
+	}
+
+	m.inspector = NewInspectorService(store, 10, m.cfg.Agent.DataFolder, m.credentials)
+
+	return m.inspector, nil
+}
+
+func (m *ServiceManager) VddkService() *VddkService {
+	return m.vddk
 }
 
 func (m *ServiceManager) CollectionService() *CollectionService {
@@ -234,5 +272,11 @@ func (m *ServiceManager) LatestRightsizingService() (*RightsizingService, error)
 func (m *ServiceManager) Stop(ctx context.Context) {
 	if m.collectorMgr != nil {
 		m.collectorMgr.StopAll()
+	}
+	m.mu.Lock()
+	inspector := m.inspector
+	m.mu.Unlock()
+	if inspector != nil {
+		_ = inspector.Stop()
 	}
 }

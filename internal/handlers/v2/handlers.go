@@ -9,6 +9,8 @@ type ServiceProvider interface {
 	ConsoleService() *svc.Console
 	CollectionService() *svc.CollectionService
 	CollectorManager() *svc.CollectorManager
+	InspectorService() (*svc.InspectorService, error)
+	VddkService() *svc.VddkService
 	CredentialsService() *svc.CredentialsService
 
 	ApplicationService(collectionID string) (*svc.ApplicationService, error)
