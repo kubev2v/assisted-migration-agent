@@ -10,6 +10,7 @@ import (
 
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 
+	services "github.com/kubev2v/assisted-migration-agent/internal/services/v2"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
@@ -26,6 +27,28 @@ func (h *Handler) GetInventory(c *gin.Context, id string) {
 		return
 	}
 
+	h.getInventory(c, invSvc)
+}
+
+// GetLatestInventory returns the inventory from the latest collection.
+// (GET /inventory)
+func (h *Handler) GetLatestInventory(c *gin.Context) {
+	invSvc, err := h.svc.LatestInventoryService()
+	if err != nil {
+		if srvErrors.IsResourceNotFoundError(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "no collections found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	h.getInventory(c, invSvc)
+}
+
+// ── Private shared logic ───────────────────────────────────────────────
+
+func (h *Handler) getInventory(c *gin.Context, invSvc *services.InventoryService) {
 	inv, err := invSvc.GetInventory(c.Request.Context())
 	if err != nil {
 		if srvErrors.IsResourceNotFoundError(err) {

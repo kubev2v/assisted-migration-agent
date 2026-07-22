@@ -65,6 +65,413 @@ paths:
         '500':
           description: Internal server error
 
+  # ── Latest-collection shortcuts ─────────────────────────────────────
+  # Mirrors of /collections/{id}/... that resolve the latest collection automatically.
+  /virtualmachines:
+    get:
+      tags: [VirtualMachines]
+      summary: List VirtualMachines from the latest collection
+      operationId: listLatestVirtualMachines
+      parameters:
+        - name: byExpression
+          in: query
+          description: Filter by expression
+          schema:
+            type: string
+        - name: sort
+          in: query
+          description: Sort fields with direction (e.g., "name:asc", "cluster:desc"). Valid fields are name, vCenterState, cluster, diskSize, memory, issues, cpuUsage, diskUsage, ramUsage, cpuAvg, memAvg.
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+          example: ["cluster:asc", "name:desc"]
+        - name: page
+          in: query
+          description: Page number for pagination
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: pageSize
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: List of VirtualMachines
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VirtualMachineListResponse'
+        '400':
+          description: Invalid request parameters
+        '404':
+          description: No collections found
+        '500':
+          description: Internal server error
+
+  /virtualmachines/batch-update-exclusion:
+    post:
+      tags: [VirtualMachines]
+      summary: Batch update migration exclusion for multiple VMs in the latest collection
+      operationId: batchUpdateLatestVMExclusion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchUpdateExclusionRequest'
+      responses:
+        '200':
+          description: Exclusion updated
+        '400':
+          description: Invalid request
+        '404':
+          description: No collections found
+        '500':
+          description: Internal server error
+
+  /virtualmachines/filter-options:
+    get:
+      tags: [VirtualMachines]
+      summary: Get available filter option values from the latest collection
+      operationId: getLatestVMFilterOptions
+      responses:
+        '200':
+          description: Filter options
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VMFilterOptionsResponse'
+        '404':
+          description: No collections found
+        '500':
+          description: Internal server error
+
+  /virtualmachines/labels:
+    get:
+      tags: [VirtualMachines]
+      summary: Get all distinct labels with counts from the latest collection
+      operationId: getLatestVMLabels
+      responses:
+        '200':
+          description: Labels with counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VMLabelsResponse'
+        '404':
+          description: No collections found
+        '500':
+          description: Internal server error
+
+  /virtualmachines/labels/{label}:
+    patch:
+      tags: [VirtualMachines]
+      summary: Add or remove a label from multiple VMs in the latest collection
+      operationId: updateLatestLabelVMs
+      parameters:
+        - name: label
+          in: path
+          required: true
+          description: Label name
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLabelVMsRequest'
+      responses:
+        '200':
+          description: Label updated
+        '400':
+          description: Invalid request
+        '404':
+          description: No collections found
+        '500':
+          description: Internal server error
+    delete:
+      tags: [VirtualMachines]
+      summary: Remove a label from all VMs in the latest collection
+      operationId: deleteLatestLabelGlobally
+      parameters:
+        - name: label
+          in: path
+          required: true
+          description: Label name
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Label removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteLabelGloballyResponse'
+        '400':
+          description: Invalid request
+        '500':
+          description: Internal server error
+
+  /virtualmachines/{vmId}:
+    get:
+      tags: [VirtualMachines]
+      summary: Get VirtualMachine details from the latest collection
+      operationId: getLatestVirtualMachine
+      parameters:
+        - name: vmId
+          in: path
+          required: true
+          description: VirtualMachine ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: VirtualMachine details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VirtualMachineDetail'
+        '404':
+          description: No collections or VirtualMachine not found
+        '500':
+          description: Internal server error
+    patch:
+      tags: [VirtualMachines]
+      summary: Update VirtualMachine properties in the latest collection
+      operationId: updateLatestVirtualMachine
+      parameters:
+        - name: vmId
+          in: path
+          required: true
+          description: VirtualMachine ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VirtualMachineUpdateRequest'
+      responses:
+        '200':
+          description: VirtualMachine updated
+        '400':
+          description: Invalid request
+        '404':
+          description: No collections or VirtualMachine not found
+        '500':
+          description: Internal server error
+
+  /virtualmachines/{vmId}/utilization:
+    get:
+      tags: [Rightsizing]
+      summary: Get utilization breakdown for a specific VM from the latest collection
+      operationId: getLatestVMUtilization
+      parameters:
+        - name: vmId
+          in: path
+          required: true
+          description: VirtualMachine MoRef ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: VM utilization details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VmUtilizationDetails'
+        '404':
+          description: No collections or no utilization data for this VM
+        '500':
+          description: Internal server error
+
+  /groups:
+    get:
+      tags: [Groups]
+      summary: List groups from the latest collection
+      operationId: listLatestGroups
+      parameters:
+        - name: byName
+          in: query
+          required: false
+          description: Filter groups by name (case-insensitive substring match)
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          description: Page number (1-indexed)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          required: false
+          description: Number of groups per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: List of groups
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupListResponse'
+        '400':
+          description: Invalid filter expression
+        '404':
+          description: No collections found
+        '500':
+          description: Internal server error
+    post:
+      tags: [Groups]
+      summary: Create a new group in the latest collection
+      operationId: createLatestGroup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGroupRequest'
+      responses:
+        '201':
+          description: Group created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+        '400':
+          description: Invalid request
+        '404':
+          description: No collections found
+        '500':
+          description: Internal server error
+
+  /groups/{groupId}:
+    get:
+      tags: [Groups]
+      summary: Get group by ID from the latest collection
+      operationId: getLatestGroup
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          description: Group ID
+          schema:
+            type: string
+        - name: sort
+          in: query
+          description: Sort fields with direction (e.g., "name:asc", "cluster:desc"). Valid fields are name, vCenterState, cluster, diskSize, memory, issues, cpuUsage, diskUsage, ramUsage, cpuAvg, memAvg.
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+          example: ["cluster:asc", "name:desc"]
+        - name: page
+          in: query
+          description: Page number for pagination
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: pageSize
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Group details with VirtualMachines
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupResponse'
+        '404':
+          description: No collections or group not found
+        '500':
+          description: Internal server error
+    patch:
+      tags: [Groups]
+      summary: Update group in the latest collection
+      operationId: updateLatestGroup
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          description: Group ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateGroupRequest'
+      responses:
+        '200':
+          description: Group updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+        '400':
+          description: Invalid request
+        '404':
+          description: No collections or group not found
+        '500':
+          description: Internal server error
+    delete:
+      tags: [Groups]
+      summary: Delete group from the latest collection
+      operationId: deleteLatestGroup
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          description: Group ID
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Group deleted
+        '404':
+          description: No collections or group not found
+        '500':
+          description: Internal server error
+
+  /inventory:
+    get:
+      tags: [Inventories]
+      summary: Get inventory from the latest collection
+      operationId: getLatestInventory
+      responses:
+        '200':
+          description: Collected inventory
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Inventory'
+        '404':
+          description: No collections or inventory not found
+        '500':
+          description: Internal server error
+
   # ── Collections ────────────────────────────────────────────────────────
   /collections:
     get:

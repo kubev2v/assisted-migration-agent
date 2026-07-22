@@ -656,6 +656,45 @@ type ListVirtualMachinesParams struct {
 	PageSize *int `form:"pageSize,omitempty" json:"pageSize,omitempty"`
 }
 
+// ListLatestGroupsParams defines parameters for ListLatestGroups.
+type ListLatestGroupsParams struct {
+	// ByName Filter groups by name (case-insensitive substring match)
+	ByName *string `form:"byName,omitempty" json:"byName,omitempty"`
+
+	// Page Page number (1-indexed)
+	Page *int `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize Number of groups per page
+	PageSize *int `form:"pageSize,omitempty" json:"pageSize,omitempty"`
+}
+
+// GetLatestGroupParams defines parameters for GetLatestGroup.
+type GetLatestGroupParams struct {
+	// Sort Sort fields with direction (e.g., "name:asc", "cluster:desc"). Valid fields are name, vCenterState, cluster, diskSize, memory, issues, cpuUsage, diskUsage, ramUsage, cpuAvg, memAvg.
+	Sort *[]string `form:"sort,omitempty" json:"sort,omitempty"`
+
+	// Page Page number for pagination
+	Page *int `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize Number of items per page
+	PageSize *int `form:"pageSize,omitempty" json:"pageSize,omitempty"`
+}
+
+// ListLatestVirtualMachinesParams defines parameters for ListLatestVirtualMachines.
+type ListLatestVirtualMachinesParams struct {
+	// ByExpression Filter by expression
+	ByExpression *string `form:"byExpression,omitempty" json:"byExpression,omitempty"`
+
+	// Sort Sort fields with direction (e.g., "name:asc", "cluster:desc"). Valid fields are name, vCenterState, cluster, diskSize, memory, issues, cpuUsage, diskUsage, ramUsage, cpuAvg, memAvg.
+	Sort *[]string `form:"sort,omitempty" json:"sort,omitempty"`
+
+	// Page Page number for pagination
+	Page *int `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize Number of items per page
+	PageSize *int `form:"pageSize,omitempty" json:"pageSize,omitempty"`
+}
+
 // SetAgentModeJSONRequestBody defines body for SetAgentMode for application/json ContentType.
 type SetAgentModeJSONRequestBody = AgentModeRequest
 
@@ -676,3 +715,18 @@ type UpdateVirtualMachineJSONRequestBody = VirtualMachineUpdateRequest
 
 // PutCredentialsJSONRequestBody defines body for PutCredentials for application/json ContentType.
 type PutCredentialsJSONRequestBody = VcenterCredentials
+
+// CreateLatestGroupJSONRequestBody defines body for CreateLatestGroup for application/json ContentType.
+type CreateLatestGroupJSONRequestBody = CreateGroupRequest
+
+// UpdateLatestGroupJSONRequestBody defines body for UpdateLatestGroup for application/json ContentType.
+type UpdateLatestGroupJSONRequestBody = UpdateGroupRequest
+
+// BatchUpdateLatestVMExclusionJSONRequestBody defines body for BatchUpdateLatestVMExclusion for application/json ContentType.
+type BatchUpdateLatestVMExclusionJSONRequestBody = BatchUpdateExclusionRequest
+
+// UpdateLatestLabelVMsJSONRequestBody defines body for UpdateLatestLabelVMs for application/json ContentType.
+type UpdateLatestLabelVMsJSONRequestBody = UpdateLabelVMsRequest
+
+// UpdateLatestVirtualMachineJSONRequestBody defines body for UpdateLatestVirtualMachine for application/json ContentType.
+type UpdateLatestVirtualMachineJSONRequestBody = VirtualMachineUpdateRequest

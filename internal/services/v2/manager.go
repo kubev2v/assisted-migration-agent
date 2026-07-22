@@ -199,6 +199,38 @@ func (m *ServiceManager) ExportService(collectionID string) (*ExportService, err
 	return NewExportService(st), nil
 }
 
+func (m *ServiceManager) LatestVirtualMachineService() (*VMService, error) {
+	db, err := m.pool.Latest()
+	if err != nil {
+		return nil, err
+	}
+	return m.VirtualMachineService(db.ID)
+}
+
+func (m *ServiceManager) LatestGroupService() (*GroupService, error) {
+	db, err := m.pool.Latest()
+	if err != nil {
+		return nil, err
+	}
+	return m.GroupService(db.ID)
+}
+
+func (m *ServiceManager) LatestInventoryService() (*InventoryService, error) {
+	db, err := m.pool.Latest()
+	if err != nil {
+		return nil, err
+	}
+	return m.InventoryService(db.ID)
+}
+
+func (m *ServiceManager) LatestRightsizingService() (*RightsizingService, error) {
+	db, err := m.pool.Latest()
+	if err != nil {
+		return nil, err
+	}
+	return m.RightsizingService(db.ID)
+}
+
 func (m *ServiceManager) Stop(ctx context.Context) {
 	if m.collectorMgr != nil {
 		m.collectorMgr.StopAll()

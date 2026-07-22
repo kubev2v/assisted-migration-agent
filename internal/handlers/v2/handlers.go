@@ -17,6 +17,11 @@ type ServiceProvider interface {
 	GroupService(collectionID string) (*svc.GroupService, error)
 	InventoryService(collectionID string) (*svc.InventoryService, error)
 	RightsizingService(collectionID string) (*svc.RightsizingService, error)
+
+	LatestVirtualMachineService() (*svc.VMService, error)
+	LatestGroupService() (*svc.GroupService, error)
+	LatestInventoryService() (*svc.InventoryService, error)
+	LatestRightsizingService() (*svc.RightsizingService, error)
 }
 
 type Handler struct {

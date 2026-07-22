@@ -233,6 +233,16 @@ func (p *Pool) List() []*Database {
 	return databases
 }
 
+func (p *Pool) Latest() (*Database, error) {
+	for db := range p.All() {
+		if db.ID == MainDatabaseID {
+			continue
+		}
+		return db, nil
+	}
+	return nil, errors.NewResourceNotFoundError("collection", "latest")
+}
+
 // All returns an iterator on sorted list of databases based on createdAt
 func (p *Pool) All() iter.Seq[*Database] {
 	dbs := p.List()

@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	v2 "github.com/kubev2v/assisted-migration-agent/api/v2"
+	services "github.com/kubev2v/assisted-migration-agent/internal/services/v2"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
@@ -58,11 +59,6 @@ func (h *Handler) GetClusterUtilization(c *gin.Context, id string, clusterId str
 // GetVMUtilization returns utilization details for a specific VM.
 // (GET /collections/{id}/virtualmachines/{vmId}/utilization)
 func (h *Handler) GetVMUtilization(c *gin.Context, id string, vmId string) {
-	if !vmIDPattern.MatchString(vmId) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid vm_id format: %q", vmId)})
-		return
-	}
-
 	rsSvc, err := h.svc.RightsizingService(id)
 	if err != nil {
 		if srvErrors.IsResourceNotFoundError(err) {
@@ -73,13 +69,40 @@ func (h *Handler) GetVMUtilization(c *gin.Context, id string, vmId string) {
 		return
 	}
 
+	h.getVMUtilization(c, rsSvc, vmId)
+}
+
+// GetLatestVMUtilization returns utilization details for a VM from the latest collection.
+// (GET /virtualmachines/{vmId}/utilization)
+func (h *Handler) GetLatestVMUtilization(c *gin.Context, vmId string) {
+	rsSvc, err := h.svc.LatestRightsizingService()
+	if err != nil {
+		if srvErrors.IsResourceNotFoundError(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "no collections found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	h.getVMUtilization(c, rsSvc, vmId)
+}
+
+// ── Private shared logic ───────────────────────────────────────────────
+
+func (h *Handler) getVMUtilization(c *gin.Context, rsSvc *services.RightsizingService, vmId string) {
+	if !vmIDPattern.MatchString(vmId) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid vm_id format: %q", vmId)})
+		return
+	}
+
 	details, err := rsSvc.GetVMUtilization(c.Request.Context(), vmId)
 	if err != nil {
 		if srvErrors.IsResourceNotFoundError(err) {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return
 		}
-		zap.S().Named("rightsizing_handler").Errorw("failed to get VM utilization", "collection_id", id, "vm_id", vmId, "error", err)
+		zap.S().Named("rightsizing_handler").Errorw("failed to get VM utilization", "vm_id", vmId, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
