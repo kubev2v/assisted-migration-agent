@@ -188,8 +188,6 @@ func (c *Console) Status() models.ConsoleStatus {
 // an ack on closeCh. Stop() and SetMode use a non-blocking send to handle
 // both normal shutdown (run alive) and self-exit (run already finished).
 func (c *Console) run(closeCh chan any) {
-	c.state.SetCurrent(models.ConsoleStatusConnected)
-
 	sched, err := scheduler.NewScheduler[any](1, 0)
 	if err != nil {
 		c.state.SetError(err)
@@ -205,6 +203,11 @@ func (c *Console) run(closeCh chan any) {
 	if errPipeline != nil {
 		zap.S().Errorw("failed to create pipeline", "error", errPipeline)
 		c.state.SetError(errPipeline)
+		return
+	}
+
+	if err := pipeline.Start(); err != nil {
+		c.state.SetError(err)
 		return
 	}
 
@@ -233,6 +236,7 @@ func (c *Console) run(closeCh chan any) {
 
 		state := pipeline.State()
 		if state.Err != nil {
+			c.state.SetCurrent(models.ConsoleStatusDisconnected)
 			c.state.SetError(state.Err)
 			if errors.IsConsoleClientError(state.Err) {
 				zap.S().Named("console_service").Errorw("failed to send request to console. console service stopped", "error", state.Err.Error())
@@ -242,6 +246,7 @@ func (c *Console) run(closeCh chan any) {
 			zap.S().Named("console_service").Errorw("failed to dispatch to console", "error", state.Err)
 			interval = min(interval*2, maxBackoffInterval)
 		} else {
+			c.state.SetCurrent(models.ConsoleStatusConnected)
 			c.state.ClearError()
 			interval = c.updateInterval
 		}

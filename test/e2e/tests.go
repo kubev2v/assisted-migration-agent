@@ -1066,5 +1066,145 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 				gm.Expect(source.Inventory.VcenterId).ToNot(gm.BeEmpty(), "gm.Expected vcenter_id to be set")
 			})
 		})
+
+		ginkgo.Context("console connectivity", func() {
+			var (
+				agentSvc *service.AgentSvc
+				sourceID openapi_types.UUID
+				userSvc  *service.PlannerSvc
+			)
+
+			ginkgo.BeforeEach(func() {
+				agentSvc = service.DefaultAgentSvc(cfg.AgentAPIUrl)
+				userSvc = plannerSvc.WithAuthUser("admin", "admin", "admin@example.com")
+
+				source, err := userSvc.CreateSource("test-source-" + uuid.NewString()[:8])
+				gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to create source")
+				sourceID = source.Id
+				ginkgo.GinkgoWriter.Printf("Created source: %s\n", sourceID)
+			})
+
+			ginkgo.AfterEach(func() {
+				// The backend is shared by every spec in "connected env", so it must be
+				// restored regardless of pass/fail before the next ordered spec runs.
+				ginkgo.GinkgoWriter.Println("Ensuring backend is running...")
+				_ = infraManager.StartBackend()
+				gm.Eventually(func() error {
+					resp, err := http.DefaultClient.Get(cfg.BackendAgentEndpoint + "/health")
+					if err != nil {
+						return err
+					}
+					defer func() {
+						_ = resp.Body.Close()
+					}()
+					if resp.StatusCode >= 500 {
+						return fmt.Errorf("server error: %d", resp.StatusCode)
+					}
+					return nil
+				}, 30*time.Second, 1*time.Second).Should(gm.BeNil())
+
+				if ginkgo.CurrentSpecReport().Failed() {
+					ginkgo.GinkgoWriter.Println("Keeping containers running (test failed)")
+					return
+				}
+				ginkgo.GinkgoWriter.Println("Stopping agent...")
+				_ = infraManager.RemoveAgent()
+
+				ginkgo.GinkgoWriter.Println("Deleting source...")
+				_ = userSvc.RemoveSource(sourceID)
+			})
+
+			// Given an agent connected to the console through a proxy
+			// When the console backend becomes unreachable and then recovers
+			// Then the agent should report disconnected with an error, then reconnect with no error
+			ginkgo.It("should report disconnected on transient console errors and reconnect once the console recovers", func() {
+				// Arrange
+				agentID := uuid.NewString()
+				_, err := infraManager.StartAgent(infra.AgentConfig{
+					AgentID:        agentID,
+					SourceID:       sourceID.String(),
+					Mode:           "connected",
+					ConsoleURL:     "http://localhost:8081",
+					UpdateInterval: "1s",
+				})
+				gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to start agent")
+				ginkgo.GinkgoWriter.Printf("Agent started with ID: %s\n", agentID)
+
+				gm.Eventually(func() error {
+					_, err := agentSvc.Status()
+					return err
+				}, 30*time.Second, 1*time.Second).Should(gm.BeNil())
+
+				gm.Eventually(func() string {
+					status, err := agentSvc.Status()
+					if err != nil {
+						return "error"
+					}
+					return status.ConsoleConnection
+				}, 30*time.Second, 1*time.Second).Should(gm.Equal("connected"), "expected agent to connect to console before the fault is injected")
+
+				// Act - take the console backend down to force transient errors
+				ginkgo.GinkgoWriter.Println("Stopping backend to simulate transient console errors...")
+				err = infraManager.StopBackend()
+				gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to stop backend")
+
+				// Assert - agent should report disconnected
+				gm.Eventually(func() string {
+					status, err := agentSvc.Status()
+					if err != nil {
+						return "error"
+					}
+					ginkgo.GinkgoWriter.Printf("Agent status while backend down: mode=%s, console_connection=%s, error=%s\n",
+						status.Mode, status.ConsoleConnection, status.Error)
+					return status.ConsoleConnection
+				}, 30*time.Second, 1*time.Second).Should(gm.Equal("disconnected"))
+
+				// Assert - and the error field should eventually be populated too
+				gm.Eventually(func() string {
+					status, err := agentSvc.Status()
+					if err != nil {
+						return ""
+					}
+					return status.Error
+				}, 10*time.Second, 1*time.Second).ShouldNot(gm.BeEmpty(), "expected agent status to report an error while console is unreachable")
+
+				// Act - bring the console backend back up
+				ginkgo.GinkgoWriter.Println("Restarting backend to simulate console recovery...")
+				err = infraManager.StartBackend()
+				gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to restart backend")
+
+				gm.Eventually(func() error {
+					resp, err := http.DefaultClient.Get(cfg.BackendAgentEndpoint + "/health")
+					if err != nil {
+						return err
+					}
+					defer func() {
+						_ = resp.Body.Close()
+					}()
+					if resp.StatusCode >= 500 {
+						return fmt.Errorf("server error: %d", resp.StatusCode)
+					}
+					return nil
+				}, 30*time.Second, 1*time.Second).Should(gm.BeNil())
+
+				// Assert - agent should recover to connected
+				gm.Eventually(func() string {
+					status, err := agentSvc.Status()
+					if err != nil {
+						return "error"
+					}
+					return status.ConsoleConnection
+				}, 30*time.Second, 1*time.Second).Should(gm.Equal("connected"))
+
+				// Assert - and the error field should eventually clear too
+				gm.Eventually(func() string {
+					status, err := agentSvc.Status()
+					if err != nil {
+						return "error"
+					}
+					return status.Error
+				}, 10*time.Second, 1*time.Second).Should(gm.BeEmpty())
+			})
+		})
 	})
 })

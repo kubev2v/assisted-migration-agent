@@ -550,6 +550,77 @@ var _ = Describe("Console Service", func() {
 			// Assert
 			Eventually(requestReceived, 500*time.Millisecond).Should(Receive())
 		})
+
+		// Given a console service in connected mode receiving transient errors
+		// When the server responds with 500 Internal Server Error
+		// Then console_connection should report disconnected
+		It("should report disconnected status on transient errors", func() {
+			// Arrange
+			requestReceived := make(chan bool, 10)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				requestReceived <- true
+				w.WriteHeader(http.StatusInternalServerError)
+			}))
+			defer server.Close()
+
+			client, err := console.NewConsoleClient(server.URL, "")
+			Expect(err).NotTo(HaveOccurred())
+
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act
+			Expect(consoleSrv.SetMode(context.Background(), models.AgentModeConnected)).To(BeNil())
+			Eventually(requestReceived, 500*time.Millisecond).Should(Receive())
+
+			// Assert
+			Eventually(func() models.ConsoleStatusType {
+				return consoleSrv.Status().Current
+			}, 500*time.Millisecond).Should(Equal(models.ConsoleStatusDisconnected))
+			Eventually(func() error {
+				return consoleSrv.Status().Error
+			}, 500*time.Millisecond).ShouldNot(BeNil())
+		})
+
+		// Given a console service that experienced transient errors
+		// When the server recovers and responds with 200
+		// Then console_connection should report connected and error should be cleared
+		It("should recover to connected status after transient errors resolve", func() {
+			// Arrange
+			var requestCount int
+			var mu sync.Mutex
+			requestReceived := make(chan bool, 20)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				mu.Lock()
+				requestCount++
+				count := requestCount
+				mu.Unlock()
+				requestReceived <- true
+				if count <= 2 {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer server.Close()
+
+			client, err := console.NewConsoleClient(server.URL, "")
+			Expect(err).NotTo(HaveOccurred())
+
+			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act
+			Expect(consoleSrv.SetMode(context.Background(), models.AgentModeConnected)).To(BeNil())
+
+			// Assert — should recover to connected with no error
+			Eventually(func() models.ConsoleStatusType {
+				return consoleSrv.Status().Current
+			}, 2*time.Second).Should(Equal(models.ConsoleStatusConnected))
+			Eventually(func() error {
+				return consoleSrv.Status().Error
+			}, 500*time.Millisecond).Should(BeNil())
+		})
 	})
 
 	Context("Outbox events", func() {
