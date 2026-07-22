@@ -95,6 +95,12 @@ const (
 	VmInspectionStatusStateRunning   VmInspectionStatusState = "running"
 )
 
+// Defines values for ExportInventoryParamsFormat.
+const (
+	Xlsx ExportInventoryParamsFormat = "xlsx"
+	Zip  ExportInventoryParamsFormat = "zip"
+)
+
 // AgentModeRequest defines model for AgentModeRequest.
 type AgentModeRequest struct {
 	Mode AgentModeRequestMode `binding:"required,oneof=connected disconnected" json:"mode"`
@@ -1049,7 +1055,13 @@ type VmUtilizationDetails struct {
 type ExportInventoryParams struct {
 	// Scope Comma-separated list of scopes to export (default: overview). Available scopes: overview, hosts, clusters, datastores, vms, network, utilization, storage-forecast, applications, groups, inspection
 	Scope *string `form:"scope,omitempty" json:"scope,omitempty"`
+
+	// Format Output format: zip (CSV files in a ZIP archive) or xlsx (Excel workbook with one sheet per scope)
+	Format *ExportInventoryParamsFormat `form:"format,omitempty" json:"format,omitempty"`
 }
+
+// ExportInventoryParamsFormat defines parameters for ExportInventory.
+type ExportInventoryParamsFormat string
 
 // GetForecasterRunsParams defines parameters for GetForecasterRuns.
 type GetForecasterRunsParams struct {

@@ -97,6 +97,7 @@ type ExportService interface {
 	SupportedScopes() []string
 	IsValidScope(scope string) bool
 	WriteZip(ctx context.Context, scopes []string, w io.Writer) error
+	WriteExcel(ctx context.Context, scopes []string, w io.Writer) error
 }
 
 type Handler struct {

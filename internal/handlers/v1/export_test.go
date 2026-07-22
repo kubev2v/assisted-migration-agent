@@ -113,6 +113,46 @@ var _ = Describe("Export Handler", func() {
 		Entry("partially invalid scopes", "?scope=overview,invalid"),
 	)
 
+	It("returns XLSX download headers for format=xlsx", func() {
+		xlsxMagic := []byte{0x50, 0x4b, 0x03, 0x04} // xlsx is a zip-based format
+		mockExport.WriteExcelResult = xlsxMagic
+
+		w := serveExport(router, "?format=xlsx")
+
+		Expect(w.Code).To(Equal(http.StatusOK))
+		Expect(w.Header().Get("Content-Type")).To(Equal("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+		Expect(w.Header().Get("Content-Disposition")).To(ContainSubstring("migration-advisor-export.xlsx"))
+		Expect(mockExport.WriteExcelCalled).To(BeTrue())
+		Expect(mockExport.WriteZipCalled).To(BeFalse())
+	})
+
+	It("returns ZIP when format=zip is explicit", func() {
+		w := serveExport(router, "?format=zip")
+
+		Expect(w.Code).To(Equal(http.StatusOK))
+		Expect(w.Header().Get("Content-Type")).To(Equal("application/zip"))
+		Expect(mockExport.WriteZipCalled).To(BeTrue())
+		Expect(mockExport.WriteExcelCalled).To(BeFalse())
+	})
+
+	It("passes scopes through to WriteExcel for format=xlsx", func() {
+		mockExport.WriteExcelResult = []byte{0x50, 0x4b, 0x03, 0x04}
+
+		w := serveExport(router, "?scope=overview,hosts&format=xlsx")
+
+		Expect(w.Code).To(Equal(http.StatusOK))
+		Expect(mockExport.WriteExcelScopes).To(Equal([]string{"overview", "hosts"}))
+	})
+
+	It("returns 500 when xlsx export generation fails", func() {
+		mockExport.WriteExcelError = errors.New("database error")
+
+		w := serveExport(router, "?scope=overview&format=xlsx")
+
+		Expect(w.Code).To(Equal(http.StatusInternalServerError))
+		Expect(w.Body.String()).To(ContainSubstring("export generation failed"))
+	})
+
 	It("returns 500 when export generation fails", func() {
 		mockExport.WriteZipError = errors.New("database error")
 
@@ -151,10 +191,14 @@ func serveExport(router *gin.Engine, query string) *httptest.ResponseRecorder {
 
 // MockExportService implements handlers.ExportService for testing.
 type MockExportService struct {
-	WriteZipResult []byte
-	WriteZipError  error
-	WriteZipCalled bool
-	WriteZipScopes []string
+	WriteZipResult   []byte
+	WriteZipError    error
+	WriteZipCalled   bool
+	WriteZipScopes   []string
+	WriteExcelResult []byte
+	WriteExcelError  error
+	WriteExcelCalled bool
+	WriteExcelScopes []string
 }
 
 func (m *MockExportService) IsValidScope(scope string) bool {
@@ -165,7 +209,7 @@ func (m *MockExportService) SupportedScopes() []string {
 	return store.ExportSupportedScopes()
 }
 
-func (m *MockExportService) WriteZip(ctx context.Context, scopes []string, w io.Writer) error {
+func (m *MockExportService) WriteZip(_ context.Context, scopes []string, w io.Writer) error {
 	m.WriteZipCalled = true
 	m.WriteZipScopes = scopes
 	if m.WriteZipError != nil {
@@ -173,6 +217,19 @@ func (m *MockExportService) WriteZip(ctx context.Context, scopes []string, w io.
 	}
 	if len(m.WriteZipResult) > 0 {
 		_, err := w.Write(m.WriteZipResult)
+		return err
+	}
+	return nil
+}
+
+func (m *MockExportService) WriteExcel(_ context.Context, scopes []string, w io.Writer) error {
+	m.WriteExcelCalled = true
+	m.WriteExcelScopes = scopes
+	if m.WriteExcelError != nil {
+		return m.WriteExcelError
+	}
+	if len(m.WriteExcelResult) > 0 {
+		_, err := w.Write(m.WriteExcelResult)
 		return err
 	}
 	return nil

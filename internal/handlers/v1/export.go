@@ -45,6 +45,17 @@ func (h *Handler) ExportInventory(c *gin.Context, params api.ExportInventoryPara
 		}
 	}
 
+	if params.Format != nil && *params.Format == api.Xlsx {
+		var buf bytes.Buffer
+		if err := h.exportSrv.WriteExcel(c.Request.Context(), scopes, &buf); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "export generation failed"})
+			return
+		}
+		c.Header("Content-Disposition", `attachment; filename="migration-advisor-export.xlsx"`)
+		c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buf.Bytes())
+		return
+	}
+
 	var buf bytes.Buffer
 	if err := h.exportSrv.WriteZip(c.Request.Context(), scopes, &buf); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "export generation failed"})

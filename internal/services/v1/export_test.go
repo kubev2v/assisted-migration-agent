@@ -13,6 +13,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/xuri/excelize/v2"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/services"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
@@ -176,7 +177,84 @@ var _ = Describe("ExportService", func() {
 			Expect(csvRowCount(entries["cluster_utilization.csv"])).To(BeNumerically(">=", 1))
 		})
 	})
+
+	Context("WriteExcel", func() {
+		It("should produce one sheet per scope", func() {
+			scopes := []string{"overview", "hosts", "vms"}
+			wantSheets := []string{"Overview", "Hosts", "VMs"}
+
+			f := exportExcel(ctx, svc, scopes)
+			sheets := f.GetSheetList()
+
+			Expect(sheets).To(Equal(wantSheets))
+		})
+
+		It("should produce all sheets for all scopes", func() {
+			allScopes := []string{
+				"overview", "hosts", "clusters", "datastores", "vms", "network",
+				"utilization", "applications", "groups", "inspection", "storage-forecast",
+			}
+			wantSheets := []string{
+				"Overview", "Hosts", "Clusters", "Datastores", "VMs", "Networks",
+				"VM Utilization", "Cluster Utilization",
+				"Applications", "Groups", "Inspection", "Storage Forecast",
+			}
+
+			f := exportExcel(ctx, svc, allScopes)
+			sheets := f.GetSheetList()
+
+			Expect(sheets).To(Equal(wantSheets))
+		})
+
+		It("should have correct row count for overview", func() {
+			f := exportExcel(ctx, svc, []string{"overview"})
+
+			rows, err := f.GetRows("Overview")
+			Expect(err).NotTo(HaveOccurred())
+			// first row is header
+			Expect(len(rows) - 1).To(Equal(len(test.VMs)))
+		})
+
+		It("should not contain default Sheet1", func() {
+			f := exportExcel(ctx, svc, []string{"overview"})
+
+			sheets := f.GetSheetList()
+			Expect(sheets).NotTo(ContainElement("Sheet1"))
+		})
+
+		It("should fail with cancelled context", func() {
+			cancelled, cancel := context.WithCancel(ctx)
+			cancel()
+
+			err := svc.WriteExcel(cancelled, []string{"overview"}, &bytes.Buffer{})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring(context.Canceled.Error()))
+		})
+
+		It("should produce utilization sheets with data", func() {
+			Expect(test.InsertVMUtilization(ctx, db)).To(Succeed())
+
+			f := exportExcel(ctx, svc, []string{"utilization"})
+
+			vmRows, err := f.GetRows("VM Utilization")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(vmRows) - 1).To(Equal(len(test.Utilizations)))
+
+			clusterRows, err := f.GetRows("Cluster Utilization")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(clusterRows) - 1).To(BeNumerically(">=", 1))
+		})
+	})
 })
+
+func exportExcel(ctx context.Context, svc *services.ExportService, scopes []string) *excelize.File {
+	var buf bytes.Buffer
+	ExpectWithOffset(1, svc.WriteExcel(ctx, scopes, &buf)).To(Succeed())
+	ExpectWithOffset(1, buf.Len()).To(BeNumerically(">", 0))
+	f, err := excelize.OpenReader(&buf)
+	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+	return f
+}
 
 func exportZip(ctx context.Context, svc *services.ExportService, scopes []string) []byte {
 	var buf bytes.Buffer

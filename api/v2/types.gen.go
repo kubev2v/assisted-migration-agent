@@ -62,6 +62,12 @@ const (
 	VirtualMachineIssueCategoryWarning     VirtualMachineIssueCategory = "Warning"
 )
 
+// Defines values for ExportCollectionParamsFormat.
+const (
+	Xlsx ExportCollectionParamsFormat = "xlsx"
+	Zip  ExportCollectionParamsFormat = "zip"
+)
+
 // AgentModeRequest defines model for AgentModeRequest.
 type AgentModeRequest struct {
 	Mode AgentModeRequestMode `binding:"required,oneof=connected disconnected" json:"mode"`
@@ -649,7 +655,13 @@ type VmUtilizationDetails struct {
 type ExportCollectionParams struct {
 	// Scope Comma-separated export scopes (e.g., "overview,vms,groups"). Defaults to "overview".
 	Scope *string `form:"scope,omitempty" json:"scope,omitempty"`
+
+	// Format Output format: zip (CSV files in a ZIP archive) or xlsx (Excel workbook with one sheet per scope)
+	Format *ExportCollectionParamsFormat `form:"format,omitempty" json:"format,omitempty"`
 }
+
+// ExportCollectionParamsFormat defines parameters for ExportCollection.
+type ExportCollectionParamsFormat string
 
 // ListGroupsParams defines parameters for ListGroups.
 type ListGroupsParams struct {

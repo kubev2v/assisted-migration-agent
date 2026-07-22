@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/xuri/excelize/v2"
+
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 )
 
@@ -62,6 +64,119 @@ func (s *ExportService) WriteZip(ctx context.Context, scopes []string, w io.Writ
 		return fmt.Errorf("ZIP creation failed: %w", err)
 	}
 
+	return nil
+}
+
+// WriteExcel generates an Excel workbook with one sheet per requested scope and writes it to w.
+func (s *ExportService) WriteExcel(ctx context.Context, scopes []string, w io.Writer) error {
+	tmpDir, err := os.MkdirTemp("", "export-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp dir: %w", err)
+	}
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	exportStore := s.store.Export()
+	for _, scope := range scopes {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if err := s.exportScope(ctx, exportStore, scope, tmpDir); err != nil {
+			return fmt.Errorf("%s export failed: %w", scope, err)
+		}
+	}
+
+	if err := s.sanitizeExportDir(tmpDir); err != nil {
+		return fmt.Errorf("CSV sanitization failed: %w", err)
+	}
+
+	return s.writeXLSX(ctx, scopes, tmpDir, w)
+}
+
+func (s *ExportService) writeXLSX(_ context.Context, scopes []string, tmpDir string, w io.Writer) error {
+	f := excelize.NewFile()
+	defer func() { _ = f.Close() }()
+
+	for _, scope := range scopes {
+		csvFiles := scopeCSVFiles(s.store.Export(), scope)
+		for _, cf := range csvFiles {
+			if err := addCSVAsSheet(f, cf.sheet, filepath.Join(tmpDir, cf.filename)); err != nil {
+				return fmt.Errorf("sheet %s: %w", cf.sheet, err)
+			}
+		}
+	}
+
+	_ = f.DeleteSheet("Sheet1")
+
+	_, err := f.WriteTo(w)
+	return err
+}
+
+type csvFileEntry struct {
+	sheet    string
+	filename string
+}
+
+func scopeCSVFiles(es *store.ExportStore, scope string) []csvFileEntry {
+	if scope == "utilization" {
+		return []csvFileEntry{
+			{sheet: "VM Utilization", filename: "vm_utilization.csv"},
+			{sheet: "Cluster Utilization", filename: "cluster_utilization.csv"},
+		}
+	}
+	filename, ok := es.ScopeFilename(scope)
+	if !ok {
+		return nil
+	}
+	return []csvFileEntry{{sheet: scopeSheetName(scope), filename: filename}}
+}
+
+var sheetNames = map[string]string{
+	"overview":         "Overview",
+	"hosts":            "Hosts",
+	"clusters":         "Clusters",
+	"datastores":       "Datastores",
+	"vms":              "VMs",
+	"network":          "Networks",
+	"applications":     "Applications",
+	"groups":           "Groups",
+	"inspection":       "Inspection",
+	"storage-forecast": "Storage Forecast",
+}
+
+func scopeSheetName(scope string) string {
+	if name, ok := sheetNames[scope]; ok {
+		return name
+	}
+	return scope
+}
+
+func addCSVAsSheet(f *excelize.File, sheet, csvPath string) error {
+	file, err := os.Open(csvPath)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = file.Close() }()
+
+	if _, err := f.NewSheet(sheet); err != nil {
+		return err
+	}
+
+	reader := csv.NewReader(file)
+	row := 1
+	for {
+		record, err := reader.Read()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		for col, val := range record {
+			cell, _ := excelize.CoordinatesToCellName(col+1, row)
+			_ = f.SetCellValue(sheet, cell, val)
+		}
+		row++
+	}
 	return nil
 }
 
