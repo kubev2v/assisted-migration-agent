@@ -50,17 +50,6 @@ func (h *Handler) ExportCollection(c *gin.Context, id string, params v2.ExportCo
 		}
 	}
 
-	if params.Format != nil && *params.Format == v2.Xlsx {
-		var buf bytes.Buffer
-		if err := exportSvc.WriteExcel(c.Request.Context(), scopes, &buf); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "export generation failed"})
-			return
-		}
-		c.Header("Content-Disposition", `attachment; filename="migration-advisor-export.xlsx"`)
-		c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buf.Bytes())
-		return
-	}
-
 	var buf bytes.Buffer
 	if err := exportSvc.WriteZip(c.Request.Context(), scopes, &buf); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "export generation failed"})

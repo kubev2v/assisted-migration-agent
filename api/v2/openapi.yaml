@@ -773,23 +773,11 @@ paths:
           description: Comma-separated export scopes (e.g., "overview,vms,groups"). Defaults to "overview".
           schema:
             type: string
-        - name: format
-          in: query
-          required: false
-          description: "Output format: zip (CSV files in a ZIP archive) or xlsx (Excel workbook with one sheet per scope)"
-          schema:
-            type: string
-            enum: [zip, xlsx]
-            default: zip
       responses:
         '200':
-          description: ZIP archive containing CSV files or Excel workbook
+          description: ZIP archive containing CSV files
           content:
             application/zip:
-              schema:
-                type: string
-                format: binary
-            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
               schema:
                 type: string
                 format: binary
