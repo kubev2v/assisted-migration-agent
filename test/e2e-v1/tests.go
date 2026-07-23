@@ -9,8 +9,9 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/kubev2v/assisted-migration-agent/test/e2e/infra"
-	"github.com/kubev2v/assisted-migration-agent/test/e2e/service"
+	"github.com/kubev2v/assisted-migration-agent/pkg/e2e/backend"
+	"github.com/kubev2v/assisted-migration-agent/pkg/e2e/infra"
+	"github.com/kubev2v/assisted-migration-agent/test/e2e-v1/service"
 
 	"github.com/google/uuid"
 	"github.com/onsi/ginkgo/v2"
@@ -580,7 +581,7 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 
 	ginkgo.Context("connected env", func() {
 		var (
-			plannerSvc *service.PlannerSvc
+			plannerSvc *backend.PlannerSvc
 			proxy      *infra.Proxy
 			oidcProxy  *infra.Proxy
 			obs        *infra.Observer
@@ -615,7 +616,7 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 				return nil
 			}, 30*time.Second, 1*time.Second).Should(gm.BeNil())
 
-			plannerSvc = service.NewPlannerServiceWithOIDC(cfg.BackendUserEndpoint, infraManager.GenerateToken)
+			plannerSvc = backend.NewPlannerServiceWithOIDC(cfg.BackendUserEndpoint, infraManager.GenerateToken)
 
 			// Start proxy between agent and backend for logging
 			target, err := url.Parse(cfg.BackendAgentEndpoint)
@@ -647,7 +648,7 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 			var (
 				agentSvc *service.AgentSvc
 				sourceID openapi_types.UUID
-				userSvc  *service.PlannerSvc
+				userSvc  *backend.PlannerSvc
 			)
 
 			ginkgo.BeforeEach(func() {
@@ -709,7 +710,7 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 			var (
 				agentSvc *service.AgentSvc
 				sourceID openapi_types.UUID
-				userSvc  *service.PlannerSvc
+				userSvc  *backend.PlannerSvc
 			)
 
 			ginkgo.BeforeEach(func() {
@@ -816,7 +817,7 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 			var (
 				agentSvc *service.AgentSvc
 				sourceID openapi_types.UUID
-				userSvc  *service.PlannerSvc
+				userSvc  *backend.PlannerSvc
 			)
 
 			ginkgo.BeforeEach(func() {
@@ -1071,7 +1072,7 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 			var (
 				agentSvc *service.AgentSvc
 				sourceID openapi_types.UUID
-				userSvc  *service.PlannerSvc
+				userSvc  *backend.PlannerSvc
 			)
 
 			ginkgo.BeforeEach(func() {

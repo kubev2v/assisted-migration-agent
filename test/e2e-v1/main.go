@@ -9,7 +9,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/kubev2v/assisted-migration-agent/test/e2e/infra"
+	"github.com/kubev2v/assisted-migration-agent/pkg/e2e/infra"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
 	gomega "github.com/onsi/gomega"

@@ -61,14 +61,14 @@ build:
 
 build.e2e:
 	@echo "Building e2e binary..."
-	go build -tags "exclude_graphdriver_btrfs containers_image_openpgp" -o bin/e2e ./test/e2e
+	go build -tags "exclude_graphdriver_btrfs containers_image_openpgp" -o bin/e2e ./test/e2e-v1
 	@echo "Build complete: bin/e2e"
 
 E2E_AGENT_IMAGE ?= $(IMAGE_NAME):$(IMAGE_TAG)
 E2E_BACKEND_IMAGE ?= quay.io/kubev2v/migration-planner-api:latest
 E2E_ISO_PATH ?= $(CURDIR)
 E2E_INFRA_MODE ?= container
-E2E_VCSIM_MODEL_PATH ?= $(CURDIR)/test/e2e/testdata/vcsim-model
+E2E_VCSIM_MODEL_PATH ?= $(CURDIR)/pkg/e2e/testdata/vcsim-model
 
 e2e: build.e2e
 	@echo "🧪 Running e2e tests (infra-mode=$(E2E_INFRA_MODE))..."

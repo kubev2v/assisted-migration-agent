@@ -12,7 +12,7 @@ import (
 
 	"github.com/kubev2v/migration-planner/test/e2e"
 
-	e2eModel "github.com/kubev2v/assisted-migration-agent/test/e2e/model"
+	e2eModel "github.com/kubev2v/assisted-migration-agent/pkg/e2e/model"
 )
 
 // GetToken retrieves the private key from the specified path, parses it, and then generates a token

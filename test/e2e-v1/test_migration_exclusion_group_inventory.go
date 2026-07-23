@@ -11,8 +11,8 @@ import (
 	"github.com/google/uuid"
 
 	v1 "github.com/kubev2v/assisted-migration-agent/api/v1"
-	"github.com/kubev2v/assisted-migration-agent/test/e2e/infra"
-	"github.com/kubev2v/assisted-migration-agent/test/e2e/service"
+	"github.com/kubev2v/assisted-migration-agent/pkg/e2e/infra"
+	"github.com/kubev2v/assisted-migration-agent/test/e2e-v1/service"
 )
 
 var _ = Describe("Migration Exclusion Group Inventory e2e tests", Ordered, func() {

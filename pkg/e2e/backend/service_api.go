@@ -1,4 +1,4 @@
-package service
+package backend
 
 import (
 	"bytes"
@@ -12,8 +12,8 @@ import (
 
 	"github.com/kubev2v/migration-planner/test/e2e"
 
-	e2eModel "github.com/kubev2v/assisted-migration-agent/test/e2e/model"
-	e2eUtils "github.com/kubev2v/assisted-migration-agent/test/e2e/utils"
+	e2eModel "github.com/kubev2v/assisted-migration-agent/pkg/e2e/model"
+	e2eUtils "github.com/kubev2v/assisted-migration-agent/pkg/e2e/utils"
 
 	"go.uber.org/zap"
 )

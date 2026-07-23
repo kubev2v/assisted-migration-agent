@@ -8,8 +8,8 @@ import (
 	. "github.com/onsi/ginkgo/v2" // nolint:staticcheck
 	. "github.com/onsi/gomega"    // nolint:staticcheck
 
-	"github.com/kubev2v/assisted-migration-agent/test/e2e/infra"
-	"github.com/kubev2v/assisted-migration-agent/test/e2e/service"
+	"github.com/kubev2v/assisted-migration-agent/pkg/e2e/infra"
+	"github.com/kubev2v/assisted-migration-agent/test/e2e-v1/service"
 
 	"github.com/google/uuid"
 )

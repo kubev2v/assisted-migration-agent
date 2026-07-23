@@ -10,8 +10,8 @@ import (
 	. "github.com/onsi/gomega"    // nolint:staticcheck
 
 	v1 "github.com/kubev2v/assisted-migration-agent/api/v1"
-	"github.com/kubev2v/assisted-migration-agent/test/e2e/infra"
-	"github.com/kubev2v/assisted-migration-agent/test/e2e/service"
+	"github.com/kubev2v/assisted-migration-agent/pkg/e2e/infra"
+	"github.com/kubev2v/assisted-migration-agent/test/e2e-v1/service"
 
 	"github.com/google/uuid"
 )
