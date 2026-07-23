@@ -174,6 +174,10 @@ func (c *ContainerInfraManager) StartAgent(cfg AgentConfig) (string, error) {
 		WithEnvVar("AGENT_CONSOLE_URL", cfg.ConsoleURL).
 		WithEnvVar("AGENT_CONSOLE_UPDATE_INTERVAL", updateInterval)
 
+	if cfg.APIVersion != "" {
+		containerCfg.WithEnvVar("AGENT_SERVER_API", cfg.APIVersion)
+	}
+
 	return c.runner.StartContainer(containerCfg)
 }
 

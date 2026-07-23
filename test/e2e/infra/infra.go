@@ -27,6 +27,7 @@ type AgentConfig struct {
 	ConsoleURL     string
 	UpdateInterval string // e.g. "1s"
 	ISOPath        string // Path to the bootable ISO on disk (VM mode: booted via libvirt)
+	APIVersion     string
 }
 
 const (
