@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/kubev2v/assisted-migration-agent/pkg/errors"
@@ -159,10 +160,11 @@ func (d *Database) Migrate(ctx context.Context, fn func(ctx context.Context, db 
 }
 
 type Pool struct {
-	mu              sync.Mutex
-	databases       map[string]*Database
-	cleanupTimer    *time.Timer
-	cleanupInterval time.Duration
+	mu                       sync.Mutex
+	databases                map[string]*Database
+	cleanupTimer             *time.Timer
+	cleanupInterval          time.Duration
+	latestCollectionDatabase atomic.Pointer[Database] // this is the hot path for services asking for the latest collection db
 }
 
 func NewPool(cleanupInterval time.Duration) *Pool {
@@ -196,6 +198,10 @@ func (p *Pool) NewDatabase(id string, dbPath string, createdAt time.Time, initTy
 }
 
 func (p *Pool) Add(db *Database) {
+	if db.ID != MainDatabaseID {
+		p.latestCollectionDatabase.Store(db)
+	}
+
 	p.mu.Lock()
 	if _, ok := p.databases[db.ID]; !ok {
 		p.databases[db.ID] = db
@@ -234,10 +240,8 @@ func (p *Pool) List() []*Database {
 }
 
 func (p *Pool) Latest() (*Database, error) {
-	for db := range p.All() {
-		if db.ID == MainDatabaseID {
-			continue
-		}
+	db := p.latestCollectionDatabase.Load()
+	if db != nil {
 		return db, nil
 	}
 	return nil, errors.NewResourceNotFoundError("collection", "latest")
