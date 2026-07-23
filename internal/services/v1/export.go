@@ -92,11 +92,14 @@ func (s *ExportService) WriteExcel(ctx context.Context, scopes []string, w io.Wr
 	return s.writeXLSX(ctx, scopes, tmpDir, w)
 }
 
-func (s *ExportService) writeXLSX(_ context.Context, scopes []string, tmpDir string, w io.Writer) error {
+func (s *ExportService) writeXLSX(ctx context.Context, scopes []string, tmpDir string, w io.Writer) error {
 	f := excelize.NewFile()
 	defer func() { _ = f.Close() }()
 
 	for _, scope := range scopes {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		csvFiles := scopeCSVFiles(s.store.Export(), scope)
 		for _, cf := range csvFiles {
 			if err := addCSVAsSheet(f, cf.sheet, filepath.Join(tmpDir, cf.filename)); err != nil {
@@ -172,8 +175,13 @@ func addCSVAsSheet(f *excelize.File, sheet, csvPath string) error {
 			return err
 		}
 		for col, val := range record {
-			cell, _ := excelize.CoordinatesToCellName(col+1, row)
-			_ = f.SetCellValue(sheet, cell, val)
+			cell, err := excelize.CoordinatesToCellName(col+1, row)
+			if err != nil {
+				return err
+			}
+			if err := f.SetCellValue(sheet, cell, val); err != nil {
+				return err
+			}
 		}
 		row++
 	}
