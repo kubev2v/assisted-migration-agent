@@ -123,7 +123,7 @@ func (p *PodmanRunner) StartContainer(cfg *ContainerConfig) (string, error) {
 				Type:        "bind",
 				Source:      hostPath,
 				Destination: containerPath,
-				Options:     []string{"rbind", "ro"},
+				Options:     []string{"rbind", "ro", "z"},
 			})
 		}
 	}
