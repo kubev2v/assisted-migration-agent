@@ -1,0 +1,74 @@
+name: Run e2e v2 tests
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, stable]
+  pull_request:
+    branches: [main, stable]
+
+jobs:
+  e2e-v2:
+    runs-on: ubuntu-latest
+    env:
+      AGENT_IMAGE: assisted-migration-agent:e2e
+      BACKEND_IMAGE: migration-planner-api
+      BACKEND_TAG: e2e
+
+    steps:
+      - name: Checkout agent code
+        uses: actions/checkout@v4
+
+      - name: Checkout migration-planner
+        uses: actions/checkout@v4
+        with:
+          repository: kubev2v/migration-planner
+          path: migration-planner
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.0'
+
+      - name: Install Podman
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman
+
+      - name: Start Podman socket
+        run: |
+          systemctl --user enable --now podman.socket
+          echo "PODMAN_SOCKET=unix://$XDG_RUNTIME_DIR/podman/podman.sock" >> $GITHUB_ENV
+
+      - name: Build backend API container
+        run: |
+          cd migration-planner
+          make migration-planner-api-container MIGRATION_PLANNER_IMAGE=${{ env.BACKEND_IMAGE }} MIGRATION_PLANNER_IMAGE_TAG=${{ env.BACKEND_TAG }}
+
+      - name: Build agent container
+        run: |
+          make image IMAGE_NAME=assisted-migration-agent IMAGE_TAG=e2e
+
+      - name: Build e2e-v2 binary
+        run: make build.e2e-v2
+
+      - name: Pull test images
+        run: |
+          podman pull docker.io/library/postgres:17
+          podman pull docker.io/vmware/vcsim:latest
+
+      - name: Download RHCOS ISO
+        run: |
+          mkdir -p iso
+          curl --silent -C - -o iso/rhcos-live-iso.x86_64.iso \
+            https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live-iso.x86_64.iso
+
+      - name: Run e2e v2 tests
+        run: |
+          ./bin/e2e-v2 \
+            -backend-image=${{ env.BACKEND_IMAGE }}:${{ env.BACKEND_TAG }} \
+            -agent-image=${{ env.AGENT_IMAGE }} \
+            -podman-socket=${{ env.PODMAN_SOCKET }} \
+            -iso-path=${{ github.workspace }}/iso \
+            -vcsim-model-path=${{ github.workspace }}/pkg/e2e/testdata/vcsim-model \
+            --ginkgo.v

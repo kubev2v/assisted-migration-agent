@@ -1,4 +1,4 @@
-.PHONY: generate generate.proto build build.e2e e2e e2e.container e2e.vm e2e.container.clean run container.run container.stop help tidy tidy-check clean lint format check-format check-generate validate-all image setup-opa-policies clean-opa-policies build-filler-image test test.fuzz
+.PHONY: generate generate.proto build build.e2e build.e2e-v2 e2e e2e.container e2e.vm e2e-v2 e2e.container.clean run container.run container.stop help tidy tidy-check clean lint format check-format check-generate validate-all image setup-opa-policies clean-opa-policies build-filler-image test test.fuzz
 
 PODMAN ?= podman
 PLANNER_AGENT_GIT_COMMIT ?= $(shell git rev-list -1 HEAD --abbrev-commit)
@@ -26,10 +26,12 @@ GO_BUILD_FLAGS := ${GO_BUILD_FLAGS}
 help:
 	@echo "Targets:"
 	@echo "    build:           build the agent binary"
-	@echo "    build.e2e:       build the e2e test binary"
-	@echo "    e2e:             run e2e tests (default: container mode)"
-	@echo "    e2e.container:   run e2e tests in container mode (Podman)"
-	@echo "    e2e.vm:          run e2e tests in VM mode (externally managed infra)"
+	@echo "    build.e2e:       build the e2e test binary (v1 API)"
+	@echo "    build.e2e-v2:    build the e2e test binary (v2 API)"
+	@echo "    e2e:             run e2e tests (default: container mode, v1 API)"
+	@echo "    e2e.container:   run e2e tests in container mode (Podman, v1 API)"
+	@echo "    e2e.vm:          run e2e tests in VM mode (externally managed infra, v1 API)"
+	@echo "    e2e-v2:          run e2e tests for v2 API (container mode)"
 	@echo "    e2e.container.clean: remove all e2e test containers and volumes"
 	@echo "    image:           build container image"
 	@echo "    run.image:       run container image locally (requires AGENT_ID and SOURCE_ID)"
@@ -64,6 +66,11 @@ build.e2e:
 	go build -tags "exclude_graphdriver_btrfs containers_image_openpgp" -o bin/e2e ./test/e2e-v1
 	@echo "Build complete: bin/e2e"
 
+build.e2e-v2:
+	@echo "Building e2e-v2 binary..."
+	go build -tags "exclude_graphdriver_btrfs containers_image_openpgp" -o bin/e2e-v2 ./test/e2e-v2
+	@echo "Build complete: bin/e2e-v2"
+
 E2E_AGENT_IMAGE ?= $(IMAGE_NAME):$(IMAGE_TAG)
 E2E_BACKEND_IMAGE ?= quay.io/kubev2v/migration-planner-api:latest
 E2E_ISO_PATH ?= $(CURDIR)
@@ -82,6 +89,11 @@ e2e.container: build.e2e e2e.container.clean
 e2e.vm: build.e2e
 	@echo "🧪 Running e2e tests (VM mode)..."
 	./bin/e2e -infra-mode=vm --ginkgo.v
+
+e2e-v2: build.e2e-v2 e2e.container.clean
+	touch $(E2E_ISO_PATH)/rhcos-live-iso.x86_64.iso
+	@echo "🧪 Running e2e-v2 tests (container mode)..."
+	./bin/e2e-v2 -infra-mode=container -agent-image=$(E2E_AGENT_IMAGE) -backend-image=$(E2E_BACKEND_IMAGE) --ginkgo.v -iso-path=$(E2E_ISO_PATH) -vcsim-model-path=$(E2E_VCSIM_MODEL_PATH)
 
 e2e.container.clean:
 	$(PODMAN) rm --force test-planner || true
