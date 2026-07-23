@@ -47,22 +47,6 @@ func (h *Handler) ListLatestGroups(c *gin.Context, params v2.ListLatestGroupsPar
 	h.listGroups(c, groupSvc, params.ByName, params.Page, params.PageSize)
 }
 
-// CreateGroup creates a new group within a collection.
-// (POST /collections/{id}/groups)
-func (h *Handler) CreateGroup(c *gin.Context, id string) {
-	groupSvc, err := h.svc.GroupService(id)
-	if err != nil {
-		if srvErrors.IsResourceNotFoundError(err) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "collection not found"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	h.createGroup(c, groupSvc)
-}
-
 // CreateLatestGroup creates a new group in the latest collection.
 // (POST /groups)
 func (h *Handler) CreateLatestGroup(c *gin.Context) {
@@ -111,22 +95,6 @@ func (h *Handler) GetLatestGroup(c *gin.Context, groupId string, params v2.GetLa
 	h.getGroup(c, groupSvc, groupId, params.Sort, params.Page, params.PageSize)
 }
 
-// UpdateGroup partially updates an existing group.
-// (PATCH /collections/{id}/groups/{groupId})
-func (h *Handler) UpdateGroup(c *gin.Context, id string, groupId string) {
-	groupSvc, err := h.svc.GroupService(id)
-	if err != nil {
-		if srvErrors.IsResourceNotFoundError(err) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "collection not found"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	h.updateGroup(c, groupSvc, groupId)
-}
-
 // UpdateLatestGroup partially updates a group in the latest collection.
 // (PATCH /groups/{groupId})
 func (h *Handler) UpdateLatestGroup(c *gin.Context, groupId string) {
@@ -141,22 +109,6 @@ func (h *Handler) UpdateLatestGroup(c *gin.Context, groupId string) {
 	}
 
 	h.updateGroup(c, groupSvc, groupId)
-}
-
-// DeleteGroup deletes a group.
-// (DELETE /collections/{id}/groups/{groupId})
-func (h *Handler) DeleteGroup(c *gin.Context, id string, groupId string) {
-	groupSvc, err := h.svc.GroupService(id)
-	if err != nil {
-		if srvErrors.IsResourceNotFoundError(err) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "collection not found"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	h.deleteGroup(c, groupSvc, groupId)
 }
 
 // DeleteLatestGroup deletes a group from the latest collection.

@@ -203,31 +203,3 @@ func (h *Handler) GetInspectorVddkStatus(c *gin.Context) {
 		Md5:     s.Md5,
 	})
 }
-
-// RemoveVMFromInspection cancels inspection for a specific VM.
-// (DELETE /collections/{id}/virtualmachines/{vmId}/inspection)
-func (h *Handler) RemoveVMFromInspection(c *gin.Context, id string, vmId string) {
-	inspSvc, err := h.svc.InspectorService()
-	if err != nil {
-		if srvErrors.IsCollectionNotFoundError(err) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "collect data before using the inspector"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
-		return
-	}
-
-	if err := inspSvc.Cancel(vmId); err != nil {
-		if srvErrors.IsInspectorNotRunningError(err) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		if srvErrors.IsResourceNotFoundError(err) {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	c.Status(http.StatusNoContent)
-}

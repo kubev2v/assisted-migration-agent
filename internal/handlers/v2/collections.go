@@ -21,9 +21,3 @@ func (h *Handler) ListCollections(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, resp)
 }
-
-// DeleteCollection deletes a collection by ID.
-// (DELETE /collections/{id})
-func (h *Handler) DeleteCollection(c *gin.Context, id string) {
-	c.JSON(http.StatusNotImplemented, gin.H{"error": "not implemented"})
-}

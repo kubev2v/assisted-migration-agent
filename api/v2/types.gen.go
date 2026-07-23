@@ -743,21 +743,6 @@ type ListLatestVirtualMachinesParams struct {
 // SetAgentModeJSONRequestBody defines body for SetAgentMode for application/json ContentType.
 type SetAgentModeJSONRequestBody = AgentModeRequest
 
-// CreateGroupJSONRequestBody defines body for CreateGroup for application/json ContentType.
-type CreateGroupJSONRequestBody = CreateGroupRequest
-
-// UpdateGroupJSONRequestBody defines body for UpdateGroup for application/json ContentType.
-type UpdateGroupJSONRequestBody = UpdateGroupRequest
-
-// BatchUpdateVMExclusionJSONRequestBody defines body for BatchUpdateVMExclusion for application/json ContentType.
-type BatchUpdateVMExclusionJSONRequestBody = BatchUpdateExclusionRequest
-
-// UpdateLabelVMsJSONRequestBody defines body for UpdateLabelVMs for application/json ContentType.
-type UpdateLabelVMsJSONRequestBody = UpdateLabelVMsRequest
-
-// UpdateVirtualMachineJSONRequestBody defines body for UpdateVirtualMachine for application/json ContentType.
-type UpdateVirtualMachineJSONRequestBody = VirtualMachineUpdateRequest
-
 // PutCredentialsJSONRequestBody defines body for PutCredentials for application/json ContentType.
 type PutCredentialsJSONRequestBody = VcenterCredentials
 

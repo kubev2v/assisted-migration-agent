@@ -96,22 +96,6 @@ func (h *Handler) GetLatestVirtualMachine(c *gin.Context, vmId string) {
 	h.getVirtualMachine(c, vmSvc, vmId)
 }
 
-// UpdateVirtualMachine updates VM properties (migration exclusion, labels).
-// (PATCH /collections/{id}/virtualmachines/{vmId})
-func (h *Handler) UpdateVirtualMachine(c *gin.Context, id string, vmId string) {
-	vmSvc, err := h.svc.VirtualMachineService(id)
-	if err != nil {
-		if srvErrors.IsResourceNotFoundError(err) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "collection not found"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	h.updateVirtualMachine(c, vmSvc, vmId)
-}
-
 // UpdateLatestVirtualMachine updates VM properties in the latest collection.
 // (PATCH /virtualmachines/{vmId})
 func (h *Handler) UpdateLatestVirtualMachine(c *gin.Context, vmId string) {
@@ -126,22 +110,6 @@ func (h *Handler) UpdateLatestVirtualMachine(c *gin.Context, vmId string) {
 	}
 
 	h.updateVirtualMachine(c, vmSvc, vmId)
-}
-
-// BatchUpdateVMExclusion updates migration exclusion for multiple VMs.
-// (POST /collections/{id}/virtualmachines/batch-update-exclusion)
-func (h *Handler) BatchUpdateVMExclusion(c *gin.Context, id string) {
-	vmSvc, err := h.svc.VirtualMachineService(id)
-	if err != nil {
-		if srvErrors.IsResourceNotFoundError(err) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "collection not found"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	h.batchUpdateVMExclusion(c, vmSvc)
 }
 
 // BatchUpdateLatestVMExclusion updates migration exclusion for multiple VMs in the latest collection.
@@ -224,22 +192,6 @@ func (h *Handler) GetLatestVMLabels(c *gin.Context) {
 	h.getVMLabels(c, vmSvc)
 }
 
-// UpdateLabelVMs adds or removes a label from multiple VMs.
-// (PATCH /collections/{id}/virtualmachines/labels/{label})
-func (h *Handler) UpdateLabelVMs(c *gin.Context, id string, label string) {
-	vmSvc, err := h.svc.VirtualMachineService(id)
-	if err != nil {
-		if srvErrors.IsResourceNotFoundError(err) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "collection not found"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	h.updateLabelVMs(c, vmSvc, label)
-}
-
 // UpdateLatestLabelVMs adds or removes a label from multiple VMs in the latest collection.
 // (PATCH /virtualmachines/labels/{label})
 func (h *Handler) UpdateLatestLabelVMs(c *gin.Context, label string) {
@@ -254,22 +206,6 @@ func (h *Handler) UpdateLatestLabelVMs(c *gin.Context, label string) {
 	}
 
 	h.updateLabelVMs(c, vmSvc, label)
-}
-
-// DeleteLabelGlobally removes a label from all VMs.
-// (DELETE /collections/{id}/virtualmachines/labels/{label})
-func (h *Handler) DeleteLabelGlobally(c *gin.Context, id string, label string) {
-	vmSvc, err := h.svc.VirtualMachineService(id)
-	if err != nil {
-		if srvErrors.IsResourceNotFoundError(err) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "collection not found"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	h.deleteLabelGlobally(c, vmSvc, label)
 }
 
 // DeleteLatestLabelGlobally removes a label from all VMs in the latest collection.

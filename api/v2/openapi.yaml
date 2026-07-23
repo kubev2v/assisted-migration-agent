@@ -490,26 +490,6 @@ paths:
         '500':
           description: Internal server error
 
-  /collections/{id}:
-    delete:
-      tags: [Collections]
-      summary: Delete a collection
-      operationId: deleteCollection
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: Collection ID
-          schema:
-            type: string
-      responses:
-        '204':
-          description: Collection deleted
-        '404':
-          description: Collection not found
-        '500':
-          description: Internal server error
-
   # ── Collectors ─────────────────────────────────────────────────────────
   /collectors:
     post:
@@ -665,34 +645,6 @@ paths:
         '500':
           description: Internal server error
 
-  /collections/{id}/virtualmachines/batch-update-exclusion:
-    post:
-      tags: [VirtualMachines]
-      summary: Batch update migration exclusion for multiple VMs
-      operationId: batchUpdateVMExclusion
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: Collection ID
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BatchUpdateExclusionRequest'
-      responses:
-        '200':
-          description: Exclusion updated
-        '400':
-          description: Invalid request
-        '404':
-          description: Collection or VM not found
-        '500':
-          description: Internal server error
-
   /collections/{id}/virtualmachines/filter-options:
     get:
       tags: [VirtualMachines]
@@ -741,68 +693,6 @@ paths:
         '500':
           description: Internal server error
 
-  /collections/{id}/virtualmachines/labels/{label}:
-    patch:
-      tags: [VirtualMachines]
-      summary: Add or remove a label from multiple VMs
-      operationId: updateLabelVMs
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: Collection ID
-          schema:
-            type: string
-        - name: label
-          in: path
-          required: true
-          description: Label name
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateLabelVMsRequest'
-      responses:
-        '200':
-          description: Label updated
-        '400':
-          description: Invalid request
-        '404':
-          description: Collection or VM not found
-        '500':
-          description: Internal server error
-    delete:
-      tags: [VirtualMachines]
-      summary: Remove a label from all VMs
-      operationId: deleteLabelGlobally
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: Collection ID
-          schema:
-            type: string
-        - name: label
-          in: path
-          required: true
-          description: Label name
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Label removed
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DeleteLabelGloballyResponse'
-        '400':
-          description: Invalid request
-        '500':
-          description: Internal server error
-
   /collections/{id}/virtualmachines/{vmId}:
     get:
       tags: [VirtualMachines]
@@ -832,39 +722,7 @@ paths:
           description: Collection or VirtualMachine not found
         '500':
           description: Internal server error
-    patch:
-      tags: [VirtualMachines]
-      summary: Update VirtualMachine properties
-      operationId: updateVirtualMachine
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: Collection ID
-          schema:
-            type: string
-        - name: vmId
-          in: path
-          required: true
-          description: VirtualMachine ID
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/VirtualMachineUpdateRequest'
-      responses:
-        '200':
-          description: VirtualMachine updated
-        '400':
-          description: Invalid request
-        '404':
-          description: Collection or VirtualMachine not found
-        '500':
-          description: Internal server error
-  
+
   /collections/{id}/virtualmachines/{vmId}/utilization:
     get:
       tags: [VirtualMachines]
@@ -1004,36 +862,6 @@ paths:
           description: Collection not found
         '500':
           description: Internal server error
-    post:
-      tags: [Groups]
-      summary: Create a new group in a collection
-      operationId: createGroup
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: Collection ID
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateGroupRequest'
-      responses:
-        '201':
-          description: Group created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Group'
-        '400':
-          description: Invalid request
-        '404':
-          description: Collection not found
-        '500':
-          description: Internal server error
 
   /collections/{id}/groups/{groupId}:
     get:
@@ -1083,66 +911,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GroupResponse'
-        '404':
-          description: Collection or group not found
-        '500':
-          description: Internal server error
-    patch:
-      tags: [Groups]
-      summary: Update group
-      operationId: updateGroup
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: Collection ID
-          schema:
-            type: string
-        - name: groupId
-          in: path
-          required: true
-          description: Group ID
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateGroupRequest'
-      responses:
-        '200':
-          description: Group updated
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Group'
-        '400':
-          description: Invalid request
-        '404':
-          description: Collection or group not found
-        '500':
-          description: Internal server error
-    delete:
-      tags: [Groups]
-      summary: Delete group
-      operationId: deleteGroup
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: Collection ID
-          schema:
-            type: string
-        - name: groupId
-          in: path
-          required: true
-          description: Group ID
-          schema:
-            type: string
-      responses:
-        '204':
-          description: Group deleted
         '404':
           description: Collection or group not found
         '500':
@@ -1287,34 +1055,6 @@ paths:
                 $ref: '#/components/schemas/VddkProperties'
         '404':
           description: No VDDK uploaded
-        '500':
-          description: Internal server error
-
-  /collections/{id}/virtualmachines/{vmId}/inspection:
-    delete:
-      tags: [Inspector]
-      summary: Remove VM from inspection queue
-      operationId: removeVMFromInspection
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: Collection ID
-          schema:
-            type: string
-        - name: vmId
-          in: path
-          required: true
-          description: VirtualMachine MoRef ID
-          schema:
-            type: string
-      responses:
-        '204':
-          description: VM removed from inspection
-        '400':
-          description: Inspector not running
-        '404':
-          description: Collection or VM not found
         '500':
           description: Internal server error
 
