@@ -12,10 +12,17 @@ import (
 // StartCollector creates and starts a new collector.
 // (POST /collectors)
 func (h *Handler) StartCollector(c *gin.Context) {
-	mgr := h.svc.CollectorManager()
-	_, svc := mgr.Create()
+	collector, err := h.svc.CreateCollector()
+	if err != nil {
+		if srvErrors.IsOperationInProgressError(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "failed to start collection. Inspection is in progress"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 
-	if err := svc.Start(c.Request.Context()); err != nil {
+	if err := collector.Start(c.Request.Context()); err != nil {
 		if srvErrors.IsCredentialsNotSetError(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "credentials required: store via PUT /credentials first"})
 			return
@@ -24,14 +31,13 @@ func (h *Handler) StartCollector(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusAccepted, v2.NewCollectorStatus(svc.GetStatus()))
+	c.JSON(http.StatusAccepted, v2.NewCollectorStatus(collector.GetStatus()))
 }
 
 // ListCollectors returns all tracked collectors.
 // (GET /collectors)
 func (h *Handler) ListCollectors(c *gin.Context) {
-	mgr := h.svc.CollectorManager()
-	collectors := mgr.List()
+	collectors := h.svc.ListCollectors()
 
 	resp := v2.CollectorListResponse{
 		Collectors: make([]v2.CollectorStatus, 0, len(collectors)),
@@ -45,8 +51,7 @@ func (h *Handler) ListCollectors(c *gin.Context) {
 // GetCollectorStatus returns the status of a specific collector.
 // (GET /collectors/{id})
 func (h *Handler) GetCollectorStatus(c *gin.Context, id string) {
-	mgr := h.svc.CollectorManager()
-	svc, err := mgr.Get(id)
+	svc, err := h.svc.GetCollector(id)
 	if err != nil {
 		if srvErrors.IsResourceNotFoundError(err) {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
@@ -62,8 +67,7 @@ func (h *Handler) GetCollectorStatus(c *gin.Context, id string) {
 // StopCollector stops and removes a specific collector.
 // (DELETE /collectors/{id})
 func (h *Handler) StopCollector(c *gin.Context, id string) {
-	mgr := h.svc.CollectorManager()
-	if err := mgr.Stop(id); err != nil {
+	if err := h.svc.StopCollector(id); err != nil {
 		if srvErrors.IsResourceNotFoundError(err) {
 			c.Status(http.StatusNoContent)
 			return
@@ -71,5 +75,6 @@ func (h *Handler) StopCollector(c *gin.Context, id string) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
 	c.Status(http.StatusNoContent)
 }

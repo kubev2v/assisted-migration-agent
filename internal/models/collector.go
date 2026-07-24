@@ -10,6 +10,21 @@ var CollectorRequiredPrivileges = []string{
 // CollectorStateType represents the current state of the collector.
 type CollectorStateType string
 
+func (c CollectorStateType) IsRunning() bool {
+	switch c {
+	case CollectorStateConnecting:
+		fallthrough
+	case CollectorStateCollecting:
+		fallthrough
+	case CollectorStateMetricsCollecting:
+		fallthrough
+	case CollectorStateParsing:
+		return true
+	default:
+		return false
+	}
+}
+
 const (
 	// CollectorStateReady - credentials saved, waiting for collection request
 	CollectorStateReady CollectorStateType = "ready"

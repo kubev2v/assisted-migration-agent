@@ -12,6 +12,7 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/pkg/console"
 	"github.com/kubev2v/assisted-migration-agent/pkg/crypto"
+	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
 type ServiceManager struct {
@@ -117,20 +118,46 @@ func (m *ServiceManager) Initialize() error {
 	return nil
 }
 
-func (m *ServiceManager) CollectorManager() *CollectorManager {
-	return m.collectorMgr
+func (m *ServiceManager) ListCollectors() []*CollectorService {
+	return m.collectorMgr.List()
+}
+
+func (m *ServiceManager) GetCollector(id string) (*CollectorService, error) {
+	return m.collectorMgr.Get(id)
+}
+
+func (m *ServiceManager) StopCollector(id string) error {
+	return m.collectorMgr.Stop(id)
+}
+
+func (m *ServiceManager) CreateCollector() (*CollectorService, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.inspector != nil && m.inspector.IsBusy() {
+		return nil, srvErrors.NewInspectionInProgressError()
+	}
+
+	return m.collectorMgr.Create(), nil
 }
 
 // InspectorService must use the latest collection when returning the inspector
 // Therefore, this methods return the same inspector as long is busy.
 // When the inspector is done, to be sure we use the latest collection
-// the methods recreates a new one
+// the methods recreates a new one.
 func (m *ServiceManager) InspectorService() (*InspectorService, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if m.inspector != nil && m.inspector.IsBusy() {
 		return m.inspector, nil
+	}
+
+	collectors := m.collectorMgr.List()
+	for _, c := range collectors {
+		if c.GetStatus().State.IsRunning() {
+			return nil, srvErrors.NewCollectionInProgressError()
+		}
 	}
 
 	m.inspector = nil
@@ -170,11 +197,7 @@ func (m *ServiceManager) InventoryService(collectionID string) (*InventoryServic
 	if err != nil {
 		return nil, err
 	}
-	st, err := db.Store()
-	if err != nil {
-		return nil, err
-	}
-	return NewInventoryService(st), nil
+	return m.inventoryService(db)
 }
 
 func (m *ServiceManager) VirtualMachineService(collectionID string) (*VMService, error) {
@@ -182,11 +205,7 @@ func (m *ServiceManager) VirtualMachineService(collectionID string) (*VMService,
 	if err != nil {
 		return nil, err
 	}
-	st, err := db.Store()
-	if err != nil {
-		return nil, err
-	}
-	return NewVMService(st), nil
+	return m.vmService(db)
 }
 
 func (m *ServiceManager) GroupService(collectionID string) (*GroupService, error) {
@@ -194,11 +213,7 @@ func (m *ServiceManager) GroupService(collectionID string) (*GroupService, error
 	if err != nil {
 		return nil, err
 	}
-	st, err := db.Store()
-	if err != nil {
-		return nil, err
-	}
-	return NewGroupService(st, duckdb_parser.New(st.Querier(), nil)), nil
+	return m.groupService(db)
 }
 
 func (m *ServiceManager) ApplicationService(collectionID string) (*ApplicationService, error) {
@@ -218,11 +233,7 @@ func (m *ServiceManager) RightsizingService(collectionID string) (*RightsizingSe
 	if err != nil {
 		return nil, err
 	}
-	st, err := db.Store()
-	if err != nil {
-		return nil, err
-	}
-	return NewRightsizingService(st), nil
+	return m.rightsizingService(db)
 }
 
 func (m *ServiceManager) ExportService(collectionID string) (*ExportService, error) {
@@ -230,11 +241,7 @@ func (m *ServiceManager) ExportService(collectionID string) (*ExportService, err
 	if err != nil {
 		return nil, err
 	}
-	st, err := db.Store()
-	if err != nil {
-		return nil, err
-	}
-	return NewExportService(st), nil
+	return m.exportService(db)
 }
 
 func (m *ServiceManager) LatestVirtualMachineService() (*VMService, error) {
@@ -242,7 +249,7 @@ func (m *ServiceManager) LatestVirtualMachineService() (*VMService, error) {
 	if err != nil {
 		return nil, err
 	}
-	return m.VirtualMachineService(db.ID)
+	return m.vmService(db)
 }
 
 func (m *ServiceManager) LatestGroupService() (*GroupService, error) {
@@ -250,7 +257,7 @@ func (m *ServiceManager) LatestGroupService() (*GroupService, error) {
 	if err != nil {
 		return nil, err
 	}
-	return m.GroupService(db.ID)
+	return m.groupService(db)
 }
 
 func (m *ServiceManager) LatestInventoryService() (*InventoryService, error) {
@@ -258,7 +265,7 @@ func (m *ServiceManager) LatestInventoryService() (*InventoryService, error) {
 	if err != nil {
 		return nil, err
 	}
-	return m.InventoryService(db.ID)
+	return m.inventoryService(db)
 }
 
 func (m *ServiceManager) LatestRightsizingService() (*RightsizingService, error) {
@@ -266,17 +273,58 @@ func (m *ServiceManager) LatestRightsizingService() (*RightsizingService, error)
 	if err != nil {
 		return nil, err
 	}
-	return m.RightsizingService(db.ID)
+	return m.rightsizingService(db)
 }
 
 func (m *ServiceManager) Stop(ctx context.Context) {
 	if m.collectorMgr != nil {
 		m.collectorMgr.StopAll()
 	}
+
 	m.mu.Lock()
 	inspector := m.inspector
 	m.mu.Unlock()
 	if inspector != nil {
 		_ = inspector.Stop()
 	}
+}
+
+func (m *ServiceManager) vmService(db *store.Database) (*VMService, error) {
+	st, err := db.Store()
+	if err != nil {
+		return nil, err
+	}
+	return NewVMService(st), nil
+}
+
+func (m *ServiceManager) groupService(db *store.Database) (*GroupService, error) {
+	st, err := db.Store()
+	if err != nil {
+		return nil, err
+	}
+	return NewGroupService(st, duckdb_parser.New(st.Querier(), nil)), nil
+}
+
+func (m *ServiceManager) inventoryService(db *store.Database) (*InventoryService, error) {
+	st, err := db.Store()
+	if err != nil {
+		return nil, err
+	}
+	return NewInventoryService(st), nil
+}
+
+func (m *ServiceManager) rightsizingService(db *store.Database) (*RightsizingService, error) {
+	st, err := db.Store()
+	if err != nil {
+		return nil, err
+	}
+	return NewRightsizingService(st), nil
+}
+
+func (m *ServiceManager) exportService(db *store.Database) (*ExportService, error) {
+	st, err := db.Store()
+	if err != nil {
+		return nil, err
+	}
+	return NewExportService(st), nil
 }

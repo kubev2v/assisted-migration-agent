@@ -8,7 +8,6 @@ import (
 type ServiceProvider interface {
 	ConsoleService() *svc.Console
 	CollectionService() *svc.CollectionService
-	CollectorManager() *svc.CollectorManager
 	InspectorService() (*svc.InspectorService, error)
 	VddkService() *svc.VddkService
 	CredentialsService() *svc.CredentialsService
@@ -24,6 +23,11 @@ type ServiceProvider interface {
 	LatestGroupService() (*svc.GroupService, error)
 	LatestInventoryService() (*svc.InventoryService, error)
 	LatestRightsizingService() (*svc.RightsizingService, error)
+
+	ListCollectors() []*svc.CollectorService
+	GetCollector(id string) (*svc.CollectorService, error)
+	CreateCollector() (*svc.CollectorService, error)
+	StopCollector(id string) error
 }
 
 type Handler struct {

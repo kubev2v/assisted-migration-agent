@@ -1,7 +1,6 @@
 package v2
 
 import (
-	"maps"
 	"sync"
 
 	"github.com/google/uuid"
@@ -25,7 +24,7 @@ func NewCollectorManager(factory *collectorWorkFactory, credsSvc *CredentialsSer
 	}
 }
 
-func (m *CollectorManager) Create() (string, *CollectorService) {
+func (m *CollectorManager) Create() *CollectorService {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -33,7 +32,7 @@ func (m *CollectorManager) Create() (string, *CollectorService) {
 	svc := NewCollectorService(m.factory.Build, m.credsSvc)
 	svc.ID = id
 	m.collectors[id] = svc
-	return id, svc
+	return svc
 }
 
 func (m *CollectorManager) Get(id string) (*CollectorService, error) {
@@ -64,27 +63,24 @@ func (m *CollectorManager) List() []*CollectorService {
 
 func (m *CollectorManager) Stop(id string) error {
 	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	svc, ok := m.collectors[id]
 	if !ok {
-		m.mu.Unlock()
 		return srvErrors.NewResourceNotFoundError("collector", id)
 	}
-	delete(m.collectors, id)
-	m.mu.Unlock()
-
 	svc.Stop()
+	delete(m.collectors, id)
 	return nil
 }
 
 func (m *CollectorManager) StopAll() {
 	m.mu.Lock()
-	collectors := make(map[string]*CollectorService, len(m.collectors))
-	maps.Copy(collectors, m.collectors)
-	m.collectors = make(map[string]*CollectorService)
-	m.mu.Unlock()
+	defer m.mu.Unlock()
 
-	for _, svc := range collectors {
+	for id, svc := range m.collectors {
 		svc.Stop()
+		delete(m.collectors, id)
 	}
 }
 
