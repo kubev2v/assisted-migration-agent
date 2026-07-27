@@ -24,10 +24,9 @@ type ServiceProvider interface {
 	LatestInventoryService() (*svc.InventoryService, error)
 	LatestRightsizingService() (*svc.RightsizingService, error)
 
-	ListCollectors() []*svc.CollectorService
-	GetCollector(id string) (*svc.CollectorService, error)
+	GetCollector() (*svc.CollectorService, error)
 	CreateCollector() (*svc.CollectorService, error)
-	StopCollector(id string) error
+	StopCollector() error
 }
 
 type Handler struct {

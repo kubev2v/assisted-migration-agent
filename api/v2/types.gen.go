@@ -36,6 +36,7 @@ const (
 	CollectorStatusStatusConnecting  CollectorStatusStatus = "connecting"
 	CollectorStatusStatusError       CollectorStatusStatus = "error"
 	CollectorStatusStatusParsing     CollectorStatusStatus = "parsing"
+	CollectorStatusStatusReady       CollectorStatusStatus = "ready"
 )
 
 // Defines values for InspectionStatusState.
@@ -153,18 +154,10 @@ type CollectionListResponse struct {
 	Collections []Collection `json:"collections"`
 }
 
-// CollectorListResponse defines model for CollectorListResponse.
-type CollectorListResponse struct {
-	Collectors []CollectorStatus `json:"collectors"`
-}
-
 // CollectorStatus defines model for CollectorStatus.
 type CollectorStatus struct {
 	// Error Error message when status is error
-	Error *string `json:"error,omitempty"`
-
-	// Id Collector identifier
-	Id     string                `json:"id"`
+	Error  *string               `json:"error,omitempty"`
 	Status CollectorStatusStatus `json:"status"`
 }
 

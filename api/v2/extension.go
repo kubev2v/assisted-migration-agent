@@ -240,9 +240,10 @@ func NewCollectionFromDatabase(db *store.Database) Collection {
 // NewCollectorStatus converts a models.CollectorStatus to a v2 CollectorStatus.
 func NewCollectorStatus(status models.CollectorStatus) CollectorStatus {
 	var c CollectorStatus
-	c.Id = status.ID
 
 	switch status.State {
+	case models.CollectorStateReady:
+		c.Status = CollectorStatusStatusReady
 	case models.CollectorStateConnecting:
 		c.Status = CollectorStatusStatusConnecting
 		// TODO: fix rightsizing status

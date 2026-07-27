@@ -24,10 +24,6 @@ const (
 	initialState       string = "pending"
 )
 
-type Collector interface {
-	GetStatus() models.CollectorStatus
-}
-
 type (
 	consoleWorkUnit = work.WorkUnit[string, any]
 )
@@ -42,13 +38,13 @@ type Console struct {
 	client              *console.Client
 	requestBuilder      *console.RequestBuilder
 	close               chan any
-	collector           Collector
+	mgr                 *ServiceManager
 	eventSrv            *EventService
 	store               *store.Store2
 	legacyStatusEnabled bool
 }
 
-func NewConsoleService(cfg config.Agent, client *console.Client, collector Collector, st *store.Store2, eventSrv *EventService) (*Console, error) {
+func NewConsoleService(cfg config.Agent, client *console.Client, mgr *ServiceManager, st *store.Store2, eventSrv *EventService) (*Console, error) {
 	targetStatus, err := models.ParseConsoleStatusType(cfg.Mode)
 	if err != nil {
 		targetStatus = models.ConsoleStatusDisconnected
@@ -64,7 +60,7 @@ func NewConsoleService(cfg config.Agent, client *console.Client, collector Colle
 		defaultStatus.Target = models.ConsoleStatusType(config.AgentMode)
 	}
 
-	c := newConsoleService(cfg, client, collector, st, eventSrv, defaultStatus)
+	c := newConsoleService(cfg, client, mgr, st, eventSrv, defaultStatus)
 
 	if err := c.store.Configuration().Save(context.Background(), &models.Configuration{AgentMode: models.AgentMode(defaultStatus.Target)}); err != nil {
 		return nil, err
@@ -80,7 +76,7 @@ func NewConsoleService(cfg config.Agent, client *console.Client, collector Colle
 	return c, nil
 }
 
-func newConsoleService(cfg config.Agent, client *console.Client, collector Collector, store *store.Store2, eventSrv *EventService, defaultStatus models.ConsoleStatus) *Console {
+func newConsoleService(cfg config.Agent, client *console.Client, mgr *ServiceManager, store *store.Store2, eventSrv *EventService, defaultStatus models.ConsoleStatus) *Console {
 	agentID := uuid.MustParse(cfg.ID)
 	sourceID := uuid.MustParse(cfg.SourceID)
 	return &Console{
@@ -95,7 +91,7 @@ func newConsoleService(cfg config.Agent, client *console.Client, collector Colle
 		client:              client,
 		requestBuilder:      console.NewRequestBuilder(client, sourceID, agentID),
 		store:               store,
-		collector:           collector,
+		mgr:                 mgr,
 		eventSrv:            eventSrv,
 		legacyStatusEnabled: cfg.LegacyStatusEnabled,
 	}
@@ -287,11 +283,13 @@ func (c *Console) createPipeline(s *scheduler.Scheduler[any]) (*work.Pipeline[st
 		{
 			Status: func() string { return "status" },
 			Work: func(ctx context.Context, r any) (any, error) {
-				// FIXME: V2 has multiple collectors via CollectorManager — need to
-				// aggregate or select status instead of relying on a single Collector.
 				var status, statusInfo string
-				if c.collector != nil {
-					collectorStatus := c.collector.GetStatus()
+				collector, err := c.mgr.GetCollector()
+				if err != nil && !errors.IsResourceNotFoundError(err) {
+					return nil, err
+				}
+				if collector != nil {
+					collectorStatus := collector.GetStatus()
 					status = string(collectorStatus.State)
 					if c.legacyStatusEnabled {
 						status = string(collectorStatus.State.ToV1())

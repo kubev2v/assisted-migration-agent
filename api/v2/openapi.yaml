@@ -9,7 +9,7 @@ tags:
     description: Agent status and mode management
   - name: Collections
     description: Collection database management
-  - name: Collectors
+  - name: Collector
     description: Inventory collection operations
   - name: Inventories
     description: Collected inventory resources
@@ -491,9 +491,9 @@ paths:
           description: Internal server error
 
   # ── Collectors ─────────────────────────────────────────────────────────
-  /collectors:
+  /collector:
     post:
-      tags: [Collectors]
+      tags: [Collector]
       summary: Start a collection
       operationId: startCollector
       responses:
@@ -510,31 +510,9 @@ paths:
         '500':
           description: Internal server error
     get:
-      tags: [Collectors]
-      summary: List all collectors with status
-      operationId: listCollectors
-      responses:
-        '200':
-          description: List of collectors
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CollectorListResponse'
-        '500':
-          description: Internal server error
-
-  /collectors/{id}:
-    get:
-      tags: [Collectors]
+      tags: [Collector]
       summary: Get collector status
       operationId: getCollectorStatus
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: Collector ID
-          schema:
-            type: string
       responses:
         '200':
           description: Collector status
@@ -542,26 +520,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CollectorStatus'
-        '404':
-          description: Collector not found
         '500':
           description: Internal server error
     delete:
-      tags: [Collectors]
+      tags: [Collector]
       summary: Stop collector
       operationId: stopCollector
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: Collector ID
-          schema:
-            type: string
       responses:
         '204':
           description: Collector stopped
-        '404':
-          description: Collector not found
         '500':
           description: Internal server error
 
@@ -1191,15 +1158,12 @@ components:
     CollectorStatus:
       type: object
       required:
-        - id
         - status
       properties:
-        id:
-          type: string
-          description: Collector identifier
         status:
           type: string
           enum:
+            - ready
             - connecting
             - collecting
             - collecting metrics
@@ -1207,6 +1171,7 @@ components:
             - collected
             - error
           x-enum-varnames:
+            - CollectorStatusStatusReady
             - CollectorStatusStatusConnecting
             - CollectorStatusStatusCollecting
             - CollectorStatusMetricsCollecting
@@ -1216,16 +1181,6 @@ components:
         error:
           type: string
           description: Error message when status is error
-
-    CollectorListResponse:
-      type: object
-      required:
-        - collectors
-      properties:
-        collectors:
-          type: array
-          items:
-            $ref: '#/components/schemas/CollectorStatus'
 
     # ── Inventories ──────────────────────────────────────────────────────
     Inventory:

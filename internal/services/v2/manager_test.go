@@ -248,7 +248,7 @@ var _ = Describe("ServiceManager", func() {
 				return collector.GetStatus().State.IsRunning()
 			}).Should(BeTrue())
 
-			Expect(mgr.StopCollector(collector.ID)).To(Succeed())
+			Expect(mgr.StopCollector()).To(Succeed())
 
 			inspector, err := mgr.InspectorService()
 			Expect(err).NotTo(HaveOccurred())
@@ -294,10 +294,8 @@ var _ = Describe("ServiceManager", func() {
 			Expect(inspector2).NotTo(BeIdenticalTo(inspector1))
 		})
 
-		It("returns error when stopping non-existent collector", func() {
-			err := mgr.StopCollector("bogus-id")
-			Expect(err).To(HaveOccurred())
-			Expect(srvErrors.IsResourceNotFoundError(err)).To(BeTrue())
+		It("succeeds when stopping with no collector", func() {
+			Expect(mgr.StopCollector()).To(Succeed())
 		})
 
 		It("allows InspectorService after Stop clears running collectors", func() {

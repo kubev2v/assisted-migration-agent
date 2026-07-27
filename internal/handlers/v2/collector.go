@@ -6,16 +6,17 @@ import (
 	"github.com/gin-gonic/gin"
 
 	v2 "github.com/kubev2v/assisted-migration-agent/api/v2"
+	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
 // StartCollector creates and starts a new collector.
-// (POST /collectors)
+// (POST /collector)
 func (h *Handler) StartCollector(c *gin.Context) {
 	collector, err := h.svc.CreateCollector()
 	if err != nil {
 		if srvErrors.IsOperationInProgressError(err) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "failed to start collection. Inspection is in progress"})
+			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -34,27 +35,14 @@ func (h *Handler) StartCollector(c *gin.Context) {
 	c.JSON(http.StatusAccepted, v2.NewCollectorStatus(collector.GetStatus()))
 }
 
-// ListCollectors returns all tracked collectors.
-// (GET /collectors)
-func (h *Handler) ListCollectors(c *gin.Context) {
-	collectors := h.svc.ListCollectors()
-
-	resp := v2.CollectorListResponse{
-		Collectors: make([]v2.CollectorStatus, 0, len(collectors)),
-	}
-	for _, svc := range collectors {
-		resp.Collectors = append(resp.Collectors, v2.NewCollectorStatus(svc.GetStatus()))
-	}
-	c.JSON(http.StatusOK, resp)
-}
-
 // GetCollectorStatus returns the status of a specific collector.
-// (GET /collectors/{id})
-func (h *Handler) GetCollectorStatus(c *gin.Context, id string) {
-	svc, err := h.svc.GetCollector(id)
+// If not found, return "ready"
+// (GET /collector)
+func (h *Handler) GetCollectorStatus(c *gin.Context) {
+	svc, err := h.svc.GetCollector()
 	if err != nil {
 		if srvErrors.IsResourceNotFoundError(err) {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			c.JSON(http.StatusOK, v2.NewCollectorStatus(models.CollectorStatus{State: models.CollectorStateReady}))
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -65,13 +53,9 @@ func (h *Handler) GetCollectorStatus(c *gin.Context, id string) {
 }
 
 // StopCollector stops and removes a specific collector.
-// (DELETE /collectors/{id})
-func (h *Handler) StopCollector(c *gin.Context, id string) {
-	if err := h.svc.StopCollector(id); err != nil {
-		if srvErrors.IsResourceNotFoundError(err) {
-			c.Status(http.StatusNoContent)
-			return
-		}
+// (DELETE /collector)
+func (h *Handler) StopCollector(c *gin.Context) {
+	if err := h.svc.StopCollector(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

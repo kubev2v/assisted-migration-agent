@@ -21,14 +21,14 @@ type ServiceManager struct {
 	keyMgr        *crypto.KeyManager
 	pool          *store.Pool
 
-	console      *Console
-	collection   *CollectionService
-	credentials  *CredentialsService
-	collectorMgr *CollectorManager
-	mu           sync.Mutex
-	inspector    *InspectorService
-	vddk         *VddkService
-	validator    *opa.Validator
+	console     *Console
+	collection  *CollectionService
+	credentials *CredentialsService
+	mu          sync.Mutex
+	inspector   *InspectorService
+	vddk        *VddkService
+	validator   *opa.Validator
+	collector   *CollectorService
 }
 
 type ServiceManagerOption func(*ServiceManager)
@@ -94,7 +94,7 @@ func (m *ServiceManager) Initialize() error {
 	m.console, err = NewConsoleService(
 		m.cfg.Agent,
 		m.consoleClient,
-		nil,
+		m,
 		mainStore,
 		NewEventService(m.pool),
 	)
@@ -107,27 +107,31 @@ func (m *ServiceManager) Initialize() error {
 	m.credentials = NewCredentialsService(mainStore)
 	m.credentials.WithKeyManager(m.keyMgr)
 
-	factory, err := newCollectorWorkFactory(m.pool, m.cfg.Agent.DataFolder, m.validator)
-	if err != nil {
-		return err
-	}
-	m.collectorMgr = NewCollectorManager(factory, m.credentials)
-
 	m.vddk = NewVddkService(m.cfg.Agent.DataFolder, m.pool)
 
 	return nil
 }
 
-func (m *ServiceManager) ListCollectors() []*CollectorService {
-	return m.collectorMgr.List()
+func (m *ServiceManager) GetCollector() (*CollectorService, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.collector == nil {
+		return nil, srvErrors.NewResourceNotFoundError("collector", "")
+	}
+	return m.collector, nil
 }
 
-func (m *ServiceManager) GetCollector(id string) (*CollectorService, error) {
-	return m.collectorMgr.Get(id)
-}
+func (m *ServiceManager) StopCollector() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
-func (m *ServiceManager) StopCollector(id string) error {
-	return m.collectorMgr.Stop(id)
+	if m.collector == nil {
+		return nil
+	}
+	m.collector.Stop()
+	m.collector = nil
+	return nil
 }
 
 func (m *ServiceManager) CreateCollector() (*CollectorService, error) {
@@ -138,7 +142,18 @@ func (m *ServiceManager) CreateCollector() (*CollectorService, error) {
 		return nil, srvErrors.NewInspectionInProgressError()
 	}
 
-	return m.collectorMgr.Create(), nil
+	if m.collector != nil && m.collector.GetStatus().State.IsRunning() {
+		return nil, srvErrors.NewCollectionInProgressError()
+	}
+
+	factory, err := newCollectorWorkFactory(m.pool, m.cfg.Agent.DataFolder, m.validator)
+	if err != nil {
+		return nil, err
+	}
+
+	m.collector = NewCollectorService(factory.Build, m.credentials)
+
+	return m.collector, nil
 }
 
 // InspectorService must use the latest collection when returning the inspector
@@ -153,11 +168,8 @@ func (m *ServiceManager) InspectorService() (*InspectorService, error) {
 		return m.inspector, nil
 	}
 
-	collectors := m.collectorMgr.List()
-	for _, c := range collectors {
-		if c.GetStatus().State.IsRunning() {
-			return nil, srvErrors.NewCollectionInProgressError()
-		}
+	if m.collector != nil && m.collector.GetStatus().State.IsRunning() {
+		return nil, srvErrors.NewCollectionInProgressError()
 	}
 
 	m.inspector = nil
@@ -277,15 +289,19 @@ func (m *ServiceManager) LatestRightsizingService() (*RightsizingService, error)
 }
 
 func (m *ServiceManager) Stop(ctx context.Context) {
-	if m.collectorMgr != nil {
-		m.collectorMgr.StopAll()
-	}
-
 	m.mu.Lock()
 	inspector := m.inspector
 	m.mu.Unlock()
 	if inspector != nil {
 		_ = inspector.Stop()
+	}
+
+	m.mu.Lock()
+	c := m.collector
+	m.collector = nil
+	m.mu.Unlock()
+	if c != nil {
+		c.Stop()
 	}
 }
 
