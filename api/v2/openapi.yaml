@@ -1698,12 +1698,6 @@ components:
           type: string
           description: Filter expression (pkg/filter DSL)
           example: "memory >= 8GB and cluster = 'prod'"
-        tags:
-          type: array
-          items:
-            type: string
-          description: Tags applied to matching VirtualMachines
-          example: ["production", "critical"]
         createdAt:
           type: string
           format: date-time
@@ -1774,14 +1768,6 @@ components:
           minLength: 1
           x-oapi-codegen-extra-tags:
             binding: "required,min=1"
-        tags:
-          type: array
-          items:
-            type: string
-            pattern: "^[a-zA-Z0-9_.]+$"
-          x-oapi-codegen-extra-tags:
-            binding: "omitempty,dive,tag_format"
-
     UpdateGroupRequest:
       type: object
       properties:
@@ -1801,14 +1787,6 @@ components:
           minLength: 1
           x-oapi-codegen-extra-tags:
             binding: "omitempty,min=1"
-        tags:
-          type: array
-          items:
-            type: string
-            pattern: "^[a-zA-Z0-9_.]+$"
-          x-oapi-codegen-extra-tags:
-            binding: "omitempty,dive,tag_format"
-
     # ── Applications ─────────────────────────────────────────────────────
     ApplicationListResponse:
       type: object

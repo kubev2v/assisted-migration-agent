@@ -38,8 +38,6 @@ func formatFieldError(fe validator.FieldError) string {
 		return fmt.Sprintf("%s must be a valid URL", field)
 	case "at_least_one":
 		return "at least one field must be provided"
-	case "tag_format":
-		return fmt.Sprintf("%s must contain only alphanumeric characters, underscores, and dots", field)
 	case "notblank":
 		return fmt.Sprintf("%s must not be empty or whitespace-only", field)
 	default:

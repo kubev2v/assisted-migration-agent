@@ -173,10 +173,9 @@ type CollectorStatusStatus string
 
 // CreateGroupRequest defines model for CreateGroupRequest.
 type CreateGroupRequest struct {
-	Description *string   `binding:"omitempty,max=500" json:"description,omitempty"`
-	Filter      string    `binding:"required,min=1" json:"filter"`
-	Name        string    `binding:"required,min=1,max=100" json:"name"`
-	Tags        *[]string `binding:"omitempty,dive,tag_format" json:"tags,omitempty"`
+	Description *string `binding:"omitempty,max=500" json:"description,omitempty"`
+	Filter      string  `binding:"required,min=1" json:"filter"`
+	Name        string  `binding:"required,min=1,max=100" json:"name"`
 }
 
 // CredentialStatus defines model for CredentialStatus.
@@ -214,10 +213,7 @@ type Group struct {
 	Id string `json:"id"`
 
 	// Name Group display name
-	Name string `json:"name"`
-
-	// Tags Tags applied to matching VirtualMachines
-	Tags      *[]string  `json:"tags,omitempty"`
+	Name      string     `json:"name"`
 	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
 }
 
@@ -324,10 +320,9 @@ type StartInspectionRequest struct {
 
 // UpdateGroupRequest defines model for UpdateGroupRequest.
 type UpdateGroupRequest struct {
-	Description *string   `binding:"omitempty,max=500" json:"description,omitempty"`
-	Filter      *string   `binding:"omitempty,min=1" json:"filter,omitempty"`
-	Name        *string   `binding:"omitempty,min=1,max=100" json:"name,omitempty"`
-	Tags        *[]string `binding:"omitempty,dive,tag_format" json:"tags,omitempty"`
+	Description *string `binding:"omitempty,max=500" json:"description,omitempty"`
+	Filter      *string `binding:"omitempty,min=1" json:"filter,omitempty"`
+	Name        *string `binding:"omitempty,min=1,max=100" json:"name,omitempty"`
 }
 
 // UpdateLabelVMsRequest defines model for UpdateLabelVMsRequest.
