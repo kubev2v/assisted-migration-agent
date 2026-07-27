@@ -30,11 +30,12 @@ const (
 
 // Defines values for CollectorStatusStatus.
 const (
-	CollectorStatusStatusCollected  CollectorStatusStatus = "collected"
-	CollectorStatusStatusCollecting CollectorStatusStatus = "collecting"
-	CollectorStatusStatusConnecting CollectorStatusStatus = "connecting"
-	CollectorStatusStatusError      CollectorStatusStatus = "error"
-	CollectorStatusStatusParsing    CollectorStatusStatus = "parsing"
+	CollectorStatusMetricsCollecting CollectorStatusStatus = "collecting metrics"
+	CollectorStatusStatusCollected   CollectorStatusStatus = "collected"
+	CollectorStatusStatusCollecting  CollectorStatusStatus = "collecting"
+	CollectorStatusStatusConnecting  CollectorStatusStatus = "connecting"
+	CollectorStatusStatusError       CollectorStatusStatus = "error"
+	CollectorStatusStatusParsing     CollectorStatusStatus = "parsing"
 )
 
 // Defines values for InspectionStatusState.

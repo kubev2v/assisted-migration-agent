@@ -1202,12 +1202,14 @@ components:
           enum:
             - connecting
             - collecting
+            - collecting metrics
             - parsing
             - collected
             - error
           x-enum-varnames:
             - CollectorStatusStatusConnecting
             - CollectorStatusStatusCollecting
+            - CollectorStatusMetricsCollecting
             - CollectorStatusStatusParsing
             - CollectorStatusStatusCollected
             - CollectorStatusStatusError

@@ -193,7 +193,7 @@ func (f *collectorWorkFactory) Build(creds models.Credentials) work.WorkBuilder2
 		// 4. Ingest: import the SQLite output into the collection DuckDB and validate schema.
 		{
 			Status: func() models.CollectorStatus {
-				return models.CollectorStatus{State: models.CollectorLegacyStateCollecting}
+				return models.CollectorStatus{State: models.CollectorStateCollecting}
 			},
 			Work: func(ctx context.Context, r models.CollectorResult) (models.CollectorResult, error) {
 				st, err := collectionDb.Store()

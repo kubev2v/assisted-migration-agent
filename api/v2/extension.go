@@ -245,9 +245,11 @@ func NewCollectorStatus(status models.CollectorStatus) CollectorStatus {
 	switch status.State {
 	case models.CollectorStateConnecting:
 		c.Status = CollectorStatusStatusConnecting
-	// TODO: fix rightsizing status
+		// TODO: fix rightsizing status
 	case models.CollectorStateCollecting, models.CollectorStateRightsizingConnecting:
 		c.Status = CollectorStatusStatusCollecting
+	case models.CollectorStateMetricsCollecting:
+		c.Status = CollectorStatusMetricsCollecting
 	case models.CollectorStateParsing:
 		c.Status = CollectorStatusStatusParsing
 	case models.CollectorStateCollected:
