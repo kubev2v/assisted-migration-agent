@@ -52,17 +52,25 @@ func (a *AgentStatus) FromModel(m models.AgentStatus) {
 // NewVirtualMachineFromSummary converts a models.VirtualMachineSummary to a v2 VirtualMachine.
 func NewVirtualMachineFromSummary(vm models.VirtualMachineSummary) VirtualMachine {
 	result := VirtualMachine{
-		Id:           vm.ID,
-		Name:         vm.Name,
-		VCenterID:    vm.VCenterID,
-		VCenterState: vm.PowerState,
-		Cluster:      vm.Cluster,
-		Datacenter:   vm.Datacenter,
-		DiskSize:     vm.DiskSize,
-		Memory:       int64(vm.Memory),
-		IssueCount:   vm.IssueCount,
-		Migratable:   &vm.IsMigratable,
-		Template:     &vm.IsTemplate,
+		Id:                vm.ID,
+		Name:              vm.Name,
+		VCenterID:         vm.VCenterID,
+		VCenterState:      vm.PowerState,
+		Cluster:           vm.Cluster,
+		Datacenter:        vm.Datacenter,
+		DiskSize:          vm.DiskSize,
+		Memory:            int64(vm.Memory),
+		IssueCount:        vm.IssueCount,
+		Migratable:        &vm.IsMigratable,
+		Template:          &vm.IsTemplate,
+		MigrationExcluded: &vm.MigrationExcluded,
+	}
+
+	if len(vm.Groups) > 0 {
+		result.Groups = &vm.Groups
+	}
+	if len(vm.Labels) > 0 {
+		result.Labels = &vm.Labels
 	}
 
 	if vm.InspectionStatus.State != models.InspectionStateNotStarted {
@@ -72,9 +80,13 @@ func NewVirtualMachineFromSummary(vm models.VirtualMachineSummary) VirtualMachin
 	if vm.InspectionConcernCount > 0 {
 		result.InspectionConcernCount = &vm.InspectionConcernCount
 	}
-	if len(vm.Tags) > 0 {
-		result.Tags = &vm.Tags
-	}
+
+	result.UtilizationCpuP95 = vm.UtilizationCpuP95
+	result.UtilizationMemP95 = vm.UtilizationMemP95
+	result.UtilizationCpuMax = vm.UtilizationCpuMax
+	result.UtilizationMemMax = vm.UtilizationMemMax
+	result.UtilizationDisk = vm.UtilizationDisk
+	result.UtilizationConfidence = vm.UtilizationConfidence
 
 	return result
 }
@@ -139,8 +151,12 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 
 	details.Template = &vm.IsTemplate
 	details.Migratable = &vm.IsMigratable
+	details.MigrationExcluded = &vm.MigrationExcluded
 	details.FaultToleranceEnabled = &vm.FaultToleranceEnabled
 	details.NestedHVEnabled = &vm.NestedHVEnabled
+	if len(vm.Labels) > 0 {
+		details.Labels = &vm.Labels
+	}
 
 	for _, d := range vm.Disks {
 		capacityBytes := d.Capacity * 1024 * 1024
@@ -223,6 +239,23 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 			})
 		}
 		details.Issues = &issues
+	}
+
+	if vm.Utilization != nil {
+		u := NewVmUtilizationDetailsFromModel(*vm.Utilization)
+		details.Utilization = &u
+	}
+
+	if len(vm.GuestApps) > 0 {
+		apps := make([]Process, 0, len(vm.GuestApps))
+		for _, g := range vm.GuestApps {
+			app := Process{Name: g.Name}
+			if g.Version != "" {
+				app.Version = &g.Version
+			}
+			apps = append(apps, app)
+		}
+		details.Processes = &apps
 	}
 
 	return details

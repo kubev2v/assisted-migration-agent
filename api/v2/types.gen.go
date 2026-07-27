@@ -281,6 +281,15 @@ type OperationCapability struct {
 	MissingPrivileges *[]string `json:"missingPrivileges,omitempty"`
 }
 
+// Process defines model for Process.
+type Process struct {
+	// Name Name of the process
+	Name string `json:"name"`
+
+	// Version Version of the process
+	Version *string `json:"version,omitempty"`
+}
+
 // RightsizingClusterResponse defines model for RightsizingClusterResponse.
 type RightsizingClusterResponse struct {
 	Cluster  RightsizingClusterUtilization `json:"cluster"`
@@ -402,6 +411,9 @@ type VirtualMachine struct {
 	// DiskSize Total disk size in MB
 	DiskSize int64 `json:"diskSize"`
 
+	// Groups Names of groups this VM matches
+	Groups *[]string `json:"groups,omitempty"`
+
 	// Id VirtualMachine ID in vCenter
 	Id string `json:"id"`
 
@@ -412,20 +424,41 @@ type VirtualMachine struct {
 	// IssueCount Number of issues found for this VirtualMachine
 	IssueCount int `json:"issueCount"`
 
+	// Labels User-defined labels for this VM
+	Labels *[]string `binding:"omitempty,dive,min=1,max=100" json:"labels,omitempty"`
+
 	// Memory Memory size in MB
 	Memory int64 `json:"memory"`
 
 	// Migratable True if the VirtualMachine is migratable for MTV
 	Migratable *bool `json:"migratable,omitempty"`
 
+	// MigrationExcluded Whether this VM is excluded from migration
+	MigrationExcluded *bool `json:"migrationExcluded,omitempty"`
+
 	// Name VirtualMachine name
 	Name string `json:"name"`
 
-	// Tags Tags aggregated from matching groups
-	Tags *[]string `json:"tags,omitempty"`
-
 	// Template True if the VirtualMachine is a template
 	Template *bool `json:"template,omitempty"`
+
+	// UtilizationConfidence Data confidence -- sample_count / expected_sample_count x 100
+	UtilizationConfidence *float64 `json:"utilization_confidence,omitempty"`
+
+	// UtilizationCpuMax CPU utilization at max (%); absent when no utilization data
+	UtilizationCpuMax *float64 `json:"utilization_cpu_max,omitempty"`
+
+	// UtilizationCpuP95 CPU utilization at p95 (%); absent when no utilization data
+	UtilizationCpuP95 *float64 `json:"utilization_cpu_p95,omitempty"`
+
+	// UtilizationDisk Disk utilization (%); absent when no utilization data
+	UtilizationDisk *float64 `json:"utilization_disk,omitempty"`
+
+	// UtilizationMemMax Memory utilization at max (%); absent when no utilization data
+	UtilizationMemMax *float64 `json:"utilization_mem_max,omitempty"`
+
+	// UtilizationMemP95 Memory utilization at p95 (%); absent when no utilization data
+	UtilizationMemP95 *float64 `json:"utilization_mem_p95,omitempty"`
 
 	// VCenterID Identifier of the vCenter this VirtualMachine belongs to
 	VCenterID string `json:"vCenterID"`
@@ -488,11 +521,17 @@ type VirtualMachineDetail struct {
 	IpAddress *string                `json:"ipAddress,omitempty"`
 	Issues    *[]VirtualMachineIssue `json:"issues,omitempty"`
 
+	// Labels User-defined labels for this VM
+	Labels *[]string `binding:"omitempty,dive,min=1,max=100" json:"labels,omitempty"`
+
 	// MemoryMB Memory in megabytes
 	MemoryMB int32 `json:"memoryMB"`
 
 	// Migratable Whether the VirtualMachine can be migrated
 	Migratable *bool `json:"migratable,omitempty"`
+
+	// MigrationExcluded Whether this VM is excluded from migration
+	MigrationExcluded *bool `json:"migrationExcluded,omitempty"`
 
 	// Name Display name of the VirtualMachine
 	Name string `json:"name"`
@@ -504,6 +543,9 @@ type VirtualMachineDetail struct {
 	// PowerState Current power state (poweredOn, poweredOff, suspended)
 	PowerState string `json:"powerState"`
 
+	// Processes List of processes detected on this VM
+	Processes *[]Process `json:"processes,omitempty"`
+
 	// StorageUsed Storage consumed in bytes
 	StorageUsed *int64 `json:"storageUsed,omitempty"`
 
@@ -514,7 +556,8 @@ type VirtualMachineDetail struct {
 	ToolsRunningStatus *string `json:"toolsRunningStatus,omitempty"`
 
 	// ToolsStatus VMware Tools installation status
-	ToolsStatus *string `json:"toolsStatus,omitempty"`
+	ToolsStatus *string               `json:"toolsStatus,omitempty"`
+	Utilization *VmUtilizationDetails `json:"utilization,omitempty"`
 
 	// Uuid Universally unique identifier assigned by vCenter
 	Uuid *string `json:"uuid,omitempty"`

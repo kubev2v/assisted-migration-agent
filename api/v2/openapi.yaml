@@ -1335,11 +1335,49 @@ components:
         inspectionConcernCount:
           type: integer
           description: Number of inspection concerns for the latest persisted result
-        tags:
+        migrationExcluded:
+          type: boolean
+          description: Whether this VM is excluded from migration
+          default: false
+        groups:
           type: array
           items:
             type: string
-          description: Tags aggregated from matching groups
+          description: Names of groups this VM matches
+        labels:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 100
+            pattern: '\S'
+          description: User-defined labels for this VM
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty,dive,min=1,max=100"
+        utilization_cpu_p95:
+          type: number
+          format: double
+          description: CPU utilization at p95 (%); absent when no utilization data
+        utilization_mem_p95:
+          type: number
+          format: double
+          description: Memory utilization at p95 (%); absent when no utilization data
+        utilization_cpu_max:
+          type: number
+          format: double
+          description: CPU utilization at max (%); absent when no utilization data
+        utilization_mem_max:
+          type: number
+          format: double
+          description: Memory utilization at max (%); absent when no utilization data
+        utilization_disk:
+          type: number
+          format: double
+          description: Disk utilization (%); absent when no utilization data
+        utilization_confidence:
+          type: number
+          format: double
+          description: Data confidence -- sample_count / expected_sample_count x 100
 
     VirtualMachineDetail:
       type: object
@@ -1428,6 +1466,20 @@ components:
         migratable:
           type: boolean
           description: Whether the VirtualMachine can be migrated
+        migrationExcluded:
+          type: boolean
+          description: Whether this VM is excluded from migration
+          default: false
+        labels:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 100
+            pattern: '\S'
+          description: User-defined labels for this VM
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty,dive,min=1,max=100"
         faultToleranceEnabled:
           type: boolean
           description: Whether Fault Tolerance is enabled
@@ -1462,6 +1514,25 @@ components:
             $ref: '#/components/schemas/VirtualMachineIssue'
         inspection:
           $ref: '#/components/schemas/VirtualMachineInspectionResults'
+        utilization:
+          $ref: '#/components/schemas/VmUtilizationDetails'
+        processes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Process'
+          description: List of processes detected on this VM
+
+    Process:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: Name of the process
+        version:
+          type: string
+          description: Version of the process
 
     VirtualMachineListResponse:
       type: object
