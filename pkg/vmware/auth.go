@@ -65,9 +65,10 @@ func (m *VMManager) ValidatePrivileges(ctx context.Context, moid string, require
 }
 
 // VerifyCredentialsAndPrivileges checks authentication and then validates that the user
-// has the required privileges on all datacenter folders (vm, host, datastore, network).
-// Use this for callers that traverse the full inventory tree and need read access everywhere.
-func VerifyCredentialsAndPrivileges(ctx context.Context, creds *models.Credentials, requiredPrivileges []string, resourceName string) error {
+// has the required privileges on datacenter folders. When allFolders is true it checks
+// vm, host, datastore, and network folders (for callers that traverse the full inventory);
+// when false it checks only VM folders.
+func VerifyCredentialsAndPrivileges(ctx context.Context, creds *models.Credentials, requiredPrivileges []string, allFolders bool, resourceName string) error {
 	log := zap.S().Named(resourceName)
 	log.Info("verifying vCenter credentials")
 
@@ -98,12 +99,15 @@ func VerifyCredentialsAndPrivileges(ctx context.Context, creds *models.Credentia
 		if err != nil {
 			return srvErrors.NewVCenterError(fmt.Errorf("getting folders for datacenter %s: %w", dc.Name(), err))
 		}
-		for _, ref := range []types.ManagedObjectReference{
-			folders.VmFolder.Reference(),
-			folders.HostFolder.Reference(),
-			folders.DatastoreFolder.Reference(),
-			folders.NetworkFolder.Reference(),
-		} {
+		refs := []types.ManagedObjectReference{folders.VmFolder.Reference()}
+		if allFolders {
+			refs = append(refs,
+				folders.HostFolder.Reference(),
+				folders.DatastoreFolder.Reference(),
+				folders.NetworkFolder.Reference(),
+			)
+		}
+		for _, ref := range refs {
 			if err := ValidateUserPrivilegesOnEntity(ctx, client.Client, ref, requiredPrivileges, creds.Username); err != nil {
 				return err
 			}

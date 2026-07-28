@@ -5,14 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"net/url"
 	"sort"
 	"sync"
 	"time"
-
-	"github.com/vmware/govmomi"
-	"github.com/vmware/govmomi/session"
-	"github.com/vmware/govmomi/vim25"
 
 	"go.uber.org/zap"
 
@@ -174,65 +169,7 @@ func (f *ForecasterService) VerifyCredentials(ctx context.Context, credentials m
 		return err
 	}
 
-	if err := f.verifyCredentialsAndPrivileges(ctx, &credentials, models.ForecasterRequiredPrivileges); err != nil {
-		return err
-	}
-
-	zap.S().Named("forecaster_service").Info("credentials verified successfully")
-	return nil
-}
-
-// verifyCredentialsAndPrivileges checks both authentication and vSphere privileges.
-// It connects, verifies login, then checks the given privileges on the default VM folder.
-func (f *ForecasterService) verifyCredentialsAndPrivileges(ctx context.Context, creds *models.Credentials, requiredPrivileges []string) error {
-	u, err := url.ParseRequestURI(creds.URL)
-	if err != nil {
-		return err
-	}
-	u.User = url.UserPassword(creds.Username, creds.Password)
-
-	verifyCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	soapClient, err := vmware.NewSoapClient(u, creds.SkipTLS, creds.CACert)
-	if err != nil {
-		return err
-	}
-	vimClient, err := vim25.NewClient(verifyCtx, soapClient)
-	if err != nil {
-		return err
-	}
-
-	client := &govmomi.Client{
-		SessionManager: session.NewManager(vimClient),
-		Client:         vimClient,
-	}
-
-	zap.S().Named("forecaster_service").Info("verifying vCenter credentials")
-	if err := client.Login(verifyCtx, u.User); err != nil {
-		return srvErrors.NewVCenterError(err)
-	}
-	defer func() {
-		logoutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		_ = client.Logout(logoutCtx)
-		client.CloseIdleConnections()
-	}()
-
-	zap.S().Named("forecaster_service").Info("vCenter credentials verified, checking privileges")
-
-	dcFolders, err := collectDatacenterFolders(verifyCtx, vimClient)
-	if err != nil {
-		return err
-	}
-	for _, ref := range dcFolders.vmFolderRefs {
-		if err := vmware.ValidateUserPrivilegesOnEntity(verifyCtx, vimClient, ref, requiredPrivileges, creds.Username); err != nil {
-			return err
-		}
-	}
-
-	zap.S().Named("forecaster_service").Info("vCenter credentials and privileges verified successfully")
-	return nil
+	return vmware.VerifyCredentialsAndPrivileges(ctx, &credentials, models.ForecasterRequiredPrivileges, false, "forecaster")
 }
 
 // resolveCredentials returns stored credentials from the credentials service
@@ -242,7 +179,7 @@ func (f *ForecasterService) resolveCredentials(ctx context.Context) (models.Cred
 	if err != nil {
 		return models.Credentials{}, err
 	}
-	if err := f.verifyCredentialsAndPrivileges(ctx, &creds, models.ForecasterRequiredPrivileges); err != nil {
+	if err := vmware.VerifyCredentialsAndPrivileges(ctx, &creds, models.ForecasterRequiredPrivileges, false, "forecaster"); err != nil {
 		return models.Credentials{}, err
 	}
 	return creds, nil
