@@ -166,8 +166,8 @@ func (i *InspectorService) Credentials(ctx context.Context, credentials models.C
 	}
 	credentials.URL = url
 
-	if err := vmware.VerifyCredentials(ctx, &credentials, "inspector"); err != nil {
-		return srvErrors.NewVCenterError(err)
+	if err := vmware.VerifyCredentialsAndPrivileges(ctx, &credentials, models.InspectorRequiredPrivileges, false, "inspector"); err != nil {
+		return err
 	}
 
 	return nil

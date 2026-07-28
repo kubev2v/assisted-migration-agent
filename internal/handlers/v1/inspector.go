@@ -135,6 +135,13 @@ func (h *Handler) ValidateInspectorCredentials(c *gin.Context) {
 	}
 
 	if err := h.inspectorSrv.Credentials(c.Request.Context(), creds); err != nil {
+		if privErr := srvErrors.GetInsufficientPrivilegesError(err); privErr != nil {
+			c.JSON(http.StatusForbidden, gin.H{
+				"error":             err.Error(),
+				"missingPrivileges": privErr.Missing,
+			})
+			return
+		}
 		if srvErrors.IsVCenterError(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
