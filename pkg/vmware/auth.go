@@ -14,6 +14,7 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 
+	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/vim25"
 
 	"github.com/vmware/govmomi/object"
@@ -61,6 +62,56 @@ func ValidateUserPrivilegesOnEntity(
 
 func (m *VMManager) ValidatePrivileges(ctx context.Context, moid string, requiredPrivileges []string) error {
 	return ValidateUserPrivilegesOnEntity(ctx, m.gc.Client, refFromMoid(moid), requiredPrivileges, m.username)
+}
+
+// VerifyCredentialsAndPrivileges checks authentication and then validates that the user
+// has the required privileges on all datacenter folders (vm, host, datastore, network).
+// Use this for callers that traverse the full inventory tree and need read access everywhere.
+func VerifyCredentialsAndPrivileges(ctx context.Context, creds *models.Credentials, requiredPrivileges []string, resourceName string) error {
+	log := zap.S().Named(resourceName)
+	log.Info("verifying vCenter credentials")
+
+	client, err := Connect(ctx, creds)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		logoutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_ = client.Logout(logoutCtx)
+		client.CloseIdleConnections()
+	}()
+
+	log.Info("credentials verified, checking privileges on datacenter folders")
+
+	finder := find.NewFinder(client.Client, false)
+	datacenters, err := finder.DatacenterList(ctx, "*")
+	if err != nil {
+		return srvErrors.NewVCenterError(fmt.Errorf("listing datacenters: %w", err))
+	}
+	if len(datacenters) == 0 {
+		return srvErrors.NewVCenterError(fmt.Errorf("no datacenters found"))
+	}
+
+	for _, dc := range datacenters {
+		folders, err := dc.Folders(ctx)
+		if err != nil {
+			return srvErrors.NewVCenterError(fmt.Errorf("getting folders for datacenter %s: %w", dc.Name(), err))
+		}
+		for _, ref := range []types.ManagedObjectReference{
+			folders.VmFolder.Reference(),
+			folders.HostFolder.Reference(),
+			folders.DatastoreFolder.Reference(),
+			folders.NetworkFolder.Reference(),
+		} {
+			if err := ValidateUserPrivilegesOnEntity(ctx, client.Client, ref, requiredPrivileges, creds.Username); err != nil {
+				return err
+			}
+		}
+	}
+
+	log.Info("credentials and privileges verified successfully")
+	return nil
 }
 
 func VerifyCredentials(ctx context.Context, creds *models.Credentials, resourceName string) error {

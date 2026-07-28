@@ -46,7 +46,7 @@ func NewVSphereCollector(dbPath string) *VSphereCollector {
 }
 
 func (c *VSphereCollector) VerifyCredentials(ctx context.Context, creds *models.Credentials) error {
-	return vmware.VerifyCredentials(ctx, creds, "collector")
+	return vmware.VerifyCredentialsAndPrivileges(ctx, creds, models.CollectorRequiredPrivileges, "collector")
 }
 
 func (c *VSphereCollector) Collect(ctx context.Context, creds *models.Credentials) error {
