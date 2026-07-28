@@ -6,9 +6,6 @@ import (
 	"strings"
 
 	"github.com/go-playground/validator/v10"
-
-	v1 "github.com/kubev2v/assisted-migration-agent/api/v1"
-	"github.com/kubev2v/assisted-migration-agent/internal/handlers"
 )
 
 // validationErrorMessage translates validator.ValidationErrors into a
@@ -39,27 +36,11 @@ func formatFieldError(fe validator.FieldError) string {
 		return fmt.Sprintf("%s must be one of: %s", field, fe.Param())
 	case "url":
 		return fmt.Sprintf("%s must be a valid URL", field)
-	case "at_least_one":
-		return "at least one field must be provided"
 	case "tag_format":
 		return fmt.Sprintf("%s must contain only alphanumeric characters, underscores, and dots", field)
 	case "notblank":
 		return fmt.Sprintf("%s must not be empty or whitespace-only", field)
 	default:
 		return fmt.Sprintf("%s failed validation: %s", field, fe.Tag())
-	}
-}
-
-// RegisterValidators registers common field-level validators plus V1-specific
-// struct-level validators. Called once during application startup.
-func RegisterValidators(v *validator.Validate) {
-	handlers.RegisterValidators(v)
-	v.RegisterStructValidation(validateUpdateGroupAtLeastOneField, v1.UpdateGroupRequest{})
-}
-
-func validateUpdateGroupAtLeastOneField(sl validator.StructLevel) {
-	req := sl.Current().Interface().(v1.UpdateGroupRequest)
-	if req.Name == nil && req.Filter == nil && req.Description == nil {
-		sl.ReportError(req, "UpdateGroupRequest", "", "at_least_one", "")
 	}
 }

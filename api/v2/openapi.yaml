@@ -1796,6 +1796,7 @@ components:
             binding: "required,min=1"
     UpdateGroupRequest:
       type: object
+      minProperties: 1
       properties:
         name:
           type: string

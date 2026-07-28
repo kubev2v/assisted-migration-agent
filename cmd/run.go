@@ -160,7 +160,7 @@ func initV1(cfg *config.Configuration) (*server.Server, func(), error) {
 	}
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
-		v1Handlers.RegisterValidators(v)
+		handlers.RegisterValidators(v)
 	}
 
 	v1H := v1Handlers.NewHandler(*cfg).

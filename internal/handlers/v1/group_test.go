@@ -652,20 +652,6 @@ var _ = Describe("Group Handlers", func() {
 			Expect(mockGroup.LastUpdateGroup.Description).To(Equal("new desc"))
 		})
 
-		It("should return 400 when no fields provided", func() {
-			body := `{}`
-			req := httptest.NewRequest(http.MethodPatch, "/groups/"+testUUID1.String(), strings.NewReader(body))
-			req.Header.Set("Content-Type", "application/json")
-			w := httptest.NewRecorder()
-
-			router.ServeHTTP(w, req)
-
-			Expect(w.Code).To(Equal(http.StatusBadRequest))
-			var resp map[string]any
-			Expect(json.Unmarshal(w.Body.Bytes(), &resp)).To(Succeed())
-			Expect(resp["error"]).To(ContainSubstring("at least one field must be provided"))
-		})
-
 		It("should return 400 when name is empty string", func() {
 			body := `{"name":""}`
 			req := httptest.NewRequest(http.MethodPatch, "/groups/"+testUUID1.String(), strings.NewReader(body))

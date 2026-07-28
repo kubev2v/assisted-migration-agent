@@ -19,7 +19,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	handlers "github.com/kubev2v/assisted-migration-agent/internal/handlers/v1"
+	sharedHandlers "github.com/kubev2v/assisted-migration-agent/internal/handlers"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/services"
 )
@@ -47,7 +47,7 @@ func TestHandlers(t *testing.T) {
 
 var _ = BeforeSuite(func() {
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
-		handlers.RegisterValidators(v)
+		sharedHandlers.RegisterValidators(v)
 	}
 })
 

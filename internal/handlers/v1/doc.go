@@ -354,13 +354,16 @@
 //
 // # Request Validation
 //
-// Handlers delegate request validation to validator/v10 via Gin's ShouldBindJSON.
-// Validation rules are declared in the OpenAPI spec (api/v1/openapi.yaml) using
-// x-oapi-codegen-extra-tags, which generate `binding:"..."` struct tags in
-// api/v1/types.gen.go. Custom struct-level validators (registered in cmd/run.go):
+// Handlers delegate request validation to two layers:
 //
-//   - at_least_one: ensures at least one field is set (UpdateGroupRequest)
-//   - tag_format:   validates each tag matches ^[a-zA-Z0-9_.]+$
+//   - Schema-level: the OpenAPI request-body schema (api/v1/openapi.yaml), enforced
+//     by the OapiRequestValidator middleware (internal/server/http.go) before a
+//     request reaches the handler. This covers whole-object constraints such as
+//     UpdateGroupRequest's minProperties: 1 ("at least one field must be provided").
+//   - Field-level: validator/v10 via Gin's ShouldBindJSON, using `binding:"..."`
+//     struct tags generated from x-oapi-codegen-extra-tags in the OpenAPI spec,
+//     plus the custom tag_format validator (registered in cmd/run.go), which
+//     validates each tag matches ^[a-zA-Z0-9_.]+$.
 //
 // Validation errors are formatted by validationErrorMessage (validation.go) into
 // human-readable messages before being returned as 400 Bad Request.

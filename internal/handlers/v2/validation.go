@@ -36,8 +36,6 @@ func formatFieldError(fe validator.FieldError) string {
 		return fmt.Sprintf("%s must be one of: %s", field, fe.Param())
 	case "url":
 		return fmt.Sprintf("%s must be a valid URL", field)
-	case "at_least_one":
-		return "at least one field must be provided"
 	case "notblank":
 		return fmt.Sprintf("%s must not be empty or whitespace-only", field)
 	default:
