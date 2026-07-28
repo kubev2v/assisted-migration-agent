@@ -134,6 +134,25 @@ func (d *DiskManager) FindDatacenter(ctx context.Context, name string) (*object.
 	return finder.Datacenter(ctx, name)
 }
 
+// FindDatacenterForDatastore returns the datacenter that contains the named datastore.
+// Unlike FindDatacenter(""), this works on multi-datacenter vCenters.
+func (d *DiskManager) FindDatacenterForDatastore(ctx context.Context, datastoreName string) (*object.Datacenter, error) {
+	finder := find.NewFinder(d.gc.Client, false)
+	datacenters, err := finder.DatacenterList(ctx, "*")
+	if err != nil {
+		return nil, fmt.Errorf("listing datacenters: %w", err)
+	}
+
+	for _, dc := range datacenters {
+		finder.SetDatacenter(dc)
+		if _, err := finder.Datastore(ctx, datastoreName); err == nil {
+			return dc, nil
+		}
+	}
+
+	return nil, fmt.Errorf("datastore %q not found in any datacenter", datastoreName)
+}
+
 // FindDatastore finds a datastore by name within a datacenter.
 func (d *DiskManager) FindDatastore(ctx context.Context, datacenter *object.Datacenter, name string) (*object.Datastore, error) {
 	finder := find.NewFinder(d.gc.Client, true)

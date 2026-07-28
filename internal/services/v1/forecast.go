@@ -300,12 +300,8 @@ func (f *forecastService) validateDatastores(ctx context.Context, pair models.Da
 	log.Infow("validating datastores", "pair", pair.Name,
 		"source", pair.SourceDatastore, "target", pair.TargetDatastore)
 
-	dc, err := f.diskManager.FindDatacenter(ctx, "")
+	dc, err := f.diskManager.FindDatacenterForDatastore(ctx, pair.SourceDatastore)
 	if err != nil {
-		return fmt.Errorf("failed to find datacenter: %w", err)
-	}
-
-	if err := f.diskManager.DatastoreExists(ctx, dc, pair.SourceDatastore); err != nil {
 		return fmt.Errorf("source datastore validation failed: %w", err)
 	}
 
@@ -338,9 +334,9 @@ func (f *forecastService) runBenchmarks(ctx context.Context, strategy BenchmarkS
 	log := zap.S().Named("forecast_service")
 	var result models.ForecastResult
 
-	dc, err := f.diskManager.FindDatacenter(ctx, "")
+	dc, err := f.diskManager.FindDatacenterForDatastore(ctx, pair.SourceDatastore)
 	if err != nil {
-		return result, fmt.Errorf("failed to find datacenter: %w", err)
+		return result, fmt.Errorf("failed to find datacenter for source datastore: %w", err)
 	}
 
 	// Setup strategy for this pair (deploys filler image, etc.)
