@@ -916,6 +916,92 @@ paths:
         '500':
           description: Internal server error
 
+  # ── Collection Comparison ───────────────────────────────────────────────
+  /collections/compare/{aId}/{bId}:
+    get:
+      tags: [Collections]
+      summary: Compare two collections — returns aggregates and diffs
+      operationId: compareCollections
+      parameters:
+        - name: aId
+          in: path
+          required: true
+          description: Baseline collection ID
+          schema:
+            type: string
+        - name: bId
+          in: path
+          required: true
+          description: Comparison target collection ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Comparison summary with per-collection aggregates and diffs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectionComparisonSummary'
+        '404':
+          description: Either collection not found
+        '500':
+          description: Internal server error
+
+  /collections/compare/{aId}/{bId}/{dimension}:
+    get:
+      tags: [Collections]
+      summary: Drill down — VM IDs that differ between two collections for a given dimension
+      operationId: compareCollectionsDiff
+      parameters:
+        - name: aId
+          in: path
+          required: true
+          description: Baseline collection ID
+          schema:
+            type: string
+        - name: bId
+          in: path
+          required: true
+          description: Comparison target collection ID
+          schema:
+            type: string
+        - name: dimension
+          in: path
+          required: true
+          description: The metric to compare
+          schema:
+            type: string
+            enum:
+              - total
+              - migratable
+              - non-migratable
+        - name: page
+          in: query
+          description: Page number (1-based). Applied independently to onlyInA and onlyInB.
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: pageSize
+          in: query
+          description: Number of VM IDs per page per side
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Paginated VM IDs that differ between the two collections for the given dimension
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectionComparisonDiff'
+        '400':
+          description: Invalid dimension value
+        '404':
+          description: Either collection not found
+        '500':
+          description: Internal server error
+
   # ── Inspector ───────────────────────────────────────────────────────────
   /inspector:
     post:
@@ -1153,6 +1239,126 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Collection'
+
+    CollectionAggregate:
+      type: object
+      required:
+        - id
+        - createdAt
+        - totalVMs
+        - migratable
+        - nonMigratable
+        - clusters
+      properties:
+        id:
+          type: string
+          description: Collection identifier
+        createdAt:
+          type: string
+          format: date-time
+          description: When the collection was created
+        totalVMs:
+          type: integer
+          description: Total number of VMs in the collection
+        migratable:
+          type: integer
+          description: Number of migratable VMs (no Critical concerns)
+        nonMigratable:
+          type: integer
+          description: Number of non-migratable VMs (at least one Critical concern)
+        clusters:
+          type: integer
+          description: Number of distinct clusters
+
+    ComparisonDiffEntry:
+      type: object
+      required:
+        - delta
+      properties:
+        delta:
+          type: integer
+          description: Difference (B minus A). Positive means B has more.
+        onlyInA:
+          type: integer
+          description: Count of VMs satisfying this dimension in A but not in B
+        onlyInB:
+          type: integer
+          description: Count of VMs satisfying this dimension in B but not in A
+
+    ComparisonDiffPage:
+      type: object
+      required:
+        - total
+        - page
+        - pageCount
+        - vmIds
+      properties:
+        total:
+          type: integer
+          description: Total number of VM IDs in this list
+        page:
+          type: integer
+          description: Current page number
+        pageCount:
+          type: integer
+          description: Total number of pages
+        vmIds:
+          type: array
+          items:
+            type: string
+          description: VM IDs on this page. Empty array when page exceeds pageCount.
+
+    CollectionComparisonSummary:
+      type: object
+      required:
+        - collections
+        - diff
+      properties:
+        collections:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            $ref: '#/components/schemas/CollectionAggregate'
+          description: Aggregates for both collections. Index 0 is A (baseline), index 1 is B.
+        diff:
+          type: object
+          required:
+            - totalVMs
+            - migratable
+            - nonMigratable
+            - clusters
+          properties:
+            totalVMs:
+              $ref: '#/components/schemas/ComparisonDiffEntry'
+            migratable:
+              $ref: '#/components/schemas/ComparisonDiffEntry'
+            nonMigratable:
+              $ref: '#/components/schemas/ComparisonDiffEntry'
+            clusters:
+              $ref: '#/components/schemas/ComparisonDiffEntry'
+          description: Numeric differences (B minus A) with symmetric set-diff counts per dimension. clusters has no onlyInA/onlyInB.
+
+    CollectionComparisonDiff:
+      type: object
+      required:
+        - dimension
+        - onlyInA
+        - onlyInB
+      properties:
+        dimension:
+          type: string
+          enum:
+            - total
+            - migratable
+            - non-migratable
+          description: The dimension being compared
+        onlyInA:
+          $ref: '#/components/schemas/ComparisonDiffPage'
+          description: VM IDs satisfying the dimension in A but not in B
+        onlyInB:
+          $ref: '#/components/schemas/ComparisonDiffPage'
+          description: VM IDs satisfying the dimension in B but not in A
 
     # ── Collectors ───────────────────────────────────────────────────────
     CollectorStatus:
@@ -2201,6 +2407,265 @@ components:
         bytes:
           type: integer
           format: int64
+
+    # ── Forecaster ────────────────────────────────────────────────────────
+    ForecasterStatus:
+      type: object
+      required:
+        - state
+        - pairs
+      properties:
+        state:
+          type: string
+          enum:
+            - ready
+            - running
+        pairs:
+          type: array
+          items:
+            $ref: '#/components/schemas/ForecastPairStatus'
+
+    ForecastPairStatus:
+      type: object
+      required:
+        - state
+        - pairName
+        - sourceDatastore
+        - targetDatastore
+        - completedRuns
+        - totalRuns
+      properties:
+        state:
+          type: string
+          enum:
+            - pending
+            - preparing
+            - running
+            - completed
+            - canceled
+            - error
+        error:
+          type: string
+        pairName:
+          type: string
+        sourceDatastore:
+          type: string
+        targetDatastore:
+          type: string
+        host:
+          type: string
+        completedRuns:
+          type: integer
+        totalRuns:
+          type: integer
+        prepBytesTotal:
+          type: integer
+          format: int64
+        prepBytesUploaded:
+          type: integer
+          format: int64
+
+    BenchmarkRun:
+      type: object
+      required:
+        - id
+        - sessionId
+        - pairName
+        - sourceDatastore
+        - targetDatastore
+        - iteration
+        - diskSizeGb
+        - durationSec
+        - throughputMBps
+        - method
+        - createdAt
+      properties:
+        id:
+          type: integer
+          format: int64
+        sessionId:
+          type: integer
+          format: int64
+        pairName:
+          type: string
+        sourceDatastore:
+          type: string
+        targetDatastore:
+          type: string
+        iteration:
+          type: integer
+        diskSizeGb:
+          type: integer
+        prepDurationSec:
+          type: number
+          format: double
+        durationSec:
+          type: number
+          format: double
+        throughputMBps:
+          type: number
+          format: double
+        method:
+          type: string
+        error:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    ForecastStats:
+      type: object
+      required:
+        - pairName
+        - sampleCount
+        - meanMBps
+        - medianMBps
+        - minMBps
+        - maxMBps
+        - stdDevMBps
+        - ci95Lower
+        - ci95Upper
+        - estPer1TB
+      properties:
+        pairName:
+          type: string
+        sampleCount:
+          type: integer
+        meanMBps:
+          type: number
+          format: double
+        medianMBps:
+          type: number
+          format: double
+        minMBps:
+          type: number
+          format: double
+        maxMBps:
+          type: number
+          format: double
+        stdDevMBps:
+          type: number
+          format: double
+        ci95Lower:
+          type: number
+          format: double
+        ci95Upper:
+          type: number
+          format: double
+        estPer1TB:
+          $ref: '#/components/schemas/EstimateRange'
+
+    EstimateRange:
+      type: object
+      required:
+        - bestCase
+        - expected
+        - worstCase
+      properties:
+        bestCase:
+          type: string
+          description: Duration string (e.g. "1h30m")
+        expected:
+          type: string
+          description: Duration string (e.g. "2h15m")
+        worstCase:
+          type: string
+          description: Duration string (e.g. "3h45m")
+
+    DatastorePairRequest:
+      type: object
+      required:
+        - name
+        - sourceDatastore
+        - targetDatastore
+      properties:
+        name:
+          type: string
+        sourceDatastore:
+          type: string
+        targetDatastore:
+          type: string
+        host:
+          type: string
+
+    StartForecasterRequest:
+      type: object
+      required:
+        - pairs
+      properties:
+        pairs:
+          type: array
+          items:
+            $ref: '#/components/schemas/DatastorePairRequest'
+        diskSizeGb:
+          type: integer
+        iterations:
+          type: integer
+        concurrency:
+          type: integer
+
+    PairCapabilityRequest:
+      type: object
+      required:
+        - pairs
+      properties:
+        pairs:
+          type: array
+          items:
+            $ref: '#/components/schemas/DatastorePairRequest'
+
+    DatastoreDetail:
+      type: object
+      required:
+        - name
+        - type
+        - capacityGb
+        - freeGb
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          description: "VMFS, NFS, VVol, or OTHER"
+        capacityGb:
+          type: number
+          format: double
+        freeGb:
+          type: number
+          format: double
+        storageVendor:
+          type: string
+        storageModel:
+          type: string
+        storageArrayId:
+          type: string
+        naaDevices:
+          type: array
+          items:
+            type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+
+    PairCapability:
+      type: object
+      required:
+        - pairName
+        - sourceDatastore
+        - targetDatastore
+        - capabilities
+      properties:
+        pairName:
+          type: string
+        sourceDatastore:
+          type: string
+        targetDatastore:
+          type: string
+        capabilities:
+          type: array
+          items:
+            type: string
 
     # ── Version ──────────────────────────────────────────────────────────
     VersionInfo:

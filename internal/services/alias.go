@@ -69,10 +69,12 @@ type V2ServiceManager = v2.ServiceManager
 type V2ServiceManagerOption = v2.ServiceManagerOption
 type V2SortField = v2.SortField
 type V2VMListParams = v2.VMListParams
+type V2ForecasterService = v2.ForecasterService
 type V2VMService = v2.VMService
 
 // ── V2 constructors and option funcs ────────────────────────────────────
 var (
+	V2NewForecasterService  = v2.NewForecasterService
 	V2NewCollectorService   = v2.NewCollectorService
 	V2NewConsoleService     = v2.NewConsoleService
 	V2NewCredentialsService = v2.NewCredentialsService

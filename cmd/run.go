@@ -245,6 +245,7 @@ func initV2(cfg *config.Configuration) (*server.Server, func(), error) {
 			Swagger: swagger,
 			RegisterFn: func(router *gin.RouterGroup) {
 				v2.RegisterHandlers(router, v2H)
+				v2Handlers.RegisterForecasterRoutes(router, v2H)
 			},
 		},
 	})
