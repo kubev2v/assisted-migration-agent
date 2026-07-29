@@ -15,11 +15,12 @@ import (
 )
 
 type VMService struct {
-	store *store.Store2
+	store    *store.Store2
+	eventSrv *EventService
 }
 
 func NewVMService(st *store.Store2) *VMService {
-	return &VMService{store: st}
+	return &VMService{store: st, eventSrv: NewEventService(st)}
 }
 
 type SortField struct {
@@ -194,10 +195,7 @@ func (s *VMService) buildAndSaveMainInventory(ctx context.Context) error {
 		return fmt.Errorf("updating main inventory: %w", err)
 	}
 
-	return s.store.Outbox().Insert(ctx, models.Event{
-		Kind: models.InventoryUpdateEvent,
-		Data: mainInventoryData,
-	})
+	return s.eventSrv.AddInventoryUpdateEvent(ctx, mainInventoryData)
 }
 
 // buildAndSaveGroupInventory builds an inventory for a group's matched VMs and
@@ -224,34 +222,14 @@ func (s *VMService) buildAndSaveGroupInventory(ctx context.Context, groupID uuid
 	if err != nil {
 		return fmt.Errorf("getting group %s: %w", groupID, err)
 	}
+	group.Inventory = inv
 
-	var invJSON json.RawMessage
-	if inv != nil {
-		apiInventory := converters.ToAPI(inv)
-		invBytes, err := json.Marshal(apiInventory)
-		if err != nil {
-			return fmt.Errorf("marshaling inventory for group %s: %w", groupID, err)
-		}
-		invJSON = invBytes
-	} else {
-		invJSON = json.RawMessage("null")
-	}
-
-	payload := models.GroupInventoryEventPayload{
-		GroupID:   groupID.String(),
-		GroupName: group.Name,
-		Inventory: invJSON,
-	}
-
-	payloadBytes, err := json.Marshal(payload)
+	data, err := buildGroupInventoryEventData(group)
 	if err != nil {
 		return fmt.Errorf("marshaling event payload for group %s: %w", groupID, err)
 	}
 
-	if err := s.store.Outbox().Insert(ctx, models.Event{
-		Kind: models.GroupInventoryUpsertEvent,
-		Data: payloadBytes,
-	}); err != nil {
+	if err := s.eventSrv.AddGroupInventoryEvent(ctx, data); err != nil {
 		return fmt.Errorf("adding group inventory event for group %s: %w", groupID, err)
 	}
 

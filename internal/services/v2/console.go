@@ -39,12 +39,11 @@ type Console struct {
 	requestBuilder      *console.RequestBuilder
 	close               chan any
 	mgr                 *ServiceManager
-	eventSrv            *EventService
 	store               *store.Store2
 	legacyStatusEnabled bool
 }
 
-func NewConsoleService(cfg config.Agent, client *console.Client, mgr *ServiceManager, st *store.Store2, eventSrv *EventService) (*Console, error) {
+func NewConsoleService(cfg config.Agent, client *console.Client, mgr *ServiceManager, mainStore *store.Store2) (*Console, error) {
 	targetStatus, err := models.ParseConsoleStatusType(cfg.Mode)
 	if err != nil {
 		targetStatus = models.ConsoleStatusDisconnected
@@ -55,12 +54,12 @@ func NewConsoleService(cfg config.Agent, client *console.Client, mgr *ServiceMan
 		Target:  targetStatus,
 	}
 
-	config, err := st.Configuration().Get(context.Background())
+	conf, err := mainStore.Configuration().Get(context.Background())
 	if err == nil {
-		defaultStatus.Target = models.ConsoleStatusType(config.AgentMode)
+		defaultStatus.Target = models.ConsoleStatusType(conf.AgentMode)
 	}
 
-	c := newConsoleService(cfg, client, mgr, st, eventSrv, defaultStatus)
+	c := newConsoleService(cfg, client, mgr, mainStore, defaultStatus)
 
 	if err := c.store.Configuration().Save(context.Background(), &models.Configuration{AgentMode: models.AgentMode(defaultStatus.Target)}); err != nil {
 		return nil, err
@@ -76,7 +75,7 @@ func NewConsoleService(cfg config.Agent, client *console.Client, mgr *ServiceMan
 	return c, nil
 }
 
-func newConsoleService(cfg config.Agent, client *console.Client, mgr *ServiceManager, store *store.Store2, eventSrv *EventService, defaultStatus models.ConsoleStatus) *Console {
+func newConsoleService(cfg config.Agent, client *console.Client, mgr *ServiceManager, store *store.Store2, defaultStatus models.ConsoleStatus) *Console {
 	agentID := uuid.MustParse(cfg.ID)
 	sourceID := uuid.MustParse(cfg.SourceID)
 	return &Console{
@@ -92,7 +91,6 @@ func newConsoleService(cfg config.Agent, client *console.Client, mgr *ServiceMan
 		requestBuilder:      console.NewRequestBuilder(client, sourceID, agentID),
 		store:               store,
 		mgr:                 mgr,
-		eventSrv:            eventSrv,
 		legacyStatusEnabled: cfg.LegacyStatusEnabled,
 	}
 }
@@ -303,7 +301,12 @@ func (c *Console) createPipeline(s *scheduler.Scheduler[any]) (*work.Pipeline[st
 			},
 		}}
 
-	events, err := c.eventSrv.Events(context.Background())
+	eventSrv, err := c.mgr.LatestEventService()
+	if err != nil && !errors.IsResourceNotFoundError(err) {
+		return nil, fmt.Errorf("failed to get event service: %w", err)
+	}
+
+	events, err := eventSrv.Events(context.Background())
 	if err != nil && !errors.IsCollectionNotFoundError(err) {
 		return nil, fmt.Errorf("failed to read events: %w", err)
 	}
@@ -334,7 +337,7 @@ func (c *Console) createPipeline(s *scheduler.Scheduler[any]) (*work.Pipeline[st
 	units = append(units, consoleWorkUnit{
 		Status: func() string { return "clear" },
 		Work: func(ctx context.Context, r any) (any, error) {
-			return nil, c.eventSrv.Delete(ctx, lastID)
+			return nil, eventSrv.Delete(ctx, lastID)
 		},
 	})
 

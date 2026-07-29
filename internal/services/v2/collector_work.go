@@ -471,17 +471,10 @@ func (f *collectorWorkFactory) Build(creds models.Credentials) work.WorkBuilder2
 				return result, nil
 			},
 		},
-		// 9. Publish: write an inventory-update event to the outbox.
-		// TODO: Question for Ami:
-		// Where the Outbox lives?
-		// 1. main
-		// It could be main but it means we need to be careful with creating of groups and vm exclusion from an previous collection.
-		// Scenario: the user creates a group on a old collection, which imo it does make sense from buisness pov but let's accept the argument.
-		// the current code, updates the inventory and write it into the outbox to be sent to saas. Therefore, if we move the outbox in main the user could sent an obsolete inventory to saas.
-		// 2. It leaves in its own collection:
-		// In this case it's safe to update groups but the event service must be smart enough to read the outbox only from the latest collection.
-		// I prefer 2nd because it is easier to implement. Console service gets the Event Service instnace which gets the pool instead of a main store.
-		// So every time, console asks event service for the events, event service checks the pool for the latest collection.
+		// 9. Publish: write an inventory-update event to this collection's own outbox.
+		// The outbox lives per-collection (not in main) — mutations only ever happen against
+		// the latest collection (see ServiceManager.Latest*Service()), and Console reads/clears
+		// events via ServiceManager.LatestEventService(), which always resolves to this same DB.
 		{
 			Status: func() models.CollectorStatus {
 				return models.CollectorStatus{State: models.CollectorStateCollected}
@@ -492,10 +485,7 @@ func (f *collectorWorkFactory) Build(creds models.Credentials) work.WorkBuilder2
 					r.Err = fmt.Errorf("getting collection store: %w", err)
 					return r, r.Err
 				}
-				if err := st.Outbox().Insert(ctx, models.Event{
-					Kind: models.InventoryUpdateEvent,
-					Data: r.Inventory,
-				}); err != nil {
+				if err := NewEventService(st).AddInventoryUpdateEvent(ctx, r.Inventory); err != nil {
 					r.Err = err
 					return r, err
 				}

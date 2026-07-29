@@ -96,7 +96,6 @@ func (m *ServiceManager) Initialize() error {
 		m.consoleClient,
 		m,
 		mainStore,
-		NewEventService(m.pool),
 	)
 	if err != nil {
 		return err
@@ -270,6 +269,18 @@ func (m *ServiceManager) LatestGroupService() (*GroupService, error) {
 		return nil, err
 	}
 	return m.groupService(db)
+}
+
+func (m *ServiceManager) LatestEventService() (*EventService, error) {
+	db, err := m.pool.Latest()
+	if err != nil {
+		return nil, err
+	}
+	st, err := db.Store()
+	if err != nil {
+		return nil, err
+	}
+	return NewEventService(st), nil
 }
 
 func (m *ServiceManager) LatestInventoryService() (*InventoryService, error) {

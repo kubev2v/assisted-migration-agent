@@ -27,12 +27,14 @@ type InventoryBuilder interface {
 type GroupService struct {
 	store            *store.Store2
 	inventoryBuilder InventoryBuilder
+	eventSrv         *EventService
 }
 
 func NewGroupService(st *store.Store2, builder InventoryBuilder) *GroupService {
 	return &GroupService{
 		store:            st,
 		inventoryBuilder: builder,
+		eventSrv:         NewEventService(st),
 	}
 }
 
@@ -147,7 +149,11 @@ func (s *GroupService) Create(ctx context.Context, group models.Group) (*models.
 		created.Inventory = inv
 
 		// Add outbox event for group creation
-		if err := s.addGroupInventoryEvent(txCtx, models.GroupInventoryUpsertEvent, created); err != nil {
+		data, err := buildGroupInventoryEventData(created)
+		if err != nil {
+			return fmt.Errorf("building group inventory event payload: %w", err)
+		}
+		if err := s.eventSrv.AddGroupInventoryEvent(txCtx, data); err != nil {
 			return fmt.Errorf("adding group inventory event: %w", err)
 		}
 
@@ -191,7 +197,11 @@ func (s *GroupService) Update(ctx context.Context, id uuid.UUID, group models.Gr
 		updated.Inventory = inv
 
 		// Add outbox event for group update
-		if err := s.addGroupInventoryEvent(txCtx, models.GroupInventoryUpsertEvent, updated); err != nil {
+		data, err := buildGroupInventoryEventData(updated)
+		if err != nil {
+			return fmt.Errorf("building group inventory event payload: %w", err)
+		}
+		if err := s.eventSrv.AddGroupInventoryEvent(txCtx, data); err != nil {
 			return fmt.Errorf("adding group inventory event: %w", err)
 		}
 
@@ -212,20 +222,18 @@ func (s *GroupService) Delete(ctx context.Context, id uuid.UUID) error {
 			return err
 		}
 
-		// Add delete event BEFORE actual deletion
 		payload := models.GroupInventoryDeleteEventPayload{
 			GroupID:   id.String(),
 			GroupName: group.Name,
 		}
-		payloadBytes, err := json.Marshal(payload)
+
+		// Add delete event BEFORE actual deletion
+		data, err := json.Marshal(payload)
 		if err != nil {
 			return fmt.Errorf("marshaling delete event payload: %w", err)
 		}
 
-		if err := s.store.Outbox().Insert(txCtx, models.Event{
-			Kind: models.GroupInventoryDeleteEvent,
-			Data: payloadBytes,
-		}); err != nil {
+		if err := s.eventSrv.AddGroupInventoryDeleteEvent(txCtx, data); err != nil {
 			return fmt.Errorf("adding group delete event: %w", err)
 		}
 
@@ -251,41 +259,27 @@ func (s *GroupService) buildGroupInventory(ctx context.Context, vmIDs []string) 
 	return inv, nil
 }
 
-// addGroupInventoryEvent creates an outbox event for group inventory changes.
-// Must be called within a transaction context.
-// Event payload contains: groupID, groupName, and inventory.
+// buildGroupInventoryEventData builds the JSON payload for a group inventory upsert event.
 // Fields like vmsCount and vCenterID are extracted from inventory when processing the event.
-// Always emits an event, even for empty groups, to ensure cross-system consistency.
-func (s *GroupService) addGroupInventoryEvent(ctx context.Context, eventKind models.EventKind, group *models.Group) error {
-	// Prepare inventory as JSON
+// Always emits a payload, even for empty groups, to ensure cross-system consistency.
+func buildGroupInventoryEventData(group *models.Group) ([]byte, error) {
 	var invJSON json.RawMessage
 	if group.Inventory != nil {
-		// Convert domain inventory to API type before marshaling
 		apiInventory := converters.ToAPI(group.Inventory)
 		invBytes, err := json.Marshal(apiInventory)
 		if err != nil {
-			return fmt.Errorf("marshaling inventory: %w", err)
+			return nil, fmt.Errorf("marshaling inventory: %w", err)
 		}
 		invJSON = invBytes
 	} else {
-		// Empty inventory - use JSON null to indicate the group has no VMs
 		invJSON = json.RawMessage("null")
 	}
 
-	// Create typed event payload
 	payload := models.GroupInventoryEventPayload{
 		GroupID:   group.ID.String(),
 		GroupName: group.Name,
 		Inventory: invJSON,
 	}
 
-	payloadBytes, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("marshaling event payload: %w", err)
-	}
-
-	return s.store.Outbox().Insert(ctx, models.Event{
-		Kind: eventKind,
-		Data: payloadBytes,
-	})
+	return json.Marshal(payload)
 }
