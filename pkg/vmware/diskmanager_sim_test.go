@@ -28,7 +28,7 @@ func TestFindDatacenterForDatastore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer gc.Logout(ctx)
+	defer func() { _ = gc.Logout(ctx) }()
 
 	dm := vmware.NewDiskManager(gc)
 
