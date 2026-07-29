@@ -81,6 +81,7 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 					SourceID:       uuid.NewString(),
 					Mode:           "disconnected",
 					ConsoleURL:     cfg.AgentProxyUrl,
+					APIVersion:     "v1",
 					UpdateInterval: "1s",
 				})
 				gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to start agent")
@@ -111,6 +112,7 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 					SourceID:       uuid.NewString(),
 					Mode:           "connected",
 					ConsoleURL:     cfg.AgentProxyUrl,
+					APIVersion:     "v1",
 					UpdateInterval: "1s",
 				})
 				gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to start agent")
@@ -219,6 +221,7 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 					SourceID:       uuid.NewString(),
 					Mode:           "connected",
 					ConsoleURL:     cfg.AgentProxyUrl,
+					APIVersion:     "v1",
 					UpdateInterval: "1s",
 				})
 				gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to start agent")
@@ -258,6 +261,7 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 					SourceID:       uuid.NewString(),
 					Mode:           "disconnected",
 					ConsoleURL:     cfg.AgentProxyUrl,
+					APIVersion:     "v1",
 					UpdateInterval: "1s",
 				})
 				gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to start agent")
@@ -296,6 +300,7 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 					SourceID:       uuid.NewString(),
 					Mode:           "connected",
 					ConsoleURL:     cfg.AgentProxyUrl,
+					APIVersion:     "v1",
 					UpdateInterval: "1s",
 				})
 				gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to start agent")
@@ -386,6 +391,7 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 					SourceID:       uuid.NewString(),
 					Mode:           "disconnected",
 					ConsoleURL:     cfg.AgentProxyUrl,
+					APIVersion:     "v1",
 					UpdateInterval: "1s",
 				})
 				gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to start agent")
@@ -427,6 +433,7 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 					SourceID:       uuid.NewString(),
 					Mode:           "disconnected",
 					ConsoleURL:     cfg.AgentProxyUrl,
+					APIVersion:     "v1",
 					UpdateInterval: "1s",
 				})
 				gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to start agent")
@@ -456,6 +463,7 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 					SourceID:       uuid.NewString(),
 					Mode:           "disconnected",
 					ConsoleURL:     cfg.AgentProxyUrl,
+					APIVersion:     "v1",
 					UpdateInterval: "1s",
 				})
 				gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to start agent")
@@ -485,6 +493,7 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 					SourceID:       uuid.NewString(),
 					Mode:           "disconnected",
 					ConsoleURL:     cfg.AgentProxyUrl,
+					APIVersion:     "v1",
 					UpdateInterval: "1s",
 				})
 				gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to start agent")
@@ -531,6 +540,7 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 					SourceID:       uuid.NewString(),
 					Mode:           "disconnected",
 					ConsoleURL:     cfg.AgentProxyUrl,
+					APIVersion:     "v1",
 					UpdateInterval: "1s",
 				})
 				gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to start agent")
@@ -684,6 +694,7 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 					SourceID:       sourceID.String(),
 					Mode:           "connected",
 					ConsoleURL:     cfg.BackendAgentEndpoint,
+					APIVersion:     "v1",
 					UpdateInterval: "1s",
 				})
 				gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to start agent")
@@ -746,6 +757,7 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 					SourceID:       sourceID.String(),
 					Mode:           "disconnected",
 					ConsoleURL:     cfg.BackendAgentEndpoint,
+					APIVersion:     "v1",
 					UpdateInterval: "1s",
 				})
 				gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to start agent")
@@ -780,6 +792,7 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 					SourceID:       sourceID.String(),
 					Mode:           "disconnected",
 					ConsoleURL:     "http://localhost:8081", // Use proxy to observe requests
+					APIVersion:     "v1",
 					UpdateInterval: "1s",
 				})
 				gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to start agent")
@@ -881,6 +894,7 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 					SourceID:       sourceID.String(),
 					Mode:           "connected",
 					ConsoleURL:     "http://localhost:8081",
+					APIVersion:     "v1",
 					UpdateInterval: "1s",
 				})
 				gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to start agent")
@@ -928,6 +942,7 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 					SourceID:       sourceID.String(),
 					Mode:           "connected",
 					ConsoleURL:     "http://localhost:8081",
+					APIVersion:     "v1",
 					UpdateInterval: "1s",
 				})
 				gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to start agent")
@@ -988,6 +1003,7 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 					SourceID:       sourceID.String(),
 					Mode:           "connected",
 					ConsoleURL:     "http://localhost:8081",
+					APIVersion:     "v1",
 					UpdateInterval: "1s",
 				})
 				gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to start agent")
@@ -1017,6 +1033,7 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 					SourceID:       sourceID.String(),
 					Mode:           "connected",
 					ConsoleURL:     "http://localhost:8081",
+					APIVersion:     "v1",
 					UpdateInterval: "1s",
 				})
 				gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to start agent")
@@ -1126,6 +1143,7 @@ var _ = ginkgo.Describe("Agent e2e tests", ginkgo.Ordered, func() {
 					SourceID:       sourceID.String(),
 					Mode:           "connected",
 					ConsoleURL:     "http://localhost:8081",
+					APIVersion:     "v1",
 					UpdateInterval: "1s",
 				})
 				gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to start agent")

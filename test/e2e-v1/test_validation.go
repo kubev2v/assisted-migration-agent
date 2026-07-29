@@ -35,6 +35,7 @@ var _ = Describe("API validation e2e tests", Ordered, func() {
 			SourceID:       uuid.NewString(),
 			Mode:           "disconnected",
 			ConsoleURL:     cfg.AgentProxyUrl,
+			APIVersion:     "v1",
 			UpdateInterval: "1s",
 		})
 		Expect(err).ToNot(HaveOccurred(), "failed to start agent")

@@ -5,7 +5,7 @@ on:  # yamllint disable-line rule:truthy
   push:
     branches: [main, stable]
     paths:
-      - 'api/v1/openapi.yaml'
+      - 'api/v2/openapi.yaml'
     tags:
       - '*'
 
@@ -35,7 +35,7 @@ jobs:
     needs: version
     uses: kubev2v/migration-planner-workflows/.github/workflows/generate-and-publish.yml@main
     with:
-      openapi-spec-url: "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/api/v1/openapi.yaml"
+      openapi-spec-url: "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/api/v2/openapi.yaml"
       package-name: "@openshift-migration-advisor/agent-sdk"
       package-version: ${{ needs.version.outputs.version }}
       model-property-naming: "original"

@@ -51,6 +51,7 @@ var _ = ginkgo.Describe("VM Migration Exclusion e2e tests", ginkgo.Ordered, func
 			SourceID:       uuid.NewString(),
 			Mode:           "disconnected",
 			ConsoleURL:     cfg.AgentProxyUrl,
+			APIVersion:     "v1",
 			UpdateInterval: "1s",
 		})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred(), "failed to start agent")
