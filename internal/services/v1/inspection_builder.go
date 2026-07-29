@@ -91,7 +91,7 @@ func defaultInspectionBuilderFactory(s *store.Store, operator vmware.VMOperator,
 						if err := operator.ValidatePrivileges(ctx, id, models.InspectorRequiredPrivileges); err != nil {
 							log.Errorw("privilege validation failed", "vmId", id, "error", err)
 							result.Err = err
-							return result, nil
+							return result, err
 						}
 						log.Infow("privilege validation passed", "vmId", id)
 						return result, nil
