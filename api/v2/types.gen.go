@@ -46,6 +46,22 @@ const (
 	CollectorStatusStatusReady       CollectorStatusStatus = "ready"
 )
 
+// Defines values for ForecastPairStatusState.
+const (
+	ForecastPairStatusStateCanceled  ForecastPairStatusState = "canceled"
+	ForecastPairStatusStateCompleted ForecastPairStatusState = "completed"
+	ForecastPairStatusStateError     ForecastPairStatusState = "error"
+	ForecastPairStatusStatePending   ForecastPairStatusState = "pending"
+	ForecastPairStatusStatePreparing ForecastPairStatusState = "preparing"
+	ForecastPairStatusStateRunning   ForecastPairStatusState = "running"
+)
+
+// Defines values for ForecasterStatusState.
+const (
+	ForecasterStatusStateReady   ForecasterStatusState = "ready"
+	ForecasterStatusStateRunning ForecasterStatusState = "running"
+)
+
 // Defines values for InspectionStatusState.
 const (
 	InspectionStatusStateCanceled  InspectionStatusState = "canceled"
@@ -140,6 +156,23 @@ type BatchUpdateExclusionRequest struct {
 
 	// VmIds VM IDs to update
 	VmIds []string `binding:"required,min=1,dive,required" json:"vmIds"`
+}
+
+// BenchmarkRun defines model for BenchmarkRun.
+type BenchmarkRun struct {
+	CreatedAt       time.Time `json:"createdAt"`
+	DiskSizeGb      int       `json:"diskSizeGb"`
+	DurationSec     float64   `json:"durationSec"`
+	Error           *string   `json:"error,omitempty"`
+	Id              int64     `json:"id"`
+	Iteration       int       `json:"iteration"`
+	Method          string    `json:"method"`
+	PairName        string    `json:"pairName"`
+	PrepDurationSec *float64  `json:"prepDurationSec,omitempty"`
+	SessionId       int64     `json:"sessionId"`
+	SourceDatastore string    `json:"sourceDatastore"`
+	TargetDatastore string    `json:"targetDatastore"`
+	ThroughputMBps  float64   `json:"throughputMBps"`
 }
 
 // CapabilityStatus defines model for CapabilityStatus.
@@ -270,6 +303,29 @@ type CredentialStatus struct {
 	Valid bool `json:"valid"`
 }
 
+// DatastoreDetail defines model for DatastoreDetail.
+type DatastoreDetail struct {
+	Capabilities   *[]string `json:"capabilities,omitempty"`
+	CapacityGb     float64   `json:"capacityGb"`
+	FreeGb         float64   `json:"freeGb"`
+	NaaDevices     *[]string `json:"naaDevices,omitempty"`
+	Name           string    `json:"name"`
+	StorageArrayId *string   `json:"storageArrayId,omitempty"`
+	StorageModel   *string   `json:"storageModel,omitempty"`
+	StorageVendor  *string   `json:"storageVendor,omitempty"`
+
+	// Type VMFS, NFS, VVol, or OTHER
+	Type string `json:"type"`
+}
+
+// DatastorePairRequest defines model for DatastorePairRequest.
+type DatastorePairRequest struct {
+	Host            *string `json:"host,omitempty"`
+	Name            string  `json:"name"`
+	SourceDatastore string  `json:"sourceDatastore"`
+	TargetDatastore string  `json:"targetDatastore"`
+}
+
 // DeleteLabelGloballyResponse defines model for DeleteLabelGloballyResponse.
 type DeleteLabelGloballyResponse struct {
 	// Affected Number of VMs that had the label removed
@@ -278,6 +334,58 @@ type DeleteLabelGloballyResponse struct {
 	// Label The label that was removed
 	Label string `json:"label"`
 }
+
+// EstimateRange defines model for EstimateRange.
+type EstimateRange struct {
+	// BestCase Duration string (e.g. "1h30m")
+	BestCase string `json:"bestCase"`
+
+	// Expected Duration string (e.g. "2h15m")
+	Expected string `json:"expected"`
+
+	// WorstCase Duration string (e.g. "3h45m")
+	WorstCase string `json:"worstCase"`
+}
+
+// ForecastPairStatus defines model for ForecastPairStatus.
+type ForecastPairStatus struct {
+	CompletedRuns     int                     `json:"completedRuns"`
+	Error             *string                 `json:"error,omitempty"`
+	Host              *string                 `json:"host,omitempty"`
+	PairName          string                  `json:"pairName"`
+	PrepBytesTotal    *int64                  `json:"prepBytesTotal,omitempty"`
+	PrepBytesUploaded *int64                  `json:"prepBytesUploaded,omitempty"`
+	SourceDatastore   string                  `json:"sourceDatastore"`
+	State             ForecastPairStatusState `json:"state"`
+	TargetDatastore   string                  `json:"targetDatastore"`
+	TotalRuns         int                     `json:"totalRuns"`
+}
+
+// ForecastPairStatusState defines model for ForecastPairStatus.State.
+type ForecastPairStatusState string
+
+// ForecastStats defines model for ForecastStats.
+type ForecastStats struct {
+	Ci95Lower   float64       `json:"ci95Lower"`
+	Ci95Upper   float64       `json:"ci95Upper"`
+	EstPer1TB   EstimateRange `json:"estPer1TB"`
+	MaxMBps     float64       `json:"maxMBps"`
+	MeanMBps    float64       `json:"meanMBps"`
+	MedianMBps  float64       `json:"medianMBps"`
+	MinMBps     float64       `json:"minMBps"`
+	PairName    string        `json:"pairName"`
+	SampleCount int           `json:"sampleCount"`
+	StdDevMBps  float64       `json:"stdDevMBps"`
+}
+
+// ForecasterStatus defines model for ForecasterStatus.
+type ForecasterStatus struct {
+	Pairs []ForecastPairStatus  `json:"pairs"`
+	State ForecasterStatusState `json:"state"`
+}
+
+// ForecasterStatusState defines model for ForecasterStatus.State.
+type ForecasterStatusState string
 
 // Group defines model for Group.
 type Group struct {
@@ -369,6 +477,19 @@ type OperationCapability struct {
 	MissingPrivileges *[]string `json:"missingPrivileges,omitempty"`
 }
 
+// PairCapability defines model for PairCapability.
+type PairCapability struct {
+	Capabilities    []string `json:"capabilities"`
+	PairName        string   `json:"pairName"`
+	SourceDatastore string   `json:"sourceDatastore"`
+	TargetDatastore string   `json:"targetDatastore"`
+}
+
+// PairCapabilityRequest defines model for PairCapabilityRequest.
+type PairCapabilityRequest struct {
+	Pairs []DatastorePairRequest `json:"pairs"`
+}
+
 // Process defines model for Process.
 type Process struct {
 	// Name Name of the process
@@ -400,6 +521,14 @@ type RightsizingClusterUtilization struct {
 	TotalProvisionedDiskKb   float64 `json:"total_provisioned_disk_kb"`
 	TotalProvisionedMemoryMb int     `json:"total_provisioned_memory_mb"`
 	VmCount                  int     `json:"vm_count"`
+}
+
+// StartForecasterRequest defines model for StartForecasterRequest.
+type StartForecasterRequest struct {
+	Concurrency *int                   `json:"concurrency,omitempty"`
+	DiskSizeGb  *int                   `json:"diskSizeGb,omitempty"`
+	Iterations  *int                   `json:"iterations,omitempty"`
+	Pairs       []DatastorePairRequest `json:"pairs"`
 }
 
 // StartInspectionRequest defines model for StartInspectionRequest.
@@ -822,6 +951,18 @@ type ListVirtualMachinesParams struct {
 	PageSize *int `form:"pageSize,omitempty" json:"pageSize,omitempty"`
 }
 
+// GetForecasterRunsParams defines parameters for GetForecasterRuns.
+type GetForecasterRunsParams struct {
+	// PairName Filter runs by pair name
+	PairName *string `form:"pairName,omitempty" json:"pairName,omitempty"`
+}
+
+// GetForecasterStatsParams defines parameters for GetForecasterStats.
+type GetForecasterStatsParams struct {
+	// PairName Pair name to get statistics for
+	PairName string `form:"pairName" json:"pairName"`
+}
+
 // ListLatestGroupsParams defines parameters for ListLatestGroups.
 type ListLatestGroupsParams struct {
 	// ByName Filter groups by name (case-insensitive substring match)
@@ -877,6 +1018,12 @@ type SetAgentModeJSONRequestBody = AgentModeRequest
 
 // PutCredentialsJSONRequestBody defines body for PutCredentials for application/json ContentType.
 type PutCredentialsJSONRequestBody = VcenterCredentials
+
+// StartForecasterJSONRequestBody defines body for StartForecaster for application/json ContentType.
+type StartForecasterJSONRequestBody = StartForecasterRequest
+
+// PostForecasterPairCapabilitiesJSONRequestBody defines body for PostForecasterPairCapabilities for application/json ContentType.
+type PostForecasterPairCapabilitiesJSONRequestBody = PairCapabilityRequest
 
 // CreateLatestGroupJSONRequestBody defines body for CreateLatestGroup for application/json ContentType.
 type CreateLatestGroupJSONRequestBody = CreateGroupRequest

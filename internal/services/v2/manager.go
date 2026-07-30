@@ -27,6 +27,7 @@ type ServiceManager struct {
 	mu          sync.Mutex
 	inspector   *InspectorService
 	vddk        *VddkService
+	forecaster  *ForecasterService
 	validator   *opa.Validator
 	collector   *CollectorService
 }
@@ -107,6 +108,8 @@ func (m *ServiceManager) Initialize() error {
 	m.credentials.WithKeyManager(m.keyMgr)
 
 	m.vddk = NewVddkService(m.cfg.Agent.DataFolder, m.pool)
+
+	m.forecaster = NewForecasterService(m.pool, m.credentials)
 
 	return nil
 }
@@ -189,6 +192,10 @@ func (m *ServiceManager) InspectorService() (*InspectorService, error) {
 
 func (m *ServiceManager) VddkService() *VddkService {
 	return m.vddk
+}
+
+func (m *ServiceManager) ForecasterService() *ForecasterService {
+	return m.forecaster
 }
 
 func (m *ServiceManager) CollectionService() *CollectionService {
@@ -313,6 +320,10 @@ func (m *ServiceManager) Stop(ctx context.Context) {
 	m.mu.Unlock()
 	if c != nil {
 		c.Stop()
+	}
+
+	if m.forecaster != nil {
+		_ = m.forecaster.Stop()
 	}
 }
 

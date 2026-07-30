@@ -376,6 +376,161 @@ func NewInspectorStatusFromModel(s models.InspectorStatus) InspectorStatus {
 	}
 }
 
+// NewForecasterStatusFromModel converts a models.ForecasterStatus to the API type.
+func NewForecasterStatusFromModel(s models.ForecasterStatus) ForecasterStatus {
+	pairs := make([]ForecastPairStatus, len(s.Pairs))
+	for i, p := range s.Pairs {
+		pairs[i] = ForecastPairStatus{
+			State:           ForecastPairStatusState(p.State),
+			PairName:        p.PairName,
+			SourceDatastore: p.SourceDatastore,
+			TargetDatastore: p.TargetDatastore,
+			CompletedRuns:   p.CompletedRuns,
+			TotalRuns:       p.TotalRuns,
+		}
+		if p.Host != "" {
+			pairs[i].Host = &p.Host
+		}
+		if p.PrepBytesTotal > 0 {
+			pairs[i].PrepBytesTotal = &p.PrepBytesTotal
+		}
+		if p.PrepBytesUploaded > 0 {
+			pairs[i].PrepBytesUploaded = &p.PrepBytesUploaded
+		}
+		if p.Error != nil {
+			e := p.Error.Error()
+			pairs[i].Error = &e
+		}
+	}
+	return ForecasterStatus{
+		State: ForecasterStatusState(s.State),
+		Pairs: pairs,
+	}
+}
+
+// NewBenchmarkRunFromModel converts a models.BenchmarkRun to the API type.
+func NewBenchmarkRunFromModel(r models.BenchmarkRun) BenchmarkRun {
+	run := BenchmarkRun{
+		Id:              r.ID,
+		SessionId:       r.SessionID,
+		PairName:        r.PairName,
+		SourceDatastore: r.SourceDS,
+		TargetDatastore: r.TargetDS,
+		Iteration:       r.Iteration,
+		DiskSizeGb:      r.DiskSizeGB,
+		DurationSec:     r.DurationSec,
+		ThroughputMBps:  r.ThroughputMBps,
+		Method:          r.Method,
+		CreatedAt:       r.CreatedAt,
+	}
+	if r.PrepDurationSec > 0 {
+		run.PrepDurationSec = &r.PrepDurationSec
+	}
+	if r.Error != "" {
+		run.Error = &r.Error
+	}
+	return run
+}
+
+// NewBenchmarkRunsFromModel converts a slice of models.BenchmarkRun to API types.
+func NewBenchmarkRunsFromModel(runs []models.BenchmarkRun) []BenchmarkRun {
+	out := make([]BenchmarkRun, len(runs))
+	for i, r := range runs {
+		out[i] = NewBenchmarkRunFromModel(r)
+	}
+	return out
+}
+
+// NewForecastStatsFromModel converts a models.ForecastStats to the API type.
+func NewForecastStatsFromModel(s models.ForecastStats) ForecastStats {
+	return ForecastStats{
+		PairName:    s.PairName,
+		SampleCount: s.SampleCount,
+		MeanMBps:    s.MeanMBps,
+		MedianMBps:  s.MedianMBps,
+		MinMBps:     s.MinMBps,
+		MaxMBps:     s.MaxMBps,
+		StdDevMBps:  s.StdDevMBps,
+		Ci95Lower:   s.CI95Lower,
+		Ci95Upper:   s.CI95Upper,
+		EstPer1TB: EstimateRange{
+			BestCase:  s.EstPer1TB.BestCase.String(),
+			Expected:  s.EstPer1TB.Expected.String(),
+			WorstCase: s.EstPer1TB.WorstCase.String(),
+		},
+	}
+}
+
+// NewDatastorePairsFromAPI converts API DatastorePairRequest types to model types.
+func NewDatastorePairsFromAPI(pairs []DatastorePairRequest) []models.DatastorePair {
+	out := make([]models.DatastorePair, len(pairs))
+	for i, p := range pairs {
+		out[i] = models.DatastorePair{
+			Name:            p.Name,
+			SourceDatastore: p.SourceDatastore,
+			TargetDatastore: p.TargetDatastore,
+		}
+		if p.Host != nil {
+			out[i].Host = *p.Host
+		}
+	}
+	return out
+}
+
+// NewDatastoreDetailFromModel converts a models.DatastoreDetail to the API type.
+func NewDatastoreDetailFromModel(d models.DatastoreDetail) DatastoreDetail {
+	detail := DatastoreDetail{
+		Name:       d.Name,
+		Type:       d.Type,
+		CapacityGb: d.CapacityGB,
+		FreeGb:     d.FreeGB,
+	}
+	if d.StorageVendor != "" {
+		detail.StorageVendor = &d.StorageVendor
+	}
+	if d.StorageModel != "" {
+		detail.StorageModel = &d.StorageModel
+	}
+	if d.StorageArrayID != "" {
+		detail.StorageArrayId = &d.StorageArrayID
+	}
+	if len(d.NAADevices) > 0 {
+		detail.NaaDevices = &d.NAADevices
+	}
+	if len(d.Capabilities) > 0 {
+		detail.Capabilities = &d.Capabilities
+	}
+	return detail
+}
+
+// NewDatastoreDetailsFromModel converts a slice of models.DatastoreDetail to API types.
+func NewDatastoreDetailsFromModel(details []models.DatastoreDetail) []DatastoreDetail {
+	out := make([]DatastoreDetail, len(details))
+	for i, d := range details {
+		out[i] = NewDatastoreDetailFromModel(d)
+	}
+	return out
+}
+
+// NewPairCapabilityFromModel converts a models.PairCapability to the API type.
+func NewPairCapabilityFromModel(p models.PairCapability) PairCapability {
+	return PairCapability{
+		PairName:        p.PairName,
+		SourceDatastore: p.SourceDatastore,
+		TargetDatastore: p.TargetDatastore,
+		Capabilities:    p.Capabilities,
+	}
+}
+
+// NewPairCapabilitiesFromModel converts a slice of models.PairCapability to API types.
+func NewPairCapabilitiesFromModel(caps []models.PairCapability) []PairCapability {
+	out := make([]PairCapability, len(caps))
+	for i, c := range caps {
+		out[i] = NewPairCapabilityFromModel(c)
+	}
+	return out
+}
+
 // NewGroupFromModel converts a models.Group to a v2 Group.
 func NewGroupFromModel(g models.Group) Group {
 	createdAt := g.CreatedAt
