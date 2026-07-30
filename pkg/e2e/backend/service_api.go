@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/kubev2v/migration-planner/test/e2e"
+	"github.com/kubev2v/migration-planner/test/e2e/config"
 
 	e2eModel "github.com/kubev2v/assisted-migration-agent/pkg/e2e/model"
 	e2eUtils "github.com/kubev2v/assisted-migration-agent/pkg/e2e/utils"
@@ -32,7 +32,7 @@ func NewServiceApi(cred *e2eModel.User) (*ServiceApi, error) {
 		return nil, fmt.Errorf("error getting token: %v", err)
 	}
 	return &ServiceApi{
-		baseURL:    e2e.DefaultServiceUrl,
+		baseURL:    config.Cfg.ServiceUrl(),
 		httpClient: &http.Client{},
 		jwtToken:   token,
 	}, nil
