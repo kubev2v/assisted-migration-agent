@@ -532,6 +532,40 @@ paths:
         '500':
           description: Internal server error
 
+  /collector/rvtools:
+    post:
+      tags: [Collector]
+      summary: Start a collection from RVTools files
+      operationId: startRvtoolsCollector
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [files]
+              properties:
+                files:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+      responses:
+        '202':
+          description: Collection started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectorStatus'
+        '400':
+          description: No files provided
+        '409':
+          description: Collection already in progress
+        '500':
+          description: Internal server error
+        '501':
+          description: RVTools mode is not enabled
+
   # ── Inventories ─────────────────────────────────────────────────────────
   /collections/{id}/inventory:
     get:
@@ -2425,6 +2459,9 @@ components:
             error:
               type: string
               description: Connection error description
+        rvtoolsModeEnabled:
+          type: boolean
+          description: RVTool mode enabled
 
     AgentModeRequest:
       type: object

@@ -29,17 +29,19 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/pkg/work"
 )
 
-type collectorWorkFactory struct {
-	pool      *store.Pool
-	dataDir   string
-	validator *opa.Validator
+type vCenterCollectorWorkFactory struct {
+	pool           *store.Pool
+	dataDir        string
+	validator      *opa.Validator
+	credentialsSrv *CredentialsService
 }
 
-func newCollectorWorkFactory(pool *store.Pool, dataDir string, validator *opa.Validator) (*collectorWorkFactory, error) {
-	return &collectorWorkFactory{
-		pool:      pool,
-		dataDir:   dataDir,
-		validator: validator,
+func newVCenterCollectorWorkFactory(credSrv *CredentialsService, pool *store.Pool, dataDir string, validator *opa.Validator) (*vCenterCollectorWorkFactory, error) {
+	return &vCenterCollectorWorkFactory{
+		pool:           pool,
+		dataDir:        dataDir,
+		credentialsSrv: credSrv,
+		validator:      validator,
 	}, nil
 }
 
@@ -64,12 +66,13 @@ func newCollectorWorkFactory(pool *store.Pool, dataDir string, validator *opa.Va
 //  7. Sync with the previous collection — copy groups, labels and exclusions from the previous collection.
 //  8. Inventory — build the inventory JSON with embedded cluster utilization and persist.
 //  9. Publish — write an inventory-update event to the outbox.
-func (f *collectorWorkFactory) Build(creds models.Credentials) work.WorkBuilder2[models.CollectorStatus, models.CollectorResult] {
+func (f *vCenterCollectorWorkFactory) Build() work.WorkBuilder2[models.CollectorStatus, models.CollectorResult] {
 	log := zap.S().Named("collector_service")
 
 	var collectionDb *store.Database
 	var parser *duckdb_parser.Parser
 	database := fmt.Sprintf("collection_%d", time.Now().Unix())
+	var credentials models.Credentials
 
 	var rsReportID string
 	var rsVMs []VMInfo
@@ -84,6 +87,20 @@ func (f *collectorWorkFactory) Build(creds models.Credentials) work.WorkBuilder2
 				return models.CollectorStatus{State: models.CollectorStateConnecting}
 			},
 			Work: func(ctx context.Context, r models.CollectorResult) (models.CollectorResult, error) {
+				creds, err := f.credentialsSrv.Resolve(ctx)
+				if err != nil {
+					r.Err = err
+					return r, err
+				}
+
+				url, err := vmware.NormalizeAndValidateURL(creds.URL)
+				if err != nil {
+					r.Err = err
+					return r, err
+				}
+				creds.URL = url
+				credentials = creds
+
 				mainDB, err := f.pool.Get(store.MainDatabaseID)
 				if err != nil {
 					r.Err = fmt.Errorf("getting main database: %w", err)
@@ -146,7 +163,7 @@ func (f *collectorWorkFactory) Build(creds models.Credentials) work.WorkBuilder2
 				defer vc.Close()
 
 				log.Info("verifying vCenter credentials")
-				if err := vc.VerifyCredentials(ctx, &creds); err != nil {
+				if err := vc.VerifyCredentials(ctx, &credentials); err != nil {
 					log.Errorw("credential verification failed", "error", err)
 					r.Err = err
 					return r, err
@@ -155,7 +172,7 @@ func (f *collectorWorkFactory) Build(creds models.Credentials) work.WorkBuilder2
 
 				// since forklift collector does not expose the client
 				// we need to create a separate client for rightsizing
-				client, err := vmware.Connect(ctx, &creds)
+				client, err := vmware.Connect(ctx, &credentials)
 				if err != nil {
 					r.Err = err
 					return r, err
@@ -180,7 +197,7 @@ func (f *collectorWorkFactory) Build(creds models.Credentials) work.WorkBuilder2
 				defer vc.Close()
 
 				log.Info("starting vSphere inventory collection")
-				if err := vc.Collect(ctx, &creds); err != nil {
+				if err := vc.Collect(ctx, &credentials); err != nil {
 					log.Errorw("vSphere collection failed", "error", err)
 					r.Err = err
 					return r, err

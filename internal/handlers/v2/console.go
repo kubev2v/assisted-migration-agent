@@ -15,7 +15,7 @@ import (
 func (h *Handler) GetAgentStatus(c *gin.Context) {
 	status := h.svc.ConsoleService().Status()
 	var resp v2.AgentStatus
-	resp.FromModel(models.AgentStatus{Console: status})
+	resp.FromModel(models.AgentStatus{Console: status, RVToolsMode: h.cfg.Agent.RVToolsMode})
 
 	c.JSON(http.StatusOK, resp)
 }

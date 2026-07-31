@@ -32,6 +32,7 @@ type ServiceProvider interface {
 	GetCollectorStatus() models.CollectorStatus
 	StartCollecting(ctx context.Context) (models.CollectorStatus, error)
 	StopCollecting() error
+	StartRVToolsCollecting(rvtoolFiles []string) (models.CollectorStatus, error)
 }
 
 type Handler struct {

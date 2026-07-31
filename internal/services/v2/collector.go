@@ -6,15 +6,14 @@ import (
 
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 	"github.com/kubev2v/assisted-migration-agent/pkg/scheduler"
-	"github.com/kubev2v/assisted-migration-agent/pkg/vmware"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/pkg/work"
 )
 
-type (
-	collectorWorkBuilderFunc func(creds models.Credentials) work.WorkBuilder2[models.CollectorStatus, models.CollectorResult]
-)
+type CollectorWorkBuilder interface {
+	Build() work.WorkBuilder2[models.CollectorStatus, models.CollectorResult]
+}
 
 type CollectorService struct {
 	ID       string
@@ -22,14 +21,12 @@ type CollectorService struct {
 	pipeline *work.Pipeline2[models.CollectorStatus, models.CollectorResult]
 	sched    *scheduler.Scheduler[models.CollectorResult]
 	done     chan struct{}
-	buildFn  collectorWorkBuilderFunc
-	credsSvc *CredentialsService
+	builder  CollectorWorkBuilder
 }
 
-func NewCollectorService(buildFn collectorWorkBuilderFunc, credsSvc *CredentialsService) *CollectorService {
+func NewCollectorService(builder CollectorWorkBuilder) *CollectorService {
 	return &CollectorService{
-		buildFn:  buildFn,
-		credsSvc: credsSvc,
+		builder: builder,
 	}
 }
 
@@ -66,23 +63,12 @@ func (c *CollectorService) Start(ctx context.Context) error {
 		}
 	}
 
-	creds, err := c.credsSvc.Resolve(ctx)
-	if err != nil {
-		return err
-	}
-
-	url, err := vmware.NormalizeAndValidateURL(creds.URL)
-	if err != nil {
-		return err
-	}
-	creds.URL = url
-
 	sched, err := scheduler.NewScheduler[models.CollectorResult](1, 0)
 	if err != nil {
 		return err
 	}
 
-	p := work.NewPipeline2(sched, c.buildFn(creds))
+	p := work.NewPipeline2(sched, c.builder.Build())
 	ticks, err := p.Start()
 	if err != nil {
 		sched.Close()
@@ -121,9 +107,4 @@ func (c *CollectorService) Stop() {
 	if s != nil {
 		s.Close()
 	}
-}
-
-func (c *CollectorService) WithWorkBuilder(fn collectorWorkBuilderFunc) *CollectorService {
-	c.buildFn = fn
-	return c
 }

@@ -234,7 +234,13 @@ func initV2(cfg *config.Configuration) (*server.Server, func(), error) {
 		handlers.RegisterValidators(v)
 	}
 
-	v2H := v2Handlers.NewHandler(*cfg, v2SvcMgr)
+	var v2H v2.ServerInterface
+	if cfg.Agent.RVToolsMode {
+		zap.S().Info("rvtools mode enabled: credentials, inspector, and vCenter collector endpoints are disabled")
+		v2H = v2Handlers.NewRVToolsHandler(*cfg, v2SvcMgr)
+	} else {
+		v2H = v2Handlers.NewHandler(*cfg, v2SvcMgr)
+	}
 
 	swagger, err := v2.GetSwagger()
 	if err != nil {
@@ -340,7 +346,7 @@ func initPool(cfg *config.Configuration) (*store.Pool, error) {
 		createdAt := time.Unix(ts, 0)
 		hash := sha256.Sum256([]byte(match))
 		id := hex.EncodeToString(hash[:])[:6]
-		db, err := pool.NewDatabase(id, match, createdAt, store.LazyConnectionInitilization, 256, store.ReadWriteDatabase)
+		db, err := pool.NewDatabase(id, match, createdAt, store.LazyConnectionInitilization, 512, store.ReadWriteDatabase)
 		if err != nil {
 			zap.S().Warnw("skipping collection database", "file", match, "error", err)
 			continue
@@ -385,6 +391,46 @@ func registerFlags(cmd *cobra.Command, config *config.Configuration) {
 }
 
 func validateConfiguration(cfg *config.Configuration) error {
+	if config.ServerModeType(cfg.Server.ServerMode) == config.ServerModeProd && cfg.Server.StaticsFolder == "" {
+		return errors.New("statics folder must be set when server mode is production")
+	}
+
+	if cfg.Server.HTTPPort < 1 || cfg.Server.HTTPPort > 65535 {
+		return fmt.Errorf("invalid http-port %d: must be between 1 and 65535", cfg.Server.HTTPPort)
+	}
+
+	if cfg.Auth.Enabled && cfg.Auth.JWTFilePath == "" {
+		return errors.New("authentication-jwt-filepath must be set when authentication is enabled")
+	}
+
+	switch config.ServerModeType(cfg.Server.ServerMode) {
+	case config.ServerModeProd, config.ServerModeDev:
+	default:
+		return fmt.Errorf("invalid server mode %q: must be %q or %q", cfg.Server.ServerMode, config.ServerModeProd, config.ServerModeDev)
+	}
+
+	// validate flags for rvtools mode
+	// In rvtools mode:
+	// - we don't care about agent-id and source-id.
+	// - only v2 api
+	// - connected / disconnected ignored. the agent is in disconnected only
+	if cfg.Agent.RVToolsMode {
+		if cfg.Agent.Mode == "connected" {
+			zap.S().Info("In rvtools-mode, connected mode ignored. The agent is running only in disconnected mode")
+		}
+
+		if cfg.Agent.Version == "v1" {
+			return fmt.Errorf("RVTools mode is available only in api v2")
+		}
+
+		cfg.Agent.Mode = "disconnected"
+		// need to set random UUIDs here because console service.
+		cfg.Agent.ID = uuid.NewString()
+		cfg.Agent.SourceID = uuid.NewString()
+
+		return nil
+	}
+
 	if err := validateUUID(cfg.Agent.ID, "agent-id"); err != nil {
 		return err
 	}
@@ -396,24 +442,6 @@ func validateConfiguration(cfg *config.Configuration) error {
 	case models.AgentModeConnected, models.AgentModeDisconnected:
 	default:
 		return fmt.Errorf("invalid mode %q: must be %q or %q", cfg.Agent.Mode, models.AgentModeConnected, models.AgentModeDisconnected)
-	}
-
-	switch config.ServerModeType(cfg.Server.ServerMode) {
-	case config.ServerModeProd, config.ServerModeDev:
-	default:
-		return fmt.Errorf("invalid server mode %q: must be %q or %q", cfg.Server.ServerMode, config.ServerModeProd, config.ServerModeDev)
-	}
-
-	if config.ServerModeType(cfg.Server.ServerMode) == config.ServerModeProd && cfg.Server.StaticsFolder == "" {
-		return errors.New("statics folder must be set when server mode is production")
-	}
-
-	if cfg.Server.HTTPPort < 1 || cfg.Server.HTTPPort > 65535 {
-		return fmt.Errorf("invalid http-port %d: must be between 1 and 65535", cfg.Server.HTTPPort)
-	}
-
-	if cfg.Auth.Enabled && cfg.Auth.JWTFilePath == "" {
-		return errors.New("authentication-jwt-filepath must be set when authentication is enabled")
 	}
 
 	return nil
@@ -448,6 +476,7 @@ func registerAgentFlags(flagSet *pflag.FlagSet, config *config.Configuration) {
 	flagSet.StringVar(&config.Agent.SourceID, "source-id", config.Agent.SourceID, "Source identifier (UUID) for this agent")
 	flagSet.StringVar(&config.Agent.Version, "version", config.Agent.Version, "Agent version to report to console")
 	flagSet.StringVar(&config.Agent.DataFolder, "data-folder", config.Agent.DataFolder, "Path to the persistent data folder")
+	flagSet.BoolVar(&config.Agent.RVToolsMode, "rvtools-mode", config.Agent.RVToolsMode, "RVTool mode: enabled or disabled (default: disable)")
 }
 
 func registerConsoleFlags(flagSet *pflag.FlagSet, config *config.Configuration) {

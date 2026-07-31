@@ -47,6 +47,7 @@ func (a *AgentStatus) FromModel(m models.AgentStatus) {
 		a.ConsoleConnection.Error = &err
 	}
 	a.Mode = AgentStatusMode(m.Console.Target)
+	a.RvtoolsModeEnabled = &m.RVToolsMode
 }
 
 // NewVirtualMachineFromSummary converts a models.VirtualMachineSummary to a v2 VirtualMachine.

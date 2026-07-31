@@ -22,16 +22,16 @@ type ServiceManager struct {
 	keyMgr        *crypto.KeyManager
 	pool          *store.Pool
 
-	console              *Console
-	collection           *CollectionService
-	credentials          *CredentialsService
-	mu                   sync.Mutex
-	inspector            *InspectorService
-	vddk                 *VddkService
-	forecaster           *ForecasterService
-	validator            *opa.Validator
-	collector            *CollectorService
-	collectorWorkBuilder collectorWorkBuilderFunc
+	console     *Console
+	collection  *CollectionService
+	credentials *CredentialsService
+	mu          sync.Mutex
+	inspector   *InspectorService
+	vddk        *VddkService
+	forecaster  *ForecasterService
+	validator   *opa.Validator
+	collector   *CollectorService
+	workBuilder CollectorWorkBuilder
 }
 
 type ServiceManagerOption func(*ServiceManager)
@@ -66,9 +66,9 @@ func WithOpaValidatior(v *opa.Validator) ServiceManagerOption {
 	}
 }
 
-func WithCollectorWorkBuilder(fn collectorWorkBuilderFunc) ServiceManagerOption {
+func WithCollectorWorkBuilder(fn CollectorWorkBuilder) ServiceManagerOption {
 	return func(m *ServiceManager) {
-		m.collectorWorkBuilder = fn
+		m.workBuilder = fn
 	}
 }
 
@@ -154,18 +154,15 @@ func (m *ServiceManager) StartCollecting(ctx context.Context) (models.CollectorS
 		return models.CollectorStatus{}, srvErrors.NewCollectionInProgressError()
 	}
 
-	var buildFn collectorWorkBuilderFunc
-	if m.collectorWorkBuilder != nil {
-		buildFn = m.collectorWorkBuilder
-	} else {
-		factory, err := newCollectorWorkFactory(m.pool, m.cfg.Agent.DataFolder, m.validator)
+	if m.workBuilder == nil {
+		factory, err := newVCenterCollectorWorkFactory(m.credentials, m.pool, m.cfg.Agent.DataFolder, m.validator)
 		if err != nil {
 			return models.CollectorStatus{}, err
 		}
-		buildFn = factory.Build
+		m.workBuilder = factory
 	}
 
-	m.collector = NewCollectorService(buildFn, m.credentials)
+	m.collector = NewCollectorService(m.workBuilder)
 
 	if err := m.collector.Start(ctx); err != nil {
 		m.collector = nil
@@ -185,6 +182,33 @@ func (m *ServiceManager) StopCollecting() error {
 	m.collector.Stop()
 	m.collector = nil
 	return nil
+}
+
+func (m *ServiceManager) StartRVToolsCollecting(rvtoolFiles []string) (models.CollectorStatus, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.inspector != nil && m.inspector.IsBusy() {
+		return models.CollectorStatus{}, srvErrors.NewInspectionInProgressError()
+	}
+
+	if m.collector != nil && m.collector.GetStatus().State.IsRunning() {
+		return models.CollectorStatus{}, srvErrors.NewCollectionInProgressError()
+	}
+
+	factory, err := newRvtoolWorkFactory(m.pool, rvtoolFiles, m.cfg.Agent.DataFolder, m.validator)
+	if err != nil {
+		return models.CollectorStatus{}, err
+	}
+
+	m.collector = NewCollectorService(factory)
+
+	if err := m.collector.Start(context.Background()); err != nil {
+		m.collector = nil
+		return models.CollectorStatus{}, err
+	}
+
+	return m.collector.GetStatus(), nil
 }
 
 // InspectorService must use the latest collection when returning the inspector

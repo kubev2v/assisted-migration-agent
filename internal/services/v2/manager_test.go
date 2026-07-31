@@ -298,7 +298,6 @@ var _ = Describe("ServiceManager", func() {
 
 			_, err := blockingMgr.StartCollecting(ctx)
 			Expect(err).NotTo(HaveOccurred())
-
 			Eventually(func() bool {
 				return blockingMgr.GetCollectorStatus().State.IsRunning()
 			}).Should(BeTrue())
@@ -428,19 +427,21 @@ func newBlockingManager(cfg *config.Configuration, pool *store.Pool, keyMgr *cry
 	)
 }
 
-func completingCollectorBuilder() func(models.Credentials) work.WorkBuilder2[models.CollectorStatus, models.CollectorResult] {
-	return func(_ models.Credentials) work.WorkBuilder2[models.CollectorStatus, models.CollectorResult] {
-		return &mockCollectorWorkBuilder{
-			units: []work.WorkUnit[models.CollectorStatus, models.CollectorResult]{
-				{
-					Status: func() models.CollectorStatus {
-						return models.CollectorStatus{State: models.CollectorStateCollecting}
-					},
-					Work: func(_ context.Context, r models.CollectorResult) (models.CollectorResult, error) {
-						return r, nil
+func completingCollectorBuilder() v2.CollectorWorkBuilder {
+	return &testCollectorWorkBuilder{
+		buildFn: func() work.WorkBuilder2[models.CollectorStatus, models.CollectorResult] {
+			return &mockCollectorWorkBuilder{
+				units: []work.WorkUnit[models.CollectorStatus, models.CollectorResult]{
+					{
+						Status: func() models.CollectorStatus {
+							return models.CollectorStatus{State: models.CollectorStateCollecting}
+						},
+						Work: func(_ context.Context, r models.CollectorResult) (models.CollectorResult, error) {
+							return r, nil
+						},
 					},
 				},
-			},
-		}
+			}
+		},
 	}
 }

@@ -74,3 +74,6 @@ func (s *stubServiceProvider) StartCollecting(_ context.Context) (models.Collect
 	return models.CollectorStatus{State: models.CollectorStateReady}, nil
 }
 func (s *stubServiceProvider) StopCollecting() error { return nil }
+func (s *stubServiceProvider) StartRVToolsCollecting(_ []string) (models.CollectorStatus, error) {
+	return models.CollectorStatus{}, nil
+}

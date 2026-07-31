@@ -39,98 +39,110 @@ func (b *mockCollectorWorkBuilder) Finalize(_ context.Context, _ models.Collecto
 	return nil
 }
 
-func mockCollectorBuilder(st *store.Store2, connectErr, collectErr, processErr error) func(models.Credentials) work.WorkBuilder2[models.CollectorStatus, models.CollectorResult] {
-	return func(_ models.Credentials) work.WorkBuilder2[models.CollectorStatus, models.CollectorResult] {
-		return &mockCollectorWorkBuilder{
-			units: []work.WorkUnit[models.CollectorStatus, models.CollectorResult]{
-				{
-					Status: func() models.CollectorStatus {
-						return models.CollectorStatus{State: models.CollectorStateConnecting}
+type testCollectorWorkBuilder struct {
+	buildFn func() work.WorkBuilder2[models.CollectorStatus, models.CollectorResult]
+}
+
+func (b *testCollectorWorkBuilder) Build() work.WorkBuilder2[models.CollectorStatus, models.CollectorResult] {
+	return b.buildFn()
+}
+
+func mockCollectorBuilder(st *store.Store2, connectErr, collectErr, processErr error) v2.CollectorWorkBuilder {
+	return &testCollectorWorkBuilder{
+		buildFn: func() work.WorkBuilder2[models.CollectorStatus, models.CollectorResult] {
+			return &mockCollectorWorkBuilder{
+				units: []work.WorkUnit[models.CollectorStatus, models.CollectorResult]{
+					{
+						Status: func() models.CollectorStatus {
+							return models.CollectorStatus{State: models.CollectorStateConnecting}
+						},
+						Work: func(ctx context.Context, r models.CollectorResult) (models.CollectorResult, error) {
+							if connectErr != nil {
+								r.Err = connectErr
+							}
+							return r, nil
+						},
 					},
-					Work: func(ctx context.Context, r models.CollectorResult) (models.CollectorResult, error) {
-						if connectErr != nil {
-							r.Err = connectErr
-						}
-						return r, nil
+					{
+						Status: func() models.CollectorStatus {
+							return models.CollectorStatus{State: models.CollectorStateCollecting}
+						},
+						Work: func(ctx context.Context, r models.CollectorResult) (models.CollectorResult, error) {
+							if r.Err != nil {
+								return r, nil
+							}
+							if collectErr != nil {
+								r.Err = collectErr
+							}
+							return r, nil
+						},
+					},
+					{
+						Status: func() models.CollectorStatus {
+							return models.CollectorStatus{State: models.CollectorStateParsing}
+						},
+						Work: func(ctx context.Context, r models.CollectorResult) (models.CollectorResult, error) {
+							if r.Err != nil {
+								return r, nil
+							}
+							if processErr != nil {
+								r.Err = processErr
+								return r, nil
+							}
+							r.Inventory = []byte(`{"vms":[]}`)
+							if err := st.Inventory().Save(ctx, r.Inventory); err != nil {
+								r.Err = err
+							}
+							return r, nil
+						},
+					},
+					{
+						Status: func() models.CollectorStatus {
+							return models.CollectorStatus{State: models.CollectorStateCollected}
+						},
+						Work: func(ctx context.Context, r models.CollectorResult) (models.CollectorResult, error) {
+							if r.Err != nil {
+								return r, nil
+							}
+							if err := st.Outbox().Insert(ctx, models.Event{
+								Kind: models.InventoryUpdateEvent,
+								Data: r.Inventory,
+							}); err != nil {
+								r.Err = err
+								return r, nil
+							}
+							r.Completed = true
+							return r, nil
+						},
 					},
 				},
-				{
-					Status: func() models.CollectorStatus {
-						return models.CollectorStatus{State: models.CollectorStateCollecting}
-					},
-					Work: func(ctx context.Context, r models.CollectorResult) (models.CollectorResult, error) {
-						if r.Err != nil {
-							return r, nil
-						}
-						if collectErr != nil {
-							r.Err = collectErr
-						}
-						return r, nil
-					},
-				},
-				{
-					Status: func() models.CollectorStatus {
-						return models.CollectorStatus{State: models.CollectorStateParsing}
-					},
-					Work: func(ctx context.Context, r models.CollectorResult) (models.CollectorResult, error) {
-						if r.Err != nil {
-							return r, nil
-						}
-						if processErr != nil {
-							r.Err = processErr
-							return r, nil
-						}
-						r.Inventory = []byte(`{"vms":[]}`)
-						if err := st.Inventory().Save(ctx, r.Inventory); err != nil {
-							r.Err = err
-						}
-						return r, nil
-					},
-				},
-				{
-					Status: func() models.CollectorStatus {
-						return models.CollectorStatus{State: models.CollectorStateCollected}
-					},
-					Work: func(ctx context.Context, r models.CollectorResult) (models.CollectorResult, error) {
-						if r.Err != nil {
-							return r, nil
-						}
-						if err := st.Outbox().Insert(ctx, models.Event{
-							Kind: models.InventoryUpdateEvent,
-							Data: r.Inventory,
-						}); err != nil {
-							r.Err = err
-							return r, nil
-						}
-						r.Completed = true
-						return r, nil
-					},
-				},
-			},
-		}
+			}
+		},
 	}
 }
 
-func blockingCollectorBuilder(gate chan struct{}) func(models.Credentials) work.WorkBuilder2[models.CollectorStatus, models.CollectorResult] {
-	return func(_ models.Credentials) work.WorkBuilder2[models.CollectorStatus, models.CollectorResult] {
-		return &mockCollectorWorkBuilder{
-			units: []work.WorkUnit[models.CollectorStatus, models.CollectorResult]{
-				{
-					Status: func() models.CollectorStatus {
-						return models.CollectorStatus{State: models.CollectorStateConnecting}
-					},
-					Work: func(ctx context.Context, r models.CollectorResult) (models.CollectorResult, error) {
-						select {
-						case <-gate:
-							return r, nil
-						case <-ctx.Done():
-							r.Err = ctx.Err()
-							return r, nil
-						}
+func blockingCollectorBuilder(gate chan struct{}) v2.CollectorWorkBuilder {
+	return &testCollectorWorkBuilder{
+		buildFn: func() work.WorkBuilder2[models.CollectorStatus, models.CollectorResult] {
+			return &mockCollectorWorkBuilder{
+				units: []work.WorkUnit[models.CollectorStatus, models.CollectorResult]{
+					{
+						Status: func() models.CollectorStatus {
+							return models.CollectorStatus{State: models.CollectorStateConnecting}
+						},
+						Work: func(ctx context.Context, r models.CollectorResult) (models.CollectorResult, error) {
+							select {
+							case <-gate:
+								return r, nil
+							case <-ctx.Done():
+								r.Err = ctx.Err()
+								return r, nil
+							}
+						},
 					},
 				},
-			},
-		}
+			}
+		},
 	}
 }
 
@@ -196,7 +208,7 @@ var _ = Describe("CollectorService", func() {
 		err = credsSvc.Save(ctx, km.Key(), "credentials", creds)
 		Expect(err).NotTo(HaveOccurred())
 
-		srv = v2.NewCollectorService(mockCollectorBuilder(st, nil, nil, nil), credsSvc)
+		srv = v2.NewCollectorService(mockCollectorBuilder(st, nil, nil, nil))
 	})
 
 	AfterEach(func() {
@@ -262,7 +274,7 @@ var _ = Describe("CollectorService", func() {
 
 		It("should set error state when connection fails", func() {
 			srv = v2.NewCollectorService(
-				mockCollectorBuilder(st, errors.New("connection failed"), nil, nil), credsSvc)
+				mockCollectorBuilder(st, errors.New("connection failed"), nil, nil))
 
 			err := srv.Start(ctx)
 			Expect(err).NotTo(HaveOccurred())
@@ -277,7 +289,7 @@ var _ = Describe("CollectorService", func() {
 
 		It("should set error state when collection fails", func() {
 			srv = v2.NewCollectorService(
-				mockCollectorBuilder(st, nil, errors.New("collection failed"), nil), credsSvc)
+				mockCollectorBuilder(st, nil, errors.New("collection failed"), nil))
 
 			err := srv.Start(ctx)
 			Expect(err).NotTo(HaveOccurred())
@@ -292,7 +304,7 @@ var _ = Describe("CollectorService", func() {
 
 		It("should set error state when processor fails", func() {
 			srv = v2.NewCollectorService(
-				mockCollectorBuilder(st, nil, nil, errors.New("processing failed")), credsSvc)
+				mockCollectorBuilder(st, nil, nil, errors.New("processing failed")))
 
 			err := srv.Start(ctx)
 			Expect(err).NotTo(HaveOccurred())
@@ -310,7 +322,7 @@ var _ = Describe("CollectorService", func() {
 			defer close(gate)
 
 			srv = v2.NewCollectorService(
-				blockingCollectorBuilder(gate), credsSvc)
+				blockingCollectorBuilder(gate))
 			Expect(srv.Start(ctx)).To(Succeed())
 
 			err := srv.Start(ctx)
@@ -323,7 +335,7 @@ var _ = Describe("CollectorService", func() {
 			err := st.Inventory().Save(ctx, []byte(`{"vms":[]}`))
 			Expect(err).NotTo(HaveOccurred())
 
-			collectorSrv := v2.NewCollectorService(nil, credsSvc)
+			collectorSrv := v2.NewCollectorService(nil)
 
 			Expect(collectorSrv.GetStatus().State).To(Equal(models.CollectorStateReady))
 		})
@@ -333,7 +345,7 @@ var _ = Describe("CollectorService", func() {
 		It("should cancel running collection and return to ready", func() {
 			gate := make(chan struct{})
 			srv = v2.NewCollectorService(
-				blockingCollectorBuilder(gate), credsSvc)
+				blockingCollectorBuilder(gate))
 			err := srv.Start(ctx)
 			Expect(err).NotTo(HaveOccurred())
 
