@@ -24,6 +24,7 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	collector "github.com/kubev2v/assisted-migration-agent/pkg/collector"
+	"github.com/kubev2v/assisted-migration-agent/pkg/errors"
 	"github.com/kubev2v/assisted-migration-agent/pkg/vmware"
 	"github.com/kubev2v/assisted-migration-agent/pkg/work"
 )
@@ -347,10 +348,14 @@ func (f *collectorWorkFactory) Build(creds models.Credentials) work.WorkBuilder2
 				return models.CollectorStatus{State: models.CollectorStateCollecting}
 			},
 			Work: func(ctx context.Context, result models.CollectorResult) (models.CollectorResult, error) {
-				prevDB, ok := f.pool.LatestCollection()
-				if !ok {
-					log.Info("no previous collection found, skipping sync")
-					return result, nil
+				prevDB, err := f.pool.Latest()
+				if err != nil {
+					if errors.IsResourceNotFoundError(err) {
+						log.Info("no previous collection found, skipping sync")
+						return result, nil
+					}
+					result.Err = err
+					return result, err
 				}
 
 				log.Infow("syncing user data from previous collection", "previous_id", prevDB.ID)

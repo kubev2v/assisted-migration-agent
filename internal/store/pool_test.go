@@ -229,19 +229,13 @@ var _ = Describe("Pool", func() {
 	})
 
 	Context("LatestCollection", func() {
-		It("returns false when pool is empty", func() {
-			db, ok := pool.LatestCollection()
-			Expect(ok).To(BeFalse())
-			Expect(db).To(BeNil())
-		})
-
 		It("returns false when pool has only the main database", func() {
 			mainDB, err := pool.NewDatabase(store.MainDatabaseID, filepath.Join(tmpDir, "main.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			pool.Add(mainDB)
 
-			db, ok := pool.LatestCollection()
-			Expect(ok).To(BeFalse())
+			db, err := pool.Latest()
+			Expect(err).NotTo(BeNil())
 			Expect(db).To(BeNil())
 		})
 
@@ -258,8 +252,8 @@ var _ = Describe("Pool", func() {
 			Expect(err).NotTo(HaveOccurred())
 			pool.Add(newer)
 
-			db, ok := pool.LatestCollection()
-			Expect(ok).To(BeTrue())
+			db, err := pool.Latest()
+			Expect(err).To(BeNil())
 			Expect(db.ID).To(Equal("col-new"))
 		})
 	})

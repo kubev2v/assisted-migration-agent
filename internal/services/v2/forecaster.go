@@ -329,9 +329,9 @@ func (f *ForecasterService) mainStore() (*store.Store2, error) {
 }
 
 func (f *ForecasterService) latestCollectionStore() (*store.Store2, error) {
-	db, ok := f.pool.LatestCollection()
-	if !ok {
-		return nil, srvErrors.NewCollectionNotFoundError()
+	db, err := f.pool.Latest()
+	if err != nil {
+		return nil, err
 	}
 	return db.Store()
 }

@@ -353,6 +353,11 @@ func initPool(cfg *config.Configuration) (*store.Pool, error) {
 			continue
 		}
 
+		if err := db.Close(); err != nil {
+			zap.S().Errorw("closing database", "db", db.ID, "error", err)
+			continue
+		}
+
 		pool.Add(db)
 		zap.S().Infow("registered collection database", "name", name, "path", match)
 	}

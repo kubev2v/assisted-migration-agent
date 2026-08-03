@@ -103,13 +103,15 @@ func (d *Database) Store() (*Store2, error) {
 		return d.store, nil
 	}
 
-	conn, err := newDatabase(NewDefaultExtentionLoader(), d.Path, d.memoryLimit, d.accessMode)
-	if err != nil {
-		return nil, err
+	if d.connection == nil {
+		conn, err := newDatabase(NewDefaultExtentionLoader(), d.Path, d.memoryLimit, d.accessMode)
+		if err != nil {
+			return nil, err
+		}
+		d.connection = conn
 	}
 
-	d.connection = conn
-	d.store = newStore2(filepath.Base(d.Path), pkgstore.NewQueryInterceptor(conn), pkgstore.NewTransactor(conn))
+	d.store = newStore2(filepath.Base(d.Path), pkgstore.NewQueryInterceptor(d.connection), pkgstore.NewTransactor(d.connection))
 
 	return d.store, nil
 }
@@ -263,17 +265,6 @@ func (p *Pool) All() iter.Seq[*Database] {
 	}
 }
 
-// LatestCollection returns the most recently created collection database in the pool,
-// excluding the main database. Returns (nil, false) if no collection databases exist.
-func (p *Pool) LatestCollection() (*Database, bool) {
-	for db := range p.All() {
-		if db.ID != MainDatabaseID {
-			return db, true
-		}
-	}
-	return nil, false
-}
-
 func (p *Pool) Close() {
 	p.cleanupTimer.Stop()
 
@@ -288,7 +279,15 @@ func (p *Pool) Close() {
 }
 
 func (p *Pool) cleanup() {
-	for id, db := range p.databases {
+	for _, db := range p.databases {
+		if db.ID == MainDatabaseID {
+			continue
+		}
+
+		if db == p.latestCollectionDatabase.Load() {
+			continue
+		}
+
 		if db.LastAccess() == 0 {
 			continue
 		}
@@ -298,7 +297,7 @@ func (p *Pool) cleanup() {
 		}
 
 		if err := db.Close(); err != nil {
-			zap.S().Errorw("failed to close idle db connection", "db_id", id, "error", err)
+			zap.S().Errorw("failed to close idle db connection", "db_id", db.ID, "error", err)
 		}
 	}
 }
