@@ -276,28 +276,37 @@ func (c *Console) Stop() {
 	c.close = nil
 }
 
+func (c *Console) toStatus(state models.CollectorStateType) string {
+	if c.legacyStatusEnabled {
+		return string(state.ToV1())
+	}
+	return string(state)
+}
+
 func (c *Console) createPipeline(s *scheduler.Scheduler[any]) (*work.Pipeline[string, any], error) {
 	units := []consoleWorkUnit{
 		{
 			Status: func() string { return "status" },
 			Work: func(ctx context.Context, r any) (any, error) {
-				var status, statusInfo string
 				collector, err := c.mgr.GetCollector()
 				if err != nil && !errors.IsResourceNotFoundError(err) {
 					return nil, err
 				}
+
+				state := models.CollectorStateReady
+				statusInfo := c.toStatus(state)
+
 				if collector != nil {
-					collectorStatus := collector.GetStatus()
-					status = string(collectorStatus.State)
-					if c.legacyStatusEnabled {
-						status = string(collectorStatus.State.ToV1())
-					}
-					statusInfo = status
-					if collectorStatus.State == models.CollectorStateError {
-						statusInfo = collectorStatus.Error.Error()
+					cs := collector.GetStatus()
+					state = cs.State
+					statusInfo = c.toStatus(state)
+
+					if state == models.CollectorStateError {
+						statusInfo = cs.Error.Error()
 					}
 				}
-				return nil, c.client.UpdateAgentStatus(ctx, c.agentID, c.sourceID, c.version, status, statusInfo)
+
+				return nil, c.client.UpdateAgentStatus(ctx, c.agentID, c.sourceID, c.version, c.toStatus(state), statusInfo)
 			},
 		}}
 
