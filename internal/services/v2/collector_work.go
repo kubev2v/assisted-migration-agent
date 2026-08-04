@@ -452,9 +452,9 @@ func (f *collectorWorkFactory) Build(creds models.Credentials) work.WorkBuilder2
 							CpuAvg:     c.CpuAvg,
 							CpuP95:     c.CpuP95,
 							CpuMax:     c.CpuMax,
-							MemAvg:     c.MemAvg,
-							MemP95:     c.MemP95,
-							MemMax:     c.MemMax,
+							MemAvg:     min(c.MemAvg, 100),
+							MemP95:     min(c.MemP95, 100),
+							MemMax:     min(c.MemMax, 100),
 							Confidence: c.Confidence,
 						}
 					}
