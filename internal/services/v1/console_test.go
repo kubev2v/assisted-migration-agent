@@ -1243,11 +1243,11 @@ var _ = Describe("Console Service", func() {
 		})
 	})
 
-	Context("Legacy status", func() {
-		// Given a console service with legacy status enabled
-		// When the collector is in ready state
-		// Then it should map to legacy WaitingForCredentials status
-		It("should map collector states to legacy statuses", func() {
+	Context("SaaS status mapping", func() {
+		// Given a console service with a collector in ready state
+		// When the status is sent to console
+		// Then it should send the SaaS-mapped status
+		It("should send SaaS-mapped status to console", func() {
 			// Arrange
 			var receivedPath string
 			requestReceived := make(chan bool, 10)
@@ -1260,7 +1260,6 @@ var _ = Describe("Console Service", func() {
 
 			client, err := console.NewConsoleClient(server.URL, "")
 			Expect(err).NotTo(HaveOccurred())
-			cfg.LegacyStatusEnabled = true
 
 			consoleSrv, err := services.NewConsoleService(cfg, client, collector, st, eventSrv)
 			Expect(err).NotTo(HaveOccurred())
@@ -1393,8 +1392,8 @@ var _ = Describe("Console Service", func() {
 
 			// Assert
 			Eventually(requestReceived, 500*time.Millisecond).Should(Receive())
-			Expect(receivedStatus).To(Equal("collected"))
-			Expect(receivedStatusInfo).To(Equal("collected"))
+			Expect(receivedStatus).To(Equal("up-to-date"))
+			Expect(receivedStatusInfo).To(Equal("up-to-date"))
 		})
 	})
 })

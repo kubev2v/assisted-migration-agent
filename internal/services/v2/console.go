@@ -28,18 +28,17 @@ type (
 )
 
 type Console struct {
-	updateInterval      time.Duration
-	agentID             uuid.UUID
-	sourceID            uuid.UUID
-	version             string
-	state               *consoleState
-	mu                  sync.Mutex // protects mode changes to prevent double run()
-	client              *console.Client
-	requestBuilder      *console.RequestBuilder
-	close               chan any
-	mgr                 *ServiceManager
-	store               *store.Store2
-	legacyStatusEnabled bool
+	updateInterval time.Duration
+	agentID        uuid.UUID
+	sourceID       uuid.UUID
+	version        string
+	state          *consoleState
+	mu             sync.Mutex // protects mode changes to prevent double run()
+	client         *console.Client
+	requestBuilder *console.RequestBuilder
+	close          chan any
+	mgr            *ServiceManager
+	store          *store.Store2
 }
 
 func NewConsoleService(cfg config.Agent, client *console.Client, mgr *ServiceManager, mainStore *store.Store2) (*Console, error) {
@@ -86,11 +85,10 @@ func newConsoleService(cfg config.Agent, client *console.Client, mgr *ServiceMan
 			current: defaultStatus.Current,
 			target:  defaultStatus.Target,
 		},
-		client:              client,
-		requestBuilder:      console.NewRequestBuilder(client, sourceID, agentID),
-		store:               store,
-		mgr:                 mgr,
-		legacyStatusEnabled: cfg.LegacyStatusEnabled,
+		client:         client,
+		requestBuilder: console.NewRequestBuilder(client, sourceID, agentID),
+		store:          store,
+		mgr:            mgr,
 	}
 }
 
@@ -276,13 +274,6 @@ func (c *Console) Stop() {
 	c.close = nil
 }
 
-func (c *Console) toStatus(state models.CollectorStateType) string {
-	if c.legacyStatusEnabled {
-		return string(state.ToV1())
-	}
-	return string(state)
-}
-
 func (c *Console) createPipeline(s *scheduler.Scheduler[any]) (*work.Pipeline[string, any], error) {
 	units := []consoleWorkUnit{
 		{
@@ -293,20 +284,15 @@ func (c *Console) createPipeline(s *scheduler.Scheduler[any]) (*work.Pipeline[st
 					return nil, err
 				}
 
-				state := models.CollectorStateReady
-				statusInfo := c.toStatus(state)
-
-				if collector != nil {
-					cs := collector.GetStatus()
-					state = cs.State
-					statusInfo = c.toStatus(state)
-
-					if state == models.CollectorStateError {
-						statusInfo = cs.Error.Error()
-					}
+				state := models.CollectorStatus{
+					State: models.CollectorStateReady,
 				}
 
-				return nil, c.client.UpdateAgentStatus(ctx, c.agentID, c.sourceID, c.version, c.toStatus(state), statusInfo)
+				if collector != nil {
+					state = collector.GetStatus()
+				}
+
+				return nil, c.client.UpdateAgentStatus(ctx, c.agentID, c.sourceID, c.version, state)
 			},
 		}}
 

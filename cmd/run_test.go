@@ -83,7 +83,6 @@ var _ = Describe("Run Command", func() {
 				"--version", "v1.2.3",
 				"--data-folder", "/var/data",
 				"--opa-policies-folder", "/etc/policies",
-				"--legacy-status-enabled=false",
 			})
 
 			// Assert
@@ -94,7 +93,6 @@ var _ = Describe("Run Command", func() {
 			Expect(cfg.Agent.Version).To(Equal("v1.2.3"))
 			Expect(cfg.Agent.DataFolder).To(Equal("/var/data"))
 			Expect(cfg.Agent.OpaPoliciesFolder).To(Equal("/etc/policies"))
-			Expect(cfg.Agent.LegacyStatusEnabled).To(BeFalse())
 		})
 
 		// Given a run command with authentication flags
@@ -152,7 +150,6 @@ var _ = Describe("Run Command", func() {
 			Expect(cfg.Agent.Mode).To(Equal("disconnected"))
 			Expect(cfg.Agent.Version).To(Equal("v0.0.0"))
 			Expect(cfg.Agent.UpdateInterval).To(Equal(5 * time.Second))
-			Expect(cfg.Agent.LegacyStatusEnabled).To(BeTrue())
 			Expect(cfg.Console.URL).To(Equal("http://localhost:7443"))
 			Expect(cfg.Auth.Enabled).To(BeTrue())
 		})
@@ -212,8 +209,6 @@ var _ = Describe("Run Command", func() {
 			_ = os.Setenv("AGENT_VERSION", "v2.0.0")
 			_ = os.Setenv("AGENT_DATA_FOLDER", "/env/data")
 			_ = os.Setenv("AGENT_OPA_POLICIES_FOLDER", "/env/policies")
-			_ = os.Setenv("AGENT_LEGACY_STATUS_ENABLED", "false")
-
 			cfg = config.NewConfigurationWithOptionsAndDefaults()
 			cmd := NewRunCommand(cfg)
 
@@ -230,7 +225,6 @@ var _ = Describe("Run Command", func() {
 			Expect(cfg.Agent.Version).To(Equal("v2.0.0"))
 			Expect(cfg.Agent.DataFolder).To(Equal("/env/data"))
 			Expect(cfg.Agent.OpaPoliciesFolder).To(Equal("/env/policies"))
-			Expect(cfg.Agent.LegacyStatusEnabled).To(BeFalse())
 		})
 
 		// Given authentication environment variables are set

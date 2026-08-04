@@ -269,21 +269,6 @@
 //	    }
 //	}
 //
-// Legacy Status Mode:
-//
-// When legacyStatusEnabled is true, the collector states are mapped to legacy
-// status values for compatibility with v1 agent version:
-//
-//	┌─────────────────────────────────────────────────────────┐
-//	|  Current State    |  Legacy Status                      |
-//	├───────────────────┼─────────────────────────────────────┤
-//	|  Ready            |  waiting-for-credentials            |
-//	|  Connecting       |  collecting                         |
-//	|  Collecting       |  collecting                         |
-//	|  Parsing          |  collecting                         |
-//	|  Collected        |  collected                          |
-//	└─────────────────────────────────────────────────────────┘
-//
 // Error handling:
 //   - Transient errors: Logged, stored in status.Error, loop continues with backoff
 //   - Fatal errors (4xx): Sets fatalStopped flag, exits run loop permanently

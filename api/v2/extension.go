@@ -280,7 +280,7 @@ func NewCollectorStatus(status models.CollectorStatus) CollectorStatus {
 	case models.CollectorStateConnecting:
 		c.Status = CollectorStatusStatusConnecting
 		// TODO: fix rightsizing status
-	case models.CollectorStateCollecting, models.CollectorStateRightsizingConnecting:
+	case models.CollectorStateCollecting, models.CollectorStateRightsizingConnecting: //nolint:staticcheck // deprecated; removed with v1
 		c.Status = CollectorStatusStatusCollecting
 	case models.CollectorStateMetricsCollecting:
 		c.Status = CollectorStatusMetricsCollecting

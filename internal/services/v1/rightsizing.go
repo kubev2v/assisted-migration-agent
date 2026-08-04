@@ -466,7 +466,7 @@ func (s *RightsizingService) BuildCollectorWorkUnits(lookbackH, intervalID, batc
 		return []collectorWorkUnit{
 			{
 				Status: func() models.CollectorStatus {
-					return models.CollectorStatus{State: models.CollectorStateRightsizingConnecting}
+					return models.CollectorStatus{State: models.CollectorStateRightsizingConnecting} //nolint:staticcheck // deprecated; removed with v1
 				},
 				Work: func(ctx context.Context, r models.CollectorResult) (models.CollectorResult, error) {
 					params := models.RightsizingParams{

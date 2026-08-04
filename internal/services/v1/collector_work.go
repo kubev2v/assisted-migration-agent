@@ -262,7 +262,7 @@ func (f *collectorWorkFactory) Build(creds models.Credentials) work.WorkBuilder2
 		// 6. Collect rightsizing metrics from vCenter for the inventoried VMs.
 		{
 			Status: func() models.CollectorStatus {
-				return models.CollectorStatus{State: models.CollectorStateRightsizingConnecting}
+				return models.CollectorStatus{State: models.CollectorStateRightsizingConnecting} //nolint:staticcheck // deprecated; removed with v1
 			},
 			Work: func(ctx context.Context, r models.CollectorResult) (models.CollectorResult, error) {
 				rsSrv := NewRightsizingService(wb.collectionStore)

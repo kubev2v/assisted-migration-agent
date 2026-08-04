@@ -39,7 +39,6 @@
 //	│ DataFolder          │ ""             │ Path to data storage (DuckDB)        │
 //	│ OpaPoliciesFolder   │ ""             │ Path to OPA policy files             │
 //	│ UpdateInterval      │ 5s             │ Console update frequency             │
-//	│ LegacyStatusEnabled │ true           │ Use v1 agent status values           │
 //	└─────────────────────┴────────────────┴──────────────────────────────────────┘
 //
 // Agent modes:

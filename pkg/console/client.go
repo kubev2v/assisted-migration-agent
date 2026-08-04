@@ -11,6 +11,7 @@ import (
 	agentAPI "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	agentClient "github.com/kubev2v/migration-planner/pkg/client"
 
+	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	serviceErrs "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
@@ -40,7 +41,13 @@ func NewConsoleClient(baseURL string, jwt string) (*Client, error) {
 
 // UpdateAgentStatus sends agent status to console.redhat.com
 // PUT /api/v1/agents/{id}/status
-func (c *Client) UpdateAgentStatus(ctx context.Context, agentID uuid.UUID, sourceID uuid.UUID, version, status, statusInfo string) error {
+func (c *Client) UpdateAgentStatus(ctx context.Context, agentID uuid.UUID, sourceID uuid.UUID, version string, collectorStatus models.CollectorStatus) error {
+	status := toSaaSStatus(collectorStatus.State)
+	statusInfo := status
+	if collectorStatus.State == models.CollectorStateError && collectorStatus.Error != nil {
+		statusInfo = collectorStatus.Error.Error()
+	}
+
 	body := agentAPI.AgentStatusUpdate{
 		CredentialUrl: "http://10.10.10.1:3443",
 		Status:        status,
@@ -180,6 +187,25 @@ func (c *Client) UpdateSourceSubset(ctx context.Context, sourceID, subsetID uuid
 		return serviceErrs.NewConsoleClientError(resp.StatusCode, resp.Status)
 	default:
 		return fmt.Errorf("failed to update source subset: %s", resp.Status)
+	}
+}
+
+func toSaaSStatus(state models.CollectorStateType) string {
+	switch state {
+	case models.CollectorStateReady:
+		return "waiting-for-credentials"
+	case models.CollectorStateConnecting,
+		models.CollectorStateCollecting,
+		models.CollectorStateParsing,
+		models.CollectorStateMetricsCollecting,
+		models.CollectorStateRightsizingConnecting: //nolint:staticcheck // deprecated; removed with v1
+		return "gathering-initial-inventory"
+	case models.CollectorStateCollected:
+		return "up-to-date"
+	case models.CollectorStateError:
+		return "error"
+	default:
+		return "unknown state"
 	}
 }
 

@@ -29,17 +29,16 @@ type Server struct {
 }
 
 type Agent struct {
-	Mode                string        `debugmap:"visible" default:"disconnected"`
-	ID                  string        `debugmap:"visible"`
-	SourceID            string        `debugmap:"visible"`
-	Version             string        `debugmap:"visible" default:"v0.0.0"`
-	GitCommit           string        `debugmap:"visible" default:"unknown"`
-	UIGitCommit         string        `debugmap:"visible" default:"unknown"`
-	DataFolder          string        `debugmap:"visible"`
-	OpaPoliciesFolder   string        `debugmap:"visible"`
-	UpdateInterval      time.Duration `debugmap:"visible" default:"5s"`
-	LegacyStatusEnabled bool          `debugmap:"visible" default:"true"`
-	RetainCollections   int           `debugmap:"visible" default:"1"`
+	Mode              string        `debugmap:"visible" default:"disconnected"`
+	ID                string        `debugmap:"visible"`
+	SourceID          string        `debugmap:"visible"`
+	Version           string        `debugmap:"visible" default:"v0.0.0"`
+	GitCommit         string        `debugmap:"visible" default:"unknown"`
+	UIGitCommit       string        `debugmap:"visible" default:"unknown"`
+	DataFolder        string        `debugmap:"visible"`
+	OpaPoliciesFolder string        `debugmap:"visible"`
+	UpdateInterval    time.Duration `debugmap:"visible" default:"5s"`
+	RetainCollections int           `debugmap:"visible" default:"1"`
 }
 
 type Console struct {

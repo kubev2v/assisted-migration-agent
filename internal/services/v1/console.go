@@ -33,19 +33,18 @@ type (
 )
 
 type Console struct {
-	updateInterval      time.Duration
-	agentID             uuid.UUID
-	sourceID            uuid.UUID
-	version             string
-	state               *consoleState
-	mu                  sync.Mutex // protects mode changes to prevent double run()
-	client              *console.Client
-	requestBuilder      *console.RequestBuilder
-	close               chan any
-	collector           Collector
-	eventSrv            *EventService
-	store               *store.Store
-	legacyStatusEnabled bool
+	updateInterval time.Duration
+	agentID        uuid.UUID
+	sourceID       uuid.UUID
+	version        string
+	state          *consoleState
+	mu             sync.Mutex // protects mode changes to prevent double run()
+	client         *console.Client
+	requestBuilder *console.RequestBuilder
+	close          chan any
+	collector      Collector
+	eventSrv       *EventService
+	store          *store.Store
 }
 
 func NewConsoleService(cfg config.Agent, client *console.Client, collector Collector, st *store.Store, eventSrv *EventService) (*Console, error) {
@@ -92,12 +91,11 @@ func newConsoleService(cfg config.Agent, client *console.Client, collector Colle
 			current: defaultStatus.Current,
 			target:  defaultStatus.Target,
 		},
-		client:              client,
-		requestBuilder:      console.NewRequestBuilder(client, sourceID, agentID),
-		store:               store,
-		collector:           collector,
-		eventSrv:            eventSrv,
-		legacyStatusEnabled: cfg.LegacyStatusEnabled,
+		client:         client,
+		requestBuilder: console.NewRequestBuilder(client, sourceID, agentID),
+		store:          store,
+		collector:      collector,
+		eventSrv:       eventSrv,
 	}
 }
 
@@ -288,15 +286,7 @@ func (c *Console) createPipeline(s *scheduler.Scheduler[any]) (*work.Pipeline[st
 			Status: func() string { return "status" },
 			Work: func(ctx context.Context, r any) (any, error) {
 				collectorStatus := c.collector.GetStatus()
-				status := string(collectorStatus.State)
-				if c.legacyStatusEnabled {
-					status = string(collectorStatus.State.ToV1())
-				}
-				statusInfo := status
-				if collectorStatus.State == models.CollectorStateError {
-					statusInfo = collectorStatus.Error.Error()
-				}
-				return nil, c.client.UpdateAgentStatus(ctx, c.agentID, c.sourceID, c.version, status, statusInfo)
+				return nil, c.client.UpdateAgentStatus(ctx, c.agentID, c.sourceID, c.version, collectorStatus)
 			},
 		}}
 
