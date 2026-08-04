@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"errors"
 
 	"github.com/kubev2v/vm-migration-detective/pkg/vmdetect"
 	"go.uber.org/zap"
@@ -48,6 +49,8 @@ func (b *inspectionBuilder) Finalize(ctx context.Context, result models.Inspecti
 
 	var status models.InspectionStatus
 	switch {
+	case result.Err != nil && (errors.Is(result.Err, context.Canceled) || errors.Is(result.Err, context.DeadlineExceeded)):
+		status = models.InspectionStatus{State: models.InspectionStateCanceled, Details: "canceled"}
 	case result.Err != nil:
 		status = models.InspectionStatus{State: models.InspectionStateError, Error: result.Err, Details: ""}
 	case result.Completed:

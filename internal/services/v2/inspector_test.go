@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -47,6 +48,8 @@ func (b *testInspectionBuilder) Finalize(ctx context.Context, result models.Insp
 
 	var status models.InspectionStatus
 	switch {
+	case result.Err != nil && (errors.Is(result.Err, context.Canceled) || errors.Is(result.Err, context.DeadlineExceeded)):
+		status = models.InspectionStatus{State: models.InspectionStateCanceled}
 	case result.Err != nil:
 		status = models.InspectionStatus{State: models.InspectionStateError, Error: result.Err}
 	case result.Completed:
@@ -302,6 +305,46 @@ var _ = Describe("InspectorService", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(getInspectionStatus("vm-3")).To(Equal(models.InspectionStateCanceled))
 			})
+		})
+
+		It("persists canceled status when work unit returns a context.Canceled error", func() {
+			errReturned := make(chan struct{})
+
+			customFactory := func(id string) work.WorkBuilder2[models.InspectionStatus, models.InspectionResult] {
+				running := func() models.InspectionStatus {
+					return models.InspectionStatus{State: models.InspectionStateRunning}
+				}
+
+				return &testInspectionBuilder{
+					vmID: id,
+					st:   st,
+					units: []work.WorkUnit[models.InspectionStatus, models.InspectionResult]{
+						{
+							Status: running,
+							Work: func(ctx context.Context, result models.InspectionResult) (models.InspectionResult, error) {
+								result.Err = fmt.Errorf("inspection interrupted: %w", context.Canceled)
+								close(errReturned)
+								<-ctx.Done()
+								return result, nil
+							},
+						},
+					},
+				}
+			}
+
+			srv = mustNewInspectorService(st, 10, "", credsSvc).WithInspectionBuilder(customFactory)
+			err := srv.Start(ctx, []string{"vm-1"})
+			Expect(err).NotTo(HaveOccurred())
+
+			<-errReturned
+			err = srv.Cancel("vm-1")
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(func() models.InspectorState {
+				return srv.GetStatus().State
+			}, 10*time.Second).Should(Equal(models.InspectorStateReady))
+
+			Expect(getInspectionStatus("vm-1")).To(Equal(models.InspectionStateCanceled))
 		})
 	})
 

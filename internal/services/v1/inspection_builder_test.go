@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -247,6 +248,34 @@ var _ = Describe("inspectionBuilder", func() {
 			_, _ = pool.Cancel("vm-1")
 
 			close(gate)
+
+			Eventually(func() bool {
+				return !pool.IsRunning()
+			}).Should(BeTrue())
+			_ = pool.Stop()
+
+			Expect(getInspectionStatus("vm-1")).To(Equal(models.InspectionStateCanceled))
+		})
+
+		It("persists canceled status when work unit returns a context.Canceled error", func() {
+			errReturned := make(chan struct{})
+
+			ib := newBuilder("vm-1", func(ctx context.Context, result models.InspectionResult) (models.InspectionResult, error) {
+				result.Err = fmt.Errorf("inspection interrupted: %w", context.Canceled)
+				close(errReturned)
+				<-ctx.Done()
+				return result, nil
+			})
+
+			wb := map[string]work.WorkBuilder2[models.InspectionStatus, models.InspectionResult]{
+				"vm-1": ib,
+			}
+
+			pool := work.NewPool2(wb).WithWorkers(defaultInspectionWorkers, 0)
+			Expect(pool.Start()).To(Succeed())
+
+			<-errReturned
+			_, _ = pool.Cancel("vm-1")
 
 			Eventually(func() bool {
 				return !pool.IsRunning()
