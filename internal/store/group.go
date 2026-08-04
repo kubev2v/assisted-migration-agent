@@ -199,7 +199,9 @@ func (s *GroupStore) Create(ctx context.Context, group models.Group) (*models.Gr
 // afterward to rebuild them against the new VM set.
 func (s *GroupStore) CopyToAttached(ctx context.Context, attachAlias string, now time.Time) error {
 	selectQuery := sq.Select(
-		groupColID, groupColName, groupColDescription, groupColFilter, groupColCreatedAt,
+		groupColID, groupColName,
+	).Column("COALESCE("+groupColDescription+", '')").Columns(
+		groupColFilter, groupColCreatedAt,
 	).Column(sq.Expr("?", now)).From(groupTable)
 
 	query, args, err := sq.Insert(attachAlias+"."+groupTable).

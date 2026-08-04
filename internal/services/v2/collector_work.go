@@ -333,16 +333,17 @@ func (f *collectorWorkFactory) Build(creds models.Credentials) work.WorkBuilder2
 			},
 		},
 		// 7. Sync user data from the previous collection into the new one.
-		// Attach the (closed) new collection DB to the previous collection's connection,
-		// run cross-DB SQL to copy groups, labels, and migration exclusion flags, then
-		// detach and reopen the new DB to refresh group inventories.
+		// Clone the previous collection to a temp DB, close the new collection DB,
+		// attach it onto the clone, run cross-DB SQL to copy groups, labels, and
+		// exclusion flags, then detach, discard the clone, and reopen the new DB.
 		// If no previous collection exists, this stage is a no-op.
-		// Any failure here fails the collection — a collection without user data (groups,
-		// labels, exclusion flags) is considered invalid and should not be published.
+		// Any failure here fails the collection — a collection without user data
+		// (groups, labels, exclusion flags) is considered invalid and should not
+		// be published.
 		//
-		// This runs before the Inventory stage so that the persisted/published inventory
-		// (which embeds per-VM MigrationExcluded and Labels) reflects the synced data
-		// instead of the new collection's pre-sync defaults.
+		// This runs before the Inventory stage so that the persisted/published
+		// inventory (which embeds per-VM MigrationExcluded and Labels) reflects
+		// the synced data instead of the new collection's pre-sync defaults.
 		{
 			Status: func() models.CollectorStatus {
 				return models.CollectorStatus{State: models.CollectorStateCollecting}
@@ -361,29 +362,44 @@ func (f *collectorWorkFactory) Build(creds models.Credentials) work.WorkBuilder2
 				log.Infow("syncing user data from previous collection", "previous_id", prevDB.ID)
 				now := time.Now()
 
-				prevSt, err := prevDB.Store()
+				cloneDB, err := prevDB.Clone(ctx)
 				if err != nil {
-					result.Err = fmt.Errorf("sync: failed to open previous collection store: %w", err)
+					result.Err = fmt.Errorf("sync: failed to clone previous collection: %w", err)
+					return result, result.Err
+				}
+				defer func() {
+					if err := cloneDB.Close(); err != nil {
+						zap.S().Errorw("failed to close clone db", "id", cloneDB.ID, "error", err)
+						return
+					}
+					if err := os.Remove(cloneDB.Path); err != nil {
+						zap.S().Errorw("failed to remove clone from disk", "id", cloneDB.ID, "error", err)
+						return
+					}
+					zap.S().Infow("clone closed and removed", "id", cloneDB.ID)
+				}()
+
+				cloneSt, err := cloneDB.Store()
+				if err != nil {
+					result.Err = fmt.Errorf("sync: failed to get clone store: %w", err)
 					return result, result.Err
 				}
 
 				const attachedSchema = "new_col"
 
-				// DuckDB requires the file to be closed before it can be attached to another connection.
-				// collectionDb.Store() in subsequent steps transparently reopens it.
 				if err := collectionDb.Close(); err != nil {
 					result.Err = fmt.Errorf("sync: failed to close collection database before attach: %w", err)
 					return result, result.Err
 				}
 
-				if err := prevSt.AttachDatabase(ctx, collectionDb, attachedSchema, store.ReadWriteDatabase); err != nil {
+				if err := cloneSt.AttachDatabase(ctx, collectionDb, attachedSchema, store.ReadWriteDatabase); err != nil {
 					result.Err = fmt.Errorf("sync: failed to attach collection database: %w", err)
 					return result, result.Err
 				}
 
-				syncErr := SyncAttached(ctx, prevSt, attachedSchema, now)
+				syncErr := SyncAttached(ctx, cloneSt, attachedSchema, now)
 
-				if detachErr := prevSt.DetachDatabase(ctx, attachedSchema); detachErr != nil {
+				if detachErr := cloneSt.DetachDatabase(ctx, attachedSchema); detachErr != nil {
 					log.Errorw("failed to detach collection database", "error", detachErr)
 					if syncErr == nil {
 						syncErr = fmt.Errorf("sync: failed to detach collection database: %w", detachErr)
@@ -395,17 +411,12 @@ func (f *collectorWorkFactory) Build(creds models.Credentials) work.WorkBuilder2
 					return result, result.Err
 				}
 
-				// Reopen the collection DB (transparently reconnects after the Close() above)
-				// and refresh group inventories against the new VM set.
 				newSt, err := collectionDb.Store()
 				if err != nil {
 					result.Err = fmt.Errorf("sync: failed to reopen collection database for group refresh: %w", err)
 					return result, result.Err
 				}
 
-				// The Close() above invalidated the connection parser was bound to at
-				// provisioning time; rebind it to the reopened store so this and later
-				// stages (e.g. Inventory) don't query a closed connection.
 				parser = duckdb_parser.New(newSt.Querier(), f.validator)
 
 				changedGroups, err := RefreshGroupInventories(ctx, newSt, NewGroupService(newSt, parser))
@@ -533,6 +544,11 @@ func (f *collectorWorkFactory) Build(creds models.Credentials) work.WorkBuilder2
 					}
 				}
 
+				if err := st.Checkpoint(ctx); err != nil {
+					r.Err = err
+					return r, err
+				}
+
 				r.Completed = true
 				return r, nil
 			},
@@ -568,12 +584,22 @@ func (f *collectorWorkFactory) Build(creds models.Credentials) work.WorkBuilder2
 
 		switch {
 		case result.Completed:
+			prevDB, prevErr := f.pool.Latest()
 			f.pool.Add(collectionDb)
+
+			// try to close **after** adding new collection to the pool
+			if prevErr == nil {
+				if err := prevDB.Close(); err != nil {
+					zap.S().Warnw("failed to close previous collection database", "db_id", prevDB.ID, "error", err)
+				}
+			}
+
 			if err := mainSt.Collection().Delete(ctx, database); err != nil {
 				zap.S().Warnw("failed to delete collection marker", "error", err)
 			}
 			zap.S().Infow("collection database added to pool", "id", collectionDb.ID, "path", collectionDb.Path)
 		case result.Err != nil:
+			zap.S().Infow("collection failed", "error", result.Err)
 			if err := mainSt.Collection().MarkFailed(ctx, database, result.Err.Error()); err != nil {
 				zap.S().Warnw("failed to mark collection as failed", "error", err)
 			}

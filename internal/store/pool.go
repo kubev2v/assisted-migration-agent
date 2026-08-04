@@ -3,12 +3,16 @@ package store
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"iter"
+	"os"
 	"path/filepath"
 	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/kubev2v/assisted-migration-agent/pkg/errors"
 
@@ -142,6 +146,58 @@ func (d *Database) LastAccess() int64 {
 	}
 
 	return s.LastAccess()
+}
+
+// Clone exports this database and imports it into a new database at dstPath.
+// The source connection stays open and is not modified.
+func (d *Database) Clone(ctx context.Context) (*Database, error) {
+	d.mu.Lock()
+	if d.connection == nil {
+		conn, err := newDatabase(NewDefaultExtentionLoader(), d.Path, d.memoryLimit, d.accessMode)
+		if err != nil {
+			d.mu.Unlock()
+			return nil, err
+		}
+		d.connection = conn
+	}
+	conn := d.connection
+	d.mu.Unlock()
+
+	exportDir, err := os.MkdirTemp(filepath.Dir(d.Path), "duckdb-export-*")
+	if err != nil {
+		return nil, fmt.Errorf("creating export dir: %w", err)
+	}
+	defer func() {
+		if err := os.RemoveAll(exportDir); err != nil {
+			zap.S().Warnw("failed to remove backup folder when cloning db", "id", d.ID, "error", err)
+		}
+	}()
+
+	if _, err := conn.ExecContext(ctx, fmt.Sprintf("EXPORT DATABASE '%s'", exportDir)); err != nil {
+		return nil, fmt.Errorf("exporting database: %w", err)
+	}
+
+	cloneID := string(uuid.NewString()[:6])
+	clonePath := filepath.Join(filepath.Dir(d.Path), fmt.Sprintf("%s-%s.duckdb", filepath.Base(d.Path), cloneID))
+	dstConn, err := newDatabase(NewDefaultExtentionLoader(), clonePath, d.memoryLimit, ReadWriteDatabase)
+	if err != nil {
+		return nil, fmt.Errorf("opening destination database: %w", err)
+	}
+
+	if _, err := dstConn.ExecContext(ctx, fmt.Sprintf("IMPORT DATABASE '%s'", exportDir)); err != nil {
+		return nil, fmt.Errorf("importing database: %w", err)
+	}
+
+	clone := Database{
+		ID:          cloneID,
+		Path:        clonePath,
+		CreatedAt:   time.Now(),
+		connection:  dstConn,
+		accessMode:  ReadWriteDatabase,
+		memoryLimit: d.memoryLimit,
+	}
+
+	return &clone, nil
 }
 
 // Migrate migrates the database.
