@@ -306,6 +306,10 @@ func (c *Console) createPipeline(s *scheduler.Scheduler[any]) (*work.Pipeline[st
 		return nil, fmt.Errorf("failed to get event service: %w", err)
 	}
 
+	if eventSrv == nil {
+		return work.NewPipeline(models.ConsolePipelineInitialState, s, work.NewSliceWorkBuilder(units)), nil
+	}
+
 	events, err := eventSrv.Events(context.Background())
 	if err != nil && !errors.IsCollectionNotFoundError(err) {
 		return nil, fmt.Errorf("failed to read events: %w", err)
