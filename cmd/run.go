@@ -214,7 +214,7 @@ func initV2(cfg *config.Configuration) (*server.Server, func(), error) {
 		return nil, nil, err
 	}
 
-	_, km, err := initShared(cfg)
+	consoleClient, km, err := initShared(cfg)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -222,6 +222,7 @@ func initV2(cfg *config.Configuration) (*server.Server, func(), error) {
 	v2SvcMgr := services.V2NewServiceManager(
 		services.V2WithConfig(cfg),
 		services.V2WithPool(pool),
+		services.V2WithConsoleClient(consoleClient),
 		services.V2WithKeyManager(km),
 		services.V2WithOpaValidator(opaValidator),
 	)
