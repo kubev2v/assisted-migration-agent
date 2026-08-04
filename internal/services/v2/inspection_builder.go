@@ -2,7 +2,6 @@ package v2
 
 import (
 	"context"
-	"errors"
 
 	"github.com/kubev2v/vm-migration-detective/pkg/vmdetect"
 	"go.uber.org/zap"
@@ -137,17 +136,7 @@ func defaultInspectionBuilderFactory(store *store.Store2, operator vmware.VMOper
 				}
 			}
 
-			var status models.InspectionStatus
-			switch {
-			case result.Err != nil && (errors.Is(result.Err, context.Canceled) || errors.Is(result.Err, context.DeadlineExceeded)):
-				status = models.InspectionStatus{State: models.InspectionStateCanceled, Details: "canceled"}
-			case result.Err != nil:
-				status = models.InspectionStatus{State: models.InspectionStateError, Error: result.Err}
-			case result.Completed:
-				status = models.InspectionStatus{State: models.InspectionStateCompleted, Details: "completed"}
-			default:
-				status = models.InspectionStatus{State: models.InspectionStateCanceled, Details: "canceled"}
-			}
+			status := models.TerminalStatus(result)
 
 			if err := store.Inspection().Update(ctx, vmID, status); err != nil {
 				log.Errorw("failed to persist terminal inspection status", "vmId", vmID, "state", status.State, "error", err)

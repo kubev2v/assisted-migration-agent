@@ -1,5 +1,10 @@
 package models
 
+import (
+	"context"
+	"errors"
+)
+
 const InspectionSnapshotName = "assisted-migration-deep-inspector"
 
 // InspectorRequiredPrivileges lists the vSphere privileges needed for deep inspection.
@@ -35,6 +40,19 @@ type InspectionStatus struct {
 	State   InspectionState
 	Details string
 	Error   error
+}
+
+func TerminalStatus(result InspectionResult) InspectionStatus {
+	switch {
+	case result.Err != nil && (errors.Is(result.Err, context.Canceled) || errors.Is(result.Err, context.DeadlineExceeded)):
+		return InspectionStatus{State: InspectionStateCanceled, Details: "canceled"}
+	case result.Err != nil:
+		return InspectionStatus{State: InspectionStateError, Error: result.Err}
+	case result.Completed:
+		return InspectionStatus{State: InspectionStateCompleted, Details: "completed"}
+	default:
+		return InspectionStatus{State: InspectionStateCanceled, Details: "canceled"}
+	}
 }
 
 // InspectionResult is the shared result struct threaded through inspection work units.

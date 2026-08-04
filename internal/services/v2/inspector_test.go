@@ -46,17 +46,7 @@ func (b *testInspectionBuilder) Finalize(ctx context.Context, result models.Insp
 		return b.finalizeFn(ctx, result)
 	}
 
-	var status models.InspectionStatus
-	switch {
-	case result.Err != nil && (errors.Is(result.Err, context.Canceled) || errors.Is(result.Err, context.DeadlineExceeded)):
-		status = models.InspectionStatus{State: models.InspectionStateCanceled}
-	case result.Err != nil:
-		status = models.InspectionStatus{State: models.InspectionStateError, Error: result.Err}
-	case result.Completed:
-		status = models.InspectionStatus{State: models.InspectionStateCompleted}
-	default:
-		status = models.InspectionStatus{State: models.InspectionStateCanceled}
-	}
+	status := models.TerminalStatus(result)
 
 	if b.st != nil {
 		_ = b.st.Inspection().Update(ctx, b.vmID, status)
