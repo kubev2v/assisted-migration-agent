@@ -446,6 +446,9 @@ type GuestNetwork struct {
 
 // InspectionStatus defines model for InspectionStatus.
 type InspectionStatus struct {
+	// Details Human-readable details about the current inspection state
+	Details *string `json:"details,omitempty"`
+
 	// Error Error message when state is error
 	Error *string `json:"error,omitempty"`
 
@@ -735,7 +738,8 @@ type VirtualMachineDetail struct {
 	Id string `json:"id"`
 
 	// Inspection VirtualMachines Inspection results
-	Inspection *VirtualMachineInspectionResults `json:"inspection,omitempty"`
+	Inspection       *VirtualMachineInspectionResults `json:"inspection,omitempty"`
+	InspectionStatus *InspectionStatus                `json:"inspectionStatus,omitempty"`
 
 	// IpAddress Guest primary IP address
 	IpAddress *string                `json:"ipAddress,omitempty"`

@@ -153,6 +153,10 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 	details.Template = &vm.IsTemplate
 	details.Migratable = &vm.IsMigratable
 	details.MigrationExcluded = &vm.MigrationExcluded
+	if vm.InspectionStatus.State != models.InspectionStateNotStarted {
+		s := NewInspectionStatus(vm.InspectionStatus)
+		details.InspectionStatus = &s
+	}
 	details.FaultToleranceEnabled = &vm.FaultToleranceEnabled
 	details.NestedHVEnabled = &vm.NestedHVEnabled
 	if len(vm.Labels) > 0 {
@@ -319,6 +323,9 @@ func NewInspectionStatus(status models.InspectionStatus) InspectionStatus {
 		s.State = InspectionStatusStateError
 	}
 
+	if status.Details != "" {
+		s.Details = &status.Details
+	}
 	if status.Error != nil {
 		err := status.Error.Error()
 		s.Error = &err

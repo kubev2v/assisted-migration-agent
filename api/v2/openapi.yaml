@@ -1778,6 +1778,7 @@ components:
           type: boolean
           description: True if the VirtualMachine is a template
         inspectionStatus:
+          description: Current inspection status of the virtual machine
           $ref: '#/components/schemas/InspectionStatus'
         inspectionConcernCount:
           type: integer
@@ -1917,6 +1918,9 @@ components:
           type: boolean
           description: Whether this VM is excluded from migration
           default: false
+        inspectionStatus:
+          description: Current inspection status of the virtual machine
+          $ref: '#/components/schemas/InspectionStatus'
         labels:
           type: array
           items:
@@ -2122,6 +2126,9 @@ components:
             - InspectionStatusStateCanceled
             - InspectionStatusStateError
           description: Current inspection state
+        details:
+          type: string
+          description: Human-readable details about the current inspection state
         error:
           type: string
           description: Error message when state is error
