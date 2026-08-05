@@ -2,6 +2,7 @@ package v2
 
 import (
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
+	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	svc "github.com/kubev2v/assisted-migration-agent/internal/services/v2"
 )
 
@@ -27,6 +28,7 @@ type ServiceProvider interface {
 	LatestRightsizingService() (*svc.RightsizingService, error)
 
 	GetCollector() (*svc.CollectorService, error)
+	GetCollectorStatus() models.CollectorStatus
 	CreateCollector() (*svc.CollectorService, error)
 	StopCollector() error
 }

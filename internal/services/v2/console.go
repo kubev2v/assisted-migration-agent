@@ -280,20 +280,7 @@ func (c *Console) createPipeline(s *scheduler.Scheduler[any]) (*work.Pipeline[st
 		{
 			Status: func() string { return "status" },
 			Work: func(ctx context.Context, r any) (any, error) {
-				collector, err := c.mgr.GetCollector()
-				if err != nil && !errors.IsResourceNotFoundError(err) {
-					return nil, err
-				}
-
-				state := models.CollectorStatus{
-					State: models.CollectorStateReady,
-				}
-
-				if collector != nil {
-					state = collector.GetStatus()
-				}
-
-				return nil, c.client.UpdateAgentStatus(ctx, c.agentID, c.sourceID, c.version, state)
+				return nil, c.client.UpdateAgentStatus(ctx, c.agentID, c.sourceID, c.version, c.mgr.GetCollectorStatus())
 			},
 		}}
 

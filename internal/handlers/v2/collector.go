@@ -6,7 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 
 	v2 "github.com/kubev2v/assisted-migration-agent/api/v2"
-	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
@@ -36,20 +35,9 @@ func (h *Handler) StartCollector(c *gin.Context) {
 }
 
 // GetCollectorStatus returns the status of a specific collector.
-// If not found, return "ready"
 // (GET /collector)
 func (h *Handler) GetCollectorStatus(c *gin.Context) {
-	svc, err := h.svc.GetCollector()
-	if err != nil {
-		if srvErrors.IsResourceNotFoundError(err) {
-			c.JSON(http.StatusOK, v2.NewCollectorStatus(models.CollectorStatus{State: models.CollectorStateReady}))
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, v2.NewCollectorStatus(svc.GetStatus()))
+	c.JSON(http.StatusOK, v2.NewCollectorStatus(h.svc.GetCollectorStatus()))
 }
 
 // StopCollector stops and removes a specific collector.

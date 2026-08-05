@@ -112,6 +112,92 @@ var _ = Describe("ServiceManager", func() {
 		})
 	})
 
+	Describe("GetCollectorStatus", func() {
+		var (
+			ctx context.Context
+			mgr *v2.ServiceManager
+		)
+
+		BeforeEach(func() {
+			ctx = context.Background()
+		})
+
+		It("returns ready when no collector and no collection exists", func() {
+			mgr = v2.NewServiceManager(
+				v2.WithConfig(cfg),
+				v2.WithPool(pool),
+				v2.WithKeyManager(keyMgr),
+			)
+			Expect(mgr.Initialize()).To(Succeed())
+			defer mgr.Stop(ctx)
+
+			status := mgr.GetCollectorStatus()
+			Expect(status.State).To(Equal(models.CollectorStateReady))
+		})
+
+		It("returns collected when no collector but persisted inventory exists", func() {
+			collPath := filepath.Join(tmpDir, "collection_status.duckdb")
+			collDB, err := pool.NewDatabase("coll-status", collPath, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(collDB.Migrate(ctx, func(ctx context.Context, db *sql.DB) error {
+				s, err := collDB.Store()
+				if err != nil {
+					return err
+				}
+				parser := duckdb_parser.New(s.Querier(), nil)
+				if err := parser.Init(); err != nil {
+					return err
+				}
+				return migrations.RunCollection(ctx, db, "collection_status")
+			})).To(Succeed())
+			pool.Add(collDB)
+
+			st, err := collDB.Store()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(st.Inventory().Save(ctx, []byte(`{"vms":1}`))).To(Succeed())
+
+			mgr = v2.NewServiceManager(
+				v2.WithConfig(cfg),
+				v2.WithPool(pool),
+				v2.WithKeyManager(keyMgr),
+			)
+			Expect(mgr.Initialize()).To(Succeed())
+			defer mgr.Stop(ctx)
+
+			status := mgr.GetCollectorStatus()
+			Expect(status.State).To(Equal(models.CollectorStateCollected))
+		})
+
+		It("returns ready when collection exists but has no inventory", func() {
+			collPath := filepath.Join(tmpDir, "collection_empty.duckdb")
+			collDB, err := pool.NewDatabase("coll-empty", collPath, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(collDB.Migrate(ctx, func(ctx context.Context, db *sql.DB) error {
+				s, err := collDB.Store()
+				if err != nil {
+					return err
+				}
+				parser := duckdb_parser.New(s.Querier(), nil)
+				if err := parser.Init(); err != nil {
+					return err
+				}
+				return migrations.RunCollection(ctx, db, "collection_empty")
+			})).To(Succeed())
+			pool.Add(collDB)
+
+			mgr = v2.NewServiceManager(
+				v2.WithConfig(cfg),
+				v2.WithPool(pool),
+				v2.WithKeyManager(keyMgr),
+			)
+			Expect(mgr.Initialize()).To(Succeed())
+			defer mgr.Stop(ctx)
+
+			status := mgr.GetCollectorStatus()
+			Expect(status.State).To(Equal(models.CollectorStateReady))
+		})
+	})
+
 	Describe("mutual exclusion", func() {
 		var (
 			ctx context.Context

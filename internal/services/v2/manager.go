@@ -125,6 +125,26 @@ func (m *ServiceManager) GetCollector() (*CollectorService, error) {
 	return m.collector, nil
 }
 
+func (m *ServiceManager) GetCollectorStatus() models.CollectorStatus {
+	m.mu.Lock()
+	collector := m.collector
+	m.mu.Unlock()
+
+	if collector != nil {
+		return collector.GetStatus()
+	}
+
+	invSvc, err := m.LatestInventoryService()
+	if err == nil {
+		inv, err := invSvc.GetInventory(context.Background())
+		if err == nil && inv != nil {
+			return models.CollectorStatus{State: models.CollectorStateCollected}
+		}
+	}
+
+	return models.CollectorStatus{State: models.CollectorStateReady}
+}
+
 func (m *ServiceManager) StopCollector() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()

@@ -8,6 +8,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	svc "github.com/kubev2v/assisted-migration-agent/internal/services/v2"
 )
 
@@ -66,6 +67,9 @@ func (s *stubServiceProvider) LatestInventoryService() (*svc.InventoryService, e
 func (s *stubServiceProvider) LatestRightsizingService() (*svc.RightsizingService, error) {
 	return nil, nil
 }
-func (s *stubServiceProvider) GetCollector() (*svc.CollectorService, error)    { return nil, nil }
+func (s *stubServiceProvider) GetCollector() (*svc.CollectorService, error) { return nil, nil }
+func (s *stubServiceProvider) GetCollectorStatus() models.CollectorStatus {
+	return models.CollectorStatus{State: models.CollectorStateReady}
+}
 func (s *stubServiceProvider) CreateCollector() (*svc.CollectorService, error) { return nil, nil }
 func (s *stubServiceProvider) StopCollector() error                            { return nil }
