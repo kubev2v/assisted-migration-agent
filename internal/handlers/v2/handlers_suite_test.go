@@ -67,9 +67,10 @@ func (s *stubServiceProvider) LatestInventoryService() (*svc.InventoryService, e
 func (s *stubServiceProvider) LatestRightsizingService() (*svc.RightsizingService, error) {
 	return nil, nil
 }
-func (s *stubServiceProvider) GetCollector() (*svc.CollectorService, error) { return nil, nil }
 func (s *stubServiceProvider) GetCollectorStatus() models.CollectorStatus {
 	return models.CollectorStatus{State: models.CollectorStateReady}
 }
-func (s *stubServiceProvider) CreateCollector() (*svc.CollectorService, error) { return nil, nil }
-func (s *stubServiceProvider) StopCollector() error                            { return nil }
+func (s *stubServiceProvider) StartCollecting(_ context.Context) (models.CollectorStatus, error) {
+	return models.CollectorStatus{State: models.CollectorStateReady}, nil
+}
+func (s *stubServiceProvider) StopCollecting() error { return nil }

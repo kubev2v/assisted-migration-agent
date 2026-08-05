@@ -22,15 +22,16 @@ type ServiceManager struct {
 	keyMgr        *crypto.KeyManager
 	pool          *store.Pool
 
-	console     *Console
-	collection  *CollectionService
-	credentials *CredentialsService
-	mu          sync.Mutex
-	inspector   *InspectorService
-	vddk        *VddkService
-	forecaster  *ForecasterService
-	validator   *opa.Validator
-	collector   *CollectorService
+	console              *Console
+	collection           *CollectionService
+	credentials          *CredentialsService
+	mu                   sync.Mutex
+	inspector            *InspectorService
+	vddk                 *VddkService
+	forecaster           *ForecasterService
+	validator            *opa.Validator
+	collector            *CollectorService
+	collectorWorkBuilder collectorWorkBuilderFunc
 }
 
 type ServiceManagerOption func(*ServiceManager)
@@ -62,6 +63,12 @@ func WithKeyManager(km *crypto.KeyManager) ServiceManagerOption {
 func WithOpaValidatior(v *opa.Validator) ServiceManagerOption {
 	return func(m *ServiceManager) {
 		m.validator = v
+	}
+}
+
+func WithCollectorWorkBuilder(fn collectorWorkBuilderFunc) ServiceManagerOption {
+	return func(m *ServiceManager) {
+		m.collectorWorkBuilder = fn
 	}
 }
 
@@ -115,16 +122,6 @@ func (m *ServiceManager) Initialize() error {
 	return nil
 }
 
-func (m *ServiceManager) GetCollector() (*CollectorService, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if m.collector == nil {
-		return nil, srvErrors.NewResourceNotFoundError("collector", "")
-	}
-	return m.collector, nil
-}
-
 func (m *ServiceManager) GetCollectorStatus() models.CollectorStatus {
 	m.mu.Lock()
 	collector := m.collector
@@ -145,7 +142,40 @@ func (m *ServiceManager) GetCollectorStatus() models.CollectorStatus {
 	return models.CollectorStatus{State: models.CollectorStateReady}
 }
 
-func (m *ServiceManager) StopCollector() error {
+func (m *ServiceManager) StartCollecting(ctx context.Context) (models.CollectorStatus, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.inspector != nil && m.inspector.IsBusy() {
+		return models.CollectorStatus{}, srvErrors.NewInspectionInProgressError()
+	}
+
+	if m.collector != nil && m.collector.GetStatus().State.IsRunning() {
+		return models.CollectorStatus{}, srvErrors.NewCollectionInProgressError()
+	}
+
+	var buildFn collectorWorkBuilderFunc
+	if m.collectorWorkBuilder != nil {
+		buildFn = m.collectorWorkBuilder
+	} else {
+		factory, err := newCollectorWorkFactory(m.pool, m.cfg.Agent.DataFolder, m.validator)
+		if err != nil {
+			return models.CollectorStatus{}, err
+		}
+		buildFn = factory.Build
+	}
+
+	m.collector = NewCollectorService(buildFn, m.credentials)
+
+	if err := m.collector.Start(ctx); err != nil {
+		m.collector = nil
+		return models.CollectorStatus{}, err
+	}
+
+	return m.collector.GetStatus(), nil
+}
+
+func (m *ServiceManager) StopCollecting() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -155,28 +185,6 @@ func (m *ServiceManager) StopCollector() error {
 	m.collector.Stop()
 	m.collector = nil
 	return nil
-}
-
-func (m *ServiceManager) CreateCollector() (*CollectorService, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if m.inspector != nil && m.inspector.IsBusy() {
-		return nil, srvErrors.NewInspectionInProgressError()
-	}
-
-	if m.collector != nil && m.collector.GetStatus().State.IsRunning() {
-		return nil, srvErrors.NewCollectionInProgressError()
-	}
-
-	factory, err := newCollectorWorkFactory(m.pool, m.cfg.Agent.DataFolder, m.validator)
-	if err != nil {
-		return nil, err
-	}
-
-	m.collector = NewCollectorService(factory.Build, m.credentials)
-
-	return m.collector, nil
 }
 
 // InspectorService must use the latest collection when returning the inspector

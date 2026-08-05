@@ -1,6 +1,8 @@
 package v2
 
 import (
+	"context"
+
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	svc "github.com/kubev2v/assisted-migration-agent/internal/services/v2"
@@ -27,10 +29,9 @@ type ServiceProvider interface {
 	LatestInventoryService() (*svc.InventoryService, error)
 	LatestRightsizingService() (*svc.RightsizingService, error)
 
-	GetCollector() (*svc.CollectorService, error)
 	GetCollectorStatus() models.CollectorStatus
-	CreateCollector() (*svc.CollectorService, error)
-	StopCollector() error
+	StartCollecting(ctx context.Context) (models.CollectorStatus, error)
+	StopCollecting() error
 }
 
 type Handler struct {

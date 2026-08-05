@@ -12,17 +12,12 @@ import (
 // StartCollector creates and starts a new collector.
 // (POST /collector)
 func (h *Handler) StartCollector(c *gin.Context) {
-	collector, err := h.svc.CreateCollector()
+	status, err := h.svc.StartCollecting(c.Request.Context())
 	if err != nil {
 		if srvErrors.IsOperationInProgressError(err) {
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	if err := collector.Start(c.Request.Context()); err != nil {
 		if srvErrors.IsCredentialsNotSetError(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "credentials required: store via PUT /credentials first"})
 			return
@@ -31,7 +26,7 @@ func (h *Handler) StartCollector(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusAccepted, v2.NewCollectorStatus(collector.GetStatus()))
+	c.JSON(http.StatusAccepted, v2.NewCollectorStatus(status))
 }
 
 // GetCollectorStatus returns the status of a specific collector.
@@ -43,7 +38,7 @@ func (h *Handler) GetCollectorStatus(c *gin.Context) {
 // StopCollector stops and removes a specific collector.
 // (DELETE /collector)
 func (h *Handler) StopCollector(c *gin.Context) {
-	if err := h.svc.StopCollector(); err != nil {
+	if err := h.svc.StopCollecting(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

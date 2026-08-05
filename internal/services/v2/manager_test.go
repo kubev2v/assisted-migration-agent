@@ -20,6 +20,7 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	"github.com/kubev2v/assisted-migration-agent/pkg/crypto"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
+	"github.com/kubev2v/assisted-migration-agent/pkg/work"
 )
 
 var _ = Describe("ServiceManager", func() {
@@ -267,22 +268,21 @@ var _ = Describe("ServiceManager", func() {
 			mgr.Stop(ctx)
 		})
 
-		It("allows CreateCollector when no inspector is running", func() {
-			collector, err := mgr.CreateCollector()
+		It("allows StartCollecting when no inspector is running", func() {
+			completingMgr := v2.NewServiceManager(
+				v2.WithConfig(cfg),
+				v2.WithPool(pool),
+				v2.WithKeyManager(keyMgr),
+				v2.WithCollectorWorkBuilder(completingCollectorBuilder()),
+			)
+			Expect(completingMgr.Initialize()).To(Succeed())
+			defer completingMgr.Stop(ctx)
+
+			_, err := completingMgr.StartCollecting(ctx)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(collector).NotTo(BeNil())
 		})
 
 		It("allows InspectorService when no collectors exist", func() {
-			inspector, err := mgr.InspectorService()
-			Expect(err).NotTo(HaveOccurred())
-			Expect(inspector).NotTo(BeNil())
-		})
-
-		It("allows InspectorService when collector is created but not started", func() {
-			_, err := mgr.CreateCollector()
-			Expect(err).NotTo(HaveOccurred())
-
 			inspector, err := mgr.InspectorService()
 			Expect(err).NotTo(HaveOccurred())
 			Expect(inspector).NotTo(BeNil())
@@ -292,21 +292,23 @@ var _ = Describe("ServiceManager", func() {
 			gate := make(chan struct{})
 			defer close(gate)
 
-			collector, err := mgr.CreateCollector()
+			blockingMgr := newBlockingManager(cfg, pool, keyMgr, gate)
+			Expect(blockingMgr.Initialize()).To(Succeed())
+			defer blockingMgr.Stop(ctx)
+
+			_, err := blockingMgr.StartCollecting(ctx)
 			Expect(err).NotTo(HaveOccurred())
-			collector.WithWorkBuilder(blockingCollectorBuilder(gate))
-			Expect(collector.Start(ctx)).To(Succeed())
 
 			Eventually(func() bool {
-				return collector.GetStatus().State.IsRunning()
+				return blockingMgr.GetCollectorStatus().State.IsRunning()
 			}).Should(BeTrue())
 
-			_, err = mgr.InspectorService()
+			_, err = blockingMgr.InspectorService()
 			Expect(err).To(HaveOccurred())
 			Expect(srvErrors.IsOperationInProgressError(err)).To(BeTrue())
 		})
 
-		It("rejects CreateCollector when inspector is busy", func() {
+		It("rejects StartCollecting when inspector is busy", func() {
 			inspector, err := mgr.InspectorService()
 			Expect(err).NotTo(HaveOccurred())
 
@@ -316,7 +318,7 @@ var _ = Describe("ServiceManager", func() {
 
 			Eventually(func() bool { return inspector.IsBusy() }).Should(BeTrue())
 
-			_, err = mgr.CreateCollector()
+			_, err = mgr.StartCollecting(ctx)
 			Expect(err).To(HaveOccurred())
 			Expect(srvErrors.IsOperationInProgressError(err)).To(BeTrue())
 		})
@@ -325,24 +327,35 @@ var _ = Describe("ServiceManager", func() {
 			gate := make(chan struct{})
 			defer close(gate)
 
-			collector, err := mgr.CreateCollector()
+			blockingMgr := newBlockingManager(cfg, pool, keyMgr, gate)
+			Expect(blockingMgr.Initialize()).To(Succeed())
+			defer blockingMgr.Stop(ctx)
+
+			_, err := blockingMgr.StartCollecting(ctx)
 			Expect(err).NotTo(HaveOccurred())
-			collector.WithWorkBuilder(blockingCollectorBuilder(gate))
-			Expect(collector.Start(ctx)).To(Succeed())
 
 			Eventually(func() bool {
-				return collector.GetStatus().State.IsRunning()
+				return blockingMgr.GetCollectorStatus().State.IsRunning()
 			}).Should(BeTrue())
 
-			Expect(mgr.StopCollector()).To(Succeed())
+			Expect(blockingMgr.StopCollecting()).To(Succeed())
 
-			inspector, err := mgr.InspectorService()
+			inspector, err := blockingMgr.InspectorService()
 			Expect(err).NotTo(HaveOccurred())
 			Expect(inspector).NotTo(BeNil())
 		})
 
-		It("allows CreateCollector after inspector finishes", func() {
-			inspector, err := mgr.InspectorService()
+		It("allows StartCollecting after inspector finishes", func() {
+			completingMgr := v2.NewServiceManager(
+				v2.WithConfig(cfg),
+				v2.WithPool(pool),
+				v2.WithKeyManager(keyMgr),
+				v2.WithCollectorWorkBuilder(completingCollectorBuilder()),
+			)
+			Expect(completingMgr.Initialize()).To(Succeed())
+			defer completingMgr.Stop(ctx)
+
+			inspector, err := completingMgr.InspectorService()
 			Expect(err).NotTo(HaveOccurred())
 
 			builder := newMockInspectionBuilder().withStore(st)
@@ -351,9 +364,8 @@ var _ = Describe("ServiceManager", func() {
 
 			Eventually(func() bool { return inspector.IsBusy() }, 10*time.Second).Should(BeFalse())
 
-			collector, err := mgr.CreateCollector()
+			_, err = completingMgr.StartCollecting(ctx)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(collector).NotTo(BeNil())
 		})
 
 		It("returns same inspector instance while busy", func() {
@@ -381,27 +393,54 @@ var _ = Describe("ServiceManager", func() {
 		})
 
 		It("succeeds when stopping with no collector", func() {
-			Expect(mgr.StopCollector()).To(Succeed())
+			Expect(mgr.StopCollecting()).To(Succeed())
 		})
 
 		It("allows InspectorService after Stop clears running collectors", func() {
 			gate := make(chan struct{})
 			defer close(gate)
 
-			collector, err := mgr.CreateCollector()
+			blockingMgr := newBlockingManager(cfg, pool, keyMgr, gate)
+			Expect(blockingMgr.Initialize()).To(Succeed())
+
+			_, err := blockingMgr.StartCollecting(ctx)
 			Expect(err).NotTo(HaveOccurred())
-			collector.WithWorkBuilder(blockingCollectorBuilder(gate))
-			Expect(collector.Start(ctx)).To(Succeed())
 
 			Eventually(func() bool {
-				return collector.GetStatus().State.IsRunning()
+				return blockingMgr.GetCollectorStatus().State.IsRunning()
 			}).Should(BeTrue())
 
-			mgr.Stop(ctx)
+			blockingMgr.Stop(ctx)
 
-			inspector, err := mgr.InspectorService()
+			inspector, err := blockingMgr.InspectorService()
 			Expect(err).NotTo(HaveOccurred())
 			Expect(inspector).NotTo(BeNil())
 		})
 	})
 })
+
+func newBlockingManager(cfg *config.Configuration, pool *store.Pool, keyMgr *crypto.KeyManager, gate chan struct{}) *v2.ServiceManager {
+	return v2.NewServiceManager(
+		v2.WithConfig(cfg),
+		v2.WithPool(pool),
+		v2.WithKeyManager(keyMgr),
+		v2.WithCollectorWorkBuilder(blockingCollectorBuilder(gate)),
+	)
+}
+
+func completingCollectorBuilder() func(models.Credentials) work.WorkBuilder2[models.CollectorStatus, models.CollectorResult] {
+	return func(_ models.Credentials) work.WorkBuilder2[models.CollectorStatus, models.CollectorResult] {
+		return &mockCollectorWorkBuilder{
+			units: []work.WorkUnit[models.CollectorStatus, models.CollectorResult]{
+				{
+					Status: func() models.CollectorStatus {
+						return models.CollectorStatus{State: models.CollectorStateCollecting}
+					},
+					Work: func(_ context.Context, r models.CollectorResult) (models.CollectorResult, error) {
+						return r, nil
+					},
+				},
+			},
+		}
+	}
+}
