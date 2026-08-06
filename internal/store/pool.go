@@ -16,7 +16,6 @@ import (
 
 	"github.com/kubev2v/assisted-migration-agent/pkg/errors"
 
-	pkgstore "github.com/kubev2v/migration-planner/pkg/store"
 	"go.uber.org/zap"
 )
 
@@ -115,7 +114,7 @@ func (d *Database) Store() (*Store2, error) {
 		d.connection = conn
 	}
 
-	d.store = newStore2(filepath.Base(d.Path), pkgstore.NewQueryInterceptor(d.connection), pkgstore.NewTransactor(d.connection))
+	d.store = newStore2(filepath.Base(d.Path), NewQueryInterceptor(d.connection), NewTransactor(d.connection))
 
 	return d.store, nil
 }
@@ -151,17 +150,10 @@ func (d *Database) LastAccess() int64 {
 // Clone exports this database and imports it into a new database at dstPath.
 // The source connection stays open and is not modified.
 func (d *Database) Clone(ctx context.Context) (*Database, error) {
-	d.mu.Lock()
-	if d.connection == nil {
-		conn, err := newDatabase(NewDefaultExtentionLoader(), d.Path, d.memoryLimit, d.accessMode)
-		if err != nil {
-			d.mu.Unlock()
-			return nil, err
-		}
-		d.connection = conn
+	store, err := d.Store()
+	if err != nil {
+		return nil, err
 	}
-	conn := d.connection
-	d.mu.Unlock()
 
 	exportDir, err := os.MkdirTemp(filepath.Dir(d.Path), "duckdb-export-*")
 	if err != nil {
@@ -173,7 +165,7 @@ func (d *Database) Clone(ctx context.Context) (*Database, error) {
 		}
 	}()
 
-	if _, err := conn.ExecContext(ctx, fmt.Sprintf("EXPORT DATABASE '%s'", exportDir)); err != nil {
+	if _, err := store.qi.ExecContext(ctx, fmt.Sprintf("EXPORT DATABASE '%s'", exportDir)); err != nil {
 		return nil, fmt.Errorf("exporting database: %w", err)
 	}
 
@@ -249,7 +241,7 @@ func (p *Pool) NewDatabase(id string, dbPath string, createdAt time.Time, initTy
 			return nil, err
 		}
 		db.connection = conn
-		db.store = newStore2(filepath.Base(dbPath), pkgstore.NewQueryInterceptor(conn), pkgstore.NewTransactor(conn))
+		db.store = newStore2(filepath.Base(dbPath), NewQueryInterceptor(conn), NewTransactor(conn))
 	}
 
 	return db, nil

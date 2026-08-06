@@ -10,7 +10,6 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
-	pkgstore "github.com/kubev2v/migration-planner/pkg/store"
 	"go.uber.org/zap"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
@@ -28,7 +27,7 @@ type Store struct {
 	outbox        *OutboxStore
 	rightsizing   *RightSizingStore
 	forecast      *ForecastStore
-	transactor    pkgstore.Transactor
+	transactor    Transactor
 	application   *ApplicationStore
 	credentials   *CredentialsStore
 	collection    *CollectionStore
@@ -36,8 +35,8 @@ type Store struct {
 }
 
 func NewStore(db *sql.DB, validator duckdb_parser.Validator) *Store {
-	qi := pkgstore.NewQueryInterceptor(db)
-	transactor := pkgstore.NewTransactor(db)
+	qi := NewQueryInterceptor(db)
+	transactor := NewTransactor(db)
 	parser := duckdb_parser.New(qi, validator)
 	return &Store{
 		db:            db,
@@ -158,10 +157,6 @@ func (s *Store) Close() error {
 func (s *Store) DB() *sql.DB {
 	return s.db
 }
-
-// QueryInterceptor is an alias for the shared store.QueryInterceptor interface.
-// Kept for backward compatibility with existing repository constructors.
-type QueryInterceptor = pkgstore.QueryInterceptor
 
 func (s *Store) SetCurrentDatabase(ctx context.Context, name string) error {
 	_, err := s.db.ExecContext(ctx, fmt.Sprintf("USE %s", name))

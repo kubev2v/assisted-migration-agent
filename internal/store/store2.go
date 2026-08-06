@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"sync/atomic"
 	"time"
-
-	pkgstore "github.com/kubev2v/migration-planner/pkg/store"
 )
 
 const (
@@ -16,11 +14,11 @@ const (
 
 type Store2 struct {
 	qi         QueryInterceptor
-	transactor pkgstore.Transactor
+	transactor Transactor
 	lastAccess *atomic.Int64
 }
 
-func newStore2(name string, qi QueryInterceptor, transactor pkgstore.Transactor) *Store2 {
+func newStore2(name string, qi QueryInterceptor, transactor Transactor) *Store2 {
 	lastAccess := &atomic.Int64{}
 	return &Store2{
 		qi:         &usageInterceptor{dbName: name, inner: qi, last: lastAccess},
