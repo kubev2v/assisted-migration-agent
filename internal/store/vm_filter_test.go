@@ -9,7 +9,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
-	"github.com/kubev2v/assisted-migration-agent/internal/services"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/test"
 )
@@ -368,12 +367,13 @@ var _ = Describe("VMStore cross-table filters", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(s.Group().RefreshMatches(ctx, g.ID)).To(Succeed())
 
-			svc := services.NewGroupService(s)
-			vms, total, err := svc.ListVirtualMachines(ctx, g.ID, services.GroupGetParams{})
+			matched, err := s.Group().GetMatchedIDs(ctx, g.ID)
+			Expect(err).NotTo(HaveOccurred())
+			vms, err := s.VM().List(ctx, nil, store.WithVMIDs(matched), store.WithDefaultSort())
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(vmIDs(vms)).To(Equal([]string{"vm-007"}))
-			Expect(total).To(Equal(1))
+			Expect(len(matched)).To(Equal(1))
 		})
 
 		It("should filter VMs through group disk controller filter", func() {
@@ -384,12 +384,13 @@ var _ = Describe("VMStore cross-table filters", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(s.Group().RefreshMatches(ctx, g.ID)).To(Succeed())
 
-			svc := services.NewGroupService(s)
-			vms, total, err := svc.ListVirtualMachines(ctx, g.ID, services.GroupGetParams{})
+			matched, err := s.Group().GetMatchedIDs(ctx, g.ID)
+			Expect(err).NotTo(HaveOccurred())
+			vms, err := s.VM().List(ctx, nil, store.WithVMIDs(matched), store.WithDefaultSort())
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(vmIDs(vms)).To(Equal([]string{"vm-008", "vm-009"}))
-			Expect(total).To(Equal(2))
+			Expect(len(matched)).To(Equal(2))
 
 			for _, vm := range vms {
 				Expect(vm.ID).NotTo(BeEmpty())
@@ -405,14 +406,13 @@ var _ = Describe("VMStore cross-table filters", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(s.Group().RefreshMatches(ctx, g.ID)).To(Succeed())
 
-			svc := services.NewGroupService(s)
-			vms, total, err := svc.ListVirtualMachines(ctx, g.ID, services.GroupGetParams{
-				Limit: 1,
-			})
+			matched, err := s.Group().GetMatchedIDs(ctx, g.ID)
+			Expect(err).NotTo(HaveOccurred())
+			vms, err := s.VM().List(ctx, nil, store.WithVMIDs(matched), store.WithDefaultSort(), store.WithLimit(1))
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(vms).To(HaveLen(1))
-			Expect(total).To(Equal(3))
+			Expect(len(matched)).To(Equal(3))
 		})
 	})
 })

@@ -4,46 +4,64 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"os"
+	"path/filepath"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
+
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
-	"github.com/kubev2v/assisted-migration-agent/internal/services"
+	v2 "github.com/kubev2v/assisted-migration-agent/internal/services/v2"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
+	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
-	"github.com/kubev2v/assisted-migration-agent/test"
 )
 
 var _ = Describe("VMService Migration Exclusion", func() {
 	var (
-		ctx context.Context
-		svc *services.VMService
-		st  *store.Store
-		db  *sql.DB
+		ctx    context.Context
+		pool   *store.Pool
+		tmpDir string
+		st     *store.Store2
+		svc    *v2.VMService
 	)
 
 	BeforeEach(func() {
 		ctx = context.Background()
 
 		var err error
-		db, err = store.NewConnection(nil, ":memory:")
+		tmpDir, err = os.MkdirTemp("", "vm-migration-exclusion-test-*")
 		Expect(err).NotTo(HaveOccurred())
 
-		st = store.NewStore(db, test.NewMockValidator())
-		Expect(st.InitCollection(ctx)).To(Succeed())
-		svc = services.NewVMService(st)
+		pool = store.NewPool(5 * time.Minute)
+		database, err := pool.NewDatabase("test", filepath.Join(tmpDir, "test.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		Expect(err).NotTo(HaveOccurred())
+
+		st, err = database.Store()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(duckdb_parser.New(st.Querier(), nil).Init()).To(Succeed())
+		Expect(database.Migrate(ctx, func(ctx context.Context, db *sql.DB) error {
+			return migrations.RunCollection(ctx, db, "test")
+		})).To(Succeed())
+
+		svc = v2.NewVMService(st)
 	})
 
 	AfterEach(func() {
-		if db != nil {
-			_ = db.Close()
+		if pool != nil {
+			pool.Close()
+		}
+		if tmpDir != "" {
+			_ = os.RemoveAll(tmpDir)
 		}
 	})
 
 	// Helper to insert VM into vinfo table
 	insertVM := func(id, name, cluster string) {
-		_, err := db.ExecContext(ctx, `
+		_, err := st.Querier().ExecContext(ctx, `
 			INSERT INTO vinfo ("VM ID", "VM", "Powerstate", "Cluster", "Memory", "Template")
 			VALUES (?, ?, 'poweredOn', ?, 4096, false)
 		`, id, name, cluster)
@@ -65,7 +83,7 @@ var _ = Describe("VMService Migration Exclusion", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify via List
-			params := services.VMListParams{
+			params := v2.VMListParams{
 				Expression: "migration_excluded = true",
 			}
 			vms, _, err := svc.List(ctx, params)
@@ -96,7 +114,7 @@ var _ = Describe("VMService Migration Exclusion", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify via List
-			params := services.VMListParams{
+			params := v2.VMListParams{
 				Expression: "migration_excluded = false",
 			}
 			vms, _, err := svc.List(ctx, params)
@@ -142,7 +160,7 @@ var _ = Describe("VMService Migration Exclusion", func() {
 		// Then all VMs should be returned
 		It("should return all VMs when MigrationExcluded filter is not set", func() {
 			// Arrange
-			params := services.VMListParams{}
+			params := v2.VMListParams{}
 
 			// Act
 			vms, total, err := svc.List(ctx, params)
@@ -158,7 +176,7 @@ var _ = Describe("VMService Migration Exclusion", func() {
 		// Then only excluded VMs should be returned
 		It("should return only excluded VMs when MigrationExcluded = true", func() {
 			// Arrange
-			params := services.VMListParams{
+			params := v2.VMListParams{
 				Expression: "migration_excluded = true",
 			}
 
@@ -183,7 +201,7 @@ var _ = Describe("VMService Migration Exclusion", func() {
 		// Then only included VMs should be returned
 		It("should return only included VMs when MigrationExcluded = false", func() {
 			// Arrange
-			params := services.VMListParams{
+			params := v2.VMListParams{
 				Expression: "migration_excluded = false",
 			}
 
@@ -208,7 +226,7 @@ var _ = Describe("VMService Migration Exclusion", func() {
 		// Then both filters should be applied
 		It("should combine MigrationExcluded filter with Expression filter", func() {
 			// Arrange - filter for cluster-a AND excluded
-			params := services.VMListParams{
+			params := v2.VMListParams{
 				Expression: `cluster = "cluster-a" and migration_excluded = true`,
 			}
 
@@ -229,7 +247,7 @@ var _ = Describe("VMService Migration Exclusion", func() {
 		// Then pagination should work correctly
 		It("should support pagination with MigrationExcluded filter", func() {
 			// Arrange
-			params := services.VMListParams{
+			params := v2.VMListParams{
 				Expression: "migration_excluded = true",
 				Limit:      1,
 				Offset:     0,
@@ -261,7 +279,7 @@ var _ = Describe("VMService Migration Exclusion", func() {
 		// Then empty list should be returned
 		It("should return empty list when no VMs match the filter", func() {
 			// Arrange
-			params := services.VMListParams{
+			params := v2.VMListParams{
 				Expression: "migration_excluded = true",
 			}
 
@@ -284,7 +302,7 @@ var _ = Describe("VMService Migration Exclusion", func() {
 			Expect(svc.UpdateMigrationExcluded(ctx, "vm-1", true)).To(Succeed())
 			Expect(svc.UpdateMigrationExcluded(ctx, "vm-2", true)).To(Succeed())
 
-			params := services.VMListParams{
+			params := v2.VMListParams{
 				Expression: "migration_excluded = false",
 			}
 
@@ -306,26 +324,26 @@ var _ = Describe("VMService Migration Exclusion", func() {
 
 			// Act & Assert - toggle multiple times
 			Expect(svc.UpdateMigrationExcluded(ctx, "vm-1", true)).To(Succeed())
-			vms, _, _ := svc.List(ctx, services.VMListParams{Expression: "migration_excluded = true"})
+			vms, _, _ := svc.List(ctx, v2.VMListParams{Expression: "migration_excluded = true"})
 			Expect(vms).To(HaveLen(1))
 
 			Expect(svc.UpdateMigrationExcluded(ctx, "vm-1", false)).To(Succeed())
-			vms, _, _ = svc.List(ctx, services.VMListParams{Expression: "migration_excluded = true"})
+			vms, _, _ = svc.List(ctx, v2.VMListParams{Expression: "migration_excluded = true"})
 			Expect(vms).To(BeEmpty())
 
 			Expect(svc.UpdateMigrationExcluded(ctx, "vm-1", true)).To(Succeed())
-			vms, _, _ = svc.List(ctx, services.VMListParams{Expression: "migration_excluded = true"})
+			vms, _, _ = svc.List(ctx, v2.VMListParams{Expression: "migration_excluded = true"})
 			Expect(vms).To(HaveLen(1))
 		})
 	})
 
 	Context("Group Inventory Refresh on MigrationExcluded Change", func() {
 		var (
-			groupSvc *services.GroupService
+			groupSvc *v2.GroupService
 		)
 
 		BeforeEach(func() {
-			groupSvc = services.NewGroupService(st)
+			groupSvc = v2.NewGroupService(st, &mockInventoryBuilder{})
 
 			// Insert test VMs
 			insertVM("vm-1", "web-server", "cluster-a")
@@ -491,7 +509,7 @@ var _ = Describe("VMService Migration Exclusion", func() {
 	})
 
 	Describe("Outbox Event Generation on Exclusion Change", func() {
-		var groupSvc *services.GroupService
+		var groupSvc *v2.GroupService
 
 		BeforeEach(func() {
 			// Insert test VMs
@@ -499,7 +517,7 @@ var _ = Describe("VMService Migration Exclusion", func() {
 			insertVM("vm-2", "test-vm-2", "cluster1")
 			insertVM("vm-3", "test-vm-3", "cluster1")
 
-			groupSvc = services.NewGroupService(st)
+			groupSvc = v2.NewGroupService(st, &mockInventoryBuilder{})
 		})
 
 		Context("when VM exclusion changes with no groups", func() {

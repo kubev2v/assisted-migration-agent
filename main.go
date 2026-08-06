@@ -32,7 +32,6 @@ func main() {
 	// default configuration
 	cfg := config.NewConfigurationWithOptionsAndDefaults(
 		config.WithServer(config.Server{
-			API:        "v2",
 			HTTPPort:   8000,
 			ServerMode: "dev",
 		}),

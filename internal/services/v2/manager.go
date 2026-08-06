@@ -60,7 +60,7 @@ func WithKeyManager(km *crypto.KeyManager) ServiceManagerOption {
 	}
 }
 
-func WithOpaValidatior(v *opa.Validator) ServiceManagerOption {
+func WithOpaValidator(v *opa.Validator) ServiceManagerOption {
 	return func(m *ServiceManager) {
 		m.validator = v
 	}

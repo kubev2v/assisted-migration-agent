@@ -10,11 +10,7 @@ on:
 jobs:
   e2e:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        api-version: [v1, v2]
-    name: e2e (${{ matrix.api-version }})
+    name: e2e
     env:
       AGENT_IMAGE: assisted-migration-agent:e2e
       BACKEND_IMAGE: migration-planner-api
@@ -56,11 +52,7 @@ jobs:
 
       - name: Build e2e binary
         run: |
-          if [ "${{ matrix.api-version }}" = "v2" ]; then
-            make build.e2e.v2
-          else
-            make build.e2e
-          fi
+          make build.e2e
 
       - name: Pull test images
         run: |
@@ -75,12 +67,7 @@ jobs:
 
       - name: Run e2e tests
         run: |
-          if [ "${{ matrix.api-version }}" = "v2" ]; then
-            BIN=./bin/e2e-v2
-          else
-            BIN=./bin/e2e
-          fi
-          $BIN \
+          ./bin/e2e \
             -backend-image=${{ env.BACKEND_IMAGE }}:${{ env.BACKEND_TAG }} \
             -agent-image=${{ env.AGENT_IMAGE }} \
             -podman-socket=${{ env.PODMAN_SOCKET }} \

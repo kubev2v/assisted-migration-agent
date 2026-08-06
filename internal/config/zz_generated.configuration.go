@@ -138,7 +138,6 @@ func (s *Server) ToOption() ServerOption {
 		to.ServerMode = s.ServerMode
 		to.HTTPPort = s.HTTPPort
 		to.StaticsFolder = s.StaticsFolder
-		to.API = s.API
 	}
 }
 
@@ -148,7 +147,6 @@ func (s *Server) DebugMap() map[string]any {
 	debugMap["ServerMode"] = helpers.DebugValue(s.ServerMode, false)
 	debugMap["HTTPPort"] = helpers.DebugValue(s.HTTPPort, false)
 	debugMap["StaticsFolder"] = helpers.DebugValue(s.StaticsFolder, false)
-	debugMap["API"] = helpers.DebugValue(s.API, false)
 	return debugMap
 }
 
@@ -186,13 +184,6 @@ func WithHTTPPort(hTTPPort int) ServerOption {
 func WithStaticsFolder(staticsFolder string) ServerOption {
 	return func(s *Server) {
 		s.StaticsFolder = staticsFolder
-	}
-}
-
-// WithAPI returns an option that can set API on a Server
-func WithAPI(aPI string) ServerOption {
-	return func(s *Server) {
-		s.API = aPI
 	}
 }
 

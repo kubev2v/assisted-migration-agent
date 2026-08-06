@@ -5,23 +5,26 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
+
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
-	"github.com/kubev2v/assisted-migration-agent/internal/services"
+	v2 "github.com/kubev2v/assisted-migration-agent/internal/services/v2"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
+	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	"github.com/kubev2v/assisted-migration-agent/pkg/crypto"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
-	"github.com/kubev2v/assisted-migration-agent/test"
 )
 
 var _ = Describe("CredentialsService", func() {
 	var (
 		ctx    context.Context
-		db     *sql.DB
-		srv    *services.CredentialsService
+		pool   *store.Pool
+		srv    *v2.CredentialsService
 		cr     *crypto.Crypto
 		tmpDir string
 	)
@@ -34,17 +37,23 @@ var _ = Describe("CredentialsService", func() {
 		tmpDir, err = os.MkdirTemp("", "credentials-test-*")
 		Expect(err).NotTo(HaveOccurred())
 
-		db, err = store.NewConnection(nil, filepath.Join(tmpDir, "agent.duckdb"))
+		pool = store.NewPool(5 * time.Minute)
+		database, err := pool.NewDatabase("agent", filepath.Join(tmpDir, "agent.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
 		Expect(err).NotTo(HaveOccurred())
 
-		st := store.NewStore(db, test.NewMockValidator())
-		Expect(st.Migrate(ctx, "")).To(Succeed())
-		srv = services.NewCredentialsService(st)
+		st, err := database.Store()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(duckdb_parser.New(st.Querier(), nil).Init()).To(Succeed())
+		Expect(database.Migrate(ctx, func(ctx context.Context, db *sql.DB) error {
+			return migrations.RunMain(ctx, db)
+		})).To(Succeed())
+
+		srv = v2.NewCredentialsService(st)
 	})
 
 	AfterEach(func() {
-		if db != nil {
-			_ = db.Close()
+		if pool != nil {
+			pool.Close()
 		}
 		if tmpDir != "" {
 			_ = os.RemoveAll(tmpDir)

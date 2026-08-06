@@ -111,7 +111,7 @@
 //	}
 //
 //	srv, err := server.NewServer(cfg, func(router *gin.RouterGroup) {
-//	    v1.RegisterHandlers(router, myHandler)
+//	    v2.RegisterHandlers(router, myHandler)
 //	})
 //	if err != nil {
 //	    log.Fatal(err)

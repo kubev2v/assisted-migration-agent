@@ -3,45 +3,63 @@ package v2_test
 import (
 	"context"
 	"database/sql"
+	"os"
+	"path/filepath"
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/kubev2v/assisted-migration-agent/internal/services"
+	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
+
+	v2 "github.com/kubev2v/assisted-migration-agent/internal/services/v2"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
-	"github.com/kubev2v/assisted-migration-agent/test"
+	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 )
 
 var _ = Describe("VMService Labels", func() {
 	var (
-		ctx context.Context
-		svc *services.VMService
-		st  *store.Store
-		db  *sql.DB
+		ctx    context.Context
+		pool   *store.Pool
+		tmpDir string
+		st     *store.Store2
+		svc    *v2.VMService
 	)
 
 	BeforeEach(func() {
 		ctx = context.Background()
 
 		var err error
-		db, err = store.NewConnection(nil, ":memory:")
+		tmpDir, err = os.MkdirTemp("", "vm-labels-test-*")
 		Expect(err).NotTo(HaveOccurred())
 
-		st = store.NewStore(db, test.NewMockValidator())
-		Expect(st.InitCollection(ctx)).To(Succeed())
-		svc = services.NewVMService(st)
+		pool = store.NewPool(5 * time.Minute)
+		database, err := pool.NewDatabase("test", filepath.Join(tmpDir, "test.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		Expect(err).NotTo(HaveOccurred())
+
+		st, err = database.Store()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(duckdb_parser.New(st.Querier(), nil).Init()).To(Succeed())
+		Expect(database.Migrate(ctx, func(ctx context.Context, db *sql.DB) error {
+			return migrations.RunCollection(ctx, db, "test")
+		})).To(Succeed())
+
+		svc = v2.NewVMService(st)
 	})
 
 	AfterEach(func() {
-		if db != nil {
-			_ = db.Close()
+		if pool != nil {
+			pool.Close()
+		}
+		if tmpDir != "" {
+			_ = os.RemoveAll(tmpDir)
 		}
 	})
 
 	// Helper to insert VM into vinfo table
 	insertVM := func(id, name, cluster string) {
-		_, err := db.ExecContext(ctx, `
+		_, err := st.Querier().ExecContext(ctx, `
 			INSERT INTO vinfo ("VM ID", "VM", "Powerstate", "Cluster", "Memory", "Template")
 			VALUES (?, ?, 'poweredOn', ?, 4096, false)
 		`, id, name, cluster)
@@ -63,7 +81,7 @@ var _ = Describe("VMService Labels", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify via List
-			params := services.VMListParams{}
+			params := v2.VMListParams{}
 			vms, _, err := svc.List(ctx, params)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vms).To(HaveLen(1))
