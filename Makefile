@@ -1,4 +1,4 @@
-.PHONY: generate generate.proto build build.e2e build.e2e.v2 e2e e2e.container e2e.vm e2e.v2 e2e.container.clean run container.run container.stop help tidy tidy-check clean lint format check-format check-generate validate-all image setup-opa-policies clean-opa-policies build-filler-image test test.fuzz
+.PHONY: generate generate.proto build build.e2e build.e2e.v2 e2e e2e.container e2e.vm e2e.v2 e2e.container.clean run container.run container.stop help tidy tidy-check clean lint format check-format check-generate validate-all image setup-opa-policies clean-opa-policies build-filler-image test test.fuzz build-local run-local stop-local
 
 PODMAN ?= podman
 PLANNER_AGENT_GIT_COMMIT ?= $(shell git rev-list -1 HEAD --abbrev-commit)
@@ -168,6 +168,38 @@ clean:
 
 run:
 	$(BINARY_PATH) run --opa-policies-folder $(OPA_POLICIES_FOLDER) --agent-id $(AGENT_ID) --source-id $(SOURCE_ID)
+
+AGENT_LOCAL_DATA_DIR ?= $(CURDIR)/.local-data
+
+build-local:
+	@$(MAKE) build
+	@if [ ! -d "$(OPA_POLICIES_FOLDER)" ] || [ -z "$$(find "$(OPA_POLICIES_FOLDER)" -name '*.rego' 2>/dev/null)" ]; then \
+		echo "📥 Setting up OPA policies..."; \
+		$(MAKE) setup-opa-policies; \
+	fi
+
+run-local:
+ifeq ($(origin AGENT_ID),file)
+	$(error AGENT_ID is required. Set it via environment variable)
+endif
+ifeq ($(origin SOURCE_ID),file)
+	$(error SOURCE_ID is required. Set it via environment variable)
+endif
+	@mkdir -p -- "$(AGENT_LOCAL_DATA_DIR)"
+	@echo ""
+	@echo "Agent API: http://localhost:8000"
+	@echo ""
+	$(BINARY_PATH) run \
+		--agent-id "$(AGENT_ID)" \
+		--source-id "$(SOURCE_ID)" \
+		--opa-policies-folder "$(OPA_POLICIES_FOLDER)" \
+		--data-folder "$(AGENT_LOCAL_DATA_DIR)" \
+		--mode disconnected \
+		--console-url http://localhost:7443
+
+stop-local:
+	@rm -rf -- "$(AGENT_LOCAL_DATA_DIR)"
+	@echo "✅ Agent local data cleaned"
 
 run.ui:
 	cd $(CURDIR)/ui && npm run start

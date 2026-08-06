@@ -42,6 +42,9 @@ pkg/vmware/assets/seed.iso.gz
 # OPA policies (downloaded by make setup-opa-policies)
 policies/
 
+# Run Local data dir
+.local-data/
+
 # Editor/IDE
 # .idea/
 # .vscode/
