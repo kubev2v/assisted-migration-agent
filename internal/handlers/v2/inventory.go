@@ -6,10 +6,12 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 
+	v2api "github.com/kubev2v/assisted-migration-agent/api/v2"
 	services "github.com/kubev2v/assisted-migration-agent/internal/services/v2"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
@@ -66,5 +68,17 @@ func (h *Handler) getInventory(c *gin.Context, invSvc *services.InventoryService
 		return
 	}
 
-	c.JSON(http.StatusOK, inventory)
+	agentID, err := uuid.Parse(h.cfg.Agent.ID)
+	if err != nil {
+		zap.S().Named("inventory_handler").Errorw("invalid agent ID in configuration", "agent_id", h.cfg.Agent.ID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid agent ID configuration"})
+		return
+	}
+
+	c.JSON(http.StatusOK, v2api.Inventory{
+		Inventory: v1alpha1.UpdateInventory{
+			AgentId:   agentID,
+			Inventory: inventory,
+		},
+	})
 }

@@ -707,11 +707,11 @@ func (a *AgentSvc) Inventory() (*v1alpha1.Inventory, error) {
 		return nil, fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(bodyBytes))
 	}
 
-	var inventory v1alpha1.Inventory
-	if err := json.NewDecoder(resp.Body).Decode(&inventory); err != nil {
+	var envelope v2.Inventory
+	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
 		return nil, fmt.Errorf("decoding response: %w", err)
 	}
-	return &inventory, nil
+	return &envelope.Inventory.Inventory, nil
 }
 
 // --- Helpers ---
