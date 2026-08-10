@@ -1091,6 +1091,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/InspectorStatus'
+        '409':
+          description: Report generation in progress
         '500':
           description: Internal server error
     delete:
@@ -1106,6 +1108,8 @@ paths:
                 $ref: '#/components/schemas/InspectorStatus'
         '404':
           description: Inspector not running
+        '409':
+          description: Report generation in progress
         '500':
           description: Internal server error
 

@@ -21,6 +21,10 @@ func (h *Handler) StartInspection(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "failed to start inspector. You must collect data before starting the inspector"})
 			return
 		}
+		if srvErrors.IsOperationInProgressError(err) {
+			c.JSON(http.StatusConflict, gin.H{"error": "a report is currently in progress; please wait for it to complete before using deep inspection"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
@@ -75,6 +79,10 @@ func (h *Handler) GetInspectorStatus(c *gin.Context, params v2.GetInspectorStatu
 			c.JSON(http.StatusBadRequest, gin.H{"error": "collect data before using the inspector"})
 			return
 		}
+		if srvErrors.IsOperationInProgressError(err) {
+			c.JSON(http.StatusConflict, gin.H{"error": "a report is currently in progress; please wait for it to complete before using deep inspection"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
@@ -109,6 +117,10 @@ func (h *Handler) StopInspection(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "collect data before using the inspector"})
 			return
 		}
+		if srvErrors.IsOperationInProgressError(err) {
+			c.JSON(http.StatusConflict, gin.H{"error": "a report is currently in progress; please wait for it to complete before using deep inspection"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
@@ -132,6 +144,10 @@ func (h *Handler) PutInspectorVddk(c *gin.Context) {
 	if err != nil {
 		if srvErrors.IsCollectionNotFoundError(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "collect data before using the inspector"})
+			return
+		}
+		if srvErrors.IsOperationInProgressError(err) {
+			c.JSON(http.StatusConflict, gin.H{"error": "a report is currently in progress; please wait for it to complete before using deep inspection"})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
