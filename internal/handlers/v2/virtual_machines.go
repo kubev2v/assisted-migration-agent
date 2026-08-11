@@ -1,6 +1,7 @@
 package v2
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -314,7 +315,8 @@ func (h *Handler) updateVirtualMachine(c *gin.Context, vmSvc *services.VMService
 		return
 	}
 
-	ctx := c.Request.Context()
+	ctx, cancel := context.WithTimeout(c.Request.Context(), writeTimeout)
+	defer cancel()
 
 	if req.MigrationExcluded != nil {
 		if err := vmSvc.UpdateMigrationExcluded(ctx, vmId, *req.MigrationExcluded); err != nil {
@@ -357,7 +359,10 @@ func (h *Handler) batchUpdateVMExclusion(c *gin.Context, vmSvc *services.VMServi
 		return
 	}
 
-	if err := vmSvc.UpdateMigrationExcludedBatch(c.Request.Context(), req.VmIds, req.MigrationExcluded); err != nil {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), writeTimeout)
+	defer cancel()
+
+	if err := vmSvc.UpdateMigrationExcludedBatch(ctx, req.VmIds, req.MigrationExcluded); err != nil {
 		if srvErrors.IsResourceNotFoundError(err) {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return
@@ -427,7 +432,10 @@ func (h *Handler) updateLabelVMs(c *gin.Context, vmSvc *services.VMService, labe
 		removeVMIDs = *req.Remove
 	}
 
-	if err := vmSvc.UpdateLabelVMs(c.Request.Context(), addVMIDs, removeVMIDs, label); err != nil {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), writeTimeout)
+	defer cancel()
+
+	if err := vmSvc.UpdateLabelVMs(ctx, addVMIDs, removeVMIDs, label); err != nil {
 		if srvErrors.IsResourceNotFoundError(err) {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return
@@ -453,7 +461,10 @@ func (h *Handler) deleteLabelGlobally(c *gin.Context, vmSvc *services.VMService,
 		return
 	}
 
-	affected, err := vmSvc.RemoveLabelFromAllVMs(c.Request.Context(), label)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), writeTimeout)
+	defer cancel()
+
+	affected, err := vmSvc.RemoveLabelFromAllVMs(ctx, label)
 	if err != nil {
 		if srvErrors.IsValidationError(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

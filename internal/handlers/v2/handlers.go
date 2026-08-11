@@ -2,11 +2,14 @@ package v2
 
 import (
 	"context"
+	"time"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	svc "github.com/kubev2v/assisted-migration-agent/internal/services/v2"
 )
+
+const writeTimeout = 30 * time.Second
 
 type ServiceProvider interface {
 	ConsoleService() *svc.Console

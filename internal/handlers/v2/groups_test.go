@@ -1,6 +1,7 @@
 package v2_test
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -188,6 +189,186 @@ var _ = Describe("GetGroup handler", func() {
 			var resp v2api.GroupResponse
 			Expect(json.Unmarshal(w.Body.Bytes(), &resp)).To(Succeed())
 			Expect(resp.Inventory).To(BeNil())
+		})
+	})
+})
+
+var _ = Describe("Group write handlers (context timeout)", func() {
+	var (
+		handler *handlers.Handler
+		router  *gin.Engine
+		tmpDir  string
+		pool    *store.Pool
+	)
+
+	BeforeEach(func() {
+		gin.SetMode(gin.TestMode)
+
+		var err error
+		tmpDir, err = os.MkdirTemp("", "handler-group-write-test-*")
+		Expect(err).NotTo(HaveOccurred())
+
+		pool = store.NewPool(5 * time.Minute)
+		database, err := pool.NewDatabase(
+			"test",
+			filepath.Join(tmpDir, "test.duckdb"),
+			time.Now(),
+			store.EagerConnectionInitilization,
+			0,
+			store.ReadWriteDatabase,
+		)
+		Expect(err).NotTo(HaveOccurred())
+
+		st, err := database.Store()
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(duckdb_parser.New(st.Querier(), nil).Init()).To(Succeed())
+		Expect(database.Migrate(context.Background(), func(ctx context.Context, db *sql.DB) error {
+			return migrations.RunCollection(ctx, db, "test")
+		})).To(Succeed())
+
+		groupSvc := svc.NewGroupService(st, &mockInventoryBuilder{})
+		handler = handlers.NewHandler(config.Configuration{}, &stubServiceProvider{groupSvc: groupSvc})
+
+		router = gin.New()
+		router.POST("/groups", func(c *gin.Context) {
+			handler.CreateLatestGroup(c)
+		})
+		router.PATCH("/groups/:groupId", func(c *gin.Context) {
+			handler.UpdateLatestGroup(c, c.Param("groupId"))
+		})
+		router.DELETE("/groups/:groupId", func(c *gin.Context) {
+			handler.DeleteLatestGroup(c, c.Param("groupId"))
+		})
+	})
+
+	AfterEach(func() {
+		pool.Close()
+		os.RemoveAll(tmpDir) //nolint:errcheck
+	})
+
+	Describe("POST /groups (CreateLatestGroup)", func() {
+		It("creates a group successfully within the write timeout", func() {
+			body := `{"name": "timeout-test-group", "filter": "name = 'vm1'"}`
+			req := httptest.NewRequest(http.MethodPost, "/groups", bytes.NewBufferString(body))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusCreated))
+			var resp v2api.Group
+			Expect(json.Unmarshal(w.Body.Bytes(), &resp)).To(Succeed())
+			Expect(resp.Name).To(Equal("timeout-test-group"))
+		})
+
+		It("fails when request context is already cancelled", func() {
+			body := `{"name": "should-fail", "filter": "name = 'vm1'"}`
+			req := httptest.NewRequest(http.MethodPost, "/groups", bytes.NewBufferString(body))
+			req.Header.Set("Content-Type", "application/json")
+
+			ctx, cancel := context.WithCancel(req.Context())
+			cancel()
+			req = req.WithContext(ctx)
+
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+
+			Expect(w.Code).To(Equal(http.StatusInternalServerError))
+		})
+	})
+
+	Describe("PATCH /groups/{groupId} (UpdateLatestGroup)", func() {
+		It("updates a group successfully within the write timeout", func() {
+			createBody := `{"name": "update-me", "filter": "name = 'vm1'"}`
+			createReq := httptest.NewRequest(http.MethodPost, "/groups", bytes.NewBufferString(createBody))
+			createReq.Header.Set("Content-Type", "application/json")
+			createW := httptest.NewRecorder()
+			router.ServeHTTP(createW, createReq)
+			Expect(createW.Code).To(Equal(http.StatusCreated))
+
+			var created v2api.Group
+			Expect(json.Unmarshal(createW.Body.Bytes(), &created)).To(Succeed())
+
+			updateBody := `{"name": "updated-name"}`
+			updateReq := httptest.NewRequest(http.MethodPatch, "/groups/"+created.Id, bytes.NewBufferString(updateBody))
+			updateReq.Header.Set("Content-Type", "application/json")
+			updateW := httptest.NewRecorder()
+
+			router.ServeHTTP(updateW, updateReq)
+
+			Expect(updateW.Code).To(Equal(http.StatusOK))
+			var updated v2api.Group
+			Expect(json.Unmarshal(updateW.Body.Bytes(), &updated)).To(Succeed())
+			Expect(updated.Name).To(Equal("updated-name"))
+		})
+
+		It("fails when request context is already cancelled", func() {
+			createBody := `{"name": "cancel-update", "filter": "name = 'vm1'"}`
+			createReq := httptest.NewRequest(http.MethodPost, "/groups", bytes.NewBufferString(createBody))
+			createReq.Header.Set("Content-Type", "application/json")
+			createW := httptest.NewRecorder()
+			router.ServeHTTP(createW, createReq)
+			Expect(createW.Code).To(Equal(http.StatusCreated))
+
+			var created v2api.Group
+			Expect(json.Unmarshal(createW.Body.Bytes(), &created)).To(Succeed())
+
+			updateBody := `{"name": "should-fail"}`
+			updateReq := httptest.NewRequest(http.MethodPatch, "/groups/"+created.Id, bytes.NewBufferString(updateBody))
+			updateReq.Header.Set("Content-Type", "application/json")
+
+			ctx, cancel := context.WithCancel(updateReq.Context())
+			cancel()
+			updateReq = updateReq.WithContext(ctx)
+
+			updateW := httptest.NewRecorder()
+			router.ServeHTTP(updateW, updateReq)
+
+			Expect(updateW.Code).To(BeNumerically(">=", 400))
+		})
+	})
+
+	Describe("DELETE /groups/{groupId} (DeleteLatestGroup)", func() {
+		It("deletes a group successfully within the write timeout", func() {
+			createBody := `{"name": "delete-me", "filter": "name = 'vm1'"}`
+			createReq := httptest.NewRequest(http.MethodPost, "/groups", bytes.NewBufferString(createBody))
+			createReq.Header.Set("Content-Type", "application/json")
+			createW := httptest.NewRecorder()
+			router.ServeHTTP(createW, createReq)
+			Expect(createW.Code).To(Equal(http.StatusCreated))
+
+			var created v2api.Group
+			Expect(json.Unmarshal(createW.Body.Bytes(), &created)).To(Succeed())
+
+			deleteReq := httptest.NewRequest(http.MethodDelete, "/groups/"+created.Id, nil)
+			deleteW := httptest.NewRecorder()
+
+			router.ServeHTTP(deleteW, deleteReq)
+
+			Expect(deleteW.Code).To(Equal(http.StatusNoContent))
+		})
+
+		It("fails when request context is already cancelled", func() {
+			createBody := `{"name": "cancel-delete", "filter": "name = 'vm1'"}`
+			createReq := httptest.NewRequest(http.MethodPost, "/groups", bytes.NewBufferString(createBody))
+			createReq.Header.Set("Content-Type", "application/json")
+			createW := httptest.NewRecorder()
+			router.ServeHTTP(createW, createReq)
+			Expect(createW.Code).To(Equal(http.StatusCreated))
+
+			var created v2api.Group
+			Expect(json.Unmarshal(createW.Body.Bytes(), &created)).To(Succeed())
+
+			deleteReq := httptest.NewRequest(http.MethodDelete, "/groups/"+created.Id, nil)
+			ctx, cancel := context.WithCancel(deleteReq.Context())
+			cancel()
+			deleteReq = deleteReq.WithContext(ctx)
+
+			deleteW := httptest.NewRecorder()
+			router.ServeHTTP(deleteW, deleteReq)
+
+			Expect(deleteW.Code).To(Equal(http.StatusInternalServerError))
 		})
 	})
 })

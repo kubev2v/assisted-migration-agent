@@ -1,6 +1,7 @@
 package v2
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -202,7 +203,10 @@ func (h *Handler) createGroup(c *gin.Context, groupSvc *services.GroupService) {
 		group.Description = *req.Description
 	}
 
-	created, err := groupSvc.Create(c.Request.Context(), group)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), writeTimeout)
+	defer cancel()
+
+	created, err := groupSvc.Create(ctx, group)
 	if err != nil {
 		if srvErrors.IsDuplicateResourceError(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -325,7 +329,10 @@ func (h *Handler) updateGroup(c *gin.Context, groupSvc *services.GroupService, g
 		}
 	}
 
-	existing, err := groupSvc.Get(c.Request.Context(), gid)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), writeTimeout)
+	defer cancel()
+
+	existing, err := groupSvc.Get(ctx, gid)
 	if err != nil {
 		if srvErrors.IsResourceNotFoundError(err) {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
@@ -345,7 +352,7 @@ func (h *Handler) updateGroup(c *gin.Context, groupSvc *services.GroupService, g
 		existing.Description = *req.Description
 	}
 
-	updated, err := groupSvc.Update(c.Request.Context(), gid, *existing)
+	updated, err := groupSvc.Update(ctx, gid, *existing)
 	if err != nil {
 		if srvErrors.IsDuplicateResourceError(err) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -365,7 +372,10 @@ func (h *Handler) deleteGroup(c *gin.Context, groupSvc *services.GroupService, g
 		return
 	}
 
-	if err := groupSvc.Delete(c.Request.Context(), gid); err != nil {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), writeTimeout)
+	defer cancel()
+
+	if err := groupSvc.Delete(ctx, gid); err != nil {
 		if !srvErrors.IsResourceNotFoundError(err) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
