@@ -74,6 +74,7 @@
     <name>childEntity</name>
     <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfManagedObjectReference">
       <ManagedObjectReference type="Datastore">datastore-39</ManagedObjectReference>
+      <ManagedObjectReference type="Datastore">datastore-41</ManagedObjectReference>
     </val>
   </propSet>
   <propSet>
@@ -150,6 +151,7 @@
     <name>childEntity</name>
     <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ArrayOfManagedObjectReference">
       <ManagedObjectReference type="Datastore">datastore-39</ManagedObjectReference>
+      <ManagedObjectReference type="Datastore">datastore-41</ManagedObjectReference>
     </val>
   </propSet>
 </ObjectContent>
