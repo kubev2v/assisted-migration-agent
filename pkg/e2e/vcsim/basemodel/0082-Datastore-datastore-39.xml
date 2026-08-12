@@ -160,6 +160,18 @@
     <val type="HostDatastoreBrowser" xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="ManagedObjectReference">hostdatastorebrowser-40</val>
   </propSet>
   <propSet>
+    <name>iormConfiguration</name>
+    <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="StorageIORMInfo">
+      <enabled>false</enabled>
+      <congestionThreshold>30</congestionThreshold>
+      <congestionThresholdMode>automatic</congestionThresholdMode>
+      <statsCollectionEnabled>false</statsCollectionEnabled>
+      <reservationEnabled>false</reservationEnabled>
+      <statsAggregationDisabled>true</statsAggregationDisabled>
+      <percentOfPeakThroughput>90</percentOfPeakThroughput>
+    </val>
+  </propSet>
+  <propSet>
     <name>capability</name>
     <val xmlns:_XMLSchema-instance="http://www.w3.org/2001/XMLSchema-instance" _XMLSchema-instance:type="DatastoreCapability">
       <directoryHierarchySupported>true</directoryHierarchySupported>
