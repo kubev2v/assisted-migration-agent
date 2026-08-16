@@ -68,7 +68,7 @@ func (b *forecastBuilder) build() *work.SliceWorkBuilder2[models.ForecastPairSta
 				log.Infow("validating datastores", "pair", b.pair.Name,
 					"source", b.pair.SourceDatastore, "target", b.pair.TargetDatastore)
 
-				dc, err := b.diskManager.FindDatacenter(ctx, "")
+				dc, err := b.diskManager.FindDatacenterForDatastore(ctx, b.pair.SourceDatastore)
 				if err != nil {
 					return result, fmt.Errorf("failed to find datacenter: %w", err)
 				}

@@ -47,23 +47,43 @@ func (f *ForecasterService) GetStatus() models.ForecasterStatus {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	if f.workPool == nil || !f.workPool.IsRunning() {
+	pool := f.workPool
+	if pool == nil {
 		return models.ForecasterStatus{State: models.ForecasterStateReady}
 	}
 
-	var pairs []models.ForecastPairStatus
-	for _, name := range f.pairNames {
-		s, err := f.workPool.State(name)
-		if err != nil {
-			continue
-		}
-		pairs = append(pairs, s)
+	running := pool.IsRunning()
+	state := models.ForecasterStateReady
+	if running {
+		state = models.ForecasterStateRunning
 	}
 
 	return models.ForecasterStatus{
-		State: models.ForecasterStateRunning,
-		Pairs: pairs,
+		State: state,
+		Pairs: collectPairStatuses(pool, f.pairNames, !running),
 	}
+}
+
+func collectPairStatuses(
+	wp *work.Pool2[models.ForecastPairStatus, models.ForecastResult],
+	pairNames []string,
+	includeResultErrors bool,
+) []models.ForecastPairStatus {
+	pairs := make([]models.ForecastPairStatus, 0, len(pairNames))
+	for _, name := range pairNames {
+		s, err := wp.State(name)
+		if err != nil {
+			continue
+		}
+		if includeResultErrors {
+			if _, resultErr := wp.Result(name); resultErr != nil {
+				s.State = models.ForecastPairStateError
+				s.Error = resultErr
+			}
+		}
+		pairs = append(pairs, s)
+	}
+	return pairs
 }
 
 func (f *ForecasterService) Start(ctx context.Context, req models.ForecastRequest) (err error) {
