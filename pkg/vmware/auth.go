@@ -3,6 +3,7 @@ package vmware
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/url"
 	"strings"
 	"time"
@@ -171,6 +172,20 @@ func NormalizeAndValidateURL(vUrl string) (string, error) {
 	u, err := url.Parse(vUrl)
 	if err != nil {
 		return "", err
+	}
+
+	// SSRF guard: enforce https, require a host, and reject IP literals in
+	// loopback / link-local / unspecified ranges.
+	if u.Scheme != "https" {
+		return "", fmt.Errorf("vCenter URL must use HTTPS scheme, got %q", u.Scheme)
+	}
+	if u.Hostname() == "" {
+		return "", fmt.Errorf("vCenter URL must specify a host")
+	}
+	if ip := net.ParseIP(u.Hostname()); ip != nil {
+		if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
+			return "", fmt.Errorf("vCenter URL host %q is not an allowed address", u.Hostname())
+		}
 	}
 
 	path := strings.TrimRight(u.Path, "/")
