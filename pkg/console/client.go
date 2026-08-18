@@ -11,6 +11,7 @@ import (
 	agentAPI "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	agentClient "github.com/kubev2v/migration-planner/pkg/client"
 
+	"github.com/kubev2v/assisted-migration-agent/internal/inventoryutil"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	serviceErrs "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
@@ -152,23 +153,7 @@ func (c *Client) UpdateSource(ctx context.Context, sourceID, agentID uuid.UUID, 
 // UpdateSourceSubset creates or updates a subset inventory
 // PUT /api/v1/sources/{id}/subset/{subsetId}
 func (c *Client) UpdateSourceSubset(ctx context.Context, sourceID, subsetID uuid.UUID, name string, inv v1.Inventory) error {
-	// Extract vCenter ID from inventory
-	var vcenterID *string
-	if inv.VcenterId != "" {
-		vcenterID = &inv.VcenterId
-	}
-
-	vmsCount := 0
-	for _, cluster := range inv.Clusters {
-		vmsCount += cluster.Vms.Total
-	}
-
-	body := agentAPI.SourceSubsetUpdate{
-		VcenterId: vcenterID,
-		Name:      name,
-		VmsCount:  &vmsCount,
-		Inventory: inv,
-	}
+	body := inventoryutil.NewSourceSubsetUpdate(name, inv)
 
 	resp, err := c.httpClient.UpdateSourceSubset(ctx, sourceID, subsetID, body)
 	if err != nil {

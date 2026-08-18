@@ -486,13 +486,31 @@ paths:
       tags: [Inventories]
       summary: Get inventory from the latest collection
       operationId: getLatestInventory
+      parameters:
+        - name: scope
+          in: query
+          required: false
+          description: >-
+            Selects which inventories to return. "main" (default) returns only the main
+            inventory as JSON. "all" returns a ZIP bundle containing the main inventory
+            (inventory.json) and every group subset inventory (subsets/<groupId>.json),
+            for manual upload in disconnected environments.
+          schema:
+            type: string
+            enum: [main, all]
+            default: main
       responses:
         '200':
-          description: Collected inventory
+          description: >-
+            Collected inventory. JSON when scope is "main"; a ZIP archive when scope is "all".
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Inventory'
+            application/zip:
+              schema:
+                type: string
+                format: binary
         '404':
           description: No collections or inventory not found
         '500':

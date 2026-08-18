@@ -100,6 +100,12 @@ const (
 	Zip  ExportCollectionParamsFormat = "zip"
 )
 
+// Defines values for GetLatestInventoryParamsScope.
+const (
+	All  GetLatestInventoryParamsScope = "all"
+	Main GetLatestInventoryParamsScope = "main"
+)
+
 // AgentModeRequest defines model for AgentModeRequest.
 type AgentModeRequest struct {
 	Mode AgentModeRequestMode `binding:"required,oneof=connected disconnected" json:"mode"`
@@ -1021,6 +1027,15 @@ type GetInspectorStatusParams struct {
 type PutInspectorVddkMultipartBody struct {
 	File openapi_types.File `json:"file"`
 }
+
+// GetLatestInventoryParams defines parameters for GetLatestInventory.
+type GetLatestInventoryParams struct {
+	// Scope Selects which inventories to return. "main" (default) returns only the main inventory as JSON. "all" returns a ZIP bundle containing the main inventory (inventory.json) and every group subset inventory (subsets/<groupId>.json), for manual upload in disconnected environments.
+	Scope *GetLatestInventoryParamsScope `form:"scope,omitempty" json:"scope,omitempty"`
+}
+
+// GetLatestInventoryParamsScope defines parameters for GetLatestInventory.
+type GetLatestInventoryParamsScope string
 
 // ListLatestVirtualMachinesParams defines parameters for ListLatestVirtualMachines.
 type ListLatestVirtualMachinesParams struct {
