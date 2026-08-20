@@ -255,7 +255,6 @@ const clustersQuery = `
 				COALESCE(c."Object ID", '') AS id,
 				COALESCE(c."DrsEnabled", false) AS drs_enabled,
 				COALESCE(c."DrsDefaultVmBehavior", 'None') AS drs_default_vm_behavior,
-				COALESCE(c."StorageDrsEnabled", false) AS storage_drs_enabled,
 				COALESCE(host_counts.host_count, 0) AS host_count,
 				COALESCE(vm_counts.vm_count, 0) AS vm_count
 
