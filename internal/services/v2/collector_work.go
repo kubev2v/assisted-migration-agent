@@ -243,7 +243,13 @@ func (f *vCenterCollectorWorkFactory) Build() work.WorkBuilder2[models.Collector
 
 				if result.HasErrors() {
 					log.Errorw("schema validation errors", "errors", result.Errors)
-					r.Err = fmt.Errorf("schema validation failed: %v", result.Errors)
+					r.Err = result.Error()
+					for _, e := range result.Errors {
+						if e.Code == "MISSING_CLUSTER" || e.Code == "NO_VMS" {
+							r.Err = fmt.Errorf("%w — this may indicate insufficient vCenter permissions; VMware can return incomplete inventory without an explicit permission error; verify your vCenter user has read-only access to all clusters and hosts", r.Err)
+							break
+						}
+					}
 					return r, r.Err
 				}
 
