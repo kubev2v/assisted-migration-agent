@@ -234,7 +234,13 @@ func (f *collectorWorkFactory) Build(creds models.Credentials) work.WorkBuilder2
 				}
 
 				if len(result.Warnings) > 0 {
-					log.Warnw("schema validation warnings", "warnings", result.Warnings)
+					for _, w := range result.Warnings {
+						if w.Code == "EMPTY_NETWORKS" || w.Code == "EMPTY_HOSTS" || w.Code == "EMPTY_DATASTORES" {
+							log.Warnw("schema validation warning (may indicate insufficient permissions)", "code", w.Code, "message", w.Message)
+						} else {
+							log.Warnw("schema validation warning", "code", w.Code, "message", w.Message)
+						}
+					}
 				}
 
 				log.Info("sqlite data successfully ingested into duckdb")
