@@ -468,3 +468,36 @@ func (h *Handler) deleteLabelGlobally(c *gin.Context, vmSvc *services.VMService,
 		Label:    label,
 	})
 }
+
+// CancelVirtualMachineInspection cancels deep inspection for a specific VirtualMachine.
+// (DELETE /virtualmachines/{vmId}/inspection)
+func (h *Handler) CancelVirtualMachineInspection(c *gin.Context, vmId string) {
+	inspSvc, err := h.svc.InspectorService()
+	if err != nil {
+		if srvErrors.IsCollectionNotFoundError(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "collect data before using the inspector"})
+			return
+		}
+		if srvErrors.IsOperationInProgressError(err) {
+			c.JSON(http.StatusConflict, gin.H{"error": "a collection is currently in progress; please wait for it to complete before using deep inspection"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	if err := inspSvc.Cancel(vmId); err != nil {
+		if srvErrors.IsInspectorNotRunningError(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if srvErrors.IsResourceNotFoundError(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
