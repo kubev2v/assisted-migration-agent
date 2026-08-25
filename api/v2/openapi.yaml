@@ -272,6 +272,30 @@ paths:
         '500':
           description: Internal server error
 
+  /virtualmachines/{vmId}/inspection:
+    delete:
+      tags: [VirtualMachines]
+      summary: Cancel deep inspection for a specific VirtualMachine
+      operationId: cancelVirtualMachineInspection
+      parameters:
+        - name: vmId
+          in: path
+          required: true
+          description: VirtualMachine ID
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Inspection canceled for the VirtualMachine
+        '400':
+          description: Inspector not running
+        '404':
+          description: VirtualMachine not found in inspection queue
+        '409':
+          description: A collection or report is in progress
+        '500':
+          description: Internal server error
+
   /virtualmachines/{vmId}/utilization:
     get:
       tags: [Rightsizing]
