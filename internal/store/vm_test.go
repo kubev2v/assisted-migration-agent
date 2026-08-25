@@ -1346,4 +1346,41 @@ var _ = Describe("VMStore", func() {
 			Expect(count).To(Equal(3))
 		})
 	})
+
+	Context("FaultToleranceEnabled predicate", func() {
+		// Helper to insert VM with FT State
+		insertVMWithFTState := func(id, name, ftState string) {
+			_, err := db.ExecContext(ctx, `
+				INSERT INTO vinfo ("VM ID", "VM", "Powerstate", "Cluster", "Memory", "Template", "FT State")
+				VALUES (?, ?, 'poweredOn', 'cluster-test', 4096, false, ?)
+			`, id, name, ftState)
+			Expect(err).NotTo(HaveOccurred())
+		}
+
+		BeforeEach(func() {
+			// Agent only writes two FT State values
+			insertVMWithFTState("vm-enabled", "VM with FT enabled", "enabled")
+			insertVMWithFTState("vm-notconfigured", "VM with FT not configured", "notConfigured")
+		})
+
+		// Given a VM with FT State = 'enabled'
+		// When we query the VM
+		// Then FaultToleranceEnabled should be true
+		It("should return true for FT State 'enabled'", func() {
+			vm, err := s.VM().Get(ctx, "vm-enabled")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vm).NotTo(BeNil())
+			Expect(vm.FaultToleranceEnabled).To(BeTrue())
+		})
+
+		// Given a VM with FT State = 'notConfigured'
+		// When we query the VM
+		// Then FaultToleranceEnabled should be false
+		It("should return false for FT State 'notConfigured'", func() {
+			vm, err := s.VM().Get(ctx, "vm-notconfigured")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vm).NotTo(BeNil())
+			Expect(vm.FaultToleranceEnabled).To(BeFalse())
+		})
+	})
 })
