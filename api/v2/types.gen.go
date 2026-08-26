@@ -28,6 +28,12 @@ const (
 	AgentStatusModeDisconnected AgentStatusMode = "disconnected"
 )
 
+// Defines values for CollectionAggregateRole.
+const (
+	Baseline   CollectionAggregateRole = "baseline"
+	Comparison CollectionAggregateRole = "comparison"
+)
+
 // Defines values for CollectionComparisonDiffDimension.
 const (
 	CollectionComparisonDiffDimensionMigratable    CollectionComparisonDiffDimension = "migratable"
@@ -222,9 +228,15 @@ type CollectionAggregate struct {
 	// NonMigratable Number of non-migratable VMs (at least one Critical concern)
 	NonMigratable int `json:"nonMigratable"`
 
+	// Role Role of this collection in a comparison. baseline (A) is the older/reference collection, comparison (B) is the newer one being compared against it.
+	Role *CollectionAggregateRole `json:"role,omitempty"`
+
 	// TotalVMs Total number of VMs in the collection
 	TotalVMs int `json:"totalVMs"`
 }
+
+// CollectionAggregateRole Role of this collection in a comparison. baseline (A) is the older/reference collection, comparison (B) is the newer one being compared against it.
+type CollectionAggregateRole string
 
 // CollectionComparisonDiff defines model for CollectionComparisonDiff.
 type CollectionComparisonDiff struct {

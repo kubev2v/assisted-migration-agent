@@ -47,6 +47,7 @@ func (s *ComparisonService) Summary(ctx context.Context) (models.ComparisonSumma
 		Migratable:    countWhere(aRows, true),
 		NonMigratable: countWhere(aRows, false),
 		Clusters:      aClusters,
+		Role:          "baseline",
 	}
 	bAgg := models.CollectionAggregate{
 		ID:            s.metaB.ID,
@@ -55,6 +56,7 @@ func (s *ComparisonService) Summary(ctx context.Context) (models.ComparisonSumma
 		Migratable:    countWhere(bRows, true),
 		NonMigratable: countWhere(bRows, false),
 		Clusters:      bClusters,
+		Role:          "comparison",
 	}
 
 	return models.ComparisonSummary{

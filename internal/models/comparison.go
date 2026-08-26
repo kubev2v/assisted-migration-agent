@@ -24,6 +24,7 @@ type CollectionAggregate struct {
 	Migratable    int
 	NonMigratable int
 	Clusters      int
+	Role          string // "baseline" or "comparison"
 }
 
 // ComparisonDiffEntry is the diff for one metric: the numeric delta (B-A)

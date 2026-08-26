@@ -1526,6 +1526,12 @@ components:
         clusters:
           type: integer
           description: Number of distinct clusters
+        role:
+          type: string
+          enum:
+            - baseline
+            - comparison
+          description: Role of this collection in a comparison. baseline (A) is the older/reference collection, comparison (B) is the newer one being compared against it.
 
     ComparisonDiffEntry:
       type: object

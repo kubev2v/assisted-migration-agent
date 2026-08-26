@@ -574,7 +574,7 @@ func comparisonDiffEntryDeltaOnly(e models.ComparisonDiffEntry) ComparisonDiffEn
 }
 
 func collectionAggregateFromModel(a models.CollectionAggregate) CollectionAggregate {
-	return CollectionAggregate{
+	agg := CollectionAggregate{
 		Id:            a.ID,
 		CreatedAt:     a.CreatedAt,
 		TotalVMs:      a.TotalVMs,
@@ -582,6 +582,11 @@ func collectionAggregateFromModel(a models.CollectionAggregate) CollectionAggreg
 		NonMigratable: a.NonMigratable,
 		Clusters:      a.Clusters,
 	}
+	if a.Role != "" {
+		role := CollectionAggregateRole(a.Role)
+		agg.Role = &role
+	}
+	return agg
 }
 
 // NewCollectionComparisonSummaryFromModel converts a models.ComparisonSummary to the V2 API type.
