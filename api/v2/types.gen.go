@@ -418,6 +418,9 @@ type Group struct {
 	// Name Group display name
 	Name      string     `json:"name"`
 	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
+
+	// VmCount Number of VMs matching the group filter
+	VmCount *int `json:"vmCount,omitempty"`
 }
 
 // GroupListResponse defines model for GroupListResponse.

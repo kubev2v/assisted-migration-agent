@@ -559,6 +559,9 @@ func NewGroupFromModel(g models.Group) Group {
 	if g.Description != "" {
 		group.Description = &g.Description
 	}
+	if g.VmCount > 0 {
+		group.VmCount = &g.VmCount
+	}
 	return group
 }
 

@@ -2236,6 +2236,9 @@ components:
           type: string
           description: Filter expression (pkg/filter DSL)
           example: "memory >= 8GB and cluster = 'prod'"
+        vmCount:
+          type: integer
+          description: Number of VMs matching the group filter
         createdAt:
           type: string
           format: date-time
