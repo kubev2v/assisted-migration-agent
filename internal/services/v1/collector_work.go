@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
+	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
 	"github.com/kubev2v/migration-planner/pkg/inventory"
 	"github.com/kubev2v/migration-planner/pkg/inventory/converters"
 	"github.com/kubev2v/migration-planner/pkg/opa"
@@ -225,7 +226,7 @@ func (f *collectorWorkFactory) Build(creds models.Credentials) work.WorkBuilder2
 					log.Errorw("schema validation errors", "errors", result.Errors)
 					r.Err = result.Error()
 					for _, e := range result.Errors {
-						if e.Code == "MISSING_CLUSTER" || e.Code == "NO_VMS" {
+						if e.Code == duckdb_parser.CodeMissingCluster || e.Code == duckdb_parser.CodeNoVMs {
 							r.Err = fmt.Errorf("%w — this may indicate insufficient vCenter permissions; VMware can return incomplete inventory without an explicit permission error; verify your vCenter user has read-only access to all clusters and hosts", r.Err)
 							break
 						}
