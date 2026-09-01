@@ -12,6 +12,7 @@ type ServiceProvider interface {
 	ConsoleService() *svc.Console
 	CollectionService() *svc.CollectionService
 	InspectorService() (*svc.InspectorService, error)
+	V2VInspectorService() (*svc.InspectorServiceV2V, error)
 	VddkService() *svc.VddkService
 	CredentialsService() *svc.CredentialsService
 	ForecasterService() *svc.ForecasterService

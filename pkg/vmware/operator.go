@@ -15,6 +15,9 @@ type VMOperator interface {
 	CreateSnapshot(context.Context, CreateSnapshotRequest) (string, error)
 	RemoveSnapshot(context.Context, RemoveSnapshotRequest) error
 	ValidatePrivileges(ctx context.Context, vmId string, requiredPrivileges []string) error
+	// Ping performs a cheap liveness probe against vCenter, returning an error
+	// when the session/connection is no longer healthy.
+	Ping(ctx context.Context) error
 }
 
 // VMManager provides operations for managing virtual machines within a specific vSphere datacenter.
@@ -70,6 +73,16 @@ func (m *VMManager) CreateSnapshot(ctx context.Context, req CreateSnapshotReques
 	}
 
 	return snapshotRef.Value, nil
+}
+
+// Ping issues a lightweight GetCurrentTime call to verify the vCenter session
+// and underlying connection are still alive. Used by long-running inspections
+// to guard against dead sessions instead of relying on hard wall-clock timeouts.
+func (m *VMManager) Ping(ctx context.Context) error {
+	if _, err := methods.GetCurrentTime(ctx, m.gc.RoundTripper); err != nil {
+		return fmt.Errorf("vCenter liveness probe failed: %w", err)
+	}
+	return nil
 }
 
 // RemoveSnapshot deletes a snapshot and all its children by name from a virtual machine.
