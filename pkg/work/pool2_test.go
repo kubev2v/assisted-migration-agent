@@ -628,4 +628,154 @@ var _ = Describe("Pool2", func() {
 			Eventually(pool.IsRunning).Should(BeFalse())
 		})
 	})
+
+	Context("SerialPipelines", func() {
+		It("runs one pipeline fully before starting the next (no unit interleaving)", func() {
+			var mu sync.Mutex
+			var execOrder []string
+			track := func(name string) func(context.Context, int) (int, error) {
+				return func(_ context.Context, r int) (int, error) {
+					mu.Lock()
+					execOrder = append(execOrder, name)
+					mu.Unlock()
+					time.Sleep(20 * time.Millisecond)
+					return r + 1, nil
+				}
+			}
+			mkBuilder := func(name string) work.WorkBuilder2[string, int] {
+				return newTestBuilder(nil,
+					unit(name+"-u1", track(name)),
+					unit(name+"-u2", track(name)),
+					unit(name+"-u3", track(name)),
+				)
+			}
+			builders := map[string]work.WorkBuilder2[string, int]{
+				"a": mkBuilder("a"),
+				"b": mkBuilder("b"),
+			}
+
+			// Single worker + serial: without serial the single worker would still
+			// interleave the two pipelines' units (a-u1, b-u1, a-u2, ...). Serial mode
+			// must run all of "a" (units + finalize) before "b" starts at all.
+			pool := work.NewPool2[string, int](builders).WithWorkers(1, 1).WithSerialPipelines()
+			Expect(pool.Start()).To(Succeed())
+			Eventually(pool.IsRunning, 10*time.Second).Should(BeFalse())
+
+			mu.Lock()
+			defer mu.Unlock()
+			// Deterministic launch order is sorted keys → all "a" units, then all "b".
+			Expect(execOrder).To(Equal([]string{"a", "a", "a", "b", "b", "b"}))
+		})
+
+		It("does not start the next pipeline until the current one's Finalize completes", func() {
+			// Finalize runs as priority work (potentially on the reserved worker), so
+			// guard against the next VM starting while the current VM's Finalize (e.g.
+			// snapshot removal) is still in flight. The next pipeline must only launch
+			// after the completed pipeline's Finalize future has resolved.
+			var mu sync.Mutex
+			aFinalized := false
+			bStartedBeforeAFinalize := false
+			finalizeGate := make(chan struct{})
+
+			builders := map[string]work.WorkBuilder2[string, int]{
+				"a": newTestBuilder(
+					func(_ context.Context, _ int) error {
+						<-finalizeGate // hold "a"'s Finalize open
+						mu.Lock()
+						aFinalized = true
+						mu.Unlock()
+						return nil
+					},
+					unit("a-u1", func(_ context.Context, r int) (int, error) { return r, nil }),
+				),
+				"b": newTestBuilder(nil,
+					unit("b-u1", func(_ context.Context, r int) (int, error) {
+						mu.Lock()
+						if !aFinalized {
+							bStartedBeforeAFinalize = true
+						}
+						mu.Unlock()
+						return r, nil
+					}),
+				),
+			}
+
+			pool := work.NewPool2[string, int](builders).WithWorkers(1, 1).WithSerialPipelines()
+			Expect(pool.Start()).To(Succeed())
+
+			// "a"'s unit is done and its Finalize is blocked on the gate; "b" must not
+			// have started while that Finalize is in flight.
+			Consistently(func() bool {
+				mu.Lock()
+				defer mu.Unlock()
+				return aFinalized
+			}, 100*time.Millisecond).Should(BeFalse())
+
+			close(finalizeGate)
+			Eventually(pool.IsRunning, 10*time.Second).Should(BeFalse())
+
+			mu.Lock()
+			defer mu.Unlock()
+			Expect(bStartedBeforeAFinalize).To(BeFalse())
+		})
+
+		It("Cancel of a still-queued pipeline stops it from ever running its work", func() {
+			gate := make(chan struct{})
+			var mu sync.Mutex
+			bUnitRan := false
+			var finalized []string
+
+			builders := map[string]work.WorkBuilder2[string, int]{
+				"a": newTestBuilder(
+					func(_ context.Context, _ int) error {
+						mu.Lock()
+						finalized = append(finalized, "a")
+						mu.Unlock()
+						return nil
+					},
+					unit("a-block", func(ctx context.Context, r int) (int, error) {
+						select {
+						case <-gate:
+							return r, nil
+						case <-ctx.Done():
+							return r, ctx.Err()
+						}
+					}),
+				),
+				"b": newTestBuilder(
+					func(_ context.Context, _ int) error {
+						mu.Lock()
+						finalized = append(finalized, "b")
+						mu.Unlock()
+						return nil
+					},
+					unit("b-u1", func(_ context.Context, r int) (int, error) {
+						mu.Lock()
+						bUnitRan = true
+						mu.Unlock()
+						return r, nil
+					}),
+				),
+			}
+
+			pool := work.NewPool2[string, int](builders).WithWorkers(1, 1).WithSerialPipelines()
+			Expect(pool.Start()).To(Succeed())
+
+			// "a" is running (blocked on gate); "b" is queued with no pipeline yet.
+			Eventually(pool.IsRunning).Should(BeTrue())
+
+			// Cancel the still-queued "b": it must never execute its work, but must be
+			// finalized so its terminal (canceled) status is persisted by callers.
+			_, err := pool.Cancel("b")
+			Expect(err).NotTo(HaveOccurred())
+
+			close(gate)
+			Eventually(pool.IsRunning, 10*time.Second).Should(BeFalse())
+
+			mu.Lock()
+			defer mu.Unlock()
+			Expect(bUnitRan).To(BeFalse())
+			Expect(finalized).To(ContainElements("a", "b"))
+		})
+	})
 })

@@ -41,6 +41,16 @@ type Agent struct {
 	LegacyStatusEnabled bool          `debugmap:"visible" default:"true"`
 	RetainCollections   int           `debugmap:"visible" default:"1"`
 	RVToolsMode         bool          `debugmap:"visible" default:"false"`
+
+	// Inspection configurations.
+	// V2V dry-runs have NO wall-clock timeout by default: their duration cannot be
+	// guessed (disk size, SAN load, LUKS), so they are guarded by a vCenter
+	// liveness health check instead. V2VHealthCheckInterval controls how often the
+	// guard probes the session during a running dry-run. V2VInspectionTimeout is an
+	// optional escape hatch: 0 (default) = no deadline; set it only if an operator
+	// deliberately wants a hard backstop.
+	V2VInspectionTimeout   time.Duration `debugmap:"visible" default:"0s"`
+	V2VHealthCheckInterval time.Duration `debugmap:"visible" default:"30s"`
 }
 
 type Console struct {

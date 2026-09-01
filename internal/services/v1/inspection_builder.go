@@ -35,10 +35,10 @@ func (b *inspectionBuilder) Next() (work.WorkUnit[models.InspectionStatus, model
 func (b *inspectionBuilder) Finalize(ctx context.Context, result models.InspectionResult) error {
 	log := zap.S().Named("inspection_builder")
 
-	if result.SnapshotID != "" {
+	if result.SnapshotId != "" {
 		log.Infow("removing VM snapshot", "vmId", b.vmID)
 		req := vmware.RemoveSnapshotRequest{
-			SnapshotId:  result.SnapshotID,
+			SnapshotId:  result.SnapshotId,
 			Consolidate: true,
 		}
 		if err := b.operator.RemoveSnapshot(ctx, req); err != nil {
@@ -108,7 +108,7 @@ func defaultInspectionBuilderFactory(s *store.Store, operator vmware.VMOperator,
 							result.Err = err
 							return result, nil
 						}
-						result.SnapshotID = snapID
+						result.SnapshotId = snapID
 						log.Infow("VM snapshot created", "vmId", id)
 
 						return result, nil
@@ -123,14 +123,14 @@ func defaultInspectionBuilderFactory(s *store.Store, operator vmware.VMOperator,
 						return status
 					},
 					Work: func(ctx context.Context, result models.InspectionResult) (models.InspectionResult, error) {
-						log.Infow("running deep inspection", "vmId", id, "snapshotId", result.SnapshotID)
+						log.Infow("running deep inspection", "vmId", id, "snapshotId", result.SnapshotId)
 						detectResult, err := detector.Detect(vmdetect.DetectParams{
 							Ctx:           ctx,
 							VMMoref:       id,
-							SnapshotMoref: result.SnapshotID,
+							SnapshotMoref: result.SnapshotId,
 						})
 						if err != nil {
-							log.Errorw("deep inspection failed", "vmId", id, "snapshotId", result.SnapshotID, "error", err)
+							log.Errorw("deep inspection failed", "vmId", id, "snapshotId", result.SnapshotId, "error", err)
 							result.Err = err
 							return result, nil
 						}

@@ -3,10 +3,12 @@ package v2
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
 	"github.com/kubev2v/migration-planner/pkg/opa"
+	"github.com/sirupsen/logrus"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
@@ -22,16 +24,17 @@ type ServiceManager struct {
 	keyMgr        *crypto.KeyManager
 	pool          *store.Pool
 
-	console     *Console
-	collection  *CollectionService
-	credentials *CredentialsService
-	mu          sync.Mutex
-	inspector   *InspectorService
-	vddk        *VddkService
-	forecaster  *ForecasterService
-	validator   *opa.Validator
-	collector   *CollectorService
-	workBuilder CollectorWorkBuilder
+	console      *Console
+	collection   *CollectionService
+	credentials  *CredentialsService
+	mu           sync.Mutex
+	inspector    *InspectorService
+	inspectorV2V *InspectorServiceV2V
+	vddk         *VddkService
+	forecaster   *ForecasterService
+	validator    *opa.Validator
+	collector    *CollectorService
+	workBuilder  CollectorWorkBuilder
 }
 
 type ServiceManagerOption func(*ServiceManager)
@@ -120,6 +123,22 @@ func (m *ServiceManager) Initialize() error {
 	m.forecaster = NewForecasterService(m.pool, m.credentials)
 
 	return nil
+}
+
+// RunBootRecovery scans for orphaned inspection tasks from prior agent crashes and cleans them up.
+// Should be called after Initialize() and before starting the HTTP server.
+func (m *ServiceManager) RunBootRecovery(ctx context.Context) error {
+	db, err := m.pool.Latest()
+	if err != nil {
+		return fmt.Errorf("failed to get database for boot recovery: %w", err)
+	}
+	store, err := db.Store()
+	if err != nil {
+		return fmt.Errorf("failed to get store for boot recovery: %w", err)
+	}
+
+	recoveryMgr := NewBootRecoveryManager(store, logrus.StandardLogger())
+	return recoveryMgr.ReconcileOrphanedInspections(ctx)
 }
 
 func (m *ServiceManager) GetCollectorStatus() models.CollectorStatus {
@@ -238,9 +257,37 @@ func (m *ServiceManager) InspectorService() (*InspectorService, error) {
 		return nil, err
 	}
 
-	m.inspector = NewInspectorService(store, 10, m.cfg.Agent.DataFolder, m.credentials)
+	m.inspector = NewInspectorService(store, 10, m.cfg.Agent.DataFolder, m.credentials, &m.cfg.Agent)
 
 	return m.inspector, nil
+}
+
+func (m *ServiceManager) V2VInspectorService() (*InspectorServiceV2V, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.inspectorV2V != nil && m.inspectorV2V.IsBusy() {
+		return m.inspectorV2V, nil
+	}
+
+	if m.collector != nil && m.collector.GetStatus().State.IsRunning() {
+		return nil, srvErrors.NewCollectionInProgressError()
+	}
+
+	m.inspectorV2V = nil
+
+	db, err := m.pool.Latest()
+	if err != nil {
+		return nil, err
+	}
+	store, err := db.Store()
+	if err != nil {
+		return nil, err
+	}
+
+	m.inspectorV2V = NewInspectorServiceV2V(store, 10, m.cfg.Agent.DataFolder, m.credentials, &m.cfg.Agent)
+
+	return m.inspectorV2V, nil
 }
 
 func (m *ServiceManager) VddkService() *VddkService {

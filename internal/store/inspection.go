@@ -94,6 +94,21 @@ func (s *InspectionStore) insertConcerns(ctx context.Context, vmID string, inspe
 	return nil
 }
 
+// PurgeConcerns deletes all concerns for a VM. Typically called before inserting fresh results.
+func (s *InspectionStore) PurgeConcerns(ctx context.Context, vmID string) error {
+	query, args, err := sq.Delete(vmInspectionConcernsTable).
+		Where(sq.Eq{vmInspectionConcernsColVMID: vmID}).
+		ToSql()
+	if err != nil {
+		return fmt.Errorf("building purge concerns query: %w", err)
+	}
+	_, err = s.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("purging concerns for vm %s: %w", vmID, err)
+	}
+	return nil
+}
+
 func (s *InspectionStore) InsertResult(ctx context.Context, vmID string, concerns []models.VmInspectionConcern) error {
 	if len(concerns) == 0 {
 		return nil

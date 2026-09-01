@@ -15,6 +15,7 @@ import (
 
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
 
+	"github.com/kubev2v/assisted-migration-agent/internal/config"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	v2 "github.com/kubev2v/assisted-migration-agent/internal/services/v2"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
@@ -56,12 +57,19 @@ func (b *testInspectionBuilder) Finalize(ctx context.Context, result models.Insp
 }
 
 type mockInspectionBuilder struct {
-	delay     time.Duration
-	vmErrors  map[string]error
-	inspected []string
-	mu        sync.Mutex
-	st        *store.Store2
-	concerns  map[string][]models.VmInspectionConcern
+	delay       time.Duration
+	vmErrors    map[string]error
+	inspected   []string
+	inFlight    int
+	maxInFlight int
+	mu          sync.Mutex
+	st          *store.Store2
+	concerns    map[string][]models.VmInspectionConcern
+	// writeV2VRunning makes Work persist "running" to the v2v status table on
+	// dispatch, mirroring the real unit-1 builder (which writes from Work, not
+	// Status). Lets a test observe that a queued VM stays "pending" until the
+	// single worker actually picks it up.
+	writeV2VRunning bool
 }
 
 func (m *mockInspectionBuilder) withWorkDelay(d time.Duration) *mockInspectionBuilder {
@@ -79,6 +87,11 @@ func (m *mockInspectionBuilder) withStore(st *store.Store2) *mockInspectionBuild
 	return m
 }
 
+func (m *mockInspectionBuilder) withV2VStatusWrites() *mockInspectionBuilder {
+	m.writeV2VRunning = true
+	return m
+}
+
 func (m *mockInspectionBuilder) withVmConcerns(vmID string, concerns []models.VmInspectionConcern) *mockInspectionBuilder {
 	m.concerns[vmID] = concerns
 	return m
@@ -88,6 +101,15 @@ func (m *mockInspectionBuilder) getInspectedVMs() []string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return append([]string(nil), m.inspected...)
+}
+
+// getMaxInFlight returns the peak number of work units observed running
+// concurrently. It equals the pool's effective worker count under load, so a
+// value of 1 proves the v2v pool serialized the batch.
+func (m *mockInspectionBuilder) getMaxInFlight() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.maxInFlight
 }
 
 func (m *mockInspectionBuilder) builder() func(id string) work.WorkBuilder2[models.InspectionStatus, models.InspectionResult] {
@@ -103,6 +125,22 @@ func (m *mockInspectionBuilder) builder() func(id string) work.WorkBuilder2[mode
 				{
 					Status: running,
 					Work: func(ctx context.Context, result models.InspectionResult) (models.InspectionResult, error) {
+						m.mu.Lock()
+						m.inFlight++
+						if m.inFlight > m.maxInFlight {
+							m.maxInFlight = m.inFlight
+						}
+						m.mu.Unlock()
+						defer func() {
+							m.mu.Lock()
+							m.inFlight--
+							m.mu.Unlock()
+						}()
+
+						if m.writeV2VRunning && m.st != nil {
+							_ = m.st.InspectionV2V().Update(ctx, id, models.InspectionStatus{State: models.InspectionStateRunning})
+						}
+
 						if m.delay > 0 {
 							select {
 							case <-time.After(m.delay):
@@ -155,13 +193,22 @@ var _ = Describe("InspectorService", func() {
 	)
 
 	mustNewInspectorService := func(s *store.Store2, limit int, dir string, cSvc *v2.CredentialsService) *v2.InspectorService {
-		svc := v2.NewInspectorService(s, limit, dir, cSvc)
+		svc := v2.NewInspectorService(s, limit, dir, cSvc, &config.Agent{})
 		return svc
 	}
 
 	getInspectionStatus := func(vmID string) models.InspectionState {
 		var status string
 		err := st.Querier().QueryRowContext(ctx, `SELECT status FROM vm_inspection_status WHERE "VM ID" = ?`, vmID).Scan(&status)
+		if err != nil {
+			return models.InspectionStateNotStarted
+		}
+		return models.InspectionState(status)
+	}
+
+	getV2VInspectionStatus := func(vmID string) models.InspectionState {
+		var status string
+		err := st.Querier().QueryRowContext(ctx, `SELECT status FROM vm_inspection_status_v2v WHERE "VM ID" = ?`, vmID).Scan(&status)
 		if err != nil {
 			return models.InspectionStateNotStarted
 		}
@@ -561,6 +608,105 @@ var _ = Describe("InspectorService", func() {
 			}
 			Expect(vm).NotTo(BeNil())
 			Expect(vm.InspectionConcernCount).To(Equal(3))
+		})
+	})
+
+	Describe("V2V pool scheduling", func() {
+		// The v2v pool is throttled to a single worker (defaultV2VWorkers = 1) to
+		// protect ESXi I/O. These tests dispatch two VMs at once and assert the
+		// scheduler serializes them (peak concurrency 1), in contrast to the
+		// multi-worker standard pool which runs them in parallel.
+
+		It("serializes two VMs through the single-worker v2v pool", func() {
+			builder := newMockInspectionBuilder().withStore(st).
+				withWorkDelay(200 * time.Millisecond).withV2VStatusWrites()
+			v2vSrv := v2.NewInspectorServiceV2V(st, 10, "", credsSvc, &config.Agent{}).
+				WithInspectionBuilder(builder.builder())
+			defer func() { _ = v2vSrv.Stop() }()
+
+			err := v2vSrv.Start(ctx, []string{"vm-1", "vm-2"})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Mid-batch the pool is running exactly one VM; the other is still queued
+			// and MUST read "pending", not "running". This is the user-visible contract
+			// the unit-1 status fix guarantees.
+			Eventually(func() []models.InspectionState {
+				return []models.InspectionState{
+					getV2VInspectionStatus("vm-1"), getV2VInspectionStatus("vm-2"),
+				}
+			}, time.Second*5, 10*time.Millisecond).Should(
+				ConsistOf(models.InspectionStateRunning, models.InspectionStatePending),
+			)
+
+			// Both VMs drain and the pool returns to ready.
+			Eventually(func() models.InspectorState {
+				return v2vSrv.GetStatus().State
+			}, time.Second*15).Should(Equal(models.InspectorStateReady))
+
+			// Both VMs actually ran...
+			Expect(builder.getInspectedVMs()).To(ConsistOf("vm-1", "vm-2"))
+			// ...but never at the same time: 1 worker => peak concurrency of 1.
+			Expect(builder.getMaxInFlight()).To(Equal(1))
+		})
+
+		// Regression: the pipeline calls each unit's Status() before it dispatches
+		// that unit's Work, and the single v2v worker is released between units. So a
+		// Status() with a DB side effect would flip a still-queued VM — or a VM parked
+		// between units while another holds the worker — to "running <that stage>" in
+		// the DB before the worker actually dispatches it. That produced two VMs both
+		// reading "running V2V translation dry-run" when only one was truly executing.
+		// Every unit must therefore persist "running" from Work(), not Status().
+		It("v2v builder Status() persists nothing (only Work() writes the DB)", func() {
+			Expect(st.InspectionV2V().Update(ctx, "vm-1",
+				models.InspectionStatus{State: models.InspectionStatePending})).To(Succeed())
+
+			wb := v2.DefaultV2VInspectionBuilderFactory(st, nil, nil, &config.Agent{})("vm-1")
+			unitCount := 0
+			for unit, more := wb.Next(); more; unit, more = wb.Next() {
+				unitCount++
+				// Status() is a pure in-memory progress read.
+				Expect(unit.Status().State).To(Equal(models.InspectionStateRunning))
+			}
+			Expect(unitCount).To(BeNumerically(">", 1),
+				"multi-unit pipeline is what exposes the cross-unit Status() leak")
+
+			// Had any unit's Status() written to the store, this would read "running".
+			Expect(getV2VInspectionStatus("vm-1")).To(Equal(models.InspectionStatePending))
+		})
+
+		It("standard builder Status() persists nothing (only Work() writes the DB)", func() {
+			Expect(st.Inspection().Update(ctx, "vm-1",
+				models.InspectionStatus{State: models.InspectionStatePending})).To(Succeed())
+
+			wb := v2.DefaultStandardInspectionBuilderFactory(st, nil, nil, &config.Agent{})("vm-1")
+			unitCount := 0
+			for unit, more := wb.Next(); more; unit, more = wb.Next() {
+				unitCount++
+				Expect(unit.Status().State).To(Equal(models.InspectionStateRunning))
+			}
+			Expect(unitCount).To(BeNumerically(">", 1))
+
+			Expect(getInspectionStatus("vm-1")).To(Equal(models.InspectionStatePending))
+		})
+
+		It("runs the same two VMs in parallel on the multi-worker standard pool", func() {
+			// Contrast case: proves the concurrency gauge detects real parallelism,
+			// so the v2v result above reflects the worker cap, not a measurement
+			// artifact. The standard pool has 5 workers, so two VMs overlap.
+			builder := newMockInspectionBuilder().withStore(st).withWorkDelay(200 * time.Millisecond)
+			stdSrv := mustNewInspectorService(st, 10, "", credsSvc).
+				WithInspectionBuilder(builder.builder())
+			defer func() { _ = stdSrv.Stop() }()
+
+			err := stdSrv.Start(ctx, []string{"vm-1", "vm-2"})
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(func() models.InspectorState {
+				return stdSrv.GetStatus().State
+			}, time.Second*15).Should(Equal(models.InspectorStateReady))
+
+			Expect(builder.getInspectedVMs()).To(ConsistOf("vm-1", "vm-2"))
+			Expect(builder.getMaxInFlight()).To(Equal(2))
 		})
 	})
 })

@@ -2,6 +2,7 @@ package v2
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"sync"
 	"time"
@@ -10,35 +11,39 @@ import (
 
 	"github.com/kubev2v/vm-migration-detective/pkg/vmdetect"
 
+	"github.com/kubev2v/assisted-migration-agent/internal/config"
+	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
-
+	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 	"github.com/kubev2v/assisted-migration-agent/pkg/vmware"
 	"github.com/kubev2v/assisted-migration-agent/pkg/work"
 
 	"go.uber.org/zap"
-
-	"github.com/kubev2v/assisted-migration-agent/internal/models"
-	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
-const defaultInspectionWorkers = 5
+const (
+	// Standard Pool Configuration (High Concurrency, Lightweight)
+	defaultStandardWorkers = 5
+)
 
 type InspectorService struct {
 	mu              sync.Mutex
-	pool            *work.Pool2[models.InspectionStatus, models.InspectionResult]
-	buildFn         inspectionBuilderFactory
 	store           *store.Store2
 	inspectionLimit int
 	vddkLibDir      string
 	credsSvc        *CredentialsService
+	cfg             *config.Agent
+	buildFn         inspectionBuilderFactory
+	pool            *work.Pool2[models.InspectionStatus, models.InspectionResult]
 }
 
-func NewInspectorService(st *store.Store2, inspectionLimit int, dataDir string, credsSvc *CredentialsService) *InspectorService {
+func NewInspectorService(st *store.Store2, inspectionLimit int, dataDir string, credsSvc *CredentialsService, cfg *config.Agent) *InspectorService {
 	return &InspectorService{
 		store:           st,
 		inspectionLimit: inspectionLimit,
 		vddkLibDir:      filepath.Join(dataDir, vddkFolder, vddkLibPath),
 		credsSvc:        credsSvc,
+		cfg:             cfg,
 	}
 }
 
@@ -57,18 +62,18 @@ func (i *InspectorService) IsBusy() bool {
 	return i.GetStatus().State == models.InspectorStateRunning
 }
 
-func (i *InspectorService) Start(ctx context.Context, vmIDs []string) (err error) {
+// Start dispatches VMs to standard inspection pool.
+// Pool is created on-demand per request batch to avoid re-entrant Pool2 execution limits.
+func (i *InspectorService) Start(ctx context.Context, vmIds []string) (err error) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
-	if i.pool != nil && i.pool.IsRunning() {
-		return srvErrors.NewInspectionInProgressError()
+	if len(vmIds) > i.inspectionLimit {
+		return srvErrors.NewInspectionLimitReachedError(i.inspectionLimit)
 	}
 
-	i.pool = nil
-
-	if len(vmIDs) > i.inspectionLimit {
-		return srvErrors.NewInspectionLimitReachedError(i.inspectionLimit)
+	if i.pool != nil && i.pool.IsRunning() {
+		return fmt.Errorf("the standard inspection pool is busy processing previous inspection tasks")
 	}
 
 	creds, err := i.credsSvc.Resolve(ctx)
@@ -76,7 +81,7 @@ func (i *InspectorService) Start(ctx context.Context, vmIDs []string) (err error
 		return err
 	}
 
-	zap.S().Infow("starting inspector", "vmCount", len(vmIDs))
+	zap.S().Infow("starting standard inspector", "vmCount", len(vmIds))
 
 	url, err := vmware.NormalizeAndValidateURL(creds.URL)
 	if err != nil {
@@ -121,32 +126,31 @@ func (i *InspectorService) Start(ctx context.Context, vmIDs []string) (err error
 
 	buildFn := i.buildFn
 	if buildFn == nil {
-		buildFn = defaultInspectionBuilderFactory(i.store, vmwareOperator, detector)
+		buildFn = defaultStandardInspectionBuilderFactory(i.store, vmwareOperator, detector, i.cfg)
 	}
 
-	wb := make(map[string]work.WorkBuilder2[models.InspectionStatus, models.InspectionResult], len(vmIDs))
-	for _, id := range vmIDs {
-		wb[id] = buildFn(id)
-	}
-
-	for _, id := range vmIDs {
-		if err = i.store.Inspection().Update(ctx, id, models.InspectionStatus{State: models.InspectionStatePending}); err != nil {
+	// Mark all VMs as pending
+	for _, vmID := range vmIds {
+		if err = i.store.Inspection().Update(ctx, vmID, models.InspectionStatus{State: models.InspectionStatePending}); err != nil {
 			return err
 		}
 	}
 
-	pool := work.NewPool2(wb).WithWorkers(defaultInspectionWorkers, defaultInspectionWorkers).
+	// Provision and trigger Standard Pool
+	wb := make(map[string]work.WorkBuilder2[models.InspectionStatus, models.InspectionResult])
+	for _, vmID := range vmIds {
+		wb[vmID] = buildFn(vmID)
+	}
+	pool := work.NewPool2(wb).WithWorkers(defaultStandardWorkers, defaultStandardWorkers).
 		WithFinalizer(func(_ context.Context) error {
 			logoutCtx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 			defer cancel()
 			_ = vClient.Logout(logoutCtx)
 			return nil
 		})
-
 	if err = pool.Start(); err != nil {
 		return err
 	}
-
 	i.pool = pool
 
 	return nil
@@ -156,14 +160,16 @@ func (i *InspectorService) Stop() error {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
-	pool := i.pool
-	i.pool = nil
-
-	if pool == nil {
+	if i.pool == nil {
 		return srvErrors.NewInspectorNotRunningError()
 	}
 
-	return pool.Stop()
+	if err := i.pool.Stop(); err != nil {
+		return err
+	}
+	i.pool = nil
+
+	return nil
 }
 
 func (i *InspectorService) Cancel(virtualMachineID string) error {
@@ -174,11 +180,11 @@ func (i *InspectorService) Cancel(virtualMachineID string) error {
 		return srvErrors.NewInspectorNotRunningError()
 	}
 
-	if _, err := i.pool.Cancel(virtualMachineID); err != nil {
-		return srvErrors.NewResourceNotFoundError("vm", virtualMachineID)
+	if _, err := i.pool.Cancel(virtualMachineID); err == nil {
+		return nil
 	}
 
-	return nil
+	return srvErrors.NewResourceNotFoundError("vm", virtualMachineID)
 }
 
 func (i *InspectorService) WithInspectionBuilder(builder inspectionBuilderFactory) *InspectorService {

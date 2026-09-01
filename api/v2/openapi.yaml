@@ -1203,6 +1203,104 @@ paths:
         '500':
           description: Internal server error
 
+  /inspector/v2v:
+    post:
+      tags: [Inspector]
+      summary: Start V2V deep inspection for VMs
+      operationId: startV2VInspection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartInspectionRequest'
+      responses:
+        '202':
+          description: V2V inspection started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectorStatus'
+        '400':
+          description: Invalid request (no VMs, no VDDK, no credentials)
+        '409':
+          description: V2V inspector already running
+        '500':
+          description: Internal server error
+    delete:
+      tags: [Inspector]
+      summary: Stop V2V inspector
+      operationId: stopV2VInspection
+      responses:
+        '200':
+          description: V2V inspector stopped
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectorStatus'
+        '400':
+          description: Collection not found (collect data before using the v2v inspector)
+        '404':
+          description: V2V inspector not running
+        '409':
+          description: Report generation in progress
+        '500':
+          description: Internal server error
+
+  /inspector/v2v/status:
+    get:
+      tags: [Inspector]
+      summary: Get V2V inspector status
+      operationId: getV2VInspectorStatus
+      parameters:
+        - name: includeVddk
+          in: query
+          required: false
+          description: Include VDDK metadata in the response
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: V2V inspector status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectorStatus'
+        '400':
+          description: Collection not found (collect data before using the v2v inspector)
+        '409':
+          description: Report generation in progress
+        '500':
+          description: Internal server error
+
+  /inspector/v2v/{vmId}:
+    delete:
+      tags: [Inspector]
+      summary: Cancel the in-progress v2v inspection for a single VM
+      operationId: cancelV2VInspection
+      parameters:
+        - name: vmId
+          in: path
+          required: true
+          description: The vSphere managed object reference of the VM to cancel
+          schema:
+            type: string
+      responses:
+        '200':
+          description: V2V inspection canceled for the VM
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectorStatus'
+        '400':
+          description: Collection not found (collect data before using the v2v inspector)
+        '404':
+          description: V2V inspector not running, or the VM is not currently being inspected
+        '409':
+          description: Report generation in progress
+        '500':
+          description: Internal server error
+
   # ── Credentials ────────────────────────────────────────────────────────
   /credentials:
     put:
@@ -1977,8 +2075,13 @@ components:
           description: Whether this VM is excluded from migration
           default: false
         inspectionStatus:
-          description: Current inspection status of the virtual machine
-          $ref: '#/components/schemas/InspectionStatus'
+          description: Current standard (virt-inspector) inspection status of the virtual machine
+          allOf:
+            - $ref: '#/components/schemas/InspectionStatus'
+        v2vInspectionStatus:
+          description: Current v2v (virt-v2v-inspector) deep dry-run inspection status of the virtual machine
+          allOf:
+            - $ref: '#/components/schemas/InspectionStatus'
         labels:
           type: array
           items:
@@ -2197,6 +2300,12 @@ components:
       properties:
         concerns:
           type: array
+          description: Concerns from the standard virt-inspector metadata audit
+          items:
+            $ref: '#/components/schemas/VirtualMachineInspectionConcern'
+        v2vConcerns:
+          type: array
+          description: Concerns from the deep virt-v2v-inspector translation dry-run
           items:
             $ref: '#/components/schemas/VirtualMachineInspectionConcern'
 
@@ -2683,7 +2792,7 @@ components:
           type: array
           items:
             type: string
-          description: VM MoRef IDs to inspect
+          description: List of VM IDs to inspect
           x-oapi-codegen-extra-tags:
             binding: "required,min=1,dive,required"
 
