@@ -92,6 +92,20 @@ func NewVirtualMachineFromSummary(vm models.VirtualMachineSummary) VirtualMachin
 	return result
 }
 
+// toAPIConcerns maps storage-model inspection concerns to the API type. Shared by
+// the standard and v2v concern lists.
+func toAPIConcerns(concerns []models.VmInspectionConcern) []VirtualMachineInspectionConcern {
+	out := make([]VirtualMachineInspectionConcern, 0, len(concerns))
+	for _, co := range concerns {
+		out = append(out, VirtualMachineInspectionConcern{
+			Category: co.Category,
+			Label:    co.Label,
+			Message:  co.Msg,
+		})
+	}
+	return out
+}
+
 // NewVirtualMachineDetailFromModel converts a models.VM to a v2 VirtualMachineDetail.
 func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 	details := VirtualMachineDetail{
@@ -157,6 +171,10 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 		s := NewInspectionStatus(vm.InspectionStatus)
 		details.InspectionStatus = &s
 	}
+	if vm.V2VInspectionStatus.State != models.InspectionStateNotStarted {
+		s := NewInspectionStatus(vm.V2VInspectionStatus)
+		details.V2vInspectionStatus = &s
+	}
 	details.FaultToleranceEnabled = &vm.FaultToleranceEnabled
 	details.NestedHVEnabled = &vm.NestedHVEnabled
 	if len(vm.Labels) > 0 {
@@ -218,16 +236,18 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 		details.GuestNetworks = &networks
 	}
 
-	if len(vm.InspectionConcerns) > 0 {
-		concerns := make([]VirtualMachineInspectionConcern, 0, len(vm.InspectionConcerns))
-		for _, co := range vm.InspectionConcerns {
-			concerns = append(concerns, VirtualMachineInspectionConcern{
-				Category: co.Category,
-				Label:    co.Label,
-				Message:  co.Msg,
-			})
+	if len(vm.InspectionConcerns) > 0 || len(vm.V2VInspectionConcerns) > 0 {
+		details.Inspection = &VirtualMachineInspectionResults{}
+
+		if len(vm.InspectionConcerns) > 0 {
+			concerns := toAPIConcerns(vm.InspectionConcerns)
+			details.Inspection.Concerns = &concerns
 		}
-		details.Inspection = &VirtualMachineInspectionResults{Concerns: &concerns}
+
+		if len(vm.V2VInspectionConcerns) > 0 {
+			v2vConcerns := toAPIConcerns(vm.V2VInspectionConcerns)
+			details.Inspection.V2vConcerns = &v2vConcerns
+		}
 	}
 
 	if len(vm.Issues) > 0 {

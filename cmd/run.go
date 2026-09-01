@@ -230,6 +230,12 @@ func initV2(cfg *config.Configuration) (*server.Server, func(), error) {
 		return nil, nil, fmt.Errorf("failed to initialize v2 services: %w", err)
 	}
 
+	// Run boot-time recovery to clean up orphaned inspection tasks from prior crashes
+	if err := v2SvcMgr.RunBootRecovery(context.Background()); err != nil {
+		zap.S().Warnw("boot recovery failed", "error", err)
+		// Non-fatal - continue startup even if recovery fails
+	}
+
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		handlers.RegisterValidators(v)
 	}

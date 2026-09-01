@@ -232,6 +232,8 @@ func (a *Agent) ToOption() AgentOption {
 		to.LegacyStatusEnabled = a.LegacyStatusEnabled
 		to.RetainCollections = a.RetainCollections
 		to.RVToolsMode = a.RVToolsMode
+		to.V2VInspectionTimeout = a.V2VInspectionTimeout
+		to.V2VHealthCheckInterval = a.V2VHealthCheckInterval
 	}
 }
 
@@ -250,6 +252,8 @@ func (a *Agent) DebugMap() map[string]any {
 	debugMap["LegacyStatusEnabled"] = helpers.DebugValue(a.LegacyStatusEnabled, false)
 	debugMap["RetainCollections"] = helpers.DebugValue(a.RetainCollections, false)
 	debugMap["RVToolsMode"] = helpers.DebugValue(a.RVToolsMode, false)
+	debugMap["V2VInspectionTimeout"] = helpers.DebugValue(a.V2VInspectionTimeout, false)
+	debugMap["V2VHealthCheckInterval"] = helpers.DebugValue(a.V2VHealthCheckInterval, false)
 	return debugMap
 }
 
@@ -350,6 +354,20 @@ func WithRetainCollections(retainCollections int) AgentOption {
 func WithRVToolsMode(rVToolsMode bool) AgentOption {
 	return func(a *Agent) {
 		a.RVToolsMode = rVToolsMode
+	}
+}
+
+// WithV2VInspectionTimeout returns an option that can set V2VInspectionTimeout on a Agent
+func WithV2VInspectionTimeout(v2VInspectionTimeout time.Duration) AgentOption {
+	return func(a *Agent) {
+		a.V2VInspectionTimeout = v2VInspectionTimeout
+	}
+}
+
+// WithV2VHealthCheckInterval returns an option that can set V2VHealthCheckInterval on a Agent
+func WithV2VHealthCheckInterval(v2VHealthCheckInterval time.Duration) AgentOption {
+	return func(a *Agent) {
+		a.V2VHealthCheckInterval = v2VHealthCheckInterval
 	}
 }
 

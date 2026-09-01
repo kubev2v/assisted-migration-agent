@@ -76,6 +76,7 @@ func (s *Store2) Configuration() *ConfigurationStore { return NewConfigurationSt
 func (s *Store2) Inventory() *InventoryStore         { return NewInventoryStore(s.qi) }
 func (s *Store2) VM() *VMStore                       { return NewVMStore(s.qi) }
 func (s *Store2) Inspection() *InspectionStore       { return NewInspectionStore(s.qi) }
+func (s *Store2) InspectionV2V() *InspectionStoreV2V { return NewInspectionStoreV2V(s.qi) }
 func (s *Store2) Group() *GroupStore                 { return NewGroupStore(s.qi) }
 func (s *Store2) Vddk() *VddkStore                   { return NewVddkStore(s.qi) }
 func (s *Store2) Outbox() *OutboxStore               { return NewOutboxStore(s.qi) }

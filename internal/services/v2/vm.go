@@ -45,12 +45,23 @@ func (s *VMService) Get(ctx context.Context, id string) (*models.VM, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	if len(results) == 0 {
-		return vm, nil
+	if len(results) > 0 {
+		vm.InspectionConcerns = results[0].Concerns
 	}
 
-	vm.InspectionConcerns = results[0].Concerns
+	v2vResults, err := s.store.InspectionV2V().ListResults(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if len(v2vResults) > 0 {
+		vm.V2VInspectionConcerns = v2vResults[0].Concerns
+	}
+
+	v2vStatus, err := s.store.InspectionV2V().GetStatus(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	vm.V2VInspectionStatus = v2vStatus
 
 	return vm, nil
 }

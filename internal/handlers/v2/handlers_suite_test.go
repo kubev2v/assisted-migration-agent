@@ -37,9 +37,12 @@ type stubServiceProvider struct {
 func (s *stubServiceProvider) ConsoleService() *svc.Console                     { return nil }
 func (s *stubServiceProvider) CollectionService() *svc.CollectionService        { return nil }
 func (s *stubServiceProvider) InspectorService() (*svc.InspectorService, error) { return nil, nil }
-func (s *stubServiceProvider) VddkService() *svc.VddkService                    { return nil }
-func (s *stubServiceProvider) CredentialsService() *svc.CredentialsService      { return nil }
-func (s *stubServiceProvider) ForecasterService() *svc.ForecasterService        { return nil }
+func (s *stubServiceProvider) V2VInspectorService() (*svc.InspectorServiceV2V, error) {
+	return nil, nil
+}
+func (s *stubServiceProvider) VddkService() *svc.VddkService               { return nil }
+func (s *stubServiceProvider) CredentialsService() *svc.CredentialsService { return nil }
+func (s *stubServiceProvider) ForecasterService() *svc.ForecasterService   { return nil }
 func (s *stubServiceProvider) ApplicationService(_ string) (*svc.ApplicationService, error) {
 	return nil, nil
 }
