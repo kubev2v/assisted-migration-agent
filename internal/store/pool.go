@@ -31,10 +31,10 @@ import (
 // an in-progress collection database must not be exposed to readers until
 // the collection is complete.
 //
-// Database.Store() lazily initializes the connection and returns a *Store2.
+// Database.Store() lazily initializes the connection and returns a *Store.
 // Calling Store() on a closed connection transparently reconnects.
 //
-// Idle eligibility is tracked by Store2 itself: every query updates a
+// Idle eligibility is tracked by Store itself: every query updates a
 // lastAccess timestamp via usageInterceptor (see store2.go). Pool.cleanup()
 // compares that timestamp against the cleanup interval to decide whether
 // to close the connection. This is best-effort — see the usageInterceptor
@@ -68,7 +68,7 @@ import (
 //	    pool.Add(db)
 //	}
 //
-//	// Get a *Store2 for any registered database.
+//	// Get a *Store for any registered database.
 //	db, _ := pool.Get(mainDB.ID)
 //	st, _ := db.Store()
 //	cfg, _ := st.Configuration().Get(ctx)
@@ -93,13 +93,13 @@ type Database struct {
 	Path        string
 	CreatedAt   time.Time
 	mu          sync.Mutex
-	store       *Store2
+	store       *Store
 	accessMode  DatabaseAccessMode
 	connection  *sql.DB
 	memoryLimit int
 }
 
-func (d *Database) Store() (*Store2, error) {
+func (d *Database) Store() (*Store, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -115,7 +115,7 @@ func (d *Database) Store() (*Store2, error) {
 		d.connection = conn
 	}
 
-	d.store = newStore2(filepath.Base(d.Path), pkgstore.NewQueryInterceptor(d.connection), pkgstore.NewTransactor(d.connection))
+	d.store = newStore(filepath.Base(d.Path), pkgstore.NewQueryInterceptor(d.connection), pkgstore.NewTransactor(d.connection))
 
 	return d.store, nil
 }
@@ -249,7 +249,7 @@ func (p *Pool) NewDatabase(id string, dbPath string, createdAt time.Time, initTy
 			return nil, err
 		}
 		db.connection = conn
-		db.store = newStore2(filepath.Base(dbPath), pkgstore.NewQueryInterceptor(conn), pkgstore.NewTransactor(conn))
+		db.store = newStore(filepath.Base(dbPath), pkgstore.NewQueryInterceptor(conn), pkgstore.NewTransactor(conn))
 	}
 
 	return db, nil

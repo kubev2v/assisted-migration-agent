@@ -30,8 +30,6 @@ type GroupInventoryDeleteEventPayload struct {
 	GroupName string `json:"groupName"`
 }
 
-// Console pipeline stage labels, reported via WorkUnit.Status.
 const (
-	ConsolePipelineInitialState = "pending"
-	ConsolePipelineEventStage   = "event"
+	ConsolePipelineEventStage = "event"
 )

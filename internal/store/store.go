@@ -4,244 +4,118 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"path/filepath"
-	"strconv"
-	"strings"
+	"sync/atomic"
+	"time"
 
-	sq "github.com/Masterminds/squirrel"
-	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
 	pkgstore "github.com/kubev2v/migration-planner/pkg/store"
-	"go.uber.org/zap"
-
-	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 )
 
+const (
+	dbNameKey string = "db_name"
+)
+
+type QueryInterceptor = pkgstore.QueryInterceptor
+
 type Store struct {
-	db            *sql.DB
-	parser        *duckdb_parser.Parser
-	configuration *ConfigurationStore
-	inventory     *InventoryStore
-	vm            *VMStore
-	inspection    *InspectionStore
-	group         *GroupStore
-	vddk          *VddkStore
-	outbox        *OutboxStore
-	rightsizing   *RightSizingStore
-	forecast      *ForecastStore
-	transactor    pkgstore.Transactor
-	application   *ApplicationStore
-	credentials   *CredentialsStore
-	collection    *CollectionStore
-	export        *ExportStore
+	qi         QueryInterceptor
+	transactor pkgstore.Transactor
+	lastAccess *atomic.Int64
 }
 
-func NewStore(db *sql.DB, validator duckdb_parser.Validator) *Store {
-	qi := pkgstore.NewQueryInterceptor(db)
-	transactor := pkgstore.NewTransactor(db)
-	parser := duckdb_parser.New(qi, validator)
+func newStore(name string, qi QueryInterceptor, transactor pkgstore.Transactor) *Store {
+	lastAccess := &atomic.Int64{}
 	return &Store{
-		db:            db,
-		parser:        parser,
-		configuration: NewConfigurationStore(qi),
-		inventory:     NewInventoryStore(qi),
-		vm:            NewVMStore(qi),
-		inspection:    NewInspectionStore(qi),
-		group:         NewGroupStore(qi),
-		vddk:          NewVddkStore(qi),
-		outbox:        NewOutboxStore(qi),
-		rightsizing:   NewRightSizingStore(qi),
-		forecast:      NewForecastStore(qi),
-		transactor:    transactor,
-		application:   NewApplicationStore(qi),
-		credentials:   NewCredentialsStore(qi),
-		collection:    NewCollectionStore(qi),
-		export:        NewExportStore(qi),
+		qi:         &usageInterceptor{dbName: name, inner: qi, last: lastAccess},
+		lastAccess: lastAccess,
+		transactor: transactor,
 	}
 }
 
-func (s *Store) InitCollection(ctx context.Context) error {
-	if err := s.parser.Init(); err != nil {
-		return fmt.Errorf("initializing parser tables: %w", err)
+func (s *Store) LastAccess() int64 {
+	return s.lastAccess.Load()
+}
+
+func (s *Store) Querier() QueryInterceptor {
+	return s.qi
+}
+
+// AttachDatabase attaches a database to the current connection with the given access mode.
+// DuckDB does not allow attaching a file that is already open by another connection,
+// so the caller must close the target database before attaching it.
+// See test AttachDatabase in pool_test.go.
+func (s *Store) AttachDatabase(ctx context.Context, db *Database, name string, mode DatabaseAccessMode) error {
+	accessMode := "READ_ONLY"
+	if mode == ReadWriteDatabase {
+		accessMode = "READ_WRITE"
 	}
-	ns, err := s.GetCurrentDatabase(ctx)
-	if err != nil {
-		return fmt.Errorf("getting current database: %w", err)
-	}
-	if err := migrations.RunCollection(ctx, s.db, ns); err != nil {
-		return fmt.Errorf("running collection migrations: %w", err)
+	if _, err := s.qi.ExecContext(ctx, fmt.Sprintf("ATTACH '%s' AS %s (%s)", db.Path, name, accessMode)); err != nil {
+		return fmt.Errorf("attaching database %s: %w", name, err)
 	}
 	return nil
 }
 
-func (s *Store) Migrate(ctx context.Context, dataDir string) error {
-	if err := migrations.RunMain(ctx, s.db); err != nil {
-		return err
-	}
-	if dataDir != "" {
-		if err := s.LoadDatabases(ctx, dataDir); err != nil {
-			return err
-		}
+// DetachDatabase detach a database from the connection.
+// It does not check whatever the db is attached.
+func (s *Store) DetachDatabase(ctx context.Context, name string) error {
+	if _, err := s.qi.ExecContext(ctx, fmt.Sprintf("DETACH %s", name)); err != nil {
+		return fmt.Errorf("detaching database %s: %w", name, err)
 	}
 	return nil
 }
 
-func (s *Store) Parser() *duckdb_parser.Parser {
-	return s.parser
+func (s *Store) VerifyConnection(ctx context.Context) error {
+	var result int
+	return s.qi.QueryRowContext(ctx, "SELECT 1").Scan(&result)
 }
 
-func (s *Store) Configuration() *ConfigurationStore {
-	return s.configuration
+// Checkpoint forces a WAL flush to the main database file.
+func (s *Store) Checkpoint(ctx context.Context) error {
+	_, err := s.qi.ExecContext(ctx, "FORCE CHECKPOINT")
+	return err
 }
 
-func (s *Store) Inventory() *InventoryStore {
-	return s.inventory
-}
-
-func (s *Store) VM() *VMStore {
-	return s.vm
-}
-
-func (s *Store) Inspection() *InspectionStore {
-	return s.inspection
-}
-
-func (s *Store) Group() *GroupStore {
-	return s.group
-}
-
-func (s *Store) Vddk() *VddkStore {
-	return s.vddk
-}
-
-func (s *Store) Outbox() *OutboxStore {
-	return s.outbox
-}
-
-func (s *Store) RightSizing() *RightSizingStore {
-	return s.rightsizing
-}
-
-func (s *Store) Forecast() *ForecastStore {
-	return s.forecast
-}
-
-func (s *Store) Application() *ApplicationStore {
-	return s.application
-}
-
-func (s *Store) Credentials() *CredentialsStore {
-	return s.credentials
-}
-
-func (s *Store) Collection() *CollectionStore {
-	return s.collection
-}
-
-func (s *Store) Export() *ExportStore {
-	return s.export
-}
+func (s *Store) Configuration() *ConfigurationStore { return NewConfigurationStore(s.qi) }
+func (s *Store) Inventory() *InventoryStore         { return NewInventoryStore(s.qi) }
+func (s *Store) VM() *VMStore                       { return NewVMStore(s.qi) }
+func (s *Store) Inspection() *InspectionStore       { return NewInspectionStore(s.qi) }
+func (s *Store) Group() *GroupStore                 { return NewGroupStore(s.qi) }
+func (s *Store) Vddk() *VddkStore                   { return NewVddkStore(s.qi) }
+func (s *Store) Outbox() *OutboxStore               { return NewOutboxStore(s.qi) }
+func (s *Store) RightSizing() *RightSizingStore     { return NewRightSizingStore(s.qi) }
+func (s *Store) Forecast() *ForecastStore           { return NewForecastStore(s.qi) }
+func (s *Store) Application() *ApplicationStore     { return NewApplicationStore(s.qi) }
+func (s *Store) Credentials() *CredentialsStore     { return NewCredentialsStore(s.qi) }
+func (s *Store) Collection() *CollectionStore       { return NewCollectionStore(s.qi) }
+func (s *Store) Export() *ExportStore               { return NewExportStore(s.qi) }
 
 func (s *Store) WithTx(ctx context.Context, fn func(ctx context.Context) error) error {
 	return s.transactor.WithTx(ctx, fn)
 }
 
-// Checkpoint forces a WAL flush to the main database file.
-func (s *Store) Checkpoint() error {
-	_, err := s.db.Exec("FORCE CHECKPOINT")
-	return err
+// usageInterceptor updates the lastAccess at every query for pool to know if it is time to close the unused connection.
+// This is **best-effort** because QueryRowContext return a sql.Row that keep connection opened so it might happen
+// that the last timestamp don't correspont to the timestamp when the last row.Scan query was made.
+// But, the pool has 5min timeout which enough for row.Scan to finish scanning all the rows.
+type usageInterceptor struct {
+	dbName string
+	inner  QueryInterceptor
+	last   *atomic.Int64
 }
 
-func (s *Store) Close() error {
-	return s.db.Close()
+func (u *usageInterceptor) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
+	ctx = context.WithValue(ctx, dbNameKey, u.dbName) //nolint:staticcheck // string key is intentional — cross-library context value
+	u.last.Store(time.Now().UnixNano())
+	return u.inner.QueryRowContext(ctx, query, args...)
 }
 
-func (s *Store) DB() *sql.DB {
-	return s.db
+func (u *usageInterceptor) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	ctx = context.WithValue(ctx, dbNameKey, u.dbName) //nolint:staticcheck // string key is intentional — cross-library context value
+	u.last.Store(time.Now().UnixNano())
+	return u.inner.QueryContext(ctx, query, args...)
 }
 
-// QueryInterceptor is an alias for the shared store.QueryInterceptor interface.
-// Kept for backward compatibility with existing repository constructors.
-type QueryInterceptor = pkgstore.QueryInterceptor
-
-func (s *Store) SetCurrentDatabase(ctx context.Context, name string) error {
-	_, err := s.db.ExecContext(ctx, fmt.Sprintf("USE %s", name))
-	return err
-}
-
-func (s *Store) GetCurrentDatabase(ctx context.Context) (string, error) {
-	query, _, err := sq.Select("current_database()").ToSql()
-	if err != nil {
-		return "", fmt.Errorf("building current database query: %w", err)
-	}
-
-	var name string
-	if err := s.db.QueryRowContext(ctx, query).Scan(&name); err != nil {
-		return "", fmt.Errorf("reading current database: %w", err)
-	}
-
-	return name, nil
-}
-
-func (s *Store) AttachDatabase(ctx context.Context, dataDir, name string) error {
-	dbPath := filepath.Join(dataDir, fmt.Sprintf("%s.duckdb", name))
-	if _, err := s.db.ExecContext(ctx, fmt.Sprintf("ATTACH '%s' AS %s", dbPath, name)); err != nil {
-		return fmt.Errorf("attaching database %s: %w", name, err)
-	}
-	return s.SetCurrentDatabase(ctx, name)
-}
-
-func (s *Store) CreateDatabase(ctx context.Context, dataDir, name string) error {
-	dbPath := filepath.Join(dataDir, fmt.Sprintf("%s.duckdb", name))
-	if _, err := s.db.ExecContext(ctx, fmt.Sprintf("ATTACH '%s' AS %s", dbPath, name)); err != nil {
-		return fmt.Errorf("attaching database %s: %w", name, err)
-	}
-
-	prev, err := s.GetCurrentDatabase(ctx)
-	if err != nil {
-		return err
-	}
-
-	if err := s.SetCurrentDatabase(ctx, name); err != nil {
-		return fmt.Errorf("switching to %s: %w", name, err)
-	}
-	defer func() { _ = s.SetCurrentDatabase(ctx, prev) }()
-
-	if err := s.parser.Init(); err != nil {
-		return fmt.Errorf("initializing parser tables in %s: %w", name, err)
-	}
-
-	if err := migrations.RunCollection(ctx, s.db, name); err != nil {
-		return fmt.Errorf("running collection migrations in %s: %w", name, err)
-	}
-
-	return nil
-}
-
-func (s *Store) LoadDatabases(ctx context.Context, dataDir string) error {
-	matches, err := filepath.Glob(filepath.Join(dataDir, "collection_*.duckdb"))
-	if err != nil {
-		return fmt.Errorf("scanning for collection databases: %w", err)
-	}
-
-	var latest string
-	var latestTS int64
-	for _, match := range matches {
-		name := strings.TrimSuffix(filepath.Base(match), ".duckdb")
-		if _, err := s.db.ExecContext(ctx, fmt.Sprintf("ATTACH '%s' AS %s", match, name)); err != nil {
-			return fmt.Errorf("attaching collection database %s: %w", name, err)
-		}
-		zap.S().Infow("attached collection database", "name", name, "path", match)
-		if ts, err := strconv.ParseInt(strings.TrimPrefix(name, "collection_"), 10, 64); err == nil && ts > latestTS {
-			latestTS = ts
-			latest = name
-		}
-	}
-
-	if latest != "" {
-		if err := s.SetCurrentDatabase(ctx, latest); err != nil {
-			return fmt.Errorf("switching to latest collection %s: %w", latest, err)
-		}
-		zap.S().Infow("defaulted to latest collection database", "name", latest)
-	}
-	return nil
+func (u *usageInterceptor) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	ctx = context.WithValue(ctx, dbNameKey, u.dbName) //nolint:staticcheck // string key is intentional — cross-library context value
+	u.last.Store(time.Now().UnixNano())
+	return u.inner.ExecContext(ctx, query, args...)
 }

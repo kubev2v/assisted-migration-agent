@@ -3,43 +3,65 @@ package store_test
 import (
 	"context"
 	"database/sql"
+	"os"
+	"path/filepath"
+	"time"
 
 	sq "github.com/Masterminds/squirrel"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
+
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
+	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	"github.com/kubev2v/assisted-migration-agent/test"
 )
 
 var _ = Describe("VMStore Migration Exclusion", func() {
 	var (
-		ctx context.Context
-		s   *store.Store
-		db  *sql.DB
+		ctx    context.Context
+		s      *store.Store
+		pool   *store.Pool
+		tmpDir string
 	)
 
 	BeforeEach(func() {
 		ctx = context.Background()
-
 		var err error
-		db, err = store.NewConnection(nil, ":memory:")
+		tmpDir, err = os.MkdirTemp("", "migration-excluded-store-test-*")
 		Expect(err).NotTo(HaveOccurred())
-
-		s = store.NewStore(db, test.NewMockValidator())
-		Expect(s.InitCollection(ctx)).To(Succeed())
+		pool = store.NewPool(5 * time.Minute)
+		collDB, dbErr := pool.NewDatabase("coll", filepath.Join(tmpDir, "collection.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		Expect(dbErr).NotTo(HaveOccurred())
+		Expect(collDB.Migrate(ctx, func(mCtx context.Context, sqlDB *sql.DB) error {
+			st, stErr := collDB.Store()
+			if stErr != nil {
+				return stErr
+			}
+			if pErr := duckdb_parser.New(st.Querier(), test.NewMockValidator()).Init(); pErr != nil {
+				return pErr
+			}
+			return migrations.RunCollection(mCtx, sqlDB, "collection")
+		})).To(Succeed())
+		pool.Add(collDB)
+		s, err = collDB.Store()
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	AfterEach(func() {
-		if db != nil {
-			_ = db.Close()
+		if pool != nil {
+			pool.Close()
+		}
+		if tmpDir != "" {
+			_ = os.RemoveAll(tmpDir)
 		}
 	})
 
 	// Helper to insert VM into vinfo table
 	insertVM := func(id, name, cluster string) {
-		_, err := db.ExecContext(ctx, `
+		_, err := s.Querier().ExecContext(ctx, `
 			INSERT INTO vinfo ("VM ID", "VM", "Powerstate", "Cluster", "Memory", "Template")
 			VALUES (?, ?, 'poweredOn', ?, 4096, false)
 		`, id, name, cluster)
@@ -110,7 +132,7 @@ var _ = Describe("VMStore Migration Exclusion", func() {
 
 			// Act - Query vinfo directly
 			var excluded bool
-			err = db.QueryRowContext(ctx,
+			err = s.Querier().QueryRowContext(ctx,
 				`SELECT "migration_excluded" FROM vinfo WHERE "VM ID" = ?`,
 				"vm-1").Scan(&excluded)
 
@@ -136,7 +158,7 @@ var _ = Describe("VMStore Migration Exclusion", func() {
 
 			// Verify the flag was set in vinfo table
 			var excluded bool
-			err = db.QueryRowContext(ctx, `SELECT migration_excluded FROM vinfo WHERE "VM ID" = ?`, "vm-1").Scan(&excluded)
+			err = s.Querier().QueryRowContext(ctx, `SELECT migration_excluded FROM vinfo WHERE "VM ID" = ?`, "vm-1").Scan(&excluded)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(excluded).To(BeTrue())
 		})
@@ -158,7 +180,7 @@ var _ = Describe("VMStore Migration Exclusion", func() {
 
 			// Verify the flag was updated in vinfo table
 			var excluded bool
-			err = db.QueryRowContext(ctx, `SELECT migration_excluded FROM vinfo WHERE "VM ID" = ?`, "vm-2").Scan(&excluded)
+			err = s.Querier().QueryRowContext(ctx, `SELECT migration_excluded FROM vinfo WHERE "VM ID" = ?`, "vm-2").Scan(&excluded)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(excluded).To(BeFalse())
 		})
@@ -180,7 +202,7 @@ var _ = Describe("VMStore Migration Exclusion", func() {
 
 			// Assert - verify latest value
 			var excluded bool
-			err = db.QueryRowContext(ctx, `SELECT migration_excluded FROM vinfo WHERE "VM ID" = ?`, "vm-3").Scan(&excluded)
+			err = s.Querier().QueryRowContext(ctx, `SELECT migration_excluded FROM vinfo WHERE "VM ID" = ?`, "vm-3").Scan(&excluded)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(excluded).To(BeTrue())
 		})

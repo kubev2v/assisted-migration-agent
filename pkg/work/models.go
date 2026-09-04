@@ -4,21 +4,17 @@ import "context"
 
 type WorkBuilder[S any, R any] interface {
 	Next() (WorkUnit[S, R], bool)
-}
-
-type WorkBuilder2[S any, R any] interface {
-	Next() (WorkUnit[S, R], bool)
 	Finalize(ctx context.Context, result R) error
 }
 
-// SliceWorkBuilder is a WorkBuilder backed by a fixed slice of work units.
 type SliceWorkBuilder[S any, R any] struct {
-	units []WorkUnit[S, R]
-	idx   int
+	units    []WorkUnit[S, R]
+	idx      int
+	finalize func(ctx context.Context, result R) error
 }
 
-func NewSliceWorkBuilder[S any, R any](units []WorkUnit[S, R]) *SliceWorkBuilder[S, R] {
-	return &SliceWorkBuilder[S, R]{units: units}
+func NewSliceWorkBuilder[S any, R any](units []WorkUnit[S, R], finalize func(ctx context.Context, result R) error) *SliceWorkBuilder[S, R] {
+	return &SliceWorkBuilder[S, R]{units: units, finalize: finalize}
 }
 
 func (b *SliceWorkBuilder[S, R]) Next() (WorkUnit[S, R], bool) {
@@ -30,26 +26,7 @@ func (b *SliceWorkBuilder[S, R]) Next() (WorkUnit[S, R], bool) {
 	return u, true
 }
 
-type SliceWorkBuilder2[S any, R any] struct {
-	units    []WorkUnit[S, R]
-	idx      int
-	finalize func(ctx context.Context, result R) error
-}
-
-func NewSliceWorkBuilder2[S any, R any](units []WorkUnit[S, R], finalize func(ctx context.Context, result R) error) *SliceWorkBuilder2[S, R] {
-	return &SliceWorkBuilder2[S, R]{units: units, finalize: finalize}
-}
-
-func (b *SliceWorkBuilder2[S, R]) Next() (WorkUnit[S, R], bool) {
-	if b.idx >= len(b.units) {
-		return WorkUnit[S, R]{}, false
-	}
-	u := b.units[b.idx]
-	b.idx++
-	return u, true
-}
-
-func (b *SliceWorkBuilder2[S, R]) Finalize(ctx context.Context, result R) error {
+func (b *SliceWorkBuilder[S, R]) Finalize(ctx context.Context, result R) error {
 	return b.finalize(ctx, result)
 }
 
