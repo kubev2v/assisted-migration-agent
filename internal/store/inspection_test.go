@@ -3,42 +3,64 @@ package store_test
 import (
 	"context"
 	"database/sql"
+	"os"
+	"path/filepath"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
+
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
+	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	"github.com/kubev2v/assisted-migration-agent/test"
 )
 
 var _ = Describe("InspectionStore", func() {
 	Context("vm_inspection_concerns", func() {
 		var (
-			ctx context.Context
-			s   *store.Store
-			db  *sql.DB
+			ctx    context.Context
+			s      *store.Store
+			pool   *store.Pool
+			tmpDir string
 		)
 
 		BeforeEach(func() {
 			ctx = context.Background()
-
 			var err error
-			db, err = store.NewConnection(nil, ":memory:")
+			tmpDir, err = os.MkdirTemp("", "inspection-store-test-*")
+			Expect(err).NotTo(HaveOccurred())
+			pool = store.NewPool(5 * time.Minute)
+			collDB, dbErr := pool.NewDatabase("coll", filepath.Join(tmpDir, "collection.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			Expect(dbErr).NotTo(HaveOccurred())
+			Expect(collDB.Migrate(ctx, func(mCtx context.Context, sqlDB *sql.DB) error {
+				st, stErr := collDB.Store()
+				if stErr != nil {
+					return stErr
+				}
+				if pErr := duckdb_parser.New(st.Querier(), test.NewMockValidator()).Init(); pErr != nil {
+					return pErr
+				}
+				return migrations.RunCollection(mCtx, sqlDB, "collection")
+			})).To(Succeed())
+			pool.Add(collDB)
+			s, err = collDB.Store()
 			Expect(err).NotTo(HaveOccurred())
 
-			s = store.NewStore(db, test.NewMockValidator())
-			Expect(s.InitCollection(ctx)).To(Succeed())
-
-			_, err = db.ExecContext(ctx, `
+			_, err = s.Querier().ExecContext(ctx, `
 				INSERT INTO vinfo ("VM ID", "VM") VALUES ('vm-inspect-1', 'test-vm')
 			`)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		AfterEach(func() {
-			if db != nil {
-				_ = db.Close()
+			if pool != nil {
+				pool.Close()
+			}
+			if tmpDir != "" {
+				_ = os.RemoveAll(tmpDir)
 			}
 		})
 
@@ -102,7 +124,7 @@ var _ = Describe("InspectionStore", func() {
 		})
 
 		It("should return an empty list when the VM has no inspection results", func() {
-			_, err := db.ExecContext(ctx, `
+			_, err := s.Querier().ExecContext(ctx, `
 				INSERT INTO vinfo ("VM ID", "VM") VALUES ('vm-no-result', 'other')
 			`)
 			Expect(err).NotTo(HaveOccurred())

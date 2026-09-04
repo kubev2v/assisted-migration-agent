@@ -11,7 +11,6 @@ import (
 	agentAPI "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	agentClient "github.com/kubev2v/migration-planner/pkg/client"
 
-	"github.com/kubev2v/assisted-migration-agent/internal/inventoryutil"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	serviceErrs "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
@@ -153,7 +152,20 @@ func (c *Client) UpdateSource(ctx context.Context, sourceID, agentID uuid.UUID, 
 // UpdateSourceSubset creates or updates a subset inventory
 // PUT /api/v1/sources/{id}/subset/{subsetId}
 func (c *Client) UpdateSourceSubset(ctx context.Context, sourceID, subsetID uuid.UUID, name string, inv v1.Inventory) error {
-	body := inventoryutil.NewSourceSubsetUpdate(name, inv)
+	var vcenterID *string
+	if inv.VcenterId != "" {
+		vcenterID = &inv.VcenterId
+	}
+	vmsCount := 0
+	for _, cluster := range inv.Clusters {
+		vmsCount += cluster.Vms.Total
+	}
+	body := agentAPI.SourceSubsetUpdate{
+		VcenterId: vcenterID,
+		Name:      name,
+		VmsCount:  &vmsCount,
+		Inventory: inv,
+	}
 
 	resp, err := c.httpClient.UpdateSourceSubset(ctx, sourceID, subsetID, body)
 	if err != nil {
@@ -182,8 +194,7 @@ func toSaaSStatus(state models.CollectorStateType) string {
 	case models.CollectorStateConnecting,
 		models.CollectorStateCollecting,
 		models.CollectorStateParsing,
-		models.CollectorStateMetricsCollecting,
-		models.CollectorStateRightsizingConnecting: //nolint:staticcheck // deprecated; removed with v1
+		models.CollectorStateMetricsCollecting:
 		return "gathering-initial-inventory"
 	case models.CollectorStateCollected:
 		return "up-to-date"

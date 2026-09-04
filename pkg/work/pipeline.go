@@ -8,115 +8,119 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/pkg/scheduler"
 )
 
-var (
-	ErrRunning = errors.New("pipeline is already running")
-	ErrStopped = errors.New("pipeline is stopped")
-)
-
-type Status[S any, R any] struct {
-	State  S
-	Result R
-	Err    error
-}
+var ErrRunning = errors.New("pipeline is already running")
 
 type Pipeline[S any, R any] struct {
 	mu          sync.Mutex
 	sched       *scheduler.Scheduler[R]
+	workBuilder WorkBuilder[S, R]
+	progress    progress[S, R]
+	ticks       chan struct{}
+	startCh     chan struct{}
 	stop        chan struct{}
 	done        chan struct{}
-	workBuilder WorkBuilder[S, R]
-	state       Status[S, R]
 }
 
 func NewPipeline[S any, R any](
-	initialState S,
 	sched *scheduler.Scheduler[R],
 	builder WorkBuilder[S, R],
 ) *Pipeline[S, R] {
 	return &Pipeline[S, R]{
 		sched:       sched,
 		workBuilder: builder,
-		state:       Status[S, R]{State: initialState},
+		startCh:     make(chan struct{}, 1),
 	}
 }
 
-func (p *Pipeline[S, R]) Start() error {
+func (p *Pipeline[S, R]) Start() (chan struct{}, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	if p.workBuilder == nil {
-		return nil
+		return nil, errors.New("work builder cannot be null")
 	}
 
 	if p.sched == nil {
-		return errors.New("pipeline scheduler is required")
+		return nil, errors.New("pipeline scheduler is required")
 	}
 
-	if p.done != nil {
-		return ErrRunning
+	select {
+	case p.startCh <- struct{}{}:
+	default:
+		return nil, ErrRunning
 	}
 
-	stop := make(chan struct{})
-	done := make(chan struct{})
-	p.stop = stop
-	p.done = done
-	p.state.Err = nil
+	p.ticks = make(chan struct{})
+	p.stop = make(chan struct{})
+	p.done = make(chan struct{})
 
-	go func(builder WorkBuilder[S, R], stop, done chan struct{}) {
-		var (
-			result R
-			err    error
-		)
-
+	stop := p.stop
+	go func(builder WorkBuilder[S, R]) {
 		defer func() {
 			p.mu.Lock()
 			p.stop = nil
-			p.done = nil
-			p.state.Result = result
-			p.state.Err = err
 			p.mu.Unlock()
-			close(done)
+			close(p.ticks)
+			close(p.done)
 		}()
 
+	loop:
 		for unit, hasMore := builder.Next(); hasMore; unit, hasMore = builder.Next() {
+			p.progress.setState(unit.Status())
 
 			select {
+			case p.ticks <- struct{}{}:
 			case <-stop:
-				err = ErrStopped
-				return
-			default:
+				break loop
 			}
 
-			p.mu.Lock()
-			p.state.State = unit.Status()
-			p.state.Result = result
+			result, _ := p.progress.getResult()
 			future := p.submit(unit, result)
-			p.mu.Unlock()
 
 			select {
 			case <-stop:
+				// TODO: drain future.C() and update result/progress so errors from cancelled work units are not lost
 				future.Stop()
-				err = ErrStopped
-				return
+				break loop
 			case res := <-future.C():
+				p.progress.setResult(res.Data, res.Err)
 				if res.Err != nil {
-					err = res.Err
-					return
+					select {
+					case p.ticks <- struct{}{}:
+					case <-stop:
+					}
+					break loop
 				}
-				result = res.Data
 			}
 		}
-	}(p.workBuilder, stop, done)
 
-	return nil
+		result, _ := p.progress.getResult()
+		future := p.sched.AddPriorityWork(func(ctx context.Context) (R, error) {
+			return result, builder.Finalize(ctx, result)
+		}, 1)
+
+		res := <-future.C()
+		if res.Err != nil {
+			p.progress.setResult(res.Data, res.Err)
+		}
+	}(p.workBuilder)
+
+	return p.ticks, nil
+}
+
+func (p *Pipeline[S, R]) State() S {
+	return p.progress.getState()
+}
+
+func (p *Pipeline[S, R]) Result() (R, error) {
+	return p.progress.getResult()
 }
 
 func (p *Pipeline[S, R]) Stop() {
 	p.mu.Lock()
-	stop := p.stop
 	done := p.done
-	if stop != nil {
-		close(stop)
+	if p.stop != nil {
+		close(p.stop)
 		p.stop = nil
 	}
 	p.mu.Unlock()
@@ -126,24 +130,40 @@ func (p *Pipeline[S, R]) Stop() {
 	}
 }
 
-func (p *Pipeline[S, R]) State() Status[S, R] {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return Status[S, R]{
-		State:  p.state.State,
-		Result: p.state.Result,
-		Err:    p.state.Err,
-	}
-}
-
-func (p *Pipeline[S, R]) IsRunning() bool {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return p.done != nil
-}
-
 func (p *Pipeline[S, R]) submit(u WorkUnit[S, R], result R) *scheduler.Future[scheduler.Result[R]] {
 	return p.sched.AddWork(func(ctx context.Context) (R, error) {
 		return u.Work(ctx, result)
 	})
+}
+
+type progress[S any, R any] struct {
+	mu     sync.Mutex
+	state  S
+	result R
+	err    error
+}
+
+func (p *progress[S, R]) setState(s S) {
+	p.mu.Lock()
+	p.state = s
+	p.mu.Unlock()
+}
+
+func (p *progress[S, R]) setResult(r R, err error) {
+	p.mu.Lock()
+	p.result = r
+	p.err = err
+	p.mu.Unlock()
+}
+
+func (p *progress[S, R]) getState() S {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.state
+}
+
+func (p *progress[S, R]) getResult() (R, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.result, p.err
 }

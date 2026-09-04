@@ -3,43 +3,64 @@ package store_test
 import (
 	"context"
 	"database/sql"
+	"os"
+	"path/filepath"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
+
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
+	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	"github.com/kubev2v/assisted-migration-agent/test"
 )
 
 var _ = Describe("VMStore Application Methods", func() {
 	var (
-		ctx context.Context
-		s   *store.Store
-		db  *sql.DB
+		ctx    context.Context
+		s      *store.Store
+		pool   *store.Pool
+		tmpDir string
 	)
 
 	BeforeEach(func() {
 		ctx = context.Background()
 		var err error
-
-		db, err = store.NewConnection(nil, ":memory:")
+		tmpDir, err = os.MkdirTemp("", "vm-application-store-test-*")
 		Expect(err).NotTo(HaveOccurred())
-
-		s = store.NewStore(db, test.NewMockValidator())
-
-		Expect(s.InitCollection(ctx)).To(Succeed())
+		pool = store.NewPool(5 * time.Minute)
+		collDB, dbErr := pool.NewDatabase("coll", filepath.Join(tmpDir, "collection.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		Expect(dbErr).NotTo(HaveOccurred())
+		Expect(collDB.Migrate(ctx, func(mCtx context.Context, sqlDB *sql.DB) error {
+			st, stErr := collDB.Store()
+			if stErr != nil {
+				return stErr
+			}
+			if pErr := duckdb_parser.New(st.Querier(), test.NewMockValidator()).Init(); pErr != nil {
+				return pErr
+			}
+			return migrations.RunCollection(mCtx, sqlDB, "collection")
+		})).To(Succeed())
+		pool.Add(collDB)
+		s, err = collDB.Store()
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	AfterEach(func() {
-		if db != nil {
-			_ = db.Close()
+		if pool != nil {
+			pool.Close()
+		}
+		if tmpDir != "" {
+			_ = os.RemoveAll(tmpDir)
 		}
 	})
 
 	Describe("GetGuestApps", func() {
 		insertVMWithApps := func(id, name, guestAppsJSON string) {
-			_, err := db.ExecContext(ctx, `
+			_, err := s.Querier().ExecContext(ctx, `
 				INSERT INTO vinfo ("VM ID", "VM", "Powerstate", "Cluster", "Memory", "Template", "guest_apps")
 				VALUES (?, ?, 'poweredOn', 'cluster-a', 4096, false, ?)
 			`, id, name, guestAppsJSON)
@@ -76,7 +97,7 @@ var _ = Describe("VMStore Application Methods", func() {
 		})
 
 		It("should handle null guest_apps via COALESCE", func() {
-			_, err := db.ExecContext(ctx, `
+			_, err := s.Querier().ExecContext(ctx, `
 				INSERT INTO vinfo ("VM ID", "VM", "Powerstate", "Cluster", "Memory", "Template")
 				VALUES ('vm-1', 'null-vm', 'poweredOn', 'cluster-a', 4096, false)
 			`)
@@ -107,7 +128,7 @@ var _ = Describe("VMStore Application Methods", func() {
 	Describe("GetFilterOptions includes applications", func() {
 		It("should return distinct application names from vm_applications", func() {
 			// Insert VMs for FK constraints
-			_, err := db.ExecContext(ctx, `
+			_, err := s.Querier().ExecContext(ctx, `
 				INSERT INTO vinfo ("VM ID", "VM", "Powerstate", "Cluster", "Memory", "Template")
 				VALUES ('vm-1', 'vm-one', 'poweredOn', 'cluster-a', 4096, false)
 			`)

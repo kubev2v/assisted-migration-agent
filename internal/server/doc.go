@@ -24,7 +24,7 @@
 //	│  │  Recovery (panic recovery with zap logging)             │  │
 //	│  └─────────────────────────────────────────────────────────┘  │
 //	├───────────────────────────────────────────────────────────────┤
-//	│                       Router (/api/v1)                        │
+//	│                       Router (/api/v2)                        │
 //	│  ┌─────────────────────────────────────────────────────────┐  │
 //	│  │  Handlers (registered via callback)                     │  │
 //	│  └─────────────────────────────────────────────────────────┘  │
@@ -52,7 +52,7 @@
 //	    v1.RegisterHandlers(router, handler)
 //	})
 //
-// The registerHandlerFn callback receives a RouterGroup prefixed with /api/v1.
+// The registerHandlerFn callback receives a RouterGroup prefixed with /api/v2.
 //
 // Starting:
 //

@@ -21,7 +21,7 @@ import (
 
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
 	handlers "github.com/kubev2v/assisted-migration-agent/internal/handlers/v2"
-	svc "github.com/kubev2v/assisted-migration-agent/internal/services/v2"
+	svc "github.com/kubev2v/assisted-migration-agent/internal/services"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	"github.com/kubev2v/assisted-migration-agent/pkg/crypto"

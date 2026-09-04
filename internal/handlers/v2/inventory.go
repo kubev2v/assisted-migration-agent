@@ -14,9 +14,10 @@ import (
 
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 
+	agentAPI "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
+
 	v2api "github.com/kubev2v/assisted-migration-agent/api/v2"
-	"github.com/kubev2v/assisted-migration-agent/internal/inventoryutil"
-	services "github.com/kubev2v/assisted-migration-agent/internal/services/v2"
+	services "github.com/kubev2v/assisted-migration-agent/internal/services"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
@@ -152,7 +153,20 @@ func (h *Handler) getInventoryBundle(c *gin.Context, invSvc *services.InventoryS
 			continue
 		}
 
-		subset := inventoryutil.NewSourceSubsetUpdate(g.Name, *apiInv)
+		var vcenterID *string
+		if apiInv.VcenterId != "" {
+			vcenterID = &apiInv.VcenterId
+		}
+		vmsCount := 0
+		for _, cluster := range apiInv.Clusters {
+			vmsCount += cluster.Vms.Total
+		}
+		subset := agentAPI.SourceSubsetUpdate{
+			VcenterId: vcenterID,
+			Name:      g.Name,
+			VmsCount:  &vmsCount,
+			Inventory: *apiInv,
+		}
 		data, err := json.Marshal(subset)
 		if err != nil {
 			log.Errorw("failed to marshal subset inventory", "group", g.ID, "error", err)

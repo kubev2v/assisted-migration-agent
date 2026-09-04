@@ -12,7 +12,7 @@ import (
 	v2 "github.com/kubev2v/assisted-migration-agent/api/v2"
 	vmfilter "github.com/kubev2v/assisted-migration-agent/internal/filter"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
-	services "github.com/kubev2v/assisted-migration-agent/internal/services/v2"
+	services "github.com/kubev2v/assisted-migration-agent/internal/services"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 

@@ -5,7 +5,7 @@ import (
 
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
-	svc "github.com/kubev2v/assisted-migration-agent/internal/services/v2"
+	svc "github.com/kubev2v/assisted-migration-agent/internal/services"
 )
 
 type ServiceProvider interface {

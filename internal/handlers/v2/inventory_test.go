@@ -29,7 +29,7 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
 	handlers "github.com/kubev2v/assisted-migration-agent/internal/handlers/v2"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
-	svc "github.com/kubev2v/assisted-migration-agent/internal/services/v2"
+	svc "github.com/kubev2v/assisted-migration-agent/internal/services"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	"github.com/kubev2v/assisted-migration-agent/pkg/crypto"
@@ -47,7 +47,7 @@ var _ = Describe("Inventory handler", func() {
 	// buildEnv creates a main + collection store, lets the caller seed data via
 	// seed (called before the service manager starts), then wires up a router
 	// that mirrors the generated scope query-parameter binding.
-	buildEnv := func(ctx context.Context, seed func(collSt *store.Store2)) {
+	buildEnv := func(ctx context.Context, seed func(collSt *store.Store)) {
 		pool = store.NewPool(5 * time.Minute)
 
 		mainDB, err := pool.NewDatabase(store.MainDatabaseID, filepath.Join(tmpDir, "agent.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
@@ -111,7 +111,7 @@ var _ = Describe("Inventory handler", func() {
 		})
 	}
 
-	saveMainInventory := func(collSt *store.Store2) {
+	saveMainInventory := func(collSt *store.Store) {
 		inventoryJSON := `{"vcenter_id":"vc-test","clusters":{"cluster-1":{"vms":{"total":5},"infra":{}}}}`
 		Expect(collSt.Inventory().Save(context.Background(), []byte(inventoryJSON))).To(Succeed())
 	}
@@ -211,7 +211,7 @@ var _ = Describe("Inventory handler", func() {
 		It("returns a zip with inventory.json plus a subset file per group", func() {
 			ctx := context.Background()
 			var groupA, groupB string
-			buildEnv(ctx, func(collSt *store.Store2) {
+			buildEnv(ctx, func(collSt *store.Store) {
 				saveMainInventory(collSt)
 
 				createdA, err := collSt.Group().Create(ctx, models.Group{
