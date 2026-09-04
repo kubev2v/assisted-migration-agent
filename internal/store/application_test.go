@@ -2,136 +2,116 @@ package store_test
 
 import (
 	"context"
-	"testing"
+	"database/sql"
+	"os"
+	"path/filepath"
+	"time"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
+	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
+	"github.com/kubev2v/assisted-migration-agent/test"
 )
 
-func setupApplicationStore(t *testing.T) *store.Store {
-	t.Helper()
-	db, err := store.NewConnection(nil, ":memory:")
-	if err != nil {
-		t.Fatalf("failed to create db: %v", err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
+var _ = Describe("ApplicationStore", func() {
+	var (
+		ctx    context.Context
+		s      *store.Store
+		pool   *store.Pool
+		tmpDir string
+	)
 
-	s := store.NewStore(db, nil)
-	if err := s.InitCollection(context.Background()); err != nil {
-		t.Fatalf("failed to init collection: %v", err)
-	}
-	return s
-}
+	BeforeEach(func() {
+		ctx = context.Background()
+		var err error
+		tmpDir, err = os.MkdirTemp("", "app-store-test-*")
+		Expect(err).NotTo(HaveOccurred())
+		pool = store.NewPool(5 * time.Minute)
+		collDB, dbErr := pool.NewDatabase("coll", filepath.Join(tmpDir, "collection.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		Expect(dbErr).NotTo(HaveOccurred())
+		Expect(collDB.Migrate(ctx, func(mCtx context.Context, sqlDB *sql.DB) error {
+			st, stErr := collDB.Store()
+			if stErr != nil {
+				return stErr
+			}
+			if pErr := duckdb_parser.New(st.Querier(), test.NewMockValidator()).Init(); pErr != nil {
+				return pErr
+			}
+			return migrations.RunCollection(mCtx, sqlDB, "collection")
+		})).To(Succeed())
+		pool.Add(collDB)
+		s, err = collDB.Store()
+		Expect(err).NotTo(HaveOccurred())
+	})
 
-func TestApplicationStore_ReplaceAll_And_ListOverviews(t *testing.T) {
-	s := setupApplicationStore(t)
-	ctx := context.Background()
+	AfterEach(func() {
+		if pool != nil {
+			pool.Close()
+		}
+		if tmpDir != "" {
+			_ = os.RemoveAll(tmpDir)
+		}
+	})
 
-	records := []models.ApplicationVMRecord{
-		{AppName: "PostgreSQL", AppDesc: "PG Servers", VMID: "vm-1", VMName: "db-01"},
-		{AppName: "PostgreSQL", AppDesc: "PG Servers", VMID: "vm-2", VMName: "db-02"},
-		{AppName: "Apache", AppDesc: "Web Servers", VMID: "vm-3", VMName: "web-01"},
-	}
+	It("should insert records and list overviews", func() {
+		records := []models.ApplicationVMRecord{
+			{AppName: "PostgreSQL", AppDesc: "PG Servers", VMID: "vm-1", VMName: "db-01"},
+			{AppName: "PostgreSQL", AppDesc: "PG Servers", VMID: "vm-2", VMName: "db-02"},
+			{AppName: "Apache", AppDesc: "Web Servers", VMID: "vm-3", VMName: "web-01"},
+		}
 
-	if err := s.Application().ReplaceAll(ctx, records); err != nil {
-		t.Fatalf("ReplaceAll() failed: %v", err)
-	}
+		Expect(s.Application().ReplaceAll(ctx, records)).To(Succeed())
 
-	overviews, err := s.Application().ListOverviews(ctx)
-	if err != nil {
-		t.Fatalf("ListOverviews() failed: %v", err)
-	}
+		overviews, err := s.Application().ListOverviews(ctx)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(overviews).To(HaveLen(2))
 
-	if len(overviews) != 2 {
-		t.Fatalf("expected 2 apps, got %d", len(overviews))
-	}
+		Expect(overviews[0].Name).To(Equal("Apache"))
+		Expect(overviews[0].VMCount).To(Equal(1))
 
-	// Results should be sorted alphabetically
-	if overviews[0].Name != "Apache" {
-		t.Errorf("expected first app Apache, got %s", overviews[0].Name)
-	}
-	if overviews[0].VMCount != 1 {
-		t.Errorf("expected Apache VMCount 1, got %d", overviews[0].VMCount)
-	}
+		Expect(overviews[1].Name).To(Equal("PostgreSQL"))
+		Expect(overviews[1].VMCount).To(Equal(2))
+		Expect(overviews[1].VMs[0].ID).To(Equal("vm-1"))
+		Expect(overviews[1].VMs[1].ID).To(Equal("vm-2"))
+	})
 
-	if overviews[1].Name != "PostgreSQL" {
-		t.Errorf("expected second app PostgreSQL, got %s", overviews[1].Name)
-	}
-	if overviews[1].VMCount != 2 {
-		t.Errorf("expected PostgreSQL VMCount 2, got %d", overviews[1].VMCount)
-	}
-	if overviews[1].VMs[0].ID != "vm-1" || overviews[1].VMs[1].ID != "vm-2" {
-		t.Errorf("unexpected PostgreSQL VM IDs: %v", overviews[1].VMs)
-	}
-}
+	It("should clear previous data on replace", func() {
+		initial := []models.ApplicationVMRecord{
+			{AppName: "OldApp", AppDesc: "Old", VMID: "vm-1", VMName: "old-vm"},
+		}
+		Expect(s.Application().ReplaceAll(ctx, initial)).To(Succeed())
 
-func TestApplicationStore_ReplaceAll_ClearsPreviousData(t *testing.T) {
-	s := setupApplicationStore(t)
-	ctx := context.Background()
+		updated := []models.ApplicationVMRecord{
+			{AppName: "NewApp", AppDesc: "New", VMID: "vm-2", VMName: "new-vm"},
+		}
+		Expect(s.Application().ReplaceAll(ctx, updated)).To(Succeed())
 
-	// Insert initial data
-	initial := []models.ApplicationVMRecord{
-		{AppName: "OldApp", AppDesc: "Old", VMID: "vm-1", VMName: "old-vm"},
-	}
-	if err := s.Application().ReplaceAll(ctx, initial); err != nil {
-		t.Fatalf("first ReplaceAll() failed: %v", err)
-	}
+		overviews, err := s.Application().ListOverviews(ctx)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(overviews).To(HaveLen(1))
+		Expect(overviews[0].Name).To(Equal("NewApp"))
+	})
 
-	// Replace with new data
-	updated := []models.ApplicationVMRecord{
-		{AppName: "NewApp", AppDesc: "New", VMID: "vm-2", VMName: "new-vm"},
-	}
-	if err := s.Application().ReplaceAll(ctx, updated); err != nil {
-		t.Fatalf("second ReplaceAll() failed: %v", err)
-	}
+	It("should clear table when replacing with empty records", func() {
+		Expect(s.Application().ReplaceAll(ctx, []models.ApplicationVMRecord{
+			{AppName: "App", AppDesc: "Desc", VMID: "vm-1", VMName: "vm"},
+		})).To(Succeed())
 
-	overviews, err := s.Application().ListOverviews(ctx)
-	if err != nil {
-		t.Fatalf("ListOverviews() failed: %v", err)
-	}
+		Expect(s.Application().ReplaceAll(ctx, nil)).To(Succeed())
 
-	if len(overviews) != 1 {
-		t.Fatalf("expected 1 app after replace, got %d", len(overviews))
-	}
-	if overviews[0].Name != "NewApp" {
-		t.Errorf("expected NewApp, got %s", overviews[0].Name)
-	}
-}
+		overviews, err := s.Application().ListOverviews(ctx)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(overviews).To(BeNil())
+	})
 
-func TestApplicationStore_ReplaceAll_EmptyRecords(t *testing.T) {
-	s := setupApplicationStore(t)
-	ctx := context.Background()
-
-	// Insert some data first
-	if err := s.Application().ReplaceAll(ctx, []models.ApplicationVMRecord{
-		{AppName: "App", AppDesc: "Desc", VMID: "vm-1", VMName: "vm"},
-	}); err != nil {
-		t.Fatalf("initial ReplaceAll() failed: %v", err)
-	}
-
-	// Replace with empty list should clear table
-	if err := s.Application().ReplaceAll(ctx, nil); err != nil {
-		t.Fatalf("ReplaceAll(nil) failed: %v", err)
-	}
-
-	overviews, err := s.Application().ListOverviews(ctx)
-	if err != nil {
-		t.Fatalf("ListOverviews() failed: %v", err)
-	}
-	if len(overviews) != 0 {
-		t.Errorf("expected 0 apps after empty replace, got %d", len(overviews))
-	}
-}
-
-func TestApplicationStore_ListOverviews_EmptyTable(t *testing.T) {
-	s := setupApplicationStore(t)
-	ctx := context.Background()
-
-	overviews, err := s.Application().ListOverviews(ctx)
-	if err != nil {
-		t.Fatalf("ListOverviews() failed: %v", err)
-	}
-	if overviews != nil {
-		t.Errorf("expected nil for empty table, got %v", overviews)
-	}
-}
+	It("should return nil for empty table", func() {
+		overviews, err := s.Application().ListOverviews(ctx)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(overviews).To(BeNil())
+	})
+})

@@ -22,18 +22,20 @@
 //
 // # Architecture Overview
 //
-//	┌─────────────────────────────────────────────────────────────────────────────────────┐
-//	│                                   Store (facade)                                    │
-//	├─────────────────────────────────────────────────────────────────────────────────────┤
-//	│  ConfigurationStore │  InventoryStore     │   GroupStore        │  InspectionStore  │
-//	│         ▼           │        ▼            │       ▼             │         ▼         │
-//	│   configuration     │    inventory        │    groups           │  vm_inspection_*  │
-//	│      (local)        │     (local)         │    (local)          │      (local)      │
-//	├─────────────────────┴─────────────────────┴──────────────────── ┴───────────────────┤
-//	│                                       VMStore                                       │
-//	│                                          ▼                                          │
-//	│             vinfo, vdisk, concerns (duckdb_parser); joins local tables              │
-//	└─────────────────────────────────────────────────────────────────────────────────────┘
+//	┌──────────────────────────────────────────────────────────────────────────────────────┐
+//	│                                    Pool                                              │
+//	│  Manages multiple isolated DuckDB databases. Each Database has its own connection.   │
+//	├──────────────────────────────────────────────────────────────────────────────────────┤
+//	│  Database("main")                    │  Database("coll-abc123")                      │
+//	│  ├── agent.duckdb                    │  ├── collection_1234567890.duckdb             │
+//	│  └── Store (facade)                  │  └── Store (facade)                           │
+//	│      ├── ConfigurationStore          │      ├── VMStore                               │
+//	│      ├── CredentialsStore            │      ├── GroupStore                             │
+//	│      ├── VddkStore                   │      ├── InspectionStore                       │
+//	│      ├── ForecastStore               │      ├── InventoryStore                        │
+//	│      └── CollectionStore             │      ├── OutboxStore                            │
+//	│                                      │      └── RightSizingStore                      │
+//	└──────────────────────────────────────┴───────────────────────────────────────────────┘
 //
 // # Data Sources
 //
@@ -70,13 +72,25 @@
 //
 // # Initialization Flow
 //
-//	NewStore(db)
-//	    ├── Creates duckdb_parser.Parser
-//	    └── Initializes all sub-stores with QueryInterceptor
+//	pool := NewPool(cleanupInterval)
 //
-//	Store.Migrate(ctx)
-//	    ├── parser.Init()     → Creates vinfo, vdisk, concerns, etc.
-//	    └── migrations.Run()  → Creates configuration, inventory, inspection tables, …
+//	// Main database (agent config, credentials, forecasts, collections)
+//	mainDB, _ := pool.NewDatabase(MainDatabaseID, path, ...)
+//	mainDB.Migrate(ctx, migrations.RunMain)
+//	pool.Add(mainDB)
+//
+//	// Collection database (VM inventory, groups, inspections)
+//	collDB, _ := pool.NewDatabase(id, path, ...)
+//	collDB.Migrate(ctx, func(ctx context.Context, db *sql.DB) error {
+//	    st, _ := collDB.Store()
+//	    duckdb_parser.New(st.Querier(), validator).Init()  // creates vinfo, vdisk, etc.
+//	    return migrations.RunCollection(ctx, db, name)     // creates groups, inspections, etc.
+//	})
+//	pool.Add(collDB)
+//
+//	// Access via Store facade
+//	st, _ := mainDB.Store()   // or collDB.Store()
+//	cfg, _ := st.Configuration().Get(ctx)
 //
 // # Store Components
 //

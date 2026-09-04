@@ -19,7 +19,7 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
 	handlers "github.com/kubev2v/assisted-migration-agent/internal/handlers/v2"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
-	svc "github.com/kubev2v/assisted-migration-agent/internal/services/v2"
+	svc "github.com/kubev2v/assisted-migration-agent/internal/services"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
@@ -42,7 +42,7 @@ func buildHandlerTestStore(vms []struct {
 	id         string
 	cluster    string
 	migratable bool
-}) (st *store.Store2, db *store.Database, tmpDir string) {
+}) (st *store.Store, db *store.Database, tmpDir string) {
 	var err error
 	tmpDir, err = os.MkdirTemp("", "handler-cmp-test-*")
 	Expect(err).NotTo(HaveOccurred())
