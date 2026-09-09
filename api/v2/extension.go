@@ -134,8 +134,11 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 	if vm.HostName != "" {
 		details.HostName = &vm.HostName
 	}
-	if vm.IPAddress != "" {
-		details.IpAddress = &vm.IPAddress
+	if vm.IP4Address != "" {
+		details.Ip4Address = &vm.IP4Address
+	}
+	if vm.IP6Address != "" {
+		details.Ip6Address = &vm.IP6Address
 	}
 	if vm.StorageUsed > 0 {
 		details.StorageUsed = &vm.StorageUsed
@@ -202,7 +205,12 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 		for _, g := range vm.GuestNetworks {
 			gn := GuestNetwork{
 				Mac: &g.MAC,
-				Ip:  &g.IP,
+			}
+			if g.IPv4 != "" {
+				gn.Ip4 = &g.IPv4
+			}
+			if g.IPv6 != "" {
+				gn.Ip6 = &g.IPv6
 			}
 			if g.Device != "" {
 				gn.Device = &g.Device

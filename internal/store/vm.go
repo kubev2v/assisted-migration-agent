@@ -352,6 +352,7 @@ func fromDB(pvm duckdb_models.VM) models.VM {
 	}
 
 	nics := make([]models.NIC, 0, len(pvm.NICs))
+	guestNetworks := make([]models.GuestNetwork, 0, len(pvm.NICs))
 	for i, n := range pvm.NICs {
 		nics = append(nics, models.NIC{
 			MAC:         n.MAC,
@@ -360,6 +361,15 @@ func fromDB(pvm duckdb_models.VM) models.VM {
 			IPv4Address: n.IPv4Address,
 			IPv6Address: n.IPv6Address,
 		})
+		if n.IPv4Address != "" || n.IPv6Address != "" {
+			guestNetworks = append(guestNetworks, models.GuestNetwork{
+				Device:  n.Label,
+				MAC:     n.MAC,
+				IPv4:    n.IPv4Address,
+				IPv6:    n.IPv6Address,
+				Network: n.Network.ID,
+			})
+		}
 	}
 
 	guestApps := make([]models.GuestApp, 0, len(pvm.GuestApps))
@@ -386,7 +396,8 @@ func fromDB(pvm duckdb_models.VM) models.VM {
 		MemoryMB:              pvm.MemoryMB,
 		GuestName:             pvm.GuestName,
 		HostName:              pvm.HostName,
-		IPAddress:             pvm.IpAddress,
+		IP4Address:            pvm.IpAddress,
+		IP6Address:            firstIPv6(pvm.NICs),
 		DiskSize:              totalDiskCapacityMiB,
 		StorageUsed:           int64(pvm.StorageUsed),
 		IsTemplate:            pvm.IsTemplate,
@@ -395,10 +406,20 @@ func fromDB(pvm duckdb_models.VM) models.VM {
 		FaultToleranceEnabled: pvm.FaultToleranceEnabled,
 		Disks:                 disks,
 		NICs:                  nics,
+		GuestNetworks:         guestNetworks,
 		Issues:                issues,
 		Labels:                pvm.Labels,
 		GuestApps:             guestApps,
 	}
+}
+
+func firstIPv6(nics duckdb_models.NICs) string {
+	for _, n := range nics {
+		if n.IPv6Address != "" {
+			return n.IPv6Address
+		}
+	}
+	return ""
 }
 
 // ListOption modifies a SELECT query for sorting/pagination.

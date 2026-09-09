@@ -1959,7 +1959,10 @@ components:
         hostName:
           type: string
           description: Guest hostname
-        ipAddress:
+        ip4Address:
+          type: string
+          description: Guest primary IP address
+        ip6Address:
           type: string
           description: Guest primary IP address
         storageUsed:
@@ -2122,7 +2125,10 @@ components:
         mac:
           type: string
           description: MAC address as seen by the guest
-        ip:
+        ip4:
+          type: string
+          description: IP address
+        ip6:
           type: string
           description: IP address
         prefixLength:
