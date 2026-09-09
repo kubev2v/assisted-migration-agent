@@ -45,10 +45,11 @@ type VM struct {
 	CpuAffinity    []int32
 	MemoryMB       int32
 
-	GuestName string
-	GuestID   string
-	HostName  string
-	IPAddress string
+	GuestName  string
+	GuestID    string
+	HostName   string
+	IP4Address string
+	IP6Address string
 
 	DiskSize    int64 // total disk size in MB (for list view)
 	StorageUsed int64
@@ -117,7 +118,8 @@ type Device struct {
 type GuestNetwork struct {
 	Device       string
 	MAC          string
-	IP           string
+	IPv4         string
+	IPv6         string
 	PrefixLength int32
 	Network      string
 }

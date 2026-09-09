@@ -446,8 +446,11 @@ type GuestNetwork struct {
 	// Device Network device name inside the guest
 	Device *string `json:"device,omitempty"`
 
-	// Ip IP address
-	Ip *string `json:"ip,omitempty"`
+	// Ip4 IP address
+	Ip4 *string `json:"ip4,omitempty"`
+
+	// Ip6 IP address
+	Ip6 *string `json:"ip6,omitempty"`
 
 	// Mac MAC address as seen by the guest
 	Mac *string `json:"mac,omitempty"`
@@ -756,9 +759,12 @@ type VirtualMachineDetail struct {
 	Inspection       *VirtualMachineInspectionResults `json:"inspection,omitempty"`
 	InspectionStatus *InspectionStatus                `json:"inspectionStatus,omitempty"`
 
-	// IpAddress Guest primary IP address
-	IpAddress *string                `json:"ipAddress,omitempty"`
-	Issues    *[]VirtualMachineIssue `json:"issues,omitempty"`
+	// Ip4Address Guest primary IP address
+	Ip4Address *string `json:"ip4Address,omitempty"`
+
+	// Ip6Address Guest primary IP address
+	Ip6Address *string                `json:"ip6Address,omitempty"`
+	Issues     *[]VirtualMachineIssue `json:"issues,omitempty"`
 
 	// Labels User-defined labels for this VM
 	Labels *[]string `binding:"omitempty,dive,min=1,max=100" json:"labels,omitempty"`
