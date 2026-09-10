@@ -145,4 +145,24 @@ var _ = ginkgo.Describe("Collection lifecycle v2 e2e tests", ginkgo.Ordered, fun
 		gm.Expect(diff.OnlyInA.VmIds).To(gm.BeEmpty(), "expected no VM IDs unique to the first collection")
 		gm.Expect(diff.OnlyInB.VmIds).To(gm.ConsistOf(addedVMID), "expected the added VM's ID to be the only one unique to the second collection")
 	})
+
+	// Given collections exist from previous tests
+	// When DELETE /collections is called
+	// Then all collections should be removed and the agent should be in disconnected mode
+	ginkgo.It("should delete all collections and switch to disconnected mode", func() {
+		collections, err := agentSvc.ListCollections()
+		gm.Expect(err).ToNot(gm.HaveOccurred())
+		gm.Expect(collections.Collections).ToNot(gm.BeEmpty(), "expected at least 1 collection before delete")
+
+		err = agentSvc.DeleteCollections()
+		gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to delete all collections")
+
+		collections, err = agentSvc.ListCollections()
+		gm.Expect(err).ToNot(gm.HaveOccurred())
+		gm.Expect(collections.Collections).To(gm.BeEmpty(), "expected no collections after delete")
+
+		status, err := agentSvc.Status()
+		gm.Expect(err).ToNot(gm.HaveOccurred())
+		gm.Expect(status.Mode).To(gm.Equal("disconnected"), "expected agent to be in disconnected mode after delete")
+	})
 })

@@ -321,6 +321,26 @@ func (p *Pool) All() iter.Seq[*Database] {
 	}
 }
 
+func (p *Pool) Delete(id string) error {
+	db, err := p.Get(id)
+	if err != nil {
+		if errors.IsResourceNotFoundError(err) {
+			return nil
+		}
+		return err
+	}
+
+	if err := db.Close(); err != nil {
+		return err
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	delete(p.databases, id)
+
+	return os.Remove(db.Path)
+}
+
 func (p *Pool) Close() {
 	p.cleanupTimer.Stop()
 
