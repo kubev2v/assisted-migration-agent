@@ -113,6 +113,24 @@ func (s *CollectionStore) MarkFailed(ctx context.Context, database string, errMs
 	return nil
 }
 
+func (s *CollectionStore) MarkPendingDelete(ctx context.Context, database string) error {
+	query, args, err := sq.Insert(collectionTable).
+		Columns(colCollectionDatabase, colCollectionState).
+		Values(database, string(models.CollectionStatePendingDelete)).
+		Suffix("ON CONFLICT (\"database\") DO UPDATE SET state = EXCLUDED.state").
+		ToSql()
+	if err != nil {
+		return fmt.Errorf("building mark pending delete query: %w", err)
+	}
+
+	_, err = s.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("marking collection pending delete: %w", err)
+	}
+
+	return nil
+}
+
 func (s *CollectionStore) Delete(ctx context.Context, database string) error {
 	query, args, err := sq.Delete(collectionTable).
 		Where(sq.Eq{colCollectionDatabase: database}).

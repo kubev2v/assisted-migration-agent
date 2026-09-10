@@ -33,6 +33,9 @@ type ServiceProvider interface {
 	StartCollecting(ctx context.Context) (models.CollectorStatus, error)
 	StopCollecting() error
 	StartRVToolsCollecting(rvtoolFiles []string) (models.CollectorStatus, error)
+
+	DeleteData(ctx context.Context) error
+	Stop(ctx context.Context)
 }
 
 type Handler struct {
