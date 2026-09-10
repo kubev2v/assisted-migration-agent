@@ -554,7 +554,7 @@ type StartForecasterRequest struct {
 
 // StartInspectionRequest defines model for StartInspectionRequest.
 type StartInspectionRequest struct {
-	// VmIds VM MoRef IDs to inspect
+	// VmIds List of VM IDs to inspect
 	VmIds []string `binding:"required,min=1,dive,required" json:"vmIds"`
 }
 
@@ -753,8 +753,10 @@ type VirtualMachineDetail struct {
 	Id string `json:"id"`
 
 	// Inspection VirtualMachines Inspection results
-	Inspection       *VirtualMachineInspectionResults `json:"inspection,omitempty"`
-	InspectionStatus *InspectionStatus                `json:"inspectionStatus,omitempty"`
+	Inspection *VirtualMachineInspectionResults `json:"inspection,omitempty"`
+
+	// InspectionStatus Current standard (virt-inspector) inspection status of the virtual machine
+	InspectionStatus *InspectionStatus `json:"inspectionStatus,omitempty"`
 
 	// IpAddress Guest primary IP address
 	IpAddress *string                `json:"ipAddress,omitempty"`
@@ -801,6 +803,9 @@ type VirtualMachineDetail struct {
 	// Uuid Universally unique identifier assigned by vCenter
 	Uuid *string `json:"uuid,omitempty"`
 
+	// V2vInspectionStatus Current v2v (virt-v2v-inspector) deep dry-run inspection status of the virtual machine
+	V2vInspectionStatus *InspectionStatus `json:"v2vInspectionStatus,omitempty"`
+
 	// VCenterID Identifier of the vCenter this VirtualMachine belongs to
 	VCenterID string `json:"vCenterID"`
 }
@@ -846,7 +851,11 @@ type VirtualMachineInspectionConcern struct {
 
 // VirtualMachineInspectionResults VirtualMachines Inspection results
 type VirtualMachineInspectionResults struct {
+	// Concerns Concerns from the standard virt-inspector metadata audit
 	Concerns *[]VirtualMachineInspectionConcern `json:"concerns,omitempty"`
+
+	// V2vConcerns Concerns from the deep virt-v2v-inspector translation dry-run
+	V2vConcerns *[]VirtualMachineInspectionConcern `json:"v2vConcerns,omitempty"`
 }
 
 // VirtualMachineIssue defines model for VirtualMachineIssue.
@@ -1026,6 +1035,12 @@ type GetInspectorStatusParams struct {
 	IncludeVddk *bool `form:"includeVddk,omitempty" json:"includeVddk,omitempty"`
 }
 
+// GetV2VInspectorStatusParams defines parameters for GetV2VInspectorStatus.
+type GetV2VInspectorStatusParams struct {
+	// IncludeVddk Include VDDK metadata in the response
+	IncludeVddk *bool `form:"includeVddk,omitempty" json:"includeVddk,omitempty"`
+}
+
 // PutInspectorVddkMultipartBody defines parameters for PutInspectorVddk.
 type PutInspectorVddkMultipartBody struct {
 	File openapi_types.File `json:"file"`
@@ -1078,6 +1093,9 @@ type UpdateLatestGroupJSONRequestBody = UpdateGroupRequest
 
 // StartInspectionJSONRequestBody defines body for StartInspection for application/json ContentType.
 type StartInspectionJSONRequestBody = StartInspectionRequest
+
+// StartV2VInspectionJSONRequestBody defines body for StartV2VInspection for application/json ContentType.
+type StartV2VInspectionJSONRequestBody = StartInspectionRequest
 
 // PutInspectorVddkMultipartRequestBody defines body for PutInspectorVddk for multipart/form-data ContentType.
 type PutInspectorVddkMultipartRequestBody PutInspectorVddkMultipartBody
