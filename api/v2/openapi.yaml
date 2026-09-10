@@ -531,6 +531,15 @@ paths:
                 $ref: '#/components/schemas/CollectionListResponse'
         '500':
           description: Internal server error
+    delete:
+      tags: [Collections]
+      summary: Delete all collections
+      operationId: deleteCollections
+      responses:
+        '204':
+          description: Delete all collections
+        '500':
+          description: Internal server error
 
   # ── Collectors ─────────────────────────────────────────────────────────
   /collector:

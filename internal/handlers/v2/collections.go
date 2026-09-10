@@ -21,3 +21,12 @@ func (h *Handler) ListCollections(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, resp)
 }
+
+func (h *Handler) DeleteCollections(c *gin.Context) {
+	if err := h.svc.DeleteData(c.Request.Context()); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}

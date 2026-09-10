@@ -380,6 +380,24 @@ func (m *ServiceManager) Stop(ctx context.Context) {
 	}
 }
 
+// DeleteData deletes all the collections.
+func (m *ServiceManager) DeleteData(ctx context.Context) error {
+	// stop service manager
+	m.Stop(ctx)
+
+	// wipe out data
+	if err := m.collection.DeleteAll(ctx); err != nil {
+		return err
+	}
+
+	// switch agent in disconnected mode
+	if err := m.console.SetMode(ctx, models.AgentModeDisconnected); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (m *ServiceManager) vmService(db *store.Database) (*VMService, error) {
 	st, err := db.Store()
 	if err != nil {

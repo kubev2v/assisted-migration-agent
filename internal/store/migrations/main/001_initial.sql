@@ -68,6 +68,6 @@ CREATE TABLE IF NOT EXISTS credentials (
 -- Create collections table: source of truth for lifecycle and publication state
 CREATE TABLE IF NOT EXISTS collections (
     "database" VARCHAR PRIMARY KEY,
-    state VARCHAR NOT NULL CHECK (state IN ('running',  'failed')),
+    state VARCHAR NOT NULL CHECK (state IN ('running', 'failed', 'pending_delete')),
     error VARCHAR
 );

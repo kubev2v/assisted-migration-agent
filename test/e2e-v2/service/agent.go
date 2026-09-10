@@ -333,6 +333,18 @@ func (a *AgentSvc) CompareCollectionsDiff(aId, bId string, dimension v2.CompareC
 	return &result, nil
 }
 
+func (a *AgentSvc) DeleteCollections() error {
+	resp, err := a.doRequest(http.MethodDelete, "/api/v2/collections", nil)
+	if err != nil {
+		return err
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+	return nil
+}
+
 func (a *AgentSvc) DeleteCollection(id string) error {
 	resp, err := a.doRequest(http.MethodDelete, "/api/v2/collections/"+url.PathEscape(id), nil)
 	if err != nil {
