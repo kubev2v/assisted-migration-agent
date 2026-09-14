@@ -198,8 +198,8 @@ github.com/getkin/kin-openapi v0.145.0/go.mod h1:3BH9M9XDe/y9M5DSvEocVYAYq1w0qrh
 github.com/ghodss/yaml v1.0.0/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
 github.com/gin-contrib/cors v1.7.6 h1:3gQ8GMzs1Ylpf70y8bMw4fVpycXIeX1ZemuSQIsnQQY=
 github.com/gin-contrib/cors v1.7.6/go.mod h1:Ulcl+xN4jel9t1Ry8vqph23a60FwH9xVLd+3ykmTjOk=
-github.com/gin-contrib/sse v1.1.0 h1:n0w2GMuUpWDVp7qSpvze6fAu9iRxJY4Hmj6AmBOU05w=
-github.com/gin-contrib/sse v1.1.0/go.mod h1:hxRZ5gVpWMT7Z0B0gSNYqqsSCNIJMjzvm6fqCz9vjwM=
+github.com/gin-contrib/sse v1.1.2 h1:MU2fgl1RrdYTMcgJLtz2kJF+vPg3xrqaaKfUUU18tCo=
+github.com/gin-contrib/sse v1.1.2/go.mod h1:QXzuVkA0YO7o/gun03UI1Q+FTI8ZV/n5t03kIQAI89s=
 github.com/gin-contrib/zap v1.1.5 h1:qKwhWb4DQgPriCl1AHLLob6hav/KUIctKXIjTmWIN3I=
 github.com/gin-contrib/zap v1.1.5/go.mod h1:lAchUtGz9M2K6xDr1rwtczyDrThmSx6c9F384T45iOE=
 github.com/gin-gonic/gin v1.11.0 h1:OW/6PLjyusp2PPXtyxKHU0RbX6I/l28FTdDlae5ueWk=
