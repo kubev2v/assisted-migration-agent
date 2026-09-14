@@ -389,8 +389,8 @@ github.com/json-iterator/go v1.1.6/go.mod h1:+SdeFBvtyEkXs7REEP0seUULqWtbJapLOCV
 github.com/json-iterator/go v1.1.12 h1:PV8peI4a0ysnczrg+LtxykD8LfKY9ML6u2jnxaEnrnM=
 github.com/json-iterator/go v1.1.12/go.mod h1:e30LSqwooZae/UwlEbR2852Gd8hjQvJoHmT4TnhNGBo=
 github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d/go.mod h1:2PavIy+JPciBPrBUjwbNvtwB6RQlve+hkpll6QSNmOE=
-github.com/jzelinskie/cobrautil/v2 v2.0.0-20240819150235-f7fe73942d0f h1:+WgAZQQXj+X8lcJdwcrQpD89Zd9ekdauOK3hWl3FkPU=
-github.com/jzelinskie/cobrautil/v2 v2.0.0-20240819150235-f7fe73942d0f/go.mod h1:jsl6cEF6BT3UeQoSLreA7G0sZXemoI5XNqyxzWCohbE=
+github.com/jzelinskie/cobrautil/v2 v2.0.0-20260331224425-513c88b62ffe h1:SA9iBugzqlof0pGKCn1f1zg7JWwkJuyPRu2fO86Gd3M=
+github.com/jzelinskie/cobrautil/v2 v2.0.0-20260331224425-513c88b62ffe/go.mod h1:YAKfloXwyXXcSiYqlyFFki9xnOsFC40+HONA3FnXEBA=
 github.com/jzelinskie/stringz v0.0.2 h1:OSjMEYvz8tjhovgZ/6cGcPID736ubeukr35mu6RYAmg=
 github.com/jzelinskie/stringz v0.0.2/go.mod h1:hHYbgxJuNLRw91CmpuFsYEOyQqpDVFg8pvEh23vy4P0=
 github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.7.7 h1:z4P744DR+PIpkjwXSEc6TvN3L6LVzmUquFgmNm8wSUc=

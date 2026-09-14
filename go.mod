@@ -16,7 +16,7 @@ require (
 	github.com/go-playground/validator/v10 v10.28.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
-	github.com/jzelinskie/cobrautil/v2 v2.0.0-20240819150235-f7fe73942d0f
+	github.com/jzelinskie/cobrautil/v2 v2.0.0-20260331224425-513c88b62ffe
 	github.com/kubev2v/forklift v0.0.0-20260812070321-b33d2e55b079
 	github.com/kubev2v/migration-planner v0.18.1-0.20260910132838-80cca2ad1501
 	github.com/kubev2v/vm-migration-detective v0.0.0-20260908083350-a89447103cf3
