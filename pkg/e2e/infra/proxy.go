@@ -29,10 +29,9 @@ type Proxy struct {
 
 func NewObservableProxy(name, targetName string, target *url.URL, port string) (*Proxy, chan Request) {
 	proxy := &httputil.ReverseProxy{
-		Director: func(req *http.Request) {
-			req.URL.Scheme = target.Scheme
-			req.URL.Host = target.Host
-			req.Host = target.Host
+		Rewrite: func(pr *httputil.ProxyRequest) {
+			pr.SetURL(target)
+			pr.Out.Host = target.Host
 		},
 	}
 
@@ -60,10 +59,9 @@ func NewObservableProxy(name, targetName string, target *url.URL, port string) (
 
 func NewProxy(name, targetName string, target *url.URL, port string) *Proxy {
 	proxy := &httputil.ReverseProxy{
-		Director: func(req *http.Request) {
-			req.URL.Scheme = target.Scheme
-			req.URL.Host = target.Host
-			req.Host = target.Host
+		Rewrite: func(pr *httputil.ProxyRequest) {
+			pr.SetURL(target)
+			pr.Out.Host = target.Host
 		},
 	}
 
