@@ -7,13 +7,12 @@ metadata:
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/cancel-in-progress: "false"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && (target_branch
-      == "main" || target_branch == "stable")
+    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch.startsWith("refs/tags/")
   labels:
     appstudio.openshift.io/application: assisted-migration
     appstudio.openshift.io/component: oma-appliance
     pipelines.appstudio.openshift.io/type: build
-  name: oma-appliance-on-push
+  name: oma-appliance-on-tag
   namespace: assisted-migration-tenant
 spec:
   params:
@@ -22,7 +21,7 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/assisted-migration-tenant/oma-appliance:{{revision}}
+    value: quay.io/redhat-user-workloads/assisted-migration-tenant/oma-appliance:{{git_tag}}
   - name: dockerfile
     value: Containerfile
   - name: path-context
@@ -462,14 +461,14 @@ spec:
       workspaces:
       - name: workspace
         workspace: workspace
-    - name: apply-tags-main
+    - name: apply-tags
       params:
       - name: IMAGE_URL
         value: $(tasks.build-image-index.results.IMAGE_URL)
       - name: IMAGE_DIGEST
         value: $(tasks.build-image-index.results.IMAGE_DIGEST)
       - name: ADDITIONAL_TAGS
-        value: ["latest"]
+        value: ["prod"]
       runAfter:
       - build-image-index
       taskRef:
@@ -481,35 +480,6 @@ spec:
         - name: kind
           value: task
         resolver: bundles
-      when:
-      - input: '{{target_branch}}'
-        operator: in
-        values:
-        - main
-    - name: apply-tags-stable
-      params:
-      - name: IMAGE_URL
-        value: $(tasks.build-image-index.results.IMAGE_URL)
-      - name: IMAGE_DIGEST
-        value: $(tasks.build-image-index.results.IMAGE_DIGEST)
-      - name: ADDITIONAL_TAGS
-        value: ["stable"]
-      runAfter:
-      - build-image-index
-      taskRef:
-        params:
-        - name: name
-          value: apply-tags
-        - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-apply-tags:0.3@sha256:3ab844157eccd68e95e4852adc06c3c4ea674edb7865a474b0a898227f2893d6
-        - name: kind
-          value: task
-        resolver: bundles
-      when:
-      - input: '{{target_branch}}'
-        operator: in
-        values:
-        - stable
     - name: push-dockerfile
       params:
       - name: IMAGE
