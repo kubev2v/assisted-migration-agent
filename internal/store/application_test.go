@@ -37,7 +37,7 @@ func TestApplicationStore_ReplaceAll_And_ListOverviews(t *testing.T) {
 		t.Fatalf("ReplaceAll() failed: %v", err)
 	}
 
-	overviews, err := s.Application().ListOverviews(ctx)
+	overviews, err := s.Application().ListOverviews(ctx, "")
 	if err != nil {
 		t.Fatalf("ListOverviews() failed: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestApplicationStore_ReplaceAll_ClearsPreviousData(t *testing.T) {
 		t.Fatalf("second ReplaceAll() failed: %v", err)
 	}
 
-	overviews, err := s.Application().ListOverviews(ctx)
+	overviews, err := s.Application().ListOverviews(ctx, "")
 	if err != nil {
 		t.Fatalf("ListOverviews() failed: %v", err)
 	}
@@ -114,7 +114,7 @@ func TestApplicationStore_ReplaceAll_EmptyRecords(t *testing.T) {
 		t.Fatalf("ReplaceAll(nil) failed: %v", err)
 	}
 
-	overviews, err := s.Application().ListOverviews(ctx)
+	overviews, err := s.Application().ListOverviews(ctx, "")
 	if err != nil {
 		t.Fatalf("ListOverviews() failed: %v", err)
 	}
@@ -127,7 +127,7 @@ func TestApplicationStore_ListOverviews_EmptyTable(t *testing.T) {
 	s := setupApplicationStore(t)
 	ctx := context.Background()
 
-	overviews, err := s.Application().ListOverviews(ctx)
+	overviews, err := s.Application().ListOverviews(ctx, "")
 	if err != nil {
 		t.Fatalf("ListOverviews() failed: %v", err)
 	}

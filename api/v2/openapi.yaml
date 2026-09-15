@@ -856,6 +856,14 @@ paths:
           description: Collection ID
           schema:
             type: string
+        - name: byExpression
+          in: query
+          required: false
+          description: Filter applications by VM criteria (e.g., "groups contains 'production'", "cluster = 'prod-cluster'")
+          schema:
+            type: string
+            maxLength: 10240
+          example: "groups contains 'production'"
       responses:
         '200':
           description: List of detected applications
@@ -863,6 +871,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApplicationListResponse'
+        '400':
+          description: Invalid filter expression
         '404':
           description: Collection not found
         '500':

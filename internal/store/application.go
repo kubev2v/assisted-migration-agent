@@ -6,6 +6,7 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 
+	vmfilter "github.com/kubev2v/assisted-migration-agent/internal/filter"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 )
 
@@ -57,11 +58,58 @@ func (s *ApplicationStore) ReplaceAll(ctx context.Context, records []models.Appl
 }
 
 // ListOverviews returns application overviews grouped by app name, sorted alphabetically.
-func (s *ApplicationStore) ListOverviews(ctx context.Context) ([]models.ApplicationOverview, error) {
-	query, args, err := sq.Select(appColAppName, appColAppDesc, appColVMID, appColVMName).
-		From(appTable).
-		OrderBy(appColAppName, appColVMName).
-		ToSql()
+// If filterExpr is provided, only applications from VMs matching the filter are returned.
+func (s *ApplicationStore) ListOverviews(ctx context.Context, filterExpr string) ([]models.ApplicationOverview, error) {
+	builder := sq.Select(appColAppName, appColAppDesc, appColVMID, appColVMName).
+		From(appTable+" va").
+		OrderBy(appColAppName, appColVMName)
+
+	// If filter expression provided, apply VM filtering
+	if filterExpr != "" {
+		// Parse the filter expression to get sqlizer
+		sqlizer, err := vmfilter.ParseWithDefaultMap([]byte(filterExpr))
+		if err != nil {
+			return nil, fmt.Errorf("parsing filter expression: %w", err)
+		}
+
+		// Join vinfo and other tables needed for filtering
+		// Match the pattern from internal/store/vm_queries.go buildListQuery
+		builder = builder.
+			Join("vinfo v ON va.vm_id = v.\"VM ID\"").
+			// Add LEFT JOIN for groups (for "groups contains" filters)
+			LeftJoin(`(
+				SELECT u.vm_id, ARRAY_AGG(DISTINCT grp.name) AS groups
+				FROM group_matches gm
+				JOIN groups grp ON gm.group_id = grp.id
+				, UNNEST(gm.vm_ids) AS u(vm_id)
+				GROUP BY u.vm_id
+			) g ON v."VM ID" = g.vm_id`).
+			// Add LEFT JOIN for concerns (for "concern.*" filters)
+			LeftJoin(`concerns c ON c."VM_ID" = v."VM ID"`).
+			// Add LEFT JOIN for critical concerns count (for "migratable" filter)
+			LeftJoin(`(
+				SELECT "VM_ID", COUNT(*) as critical_count
+				FROM concerns
+				WHERE "Category" IN ('Critical', 'Error')
+				GROUP BY "VM_ID"
+			) crit ON v."VM ID" = crit."VM_ID"`).
+			// Add LEFT JOIN for issues count
+			LeftJoin(`(
+				SELECT "VM_ID", COUNT(*) as issues_count
+				FROM concerns
+				GROUP BY "VM_ID"
+			) cc ON v."VM ID" = cc."VM_ID"`).
+			// Add LEFT JOIN for disk aggregation (for "total_disk_capacity" filter)
+			LeftJoin(`(
+				SELECT "VM ID", SUM(COALESCE("Capacity MiB", 0)) as total_disk
+				FROM vdisk
+				GROUP BY "VM ID"
+			) d ON v."VM ID" = d."VM ID"`).
+			// Apply the filter
+			Where(sqlizer)
+	}
+
+	query, args, err := builder.ToSql()
 	if err != nil {
 		return nil, fmt.Errorf("building list query: %w", err)
 	}

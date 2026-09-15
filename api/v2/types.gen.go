@@ -928,6 +928,12 @@ type CompareCollectionsDiffParams struct {
 // CompareCollectionsDiffParamsDimension defines parameters for CompareCollectionsDiff.
 type CompareCollectionsDiffParamsDimension string
 
+// ListApplicationsParams defines parameters for ListApplications.
+type ListApplicationsParams struct {
+	// ByExpression Filter applications by VM criteria (e.g., "groups contains 'production'", "cluster = 'prod-cluster'")
+	ByExpression *string `form:"byExpression,omitempty" json:"byExpression,omitempty"`
+}
+
 // ExportCollectionParams defines parameters for ExportCollection.
 type ExportCollectionParams struct {
 	// Scope Comma-separated export scopes (e.g., "overview,vms,groups"). Defaults to "overview".

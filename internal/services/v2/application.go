@@ -37,8 +37,8 @@ func NewApplicationService(st *store.Store2) (*ApplicationService, error) {
 	return &ApplicationService{store: st, defs: defs}, nil
 }
 
-func (s *ApplicationService) List(ctx context.Context) ([]models.ApplicationOverview, error) {
-	return s.store.Application().ListOverviews(ctx)
+func (s *ApplicationService) List(ctx context.Context, filterExpr string) ([]models.ApplicationOverview, error) {
+	return s.store.Application().ListOverviews(ctx, filterExpr)
 }
 
 // BuildCollectorWorkUnits returns a postCollectionBuilderFn that precomputes

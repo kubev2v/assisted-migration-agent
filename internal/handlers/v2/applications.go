@@ -7,12 +7,13 @@ import (
 	"github.com/gin-gonic/gin"
 
 	v2 "github.com/kubev2v/assisted-migration-agent/api/v2"
+	vmfilter "github.com/kubev2v/assisted-migration-agent/internal/filter"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
 // ListApplications returns detected applications for a collection.
 // (GET /collections/{id}/applications)
-func (h *Handler) ListApplications(c *gin.Context, id string) {
+func (h *Handler) ListApplications(c *gin.Context, id string, params v2.ListApplicationsParams) {
 	appSvc, err := h.svc.ApplicationService(id)
 	if err != nil {
 		if srvErrors.IsResourceNotFoundError(err) {
@@ -23,7 +24,17 @@ func (h *Handler) ListApplications(c *gin.Context, id string) {
 		return
 	}
 
-	apps, err := appSvc.List(c.Request.Context())
+	// Validate filter expression if provided
+	filterExpr := ""
+	if params.ByExpression != nil {
+		if _, err := vmfilter.ParseWithDefaultMap([]byte(*params.ByExpression)); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("expression filter is invalid: %v", err)})
+			return
+		}
+		filterExpr = *params.ByExpression
+	}
+
+	apps, err := appSvc.List(c.Request.Context(), filterExpr)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to list applications: %v", err)})
 		return

@@ -43,8 +43,10 @@ func (h *RVToolsHandler) PutInspectorVddk(c *gin.Context)          { rvtoolsNotA
 func (h *RVToolsHandler) GetInspectorStatus(c *gin.Context, _ v2.GetInspectorStatusParams) {
 	rvtoolsNotAvailable(c)
 }
-func (h *RVToolsHandler) GetInspectorVddkStatus(c *gin.Context)     { rvtoolsNotAvailable(c) }
-func (h *RVToolsHandler) ListApplications(c *gin.Context, _ string) { rvtoolsNotAvailable(c) }
+func (h *RVToolsHandler) GetInspectorVddkStatus(c *gin.Context) { rvtoolsNotAvailable(c) }
+func (h *RVToolsHandler) ListApplications(c *gin.Context, _ string, _ v2.ListApplicationsParams) {
+	rvtoolsNotAvailable(c)
+}
 func (h *RVToolsHandler) CompareCollections(c *gin.Context, _ string, _ string) {
 	rvtoolsNotAvailable(c)
 }
