@@ -88,6 +88,7 @@ func (s *VMStore) List(ctx context.Context, filter sq.Sqlizer, opts ...ListOptio
 			&vm.PowerState,
 			&vm.Cluster,
 			&vm.Datacenter,
+			&vm.CpuCount,
 			&vm.Memory,
 			&vm.DiskSize,
 			&vm.IssueCount,
@@ -230,6 +231,107 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 	}
 
 	return &result, nil
+}
+
+// ListDetailedVirtualMachines returns VMs with full details (disks, NICs, concerns, utilization,
+// guest apps, inspection status). Supports filtering via the standard filter subquery and
+// pagination via ListOptions.
+func (s *VMStore) ListDetailedVirtualMachines(ctx context.Context, filter sq.Sqlizer, opts ...ListOption) ([]models.VM, error) {
+	whereClause := ""
+	var queryArgs []any
+
+	if filter != nil {
+		subquery := vmFilterSubquery.Where(filter)
+		subSQL, subArgs, err := subquery.ToSql()
+		if err != nil {
+			return nil, err
+		}
+		whereClause = fmt.Sprintf(`WHERE i."VM ID" IN (%s)`, subSQL)
+		queryArgs = subArgs
+	}
+
+	query := fmt.Sprintf(vmListDetailedVirtualMachinesQuery, whereClause)
+
+	rows, err := s.db.QueryContext(ctx, query, queryArgs...)
+	if err != nil {
+		return nil, fmt.Errorf("listing detailed VMs: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var vms []models.VM
+	for rows.Next() {
+		var pvm duckdb_models.VM
+		var groups StringArray
+		var (
+			uMoid                                                sql.NullString
+			uVmName                                              sql.NullString
+			uProvCpus                                            sql.NullInt64
+			uProvMemMb                                           sql.NullInt64
+			uProvDiskKb                                          sql.NullFloat64
+			uCpuAvg, uCpuP95, uCpuMax, uCpuLatest               sql.NullFloat64
+			uMemAvg, uMemP95, uMemMax, uMemLatest               sql.NullFloat64
+			uDisk, uConfidence                                   sql.NullFloat64
+			inspectionState, inspectionDetails, inspectionError  string
+		)
+
+		if err := rows.Scan(
+			&pvm.ID, &pvm.Name, &pvm.Folder, &pvm.Host, &pvm.UUID,
+			&pvm.Firmware, &pvm.PowerState, &pvm.ConnectionState,
+			&pvm.FaultToleranceEnabled, &pvm.CpuCount, &pvm.MemoryMB,
+			&pvm.GuestName, &pvm.GuestNameFromVmwareTools, &pvm.HostName,
+			&pvm.IpAddress, &pvm.StorageUsed, &pvm.IsTemplate,
+			&pvm.ChangeTrackingEnabled, &pvm.DiskEnableUuid, &pvm.Datacenter,
+			&pvm.Cluster, &pvm.HWVersion, &pvm.TotalDiskCapacityMiB,
+			&pvm.ProvisionedMiB, &pvm.ResourcePool, &pvm.OsDiskComplexity,
+			&pvm.MigrationExcluded, &pvm.Labels, &groups,
+			&pvm.CpuHotAddEnabled, &pvm.CpuHotRemoveEnabled, &pvm.CpuSockets,
+			&pvm.CoresPerSocket, &pvm.MemoryHotAddEnabled, &pvm.BalloonedMemory,
+			&pvm.Disks, &pvm.NICs, &pvm.Networks, &pvm.Concerns,
+			&uMoid, &uVmName, &uProvCpus, &uProvMemMb, &uProvDiskKb,
+			&uCpuAvg, &uCpuP95, &uCpuMax, &uCpuLatest,
+			&uMemAvg, &uMemP95, &uMemMax, &uMemLatest,
+			&uDisk, &uConfidence, &pvm.GuestApps,
+			&inspectionState, &inspectionDetails, &inspectionError,
+		); err != nil {
+			return nil, fmt.Errorf("scanning detailed VM: %w", err)
+		}
+
+		for i := range pvm.Disks {
+			pvm.Disks[i].ChangeTrackingEnabled = pvm.ChangeTrackingEnabled
+		}
+
+		result := fromDB(pvm)
+		result.Groups = groups
+		result.InspectionStatus.State = models.InspectionState(inspectionState)
+		result.InspectionStatus.Details = inspectionDetails
+		if inspectionError != "" {
+			result.InspectionStatus.Error = errors.New(inspectionError)
+		}
+
+		if uMoid.Valid {
+			result.Utilization = &models.VmUtilizationDetails{
+				MOID:                uMoid.String,
+				VMName:              uVmName.String,
+				ProvisionedCpus:     int(uProvCpus.Int64),
+				ProvisionedMemoryMb: int(uProvMemMb.Int64),
+				ProvisionedDiskKb:   uProvDiskKb.Float64,
+				CpuAvg:              uCpuAvg.Float64,
+				CpuP95:              uCpuP95.Float64,
+				CpuMax:              uCpuMax.Float64,
+				CpuLatest:           uCpuLatest.Float64,
+				MemAvg:              uMemAvg.Float64,
+				MemP95:              uMemP95.Float64,
+				MemMax:              uMemMax.Float64,
+				MemLatest:           uMemLatest.Float64,
+				Disk:                uDisk.Float64,
+				Confidence:          uConfidence.Float64,
+			}
+		}
+
+		vms = append(vms, result)
+	}
+
+	return vms, rows.Err()
 }
 
 // GetFilterOptions returns the distinct values available for VM filtering.

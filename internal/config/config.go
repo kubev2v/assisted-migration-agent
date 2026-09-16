@@ -40,6 +40,7 @@ type Agent struct {
 	LegacyStatusEnabled bool          `debugmap:"visible" default:"true"`
 	RetainCollections   int           `debugmap:"visible" default:"1"`
 	RVToolsMode         bool          `debugmap:"visible" default:"false"`
+	ScriptingEnabled    bool          `debugmap:"visible" default:"false"`
 }
 
 type Console struct {

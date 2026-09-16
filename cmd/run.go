@@ -163,14 +163,26 @@ func initV2(cfg *config.Configuration) (*server.Server, func(), error) {
 		return nil, nil, fmt.Errorf("failed to load v2 swagger spec: %w", err)
 	}
 
-	srv, err := server.NewServer(cfg, map[string]server.APIGroup{
+	routers := map[string]server.APIGroup{
 		apiV2: {
 			Swagger: swagger,
 			RegisterFn: func(router *gin.RouterGroup) {
 				v2.RegisterHandlers(router, v2H)
 			},
 		},
-	})
+	}
+
+	if cfg.Agent.ScriptingEnabled {
+		scriptingSvc := service.NewScriptingService(pool)
+		scriptingHandler := v2Handlers.NewScriptingHandler(scriptingSvc)
+		routers["/api/exp"] = server.APIGroup{
+			RegisterFn: func(router *gin.RouterGroup) {
+				router.POST("", scriptingHandler.RunScript)
+			},
+		}
+	}
+
+	srv, err := server.NewServer(cfg, routers)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create http server: %w", err)
 	}
@@ -373,6 +385,7 @@ func registerAgentFlags(flagSet *pflag.FlagSet, config *config.Configuration) {
 	flagSet.StringVar(&config.Agent.Version, "version", config.Agent.Version, "Agent version to report to console")
 	flagSet.StringVar(&config.Agent.DataFolder, "data-folder", config.Agent.DataFolder, "Path to the persistent data folder")
 	flagSet.BoolVar(&config.Agent.RVToolsMode, "rvtools-mode", config.Agent.RVToolsMode, "RVTool mode: enabled or disabled (default: disable)")
+	flagSet.BoolVar(&config.Agent.ScriptingEnabled, "experimental-scripting-enabled", config.Agent.ScriptingEnabled, "Scripting enabled. This is experimental")
 }
 
 func registerConsoleFlags(flagSet *pflag.FlagSet, config *config.Configuration) {

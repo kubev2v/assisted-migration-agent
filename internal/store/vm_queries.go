@@ -157,6 +157,155 @@ LEFT JOIN vm_inspection_status ins ON i."VM ID" = ins."VM ID"
 
 `
 
+// vmListDetailedVirtualMachinesQuery fetches all VMs with full details (disks, NICs, concerns,
+// utilization, inspection, groups, guest apps). Derived from vmGetQuery but without the
+// single-VM filtered_vm CTE. Accepts a %s placeholder for an optional WHERE clause
+// to scope results to specific VM IDs (injected by the filter subquery).
+const vmListDetailedVirtualMachinesQuery = `
+WITH disks AS (
+    SELECT
+        dk."VM ID",
+        LIST({
+            'Key': dk."Disk Key",
+            'UnitNumber': dk."Unit #",
+            'File': COALESCE(dk."Path", dk."Disk Path"),
+            'Capacity': COALESCE(dk."Capacity MiB", 0),
+            'Shared': dk."Sharing mode",
+            'RDM': dk."Raw",
+            'Bus': dk."Shared Bus",
+            'Mode': dk."Disk Mode",
+            'Serial': dk."Disk UUID",
+            'Thin': dk."Thin",
+            'Controller': dk."Controller",
+            'Label': dk."Label",
+            'SCSIUnit': dk."SCSI Unit #",
+            'Datastore': COALESCE(ds."Object ID", '')
+        }) AS disks
+    FROM vdisk dk
+    LEFT JOIN vdatastore ds ON ds."Name" = regexp_extract(COALESCE(dk."Path", dk."Disk Path"), '\[([^\]]+)\]', 1)
+    GROUP BY dk."VM ID"
+),
+nics AS (
+    SELECT
+        vnetwork."VM ID",
+        LIST({
+            'Network': "Network",
+            'MAC': "Mac Address",
+            'Label': "NIC label",
+            'Adapter': "Adapter",
+            'Switch': "Switch",
+            'Connected': "Connected",
+            'StartsConnected': "Starts Connected",
+            'Type': "Type",
+            'IPv4Address': CASE WHEN "IPv4 Address" = 'VM' OR "IPv4 Address" IS NULL THEN '' ELSE "IPv4 Address" END,
+            'IPv6Address': CASE WHEN "IPv6 Address" = 'VM' OR "IPv6 Address" IS NULL THEN '' ELSE "IPv6 Address" END
+        } ORDER BY "Mac Address" ASC) AS nics
+    FROM vnetwork
+    GROUP BY vnetwork."VM ID"
+),
+concerns_agg AS (
+    SELECT
+        "VM_ID",
+        LIST({
+            'Id': "Concern_ID",
+            'Label': "Label",
+            'Category': "Category",
+            'Assessment': "Assessment"
+        }) AS concerns
+    FROM concerns
+    GROUP BY "VM_ID"
+),
+groups_agg AS (
+    SELECT
+        u.vm_id,
+        ARRAY_AGG(DISTINCT grp.name) AS groups
+    FROM group_matches gm
+    JOIN groups grp ON gm.group_id = grp.id
+    , UNNEST(gm.vm_ids) AS u(vm_id)
+    GROUP BY u.vm_id
+)
+SELECT
+    COALESCE(i."VM ID", '') AS "ID",
+    COALESCE(i."VM", '') AS "Name",
+    COALESCE(i."Folder ID", i."Folder", '') AS "Folder",
+    COALESCE(i."Host", '') AS "Host",
+    COALESCE(i."SMBIOS UUID", i."VM UUID", '') AS "UUID",
+    COALESCE(i."Firmware", '') AS "Firmware",
+    COALESCE(i."Powerstate", '') AS "PowerState",
+    COALESCE(i."Connection state", '') AS "ConnectionState",
+    COALESCE(i."FT State" IN ('enabled', 'running', 'starting', 'needSecondary', 'primary', 'secondary'), false) AS "FaultToleranceEnabled",
+    COALESCE(i."CPUs", 0) AS "CpuCount",
+    COALESCE(i."Memory", 0) AS "MemoryMB",
+    COALESCE(i."OS according to the configuration file", '') AS "GuestName",
+    COALESCE(i."OS according to the VMware Tools", '') AS "GuestNameFromVmwareTools",
+    COALESCE(i."DNS Name", '') AS "HostName",
+    COALESCE(i."Primary IP Address", '') AS "IpAddress",
+    CAST(COALESCE(i."In Use MiB", 0) AS BIGINT) * 1024 * 1024 AS "StorageUsed",
+    COALESCE(i."Template", false) AS "IsTemplate",
+    COALESCE(i."CBT", false) AS "ChangeTrackingEnabled",
+    COALESCE(i."EnableUUID", false) AS "DiskEnableUuid",
+    COALESCE(i."Datacenter", '') AS "Datacenter",
+    COALESCE(i."Cluster", '') AS "Cluster",
+    COALESCE(i."HW version", '') AS "HWVersion",
+    COALESCE(i."Total disk capacity MiB", 0) AS "TotalDiskCapacityMiB",
+    COALESCE(i."Provisioned MiB", 0) AS "ProvisionedMiB",
+    COALESCE(i."Resource pool", '') AS "ResourcePool",
+    COALESCE(i."OsDiskComplexity", 0) AS "OsDiskComplexity",
+    COALESCE(i."migration_excluded", false) AS "MigrationExcluded",
+    COALESCE(CAST(i."labels" AS VARCHAR[]), [])::VARCHAR[] AS "Labels",
+    COALESCE(g.groups, [])::VARCHAR[] AS "Groups",
+    COALESCE(c."Hot Add", false) AS "CpuHotAddEnabled",
+    COALESCE(c."Hot Remove", false) AS "CpuHotRemoveEnabled",
+    COALESCE(c."Sockets", 0) AS "CpuSockets",
+    COALESCE(c."Cores p/s", 0) AS "CoresPerSocket",
+    COALESCE(m."Hot Add", false) AS "MemoryHotAddEnabled",
+    COALESCE(m."Ballooned", 0) AS "BalloonedMemory",
+    COALESCE(d.disks, []) AS "Disks",
+    COALESCE(n.nics, []) AS "NICs",
+    LIST_FILTER(
+        LIST_VALUE(i."Network #1", i."Network #2", i."Network #3", i."Network #4",
+                   i."Network #5", i."Network #6", i."Network #7", i."Network #8"),
+        x -> x IS NOT NULL AND x != '' AND x != 'VM'
+    ) AS "Networks",
+    COALESCE(con.concerns, []) AS "Concerns",
+    u.moid,
+    u.vm_name,
+    u.provisioned_cpus,
+    u.provisioned_memory_mb,
+    u.provisioned_disk_kb,
+    u.cpu_avg_pct,
+    u.cpu_p95_pct,
+    u.cpu_max_pct,
+    u.cpu_latest_pct,
+    u.mem_avg_pct,
+    u.mem_p95_pct,
+    u.mem_max_pct,
+    u.mem_latest_pct,
+    u.disk_pct,
+    u.confidence_pct,
+    COALESCE(i."guest_apps", '[]') AS "GuestApps",
+    COALESCE(ins.status, 'not_started') AS "InspectionState",
+    COALESCE(ins.details, '') AS "InspectionDetails",
+    COALESCE(ins.error, '') AS "InspectionError"
+FROM vinfo i
+LEFT JOIN vcpu c ON i."VM ID" = c."VM ID"
+LEFT JOIN vmemory m ON i."VM ID" = m."VM ID"
+LEFT JOIN disks d ON i."VM ID" = d."VM ID"
+LEFT JOIN nics n ON i."VM ID" = n."VM ID"
+LEFT JOIN concerns_agg con ON i."VM ID" = con."VM_ID"
+LEFT JOIN groups_agg g ON i."VM ID" = g.vm_id
+LEFT JOIN rightsizing_vm_utilization u
+    ON u.moid = i."VM ID"
+    AND u.report_id = (
+        SELECT id FROM rightsizing_reports
+        WHERE written_batch_count > 0
+        ORDER BY created_at DESC LIMIT 1
+    )
+LEFT JOIN vm_inspection_status ins ON i."VM ID" = ins."VM ID"
+%s
+ORDER BY i."VM ID"
+`
+
 // vmFilterOptionsQuery returns distinct clusters, datacenters, concern labels,
 // and concern categories in a single row.
 const vmFilterOptionsQuery = `
@@ -181,6 +330,7 @@ var vmOutputQuery = sq.Select(
 	`v."Powerstate" AS power_state`,
 	`COALESCE(v."Cluster", '') AS cluster`,
 	`COALESCE(v."Datacenter", '') AS datacenter`,
+	`COALESCE(v."CPUs", 0) AS cpu_count`,
 	`v."Memory" AS memory`,
 	`COALESCE(d.total_disk, 0) AS disk_size`,
 	`COALESCE(c.issues_count, 0) AS issue_count`,

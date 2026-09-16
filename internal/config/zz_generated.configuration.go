@@ -223,6 +223,7 @@ func (a *Agent) ToOption() AgentOption {
 		to.LegacyStatusEnabled = a.LegacyStatusEnabled
 		to.RetainCollections = a.RetainCollections
 		to.RVToolsMode = a.RVToolsMode
+		to.ScriptingEnabled = a.ScriptingEnabled
 	}
 }
 
@@ -241,6 +242,7 @@ func (a *Agent) DebugMap() map[string]any {
 	debugMap["LegacyStatusEnabled"] = helpers.DebugValue(a.LegacyStatusEnabled, false)
 	debugMap["RetainCollections"] = helpers.DebugValue(a.RetainCollections, false)
 	debugMap["RVToolsMode"] = helpers.DebugValue(a.RVToolsMode, false)
+	debugMap["ScriptingEnabled"] = helpers.DebugValue(a.ScriptingEnabled, false)
 	return debugMap
 }
 
@@ -341,6 +343,13 @@ func WithRetainCollections(retainCollections int) AgentOption {
 func WithRVToolsMode(rVToolsMode bool) AgentOption {
 	return func(a *Agent) {
 		a.RVToolsMode = rVToolsMode
+	}
+}
+
+// WithScriptingEnabled returns an option that can set ScriptingEnabled on a Agent
+func WithScriptingEnabled(scriptingEnabled bool) AgentOption {
+	return func(a *Agent) {
+		a.ScriptingEnabled = scriptingEnabled
 	}
 }
 

@@ -8,6 +8,7 @@ type VirtualMachineSummary struct {
 	PowerState             string
 	Cluster                string
 	Datacenter             string
+	CpuCount               int32 // vCPUs
 	Memory                 int32 // MB
 	DiskSize               int64 // MB (stored as MiB in DB, treated as MB)
 	IssueCount             int
