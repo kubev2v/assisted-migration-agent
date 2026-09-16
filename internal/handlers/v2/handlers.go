@@ -28,6 +28,7 @@ type ServiceProvider interface {
 	LatestGroupService() (*svc.GroupService, error)
 	LatestInventoryService() (*svc.InventoryService, error)
 	LatestRightsizingService() (*svc.RightsizingService, error)
+	LatestApplicationService() (*svc.ApplicationService, error)
 
 	GetCollectorStatus() models.CollectorStatus
 	StartCollecting(ctx context.Context) (models.CollectorStatus, error)

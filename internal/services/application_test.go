@@ -16,6 +16,7 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/services"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
+	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
 var _ = Describe("ApplicationService", func() {
@@ -76,7 +77,7 @@ var _ = Describe("ApplicationService", func() {
 
 	Context("List", func() {
 		It("should return empty when no applications matched", func() {
-			apps, err := srv.List(ctx)
+			apps, err := srv.List(ctx, "")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(apps).To(BeEmpty())
 		})
@@ -87,7 +88,7 @@ var _ = Describe("ApplicationService", func() {
 
 			Expect(srv.MatchApplications(ctx)).To(Succeed())
 
-			apps, err := srv.List(ctx)
+			apps, err := srv.List(ctx, "")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(len(apps)).To(BeNumerically(">=", 1))
 
@@ -98,6 +99,30 @@ var _ = Describe("ApplicationService", func() {
 			Expect(names).To(ContainElement("Apache HTTP Server"))
 			Expect(names).To(ContainElement("PostgreSQL"))
 		})
+
+		It("should filter by expression", func() {
+			Expect(insertVMWithGuestApps(ctx, sqlDB, "vm-1", "web-server", []string{"httpd"})).To(Succeed())
+			Expect(insertVMWithGuestApps(ctx, sqlDB, "vm-2", "db-server", []string{"postgres"})).To(Succeed())
+
+			Expect(srv.MatchApplications(ctx)).To(Succeed())
+
+			apps, err := srv.List(ctx, "vm_id = 'vm-1'")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(apps)).To(BeNumerically(">=", 1))
+
+			var names []string
+			for _, a := range apps {
+				names = append(names, a.Name)
+			}
+			Expect(names).To(ContainElement("Apache HTTP Server"))
+			Expect(names).NotTo(ContainElement("PostgreSQL"))
+		})
+
+		It("should return error for invalid filter expression", func() {
+			_, err := srv.List(ctx, "invalid_field = 'x'")
+			Expect(err).To(HaveOccurred())
+			Expect(srvErrors.IsInvalidFilterError(err)).To(BeTrue())
+		})
 	})
 
 	Context("MatchApplications", func() {
@@ -106,7 +131,7 @@ var _ = Describe("ApplicationService", func() {
 
 			Expect(srv.MatchApplications(ctx)).To(Succeed())
 
-			apps, err := srv.List(ctx)
+			apps, err := srv.List(ctx, "")
 			Expect(err).NotTo(HaveOccurred())
 
 			var apache *struct{ vmCount int }
@@ -126,7 +151,7 @@ var _ = Describe("ApplicationService", func() {
 
 			Expect(srv.MatchApplications(ctx)).To(Succeed())
 
-			apps, err := srv.List(ctx)
+			apps, err := srv.List(ctx, "")
 			Expect(err).NotTo(HaveOccurred())
 
 			for _, a := range apps {
@@ -139,7 +164,7 @@ var _ = Describe("ApplicationService", func() {
 
 			Expect(srv.MatchApplications(ctx)).To(Succeed())
 
-			apps, err := srv.List(ctx)
+			apps, err := srv.List(ctx, "")
 			Expect(err).NotTo(HaveOccurred())
 
 			var found bool
@@ -159,7 +184,7 @@ var _ = Describe("ApplicationService", func() {
 
 			Expect(srv.MatchApplications(ctx)).To(Succeed())
 
-			apps, err := srv.List(ctx)
+			apps, err := srv.List(ctx, "")
 			Expect(err).NotTo(HaveOccurred())
 
 			for _, a := range apps {
@@ -177,7 +202,7 @@ var _ = Describe("ApplicationService", func() {
 
 			Expect(srv.MatchApplications(ctx)).To(Succeed())
 
-			apps, err := srv.List(ctx)
+			apps, err := srv.List(ctx, "")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(len(apps)).To(BeNumerically(">=", 2))
 
@@ -191,7 +216,7 @@ var _ = Describe("ApplicationService", func() {
 			Expect(insertVMWithGuestApps(ctx, sqlDB, "vm-1", "web-01", []string{"httpd"})).To(Succeed())
 			Expect(srv.MatchApplications(ctx)).To(Succeed())
 
-			apps1, err := srv.List(ctx)
+			apps1, err := srv.List(ctx, "")
 			Expect(err).NotTo(HaveOccurred())
 
 			// Remove the VM's guest apps
@@ -200,7 +225,7 @@ var _ = Describe("ApplicationService", func() {
 
 			Expect(srv.MatchApplications(ctx)).To(Succeed())
 
-			apps2, err := srv.List(ctx)
+			apps2, err := srv.List(ctx, "")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(len(apps2)).To(BeNumerically("<", len(apps1)))
 		})
@@ -208,7 +233,7 @@ var _ = Describe("ApplicationService", func() {
 		It("should handle no VMs", func() {
 			Expect(srv.MatchApplications(ctx)).To(Succeed())
 
-			apps, err := srv.List(ctx)
+			apps, err := srv.List(ctx, "")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(apps).To(BeEmpty())
 		})

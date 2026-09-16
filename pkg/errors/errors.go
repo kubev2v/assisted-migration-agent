@@ -388,6 +388,27 @@ func IsInvalidVersionError(err error) bool {
 	return errors.As(err, &e)
 }
 
+type InvalidFilterError struct {
+	Expression string
+	Reason     string
+}
+
+func NewInvalidFilterError(expression, reason string) *InvalidFilterError {
+	return &InvalidFilterError{Expression: expression, Reason: reason}
+}
+
+func (e *InvalidFilterError) Error() string {
+	if e.Reason != "" {
+		return fmt.Sprintf("invalid filter expression '%s': %s", e.Expression, e.Reason)
+	}
+	return fmt.Sprintf("invalid filter expression '%s'", e.Expression)
+}
+
+func IsInvalidFilterError(err error) bool {
+	var e *InvalidFilterError
+	return errors.As(err, &e)
+}
+
 func IsCollectionNotFoundError(err error) bool {
 	var e *ResourceNotFoundError
 	if errors.As(err, &e) {

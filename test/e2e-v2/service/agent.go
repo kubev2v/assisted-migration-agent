@@ -588,6 +588,27 @@ func (a *AgentSvc) ListApplications(collectionID string) (*v2.ApplicationListRes
 	return &result, nil
 }
 
+// --- Group Applications (latest-collection shortcut) ---
+
+func (a *AgentSvc) ListGroupApplications(groupID string) (*v2.ApplicationListResponse, error) {
+	path := fmt.Sprintf("/api/v2/groups/%s/applications", url.PathEscape(groupID))
+	resp, err := a.doGet(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var result v2.ApplicationListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+	return &result, nil
+}
+
 // --- Latest-collection VM shortcuts ---
 
 func (a *AgentSvc) ListLatestVMs(params *VMListParams) (*v2.VirtualMachineListResponse, error) {

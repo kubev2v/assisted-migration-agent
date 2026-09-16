@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
+	sq "github.com/Masterminds/squirrel"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -67,7 +68,7 @@ var _ = Describe("ApplicationStore", func() {
 
 		Expect(s.Application().ReplaceAll(ctx, records)).To(Succeed())
 
-		overviews, err := s.Application().ListOverviews(ctx)
+		overviews, err := s.Application().ListOverviews(ctx, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(overviews).To(HaveLen(2))
 
@@ -91,7 +92,7 @@ var _ = Describe("ApplicationStore", func() {
 		}
 		Expect(s.Application().ReplaceAll(ctx, updated)).To(Succeed())
 
-		overviews, err := s.Application().ListOverviews(ctx)
+		overviews, err := s.Application().ListOverviews(ctx, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(overviews).To(HaveLen(1))
 		Expect(overviews[0].Name).To(Equal("NewApp"))
@@ -104,14 +105,50 @@ var _ = Describe("ApplicationStore", func() {
 
 		Expect(s.Application().ReplaceAll(ctx, nil)).To(Succeed())
 
-		overviews, err := s.Application().ListOverviews(ctx)
+		overviews, err := s.Application().ListOverviews(ctx, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(overviews).To(BeNil())
 	})
 
 	It("should return nil for empty table", func() {
-		overviews, err := s.Application().ListOverviews(ctx)
+		overviews, err := s.Application().ListOverviews(ctx, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(overviews).To(BeNil())
+	})
+
+	It("should filter overviews by app_name", func() {
+		records := []models.ApplicationVMRecord{
+			{AppName: "PostgreSQL", AppDesc: "PG Servers", VMID: "vm-1", VMName: "db-01"},
+			{AppName: "PostgreSQL", AppDesc: "PG Servers", VMID: "vm-2", VMName: "db-02"},
+			{AppName: "Apache", AppDesc: "Web Servers", VMID: "vm-3", VMName: "web-01"},
+		}
+		Expect(s.Application().ReplaceAll(ctx, records)).To(Succeed())
+
+		overviews, err := s.Application().ListOverviews(ctx, sq.Eq{"app_name": "PostgreSQL"})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(overviews).To(HaveLen(1))
+		Expect(overviews[0].Name).To(Equal("PostgreSQL"))
+		Expect(overviews[0].VMCount).To(Equal(2))
+	})
+
+	It("should filter overviews by vm_id", func() {
+		records := []models.ApplicationVMRecord{
+			{AppName: "PostgreSQL", AppDesc: "PG Servers", VMID: "vm-1", VMName: "db-01"},
+			{AppName: "PostgreSQL", AppDesc: "PG Servers", VMID: "vm-2", VMName: "db-02"},
+			{AppName: "Apache", AppDesc: "Web Servers", VMID: "vm-1", VMName: "db-01"},
+		}
+		Expect(s.Application().ReplaceAll(ctx, records)).To(Succeed())
+
+		overviews, err := s.Application().ListOverviews(ctx, sq.Eq{"vm_id": "vm-1"})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(overviews).To(HaveLen(2))
+
+		Expect(overviews[0].Name).To(Equal("Apache"))
+		Expect(overviews[0].VMCount).To(Equal(1))
+		Expect(overviews[0].VMs[0].ID).To(Equal("vm-1"))
+
+		Expect(overviews[1].Name).To(Equal("PostgreSQL"))
+		Expect(overviews[1].VMCount).To(Equal(1))
+		Expect(overviews[1].VMs[0].ID).To(Equal("vm-1"))
 	})
 })

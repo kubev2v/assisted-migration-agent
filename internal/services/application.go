@@ -10,8 +10,10 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/kubev2v/assisted-migration-agent/internal/filter"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
+	"github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
 //go:embed applications.json
@@ -37,8 +39,16 @@ func NewApplicationService(st *store.Store) (*ApplicationService, error) {
 	return &ApplicationService{store: st, defs: defs}, nil
 }
 
-func (s *ApplicationService) List(ctx context.Context) ([]models.ApplicationOverview, error) {
-	return s.store.Application().ListOverviews(ctx)
+func (s *ApplicationService) List(ctx context.Context, byExpression string) ([]models.ApplicationOverview, error) {
+	if byExpression == "" {
+		return s.store.Application().ListOverviews(ctx, nil)
+	}
+
+	f, err := filter.ParseWithApplicationMap([]byte(byExpression))
+	if err != nil {
+		return nil, errors.NewInvalidFilterError(byExpression, err.Error())
+	}
+	return s.store.Application().ListOverviews(ctx, f)
 }
 
 // BuildCollectorWorkUnits returns a postCollectionBuilderFn that precomputes

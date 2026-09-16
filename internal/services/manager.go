@@ -359,6 +359,18 @@ func (m *ServiceManager) LatestRightsizingService() (*RightsizingService, error)
 	return m.rightsizingService(db)
 }
 
+func (m *ServiceManager) LatestApplicationService() (*ApplicationService, error) {
+	db, err := m.pool.Latest()
+	if err != nil {
+		return nil, err
+	}
+	st, err := db.Store()
+	if err != nil {
+		return nil, err
+	}
+	return NewApplicationService(st)
+}
+
 func (m *ServiceManager) Stop(ctx context.Context) {
 	m.mu.Lock()
 	inspector := m.inspector
