@@ -353,6 +353,31 @@ var _ = Describe("VMStore", func() {
 				Expect(vms[0].IssueCount).To(Equal(2)) // vm-3 has 2 issues
 			})
 
+			// Given VMs with mixed datacenter values that do not match id order
+			// When we sort by datacenter ascending
+			// Then the VM that owns DC-A moves as a whole row (id and other fields stay together)
+			It("should sort by datacenter ascending", func() {
+				_, err := s.Querier().ExecContext(ctx, `
+					UPDATE vinfo SET "Datacenter" = CASE "VM ID"
+						WHEN 'vm-1' THEN 'DC-C'
+						WHEN 'vm-2' THEN 'DC-B'
+						WHEN 'vm-3' THEN 'DC-A'
+						ELSE 'DC-B'
+					END
+				`)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Act
+				vms, err := s.VM().List(ctx, nil, store.WithSort([]store.SortParam{{Field: "datacenter", Desc: false}}))
+
+				// Assert
+				Expect(err).NotTo(HaveOccurred())
+				Expect(vms).To(HaveLen(5))
+				Expect(vms[0].Datacenter).To(Equal("DC-A"))
+				Expect(vms[0].ID).To(Equal("vm-3"))
+				Expect(vms[0].Name).To(Equal("db-server-1"))
+			})
+
 			// Given VMs with known CPU utilization values
 			// When we sort by cpuUsage descending
 			// Then VMs with highest CPU come first and VMs without data come last
