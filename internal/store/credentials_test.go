@@ -155,56 +155,6 @@ var _ = Describe("CredentialsStore", func() {
 		})
 	})
 
-	Context("GetPassword", func() {
-		// Given no master password has been stored
-		// When we try to retrieve it
-		// Then it should return a ResourceNotFoundError
-		It("should return ResourceNotFoundError when no password exists", func() {
-			// Arrange — empty database
-
-			// Act
-			_, err := s.Credentials().GetPassword(ctx)
-
-			// Assert
-			Expect(err).To(HaveOccurred())
-			Expect(srvErrors.IsResourceNotFoundError(err)).To(BeTrue())
-		})
-
-		// Given a master password was saved
-		// When we retrieve it
-		// Then it should return the saved value
-		It("should return saved password", func() {
-			// Arrange
-			encoded := "$argon2id$v=19$m=65536,t=1,p=4$c29tZXNhbHQ$somehash"
-			Expect(s.Credentials().SavePassword(ctx, encoded)).To(Succeed())
-
-			// Act
-			retrieved, err := s.Credentials().GetPassword(ctx)
-
-			// Assert
-			Expect(err).NotTo(HaveOccurred())
-			Expect(retrieved).To(Equal(encoded))
-		})
-	})
-
-	Context("SavePassword", func() {
-		// Given a master password already exists
-		// When we save a new one
-		// Then it should replace the old value
-		It("should upsert the master password", func() {
-			// Arrange
-			Expect(s.Credentials().SavePassword(ctx, "old-password")).To(Succeed())
-
-			// Act
-			Expect(s.Credentials().SavePassword(ctx, "new-password")).To(Succeed())
-
-			// Assert
-			retrieved, err := s.Credentials().GetPassword(ctx)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(retrieved).To(Equal("new-password"))
-		})
-	})
-
 	Context("Delete", func() {
 		// Given credentials exist for an ID
 		// When we delete them

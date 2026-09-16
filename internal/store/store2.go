@@ -85,6 +85,9 @@ func (s *Store2) Application() *ApplicationStore     { return NewApplicationStor
 func (s *Store2) Credentials() *CredentialsStore     { return NewCredentialsStore(s.qi) }
 func (s *Store2) Collection() *CollectionStore       { return NewCollectionStore(s.qi) }
 func (s *Store2) Export() *ExportStore               { return NewExportStore(s.qi) }
+func (s *Store2) AccessPassword() *AccessPasswordStore {
+	return NewAccessPasswordStore(s.qi)
+}
 
 func (s *Store2) WithTx(ctx context.Context, fn func(ctx context.Context) error) error {
 	return s.transactor.WithTx(ctx, fn)

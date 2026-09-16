@@ -17,22 +17,23 @@ import (
 )
 
 type Store struct {
-	db            *sql.DB
-	parser        *duckdb_parser.Parser
-	configuration *ConfigurationStore
-	inventory     *InventoryStore
-	vm            *VMStore
-	inspection    *InspectionStore
-	group         *GroupStore
-	vddk          *VddkStore
-	outbox        *OutboxStore
-	rightsizing   *RightSizingStore
-	forecast      *ForecastStore
-	transactor    pkgstore.Transactor
-	application   *ApplicationStore
-	credentials   *CredentialsStore
-	collection    *CollectionStore
-	export        *ExportStore
+	db             *sql.DB
+	parser         *duckdb_parser.Parser
+	configuration  *ConfigurationStore
+	inventory      *InventoryStore
+	vm             *VMStore
+	inspection     *InspectionStore
+	group          *GroupStore
+	vddk           *VddkStore
+	outbox         *OutboxStore
+	rightsizing    *RightSizingStore
+	forecast       *ForecastStore
+	transactor     pkgstore.Transactor
+	application    *ApplicationStore
+	credentials    *CredentialsStore
+	collection     *CollectionStore
+	export         *ExportStore
+	accessPassword *AccessPasswordStore
 }
 
 func NewStore(db *sql.DB, validator duckdb_parser.Validator) *Store {
@@ -40,22 +41,23 @@ func NewStore(db *sql.DB, validator duckdb_parser.Validator) *Store {
 	transactor := pkgstore.NewTransactor(db)
 	parser := duckdb_parser.New(qi, validator)
 	return &Store{
-		db:            db,
-		parser:        parser,
-		configuration: NewConfigurationStore(qi),
-		inventory:     NewInventoryStore(qi),
-		vm:            NewVMStore(qi),
-		inspection:    NewInspectionStore(qi),
-		group:         NewGroupStore(qi),
-		vddk:          NewVddkStore(qi),
-		outbox:        NewOutboxStore(qi),
-		rightsizing:   NewRightSizingStore(qi),
-		forecast:      NewForecastStore(qi),
-		transactor:    transactor,
-		application:   NewApplicationStore(qi),
-		credentials:   NewCredentialsStore(qi),
-		collection:    NewCollectionStore(qi),
-		export:        NewExportStore(qi),
+		db:             db,
+		parser:         parser,
+		configuration:  NewConfigurationStore(qi),
+		inventory:      NewInventoryStore(qi),
+		vm:             NewVMStore(qi),
+		inspection:     NewInspectionStore(qi),
+		group:          NewGroupStore(qi),
+		vddk:           NewVddkStore(qi),
+		outbox:         NewOutboxStore(qi),
+		rightsizing:    NewRightSizingStore(qi),
+		forecast:       NewForecastStore(qi),
+		transactor:     transactor,
+		application:    NewApplicationStore(qi),
+		credentials:    NewCredentialsStore(qi),
+		collection:     NewCollectionStore(qi),
+		export:         NewExportStore(qi),
+		accessPassword: NewAccessPasswordStore(qi),
 	}
 }
 
@@ -139,6 +141,10 @@ func (s *Store) Collection() *CollectionStore {
 
 func (s *Store) Export() *ExportStore {
 	return s.export
+}
+
+func (s *Store) AccessPassword() *AccessPasswordStore {
+	return s.accessPassword
 }
 
 func (s *Store) WithTx(ctx context.Context, fn func(ctx context.Context) error) error {
