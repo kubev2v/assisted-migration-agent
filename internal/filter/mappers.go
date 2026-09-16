@@ -355,6 +355,21 @@ var CollectionMapper filter.MapFunc = func(name string) (string, filter.FieldTyp
 	}
 }
 
+var ApplicationMapper filter.MapFunc = func(name string) (string, filter.FieldType, error) {
+	switch strings.ToLower(name) {
+	case "name":
+		return "app_name", filter.StringField, nil
+	case "description":
+		return "app_desc", filter.StringField, nil
+	case "vm_id":
+		return "vm_id", filter.StringField, nil
+	case "vm_name":
+		return "vm_name", filter.StringField, nil
+	default:
+		return "", 0, fmt.Errorf("unknown application filter field: %s", name)
+	}
+}
+
 // ParseWithDefaultMap parses a filter expression using the DefaultMapper (VM fields).
 // This is a convenience wrapper around filter.Parse() for VM filtering operations.
 func ParseWithDefaultMap(src []byte) (sq.Sqlizer, error) {
@@ -377,4 +392,10 @@ func ParseWithClusterMap(src []byte) (sq.Sqlizer, error) {
 // This is a convenience wrapper around filter.Parse() for collection filtering operations.
 func ParseWithCollectionMap(src []byte) (sq.Sqlizer, error) {
 	return filter.Parse(src, CollectionMapper)
+}
+
+// ParseWithApplicationMap parses a filter expression using the ApplicationMapper (collection fields).
+// This is a convenience wrapper around filter.Parse() for application filtering operations.
+func ParseWithApplicationMap(src []byte) (sq.Sqlizer, error) {
+	return filter.Parse(src, ApplicationMapper)
 }

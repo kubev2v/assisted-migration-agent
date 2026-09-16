@@ -625,3 +625,21 @@ func NewCollectionComparisonDiffFromModel(d models.ComparisonDiff) CollectionCom
 		OnlyInB:   toPage(d.OnlyInB),
 	}
 }
+
+func NewApplicationList(apps []models.ApplicationOverview) []ApplicationOverview {
+	apiApps := make([]ApplicationOverview, 0, len(apps))
+	for _, app := range apps {
+		vms := make([]ApplicationVM, 0, len(app.VMs))
+		for _, vm := range app.VMs {
+			vms = append(vms, ApplicationVM{Id: vm.ID, Name: vm.Name})
+		}
+		apiApps = append(apiApps, ApplicationOverview{
+			Name:        app.Name,
+			Description: app.Description,
+			VmCount:     app.VMCount,
+			Vms:         vms,
+		})
+	}
+
+	return apiApps
+}
