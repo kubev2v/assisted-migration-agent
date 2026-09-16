@@ -17,6 +17,7 @@ var validSortFields = map[string]bool{
 	"name":         true,
 	"vCenterState": true,
 	"cluster":      true,
+	"datacenter":   true,
 	"diskSize":     true,
 	"memory":       true,
 	"issues":       true,
