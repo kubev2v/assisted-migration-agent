@@ -290,11 +290,7 @@ func (p *Pool) List() []*Database {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	databases := make([]*Database, 0, len(p.databases))
-	for _, db := range p.databases {
-		databases = append(databases, db)
-	}
-	return databases
+	return p.list()
 }
 
 func (p *Pool) Latest() (*Database, error) {
@@ -302,6 +298,7 @@ func (p *Pool) Latest() (*Database, error) {
 	if db != nil {
 		return db, nil
 	}
+
 	return nil, errors.NewResourceNotFoundError("collection", "latest")
 }
 
@@ -336,7 +333,26 @@ func (p *Pool) Delete(id string) error {
 
 	p.mu.Lock()
 	defer p.mu.Unlock()
+
 	delete(p.databases, id)
+
+	if p.latestCollectionDatabase.Load() == db {
+		dbs := p.list()
+
+		p.latestCollectionDatabase.Store(nil)
+		// the latestCollectionDatabase must point to the latest db except main
+		slices.SortFunc(dbs, func(a *Database, b *Database) int {
+			return b.CreatedAt.Compare(a.CreatedAt)
+		})
+
+		for _, db := range dbs {
+			if db.ID == MainDatabaseID {
+				continue
+			}
+			p.latestCollectionDatabase.Store(db)
+			break
+		}
+	}
 
 	return os.Remove(db.Path)
 }
@@ -352,6 +368,14 @@ func (p *Pool) Close() {
 			zap.S().Errorw("failed to close db connection on pool shutdown", "db_id", id, "error", err)
 		}
 	}
+}
+
+func (p *Pool) list() []*Database {
+	databases := make([]*Database, 0, len(p.databases))
+	for _, db := range p.databases {
+		databases = append(databases, db)
+	}
+	return databases
 }
 
 func (p *Pool) cleanup() {

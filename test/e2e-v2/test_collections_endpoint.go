@@ -165,4 +165,60 @@ var _ = ginkgo.Describe("Collection lifecycle v2 e2e tests", ginkgo.Ordered, fun
 		gm.Expect(err).ToNot(gm.HaveOccurred())
 		gm.Expect(status.Mode).To(gm.Equal("disconnected"), "expected agent to be in disconnected mode after delete")
 	})
+
+	// Given a successful collection
+	// When all data is deleted and a new collection is started
+	// Then the new collection should succeed and "latest" endpoints should work
+	ginkgo.It("should collect again after deleting all data", func() {
+		// Collect
+		_, err := agentSvc.StoreCredentials(infra.VcsimURL, infra.VcsimUsername, infra.VcsimPassword)
+		gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to store credentials")
+
+		_, err = agentSvc.StartCollector()
+		gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to start collector")
+
+		gm.Eventually(func() int {
+			collections, err := agentSvc.ListCollections()
+			if err != nil {
+				return 0
+			}
+			return len(collections.Collections)
+		}, 120*time.Second, 2*time.Second).Should(gm.BeNumerically(">", 0), "expected at least 1 collection")
+
+		collections, err := agentSvc.ListCollections()
+		gm.Expect(err).ToNot(gm.HaveOccurred())
+		gm.Expect(collections.Collections[0].Id).ToNot(gm.BeEmpty())
+
+		vms, err := agentSvc.ListLatestVMs(nil)
+		gm.Expect(err).ToNot(gm.HaveOccurred(), "latest VMs endpoint should work after first collection")
+		gm.Expect(vms.Total).To(gm.BeNumerically(">", 0), "expected VMs in first collection")
+
+		// Delete everything
+		err = agentSvc.DeleteCollections()
+		gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to delete all collections")
+
+		collections, err = agentSvc.ListCollections()
+		gm.Expect(err).ToNot(gm.HaveOccurred())
+		gm.Expect(collections.Collections).To(gm.BeEmpty(), "expected no collections after delete")
+
+		// Collect again
+		_, err = agentSvc.StartCollector()
+		gm.Expect(err).ToNot(gm.HaveOccurred(), "failed to start collector after delete")
+
+		gm.Eventually(func() int {
+			collections, err := agentSvc.ListCollections()
+			if err != nil {
+				return 0
+			}
+			return len(collections.Collections)
+		}, 120*time.Second, 2*time.Second).Should(gm.BeNumerically(">", 0), "expected a new collection after re-collect")
+
+		collections, err = agentSvc.ListCollections()
+		gm.Expect(err).ToNot(gm.HaveOccurred())
+		gm.Expect(collections.Collections[0].Id).ToNot(gm.BeEmpty(), "expected new collection to have a valid ID")
+
+		vms, err = agentSvc.ListLatestVMs(nil)
+		gm.Expect(err).ToNot(gm.HaveOccurred(), "latest VMs endpoint should work after re-collect")
+		gm.Expect(vms.Total).To(gm.BeNumerically(">", 0), "expected VMs in re-collected data")
+	})
 })
