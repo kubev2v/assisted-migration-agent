@@ -152,15 +152,17 @@ func (h *Handler) getInventoryBundle(c *gin.Context, invSvc *services.InventoryS
 		if apiInv == nil {
 			continue
 		}
+		if apiInv.Vcenter == nil {
+			log.Errorw("failed to build inventory bundle", "group", g.ID, "error", "vcenter inventory is missing")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to build inventory bundle"})
+			return
+		}
 
 		var vcenterID *string
 		if apiInv.VcenterId != "" {
 			vcenterID = &apiInv.VcenterId
 		}
-		vmsCount := 0
-		for _, cluster := range apiInv.Clusters {
-			vmsCount += cluster.Vms.Total
-		}
+		vmsCount := apiInv.Vcenter.Vms.Total
 		subset := agentAPI.SourceSubsetUpdate{
 			VcenterId: vcenterID,
 			Name:      g.Name,

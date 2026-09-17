@@ -496,16 +496,12 @@ var _ = ginkgo.Describe("Connected env v2 e2e tests", ginkgo.Ordered, func() {
 			_ = infraManager.StopVcsim()
 		})
 
-		// totalVMs sums VM counts across every cluster in an inventory.
+		// totalVMs includes both clustered and standalone VMs.
 		totalVMs := func(inv *v1alpha1.Inventory) int {
-			if inv == nil {
+			if inv == nil || inv.Vcenter == nil {
 				return 0
 			}
-			total := 0
-			for _, c := range inv.Clusters {
-				total += c.Vms.Total
-			}
-			return total
+			return inv.Vcenter.Vms.Total
 		}
 
 		// subsetVMsCount returns the vmsCount reported in the most recent subset

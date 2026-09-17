@@ -152,14 +152,15 @@ func (c *Client) UpdateSource(ctx context.Context, sourceID, agentID uuid.UUID, 
 // UpdateSourceSubset creates or updates a subset inventory
 // PUT /api/v1/sources/{id}/subset/{subsetId}
 func (c *Client) UpdateSourceSubset(ctx context.Context, sourceID, subsetID uuid.UUID, name string, inv v1.Inventory) error {
+	if inv.Vcenter == nil {
+		return fmt.Errorf("cannot update source subset: vcenter inventory is missing")
+	}
+
 	var vcenterID *string
 	if inv.VcenterId != "" {
 		vcenterID = &inv.VcenterId
 	}
-	vmsCount := 0
-	for _, cluster := range inv.Clusters {
-		vmsCount += cluster.Vms.Total
-	}
+	vmsCount := inv.Vcenter.Vms.Total
 	body := agentAPI.SourceSubsetUpdate{
 		VcenterId: vcenterID,
 		Name:      name,

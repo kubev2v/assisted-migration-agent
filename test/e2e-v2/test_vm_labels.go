@@ -670,7 +670,7 @@ var _ = ginkgo.Describe("VM Labels v2 e2e tests", ginkgo.Ordered, func() {
 
 			// Find a cluster with at least 2 VMs
 			for cluster, vms := range clusterVMs {
-				if len(vms) >= 2 {
+				if cluster != "" && len(vms) >= 2 {
 					testCluster = cluster
 					vmWithLabelInCluster = vms[0].Id
 					vmNoLabelInCluster = vms[1].Id

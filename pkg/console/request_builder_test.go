@@ -1,7 +1,10 @@
 package console_test
 
 import (
+	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/google/uuid"
@@ -9,11 +12,46 @@ import (
 	. "github.com/onsi/gomega"
 
 	externalRef0 "github.com/kubev2v/migration-planner/api/v1alpha1"
+	agentAPI "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/pkg/console"
 	"github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
+
+var _ = Describe("Client", func() {
+	It("counts standalone VMs in subset metadata", func() {
+		var body agentAPI.SourceSubsetUpdate
+		var decodeErr error
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			decodeErr = json.NewDecoder(r.Body).Decode(&body)
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer server.Close()
+
+		client, err := console.NewConsoleClient(server.URL, "")
+		Expect(err).NotTo(HaveOccurred())
+		inventory := externalRef0.Inventory{
+			Vcenter: &externalRef0.InventoryData{Vms: externalRef0.VMs{Total: 4}},
+			Clusters: map[string]externalRef0.InventoryData{
+				"cluster1": {Vms: externalRef0.VMs{Total: 3}},
+			},
+		}
+
+		Expect(client.UpdateSourceSubset(context.Background(), uuid.New(), uuid.New(), "group", inventory)).To(Succeed())
+		Expect(decodeErr).NotTo(HaveOccurred())
+		Expect(body.VmsCount).NotTo(BeNil())
+		Expect(*body.VmsCount).To(Equal(4))
+	})
+
+	It("rejects subset inventory without vcenter totals", func() {
+		client, err := console.NewConsoleClient("http://localhost", "")
+		Expect(err).NotTo(HaveOccurred())
+
+		err = client.UpdateSourceSubset(context.Background(), uuid.New(), uuid.New(), "group", externalRef0.Inventory{})
+		Expect(err).To(MatchError("cannot update source subset: vcenter inventory is missing"))
+	})
+})
 
 func TestRequestBuilder(t *testing.T) {
 	RegisterFailHandler(Fail)
