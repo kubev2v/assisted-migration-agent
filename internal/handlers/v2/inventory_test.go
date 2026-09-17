@@ -219,6 +219,7 @@ var _ = Describe("Inventory handler", func() {
 					Filter: "name = 'vm1'",
 					Inventory: &inventory.Inventory{
 						VCenterID: "vc-a",
+						VCenter:   &inventory.InventoryData{VMs: inventory.VMsData{Total: 4}},
 						Clusters: map[string]inventory.InventoryData{
 							"cluster-a": {VMs: inventory.VMsData{Total: 3}},
 						},
@@ -232,6 +233,7 @@ var _ = Describe("Inventory handler", func() {
 					Filter: "name = 'vm2'",
 					Inventory: &inventory.Inventory{
 						VCenterID: "vc-b",
+						VCenter:   &inventory.InventoryData{VMs: inventory.VMsData{Total: 7}},
 						Clusters: map[string]inventory.InventoryData{
 							"cluster-b": {VMs: inventory.VMsData{Total: 7}},
 						},
@@ -258,7 +260,23 @@ var _ = Describe("Inventory handler", func() {
 			Expect(subsetA.VcenterId).NotTo(BeNil())
 			Expect(*subsetA.VcenterId).To(Equal("vc-a"))
 			Expect(subsetA.VmsCount).NotTo(BeNil())
-			Expect(*subsetA.VmsCount).To(Equal(3))
+			Expect(*subsetA.VmsCount).To(Equal(4))
+		})
+
+		It("returns an error when a subset has no vcenter totals", func() {
+			ctx := context.Background()
+			buildEnv(ctx, func(collSt *store.Store) {
+				saveMainInventory(collSt)
+				_, err := collSt.Group().Create(ctx, models.Group{
+					Name:      "invalid-group",
+					Inventory: &inventory.Inventory{VCenterID: "vc-test"},
+				})
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			w := doRequest("all")
+			Expect(w.Code).To(Equal(http.StatusInternalServerError))
+			Expect(w.Body.String()).To(ContainSubstring("failed to build inventory bundle"))
 		})
 	})
 })
