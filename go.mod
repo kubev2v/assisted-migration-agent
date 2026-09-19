@@ -1,6 +1,6 @@
 module github.com/kubev2v/assisted-migration-agent
 
-go 1.26.4
+go 1.27.0
 
 require (
 	github.com/Masterminds/squirrel v1.5.4
@@ -136,7 +136,7 @@ require (
 	github.com/google/flatbuffers v25.9.23+incompatible // indirect
 	github.com/google/gnostic-models v0.7.1 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/go-containerregistry v0.21.7 // indirect
+	github.com/google/go-containerregistry v0.22.1 // indirect
 	github.com/google/go-intervals v0.0.2 // indirect
 	github.com/google/pprof v0.0.0-20260906184651-6331bc6350fe // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
@@ -154,7 +154,7 @@ require (
 	github.com/jzelinskie/stringz v0.0.2 // indirect
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.7.7 // indirect
 	github.com/kevinburke/ssh_config v1.5.0 // indirect
-	github.com/klauspost/compress v1.18.7 // indirect
+	github.com/klauspost/compress v1.19.2 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
 	github.com/klauspost/pgzip v1.2.6 // indirect
 	github.com/kr/fs v0.1.0 // indirect
@@ -219,10 +219,10 @@ require (
 	github.com/richardlehane/msoleps v1.0.6 // indirect
 	github.com/sagikazarmark/locafero v0.11.0 // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3 // indirect
-	github.com/secure-systems-lab/go-securesystemslib v0.11.0 // indirect
+	github.com/secure-systems-lab/go-securesystemslib v0.11.1 // indirect
 	github.com/sigstore/fulcio v1.8.8 // indirect
-	github.com/sigstore/protobuf-specs v0.5.1 // indirect
-	github.com/sigstore/sigstore v1.10.8 // indirect
+	github.com/sigstore/protobuf-specs v0.5.2 // indirect
+	github.com/sigstore/sigstore v1.10.10 // indirect
 	github.com/skeema/knownhosts v1.3.2 // indirect
 	github.com/smallstep/pkcs7 v0.2.1 // indirect
 	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 // indirect
