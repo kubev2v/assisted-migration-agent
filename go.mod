@@ -154,7 +154,7 @@ require (
 	github.com/jzelinskie/stringz v0.0.2 // indirect
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.7.7 // indirect
 	github.com/kevinburke/ssh_config v1.5.0 // indirect
-	github.com/klauspost/compress v1.18.7 // indirect
+	github.com/klauspost/compress v1.19.1 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
 	github.com/klauspost/pgzip v1.2.6 // indirect
 	github.com/kr/fs v0.1.0 // indirect
@@ -256,7 +256,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.44.0 // indirect
 	go.podman.io/buildah v1.44.1 // indirect
 	go.podman.io/image/v5 v5.40.0 // indirect
-	go.podman.io/storage v1.63.0 // indirect
+	go.podman.io/storage v1.64.1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
