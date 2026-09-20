@@ -7,7 +7,7 @@ require (
 	github.com/creasty/defaults v1.8.0
 	github.com/duckdb/duckdb-go/v2 v2.5.4
 	github.com/ecordell/optgen v0.1.1
-	github.com/fatih/color v1.18.0
+	github.com/fatih/color v1.19.0
 	github.com/getkin/kin-openapi v0.145.0
 	github.com/gin-contrib/zap v1.1.8
 	github.com/gin-gonic/gin v1.12.0
