@@ -4,7 +4,7 @@ go 1.26.4
 
 require (
 	github.com/Masterminds/squirrel v1.5.4
-	github.com/creasty/defaults v1.8.0
+	github.com/creasty/defaults v1.11.0
 	github.com/duckdb/duckdb-go/v2 v2.5.4
 	github.com/ecordell/optgen v0.1.1
 	github.com/fatih/color v1.18.0
