@@ -18,10 +18,10 @@ jobs:
 
     steps:
       - name: Checkout agent code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Checkout migration-planner
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: kubev2v/migration-planner
           path: migration-planner
