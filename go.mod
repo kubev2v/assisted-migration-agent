@@ -298,7 +298,7 @@ require (
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.4.2 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
-	tags.cncf.io/container-device-interface v1.1.0 // indirect
+	tags.cncf.io/container-device-interface v1.1.1 // indirect
 )
 
 replace github.com/go-ini/ini => gopkg.in/ini.v1 v1.67.1
