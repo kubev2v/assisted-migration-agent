@@ -1,5 +1,4 @@
-// Package accesspassword owns the agent-wide API access password lifecycle.
-package accesspassword
+package services
 
 import (
 	"context"
@@ -12,20 +11,20 @@ import (
 )
 
 const (
-	MinimumLength = 8
-	MaximumLength = 128
+	minimumAccessPasswordLength = 8
+	maximumAccessPasswordLength = 128
 )
 
-type Service struct {
+type AccessPasswordService struct {
 	passwords *store.AccessPasswordStore
 	crypto    *crypto.Crypto
 }
 
-func NewService(passwords *store.AccessPasswordStore) *Service {
-	return &Service{passwords: passwords, crypto: crypto.NewCrypto()}
+func NewAccessPasswordService(passwords *store.AccessPasswordStore) *AccessPasswordService {
+	return &AccessPasswordService{passwords: passwords, crypto: crypto.NewCrypto()}
 }
 
-func (s *Service) Has(ctx context.Context) (bool, error) {
+func (s *AccessPasswordService) Has(ctx context.Context) (bool, error) {
 	_, err := s.passwords.Get(ctx)
 	if srvErrors.IsResourceNotFoundError(err) {
 		return false, nil
@@ -34,7 +33,7 @@ func (s *Service) Has(ctx context.Context) (bool, error) {
 }
 
 // Create stores a password once. It returns false when a password already exists.
-func (s *Service) Create(ctx context.Context, password string) (bool, error) {
+func (s *AccessPasswordService) Create(ctx context.Context, password string) (bool, error) {
 	if err := validateNewPassword(password); err != nil {
 		return false, err
 	}
@@ -47,7 +46,7 @@ func (s *Service) Create(ctx context.Context, password string) (bool, error) {
 }
 
 // Replace changes an existing password without affecting encrypted credentials.
-func (s *Service) Replace(ctx context.Context, password string) error {
+func (s *AccessPasswordService) Replace(ctx context.Context, password string) error {
 	if err := validateNewPassword(password); err != nil {
 		return err
 	}
@@ -59,7 +58,7 @@ func (s *Service) Replace(ctx context.Context, password string) error {
 	return s.passwords.Replace(ctx, hash)
 }
 
-func (s *Service) Verify(ctx context.Context, password string) (bool, error) {
+func (s *AccessPasswordService) Verify(ctx context.Context, password string) (bool, error) {
 	if err := validateLoginPassword(password); err != nil {
 		return false, err
 	}
@@ -75,8 +74,8 @@ func validateNewPassword(password string) error {
 	if err := validateLoginPassword(password); err != nil {
 		return err
 	}
-	if utf8.RuneCountInString(password) < MinimumLength {
-		return fmt.Errorf("password must contain at least %d characters", MinimumLength)
+	if utf8.RuneCountInString(password) < minimumAccessPasswordLength {
+		return fmt.Errorf("password must contain at least %d characters", minimumAccessPasswordLength)
 	}
 	return nil
 }
@@ -86,8 +85,8 @@ func validateLoginPassword(password string) error {
 		return fmt.Errorf("password must be valid UTF-8")
 	}
 	length := utf8.RuneCountInString(password)
-	if length == 0 || length > MaximumLength {
-		return fmt.Errorf("password must contain between 1 and %d characters", MaximumLength)
+	if length == 0 || length > maximumAccessPasswordLength {
+		return fmt.Errorf("password must contain between 1 and %d characters", maximumAccessPasswordLength)
 	}
 	return nil
 }

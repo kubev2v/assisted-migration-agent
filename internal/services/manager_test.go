@@ -131,6 +131,7 @@ var _ = Describe("ServiceManager", func() {
 			)
 			Expect(mgr.Initialize()).To(Succeed())
 			defer mgr.Stop(ctx)
+			Expect(mgr.AccessPasswordService()).NotTo(BeNil())
 
 			status := mgr.GetCollectorStatus()
 			Expect(status.State).To(Equal(models.CollectorStateReady))

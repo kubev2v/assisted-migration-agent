@@ -1,4 +1,4 @@
-package accesspassword_test
+package services_test
 
 import (
 	"context"
@@ -11,14 +11,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kubev2v/assisted-migration-agent/internal/accesspassword"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
+	"github.com/kubev2v/assisted-migration-agent/internal/services"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	"github.com/kubev2v/assisted-migration-agent/pkg/crypto"
 )
 
-func newService(t *testing.T) (*accesspassword.Service, *store.Store) {
+func newAccessPasswordService(t *testing.T) (*services.AccessPasswordService, *store.Store) {
 	t.Helper()
 	pool := store.NewPool(5 * time.Minute)
 	t.Cleanup(pool.Close)
@@ -33,11 +33,11 @@ func newService(t *testing.T) (*accesspassword.Service, *store.Store) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return accesspassword.NewService(st.AccessPassword()), st
+	return services.NewAccessPasswordService(st.AccessPassword()), st
 }
 
 func TestCreateIsAtomic(t *testing.T) {
-	svc, _ := newService(t)
+	svc, _ := newAccessPasswordService(t)
 	has, err := svc.Has(context.Background())
 	if err != nil || has {
 		t.Fatalf("unexpected initial password state: has=%t err=%v", has, err)
@@ -100,7 +100,7 @@ func TestCreateIsAtomic(t *testing.T) {
 }
 
 func TestReplacePreservesCredentials(t *testing.T) {
-	svc, st := newService(t)
+	svc, st := newAccessPasswordService(t)
 	ctx := context.Background()
 	crypt := crypto.NewCrypto()
 	key := crypt.Hash256("credential-key")
@@ -149,9 +149,9 @@ func TestReplacePreservesCredentials(t *testing.T) {
 }
 
 func TestRejectsInvalidPasswordsAndCorruptHashes(t *testing.T) {
-	svc, st := newService(t)
+	svc, st := newAccessPasswordService(t)
 	ctx := context.Background()
-	for _, password := range []string{"short", strings.Repeat("x", accesspassword.MaximumLength+1), string([]byte{0xff})} {
+	for _, password := range []string{"short", strings.Repeat("x", 129), string([]byte{0xff})} {
 		if _, err := svc.Create(ctx, password); err == nil {
 			t.Fatalf("accepted invalid password %q", password)
 		}
@@ -184,7 +184,7 @@ func (failingAccessPasswordStore) ExecContext(context.Context, string, ...any) (
 }
 
 func TestReplacePropagatesDatabaseFailure(t *testing.T) {
-	svc := accesspassword.NewService(store.NewAccessPasswordStore(failingAccessPasswordStore{}))
+	svc := services.NewAccessPasswordService(store.NewAccessPasswordStore(failingAccessPasswordStore{}))
 	if err := svc.Replace(context.Background(), "password-one"); err == nil {
 		t.Fatal("expected database error")
 	}
