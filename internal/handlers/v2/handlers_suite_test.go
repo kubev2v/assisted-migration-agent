@@ -9,7 +9,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
-	svc "github.com/kubev2v/assisted-migration-agent/internal/services/v2"
+	svc "github.com/kubev2v/assisted-migration-agent/internal/services"
 )
 
 func TestHandlersV2(t *testing.T) {
@@ -67,13 +67,18 @@ func (s *stubServiceProvider) LatestInventoryService() (*svc.InventoryService, e
 func (s *stubServiceProvider) LatestRightsizingService() (*svc.RightsizingService, error) {
 	return nil, nil
 }
+func (s *stubServiceProvider) LatestApplicationService() (*svc.ApplicationService, error) {
+	return nil, nil
+}
 func (s *stubServiceProvider) GetCollectorStatus() models.CollectorStatus {
 	return models.CollectorStatus{State: models.CollectorStateReady}
 }
 func (s *stubServiceProvider) StartCollecting(_ context.Context) (models.CollectorStatus, error) {
 	return models.CollectorStatus{State: models.CollectorStateReady}, nil
 }
-func (s *stubServiceProvider) StopCollecting() error { return nil }
+func (s *stubServiceProvider) DeleteData(_ context.Context) error { return nil }
+func (s *stubServiceProvider) Stop(_ context.Context)             {}
+func (s *stubServiceProvider) StopCollecting() error              { return nil }
 func (s *stubServiceProvider) StartRVToolsCollecting(_ []string) (models.CollectorStatus, error) {
 	return models.CollectorStatus{}, nil
 }

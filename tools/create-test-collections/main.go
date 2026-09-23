@@ -140,7 +140,7 @@ func createCollection(dataFolder string, col Collection) (string, error) {
 	return id, nil
 }
 
-func insertVM(ctx context.Context, st *store.Store2, vm VM, idx int) error {
+func insertVM(ctx context.Context, st *store.Store, vm VM, idx int) error {
 	labelsJSON := "[]"
 	if len(vm.Labels) > 0 {
 		b, _ := json.Marshal(vm.Labels)

@@ -306,7 +306,7 @@ var _ = ginkgo.Describe("VM Migration Exclusion v2 e2e tests", ginkgo.Ordered, f
 
 			// Find a cluster with at least 2 VMs
 			for cluster, vms := range clusterVMs {
-				if len(vms) >= 2 {
+				if cluster != "" && len(vms) >= 2 {
 					testCluster = cluster
 					excludedVMInCluster = vms[0].id
 					includedVMInCluster = vms[1].id

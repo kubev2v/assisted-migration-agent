@@ -3,22 +3,29 @@ package store_test
 import (
 	"context"
 	"database/sql"
+	"os"
+	"path/filepath"
 	"sort"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
+
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
-	"github.com/kubev2v/assisted-migration-agent/internal/services"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
+	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	"github.com/kubev2v/assisted-migration-agent/test"
 )
 
 var _ = Describe("VMStore cross-table filters", func() {
 	var (
-		ctx context.Context
-		s   *store.Store
-		db  *sql.DB
+		ctx    context.Context
+		s      *store.Store
+		db     *sql.DB
+		pool   *store.Pool
+		tmpDir string
 	)
 
 	vmIDs := func(vms []models.VirtualMachineSummary) []string {
@@ -33,30 +40,41 @@ var _ = Describe("VMStore cross-table filters", func() {
 	BeforeEach(func() {
 		ctx = context.Background()
 		var err error
-
-		db, err = store.NewConnection(nil, ":memory:")
+		tmpDir, err = os.MkdirTemp("", "vm-filter-store-test-*")
 		Expect(err).NotTo(HaveOccurred())
 
-		s = store.NewStore(db, test.NewMockValidator())
-
-		Expect(s.InitCollection(ctx)).To(Succeed())
-
-		err = test.InsertVMs(ctx, db)
+		pool = store.NewPool(5 * time.Minute)
+		collDB, err := pool.NewDatabase("coll", filepath.Join(tmpDir, "collection.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		Expect(err).NotTo(HaveOccurred())
+		var rawDB *sql.DB
+		Expect(collDB.Migrate(ctx, func(mCtx context.Context, sqlDB *sql.DB) error {
+			rawDB = sqlDB
+			st, stErr := collDB.Store()
+			if stErr != nil {
+				return stErr
+			}
+			if pErr := duckdb_parser.New(st.Querier(), test.NewMockValidator()).Init(); pErr != nil {
+				return pErr
+			}
+			return migrations.RunCollection(mCtx, sqlDB, "collection")
+		})).To(Succeed())
+		db = rawDB
+		pool.Add(collDB)
+		s, err = collDB.Store()
 		Expect(err).NotTo(HaveOccurred())
 
-		err = test.InsertVMMemory(ctx, db)
-		Expect(err).NotTo(HaveOccurred())
-
-		err = test.InsertVMDatastores(ctx, db)
-		Expect(err).NotTo(HaveOccurred())
-
-		err = test.InsertVMInspections(ctx, db)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(test.InsertVMs(ctx, db)).To(Succeed())
+		Expect(test.InsertVMMemory(ctx, db)).To(Succeed())
+		Expect(test.InsertVMDatastores(ctx, db)).To(Succeed())
+		Expect(test.InsertVMInspections(ctx, db)).To(Succeed())
 	})
 
 	AfterEach(func() {
-		if db != nil {
-			_ = db.Close()
+		if pool != nil {
+			pool.Close()
+		}
+		if tmpDir != "" {
+			_ = os.RemoveAll(tmpDir)
 		}
 	})
 
@@ -368,12 +386,13 @@ var _ = Describe("VMStore cross-table filters", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(s.Group().RefreshMatches(ctx, g.ID)).To(Succeed())
 
-			svc := services.NewGroupService(s)
-			vms, total, err := svc.ListVirtualMachines(ctx, g.ID, services.GroupGetParams{})
+			matched, err := s.Group().GetMatchedIDs(ctx, g.ID)
+			Expect(err).NotTo(HaveOccurred())
+			vms, err := s.VM().List(ctx, nil, store.WithVMIDs(matched), store.WithDefaultSort())
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(vmIDs(vms)).To(Equal([]string{"vm-007"}))
-			Expect(total).To(Equal(1))
+			Expect(len(matched)).To(Equal(1))
 		})
 
 		It("should filter VMs through group disk controller filter", func() {
@@ -384,12 +403,13 @@ var _ = Describe("VMStore cross-table filters", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(s.Group().RefreshMatches(ctx, g.ID)).To(Succeed())
 
-			svc := services.NewGroupService(s)
-			vms, total, err := svc.ListVirtualMachines(ctx, g.ID, services.GroupGetParams{})
+			matched, err := s.Group().GetMatchedIDs(ctx, g.ID)
+			Expect(err).NotTo(HaveOccurred())
+			vms, err := s.VM().List(ctx, nil, store.WithVMIDs(matched), store.WithDefaultSort())
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(vmIDs(vms)).To(Equal([]string{"vm-008", "vm-009"}))
-			Expect(total).To(Equal(2))
+			Expect(len(matched)).To(Equal(2))
 
 			for _, vm := range vms {
 				Expect(vm.ID).NotTo(BeEmpty())
@@ -405,14 +425,13 @@ var _ = Describe("VMStore cross-table filters", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(s.Group().RefreshMatches(ctx, g.ID)).To(Succeed())
 
-			svc := services.NewGroupService(s)
-			vms, total, err := svc.ListVirtualMachines(ctx, g.ID, services.GroupGetParams{
-				Limit: 1,
-			})
+			matched, err := s.Group().GetMatchedIDs(ctx, g.ID)
+			Expect(err).NotTo(HaveOccurred())
+			vms, err := s.VM().List(ctx, nil, store.WithVMIDs(matched), store.WithDefaultSort(), store.WithLimit(1))
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(vms).To(HaveLen(1))
-			Expect(total).To(Equal(3))
+			Expect(len(matched)).To(Equal(3))
 		})
 	})
 })

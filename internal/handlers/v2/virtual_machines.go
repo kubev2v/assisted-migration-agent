@@ -9,7 +9,7 @@ import (
 
 	v2 "github.com/kubev2v/assisted-migration-agent/api/v2"
 	vmfilter "github.com/kubev2v/assisted-migration-agent/internal/filter"
-	services "github.com/kubev2v/assisted-migration-agent/internal/services/v2"
+	services "github.com/kubev2v/assisted-migration-agent/internal/services"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
@@ -17,6 +17,7 @@ var validSortFields = map[string]bool{
 	"name":         true,
 	"vCenterState": true,
 	"cluster":      true,
+	"datacenter":   true,
 	"diskSize":     true,
 	"memory":       true,
 	"issues":       true,
@@ -467,4 +468,37 @@ func (h *Handler) deleteLabelGlobally(c *gin.Context, vmSvc *services.VMService,
 		Affected: affected,
 		Label:    label,
 	})
+}
+
+// CancelVirtualMachineInspection cancels deep inspection for a specific VirtualMachine.
+// (DELETE /virtualmachines/{vmId}/inspection)
+func (h *Handler) CancelVirtualMachineInspection(c *gin.Context, vmId string) {
+	inspSvc, err := h.svc.InspectorService()
+	if err != nil {
+		if srvErrors.IsCollectionNotFoundError(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "collect data before using the inspector"})
+			return
+		}
+		if srvErrors.IsOperationInProgressError(err) {
+			c.JSON(http.StatusConflict, gin.H{"error": "a collection is currently in progress; please wait for it to complete before using deep inspection"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+
+	if err := inspSvc.Cancel(vmId); err != nil {
+		if srvErrors.IsInspectorNotRunningError(err) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if srvErrors.IsResourceNotFoundError(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
 }

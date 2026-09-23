@@ -458,6 +458,7 @@ func WithSort(sorts []SortParam) ListOption {
 		"name":         "name",
 		"vCenterState": "power_state",
 		"cluster":      "cluster",
+		"datacenter":   "datacenter",
 		"diskSize":     "disk_size",
 		"memory":       "memory",
 		"issues":       "issue_count",

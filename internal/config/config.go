@@ -25,7 +25,6 @@ type Server struct {
 	ServerMode    string `debugmap:"visible" default:"dev"`
 	HTTPPort      int    `debugmap:"visible" default:"8000"`
 	StaticsFolder string `debugmap:"visible"`
-	API           string `debugmap:"visible" default:"v2"`
 }
 
 type Agent struct {

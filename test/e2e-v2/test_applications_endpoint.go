@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"time"
 
 	ginkgo "github.com/onsi/ginkgo/v2"
@@ -176,6 +177,63 @@ var _ = ginkgo.Describe("Applications endpoint v2 e2e tests", ginkgo.Ordered, fu
 			gm.Expect(err).ToNot(gm.HaveOccurred())
 
 			gm.Expect(result.Total).To(gm.Equal(0))
+		})
+	})
+
+	ginkgo.Context("Group applications", func() {
+		ginkgo.It("should return applications for a group matching all VMs", func() {
+			group, err := agentSvc.CreateGroup("all-vms-apps", "memory > 0", "")
+			gm.Expect(err).ToNot(gm.HaveOccurred())
+			defer func() { _, _ = agentSvc.DeleteGroup(group.Id) }()
+
+			groupApps, err := agentSvc.ListGroupApplications(group.Id)
+			gm.Expect(err).ToNot(gm.HaveOccurred())
+
+			allApps, err := agentSvc.ListApplications(collectionID)
+			gm.Expect(err).ToNot(gm.HaveOccurred())
+
+			ginkgo.GinkgoWriter.Printf("Group apps: %d, All apps: %d\n", len(groupApps.Applications), len(allApps.Applications))
+			gm.Expect(len(groupApps.Applications)).To(gm.Equal(len(allApps.Applications)))
+		})
+
+		ginkgo.It("should return empty applications for group with no matching VMs", func() {
+			group, err := agentSvc.CreateGroup("no-vms-apps", "memory > 999999999", "")
+			gm.Expect(err).ToNot(gm.HaveOccurred())
+			defer func() { _, _ = agentSvc.DeleteGroup(group.Id) }()
+
+			result, err := agentSvc.ListGroupApplications(group.Id)
+			gm.Expect(err).ToNot(gm.HaveOccurred())
+
+			ginkgo.GinkgoWriter.Printf("Empty group apps: %d\n", len(result.Applications))
+			gm.Expect(result.Applications).To(gm.BeEmpty())
+		})
+
+		ginkgo.It("should return subset of applications for a filtered group", func() {
+			pageSize := 1
+			vms, err := agentSvc.ListLatestVMs(&service.VMListParams{PageSize: &pageSize})
+			gm.Expect(err).ToNot(gm.HaveOccurred())
+			gm.Expect(len(vms.VirtualMachines)).To(gm.BeNumerically(">", 0))
+
+			vmName := vms.VirtualMachines[0].Name
+			group, err := agentSvc.CreateGroup("single-vm-apps", fmt.Sprintf("name = '%s'", vmName), "")
+			gm.Expect(err).ToNot(gm.HaveOccurred())
+			defer func() { _, _ = agentSvc.DeleteGroup(group.Id) }()
+
+			groupApps, err := agentSvc.ListGroupApplications(group.Id)
+			gm.Expect(err).ToNot(gm.HaveOccurred())
+
+			allApps, err := agentSvc.ListApplications(collectionID)
+			gm.Expect(err).ToNot(gm.HaveOccurred())
+
+			ginkgo.GinkgoWriter.Printf("Single VM '%s' apps: %d, All apps: %d\n", vmName, len(groupApps.Applications), len(allApps.Applications))
+			gm.Expect(len(groupApps.Applications)).To(gm.BeNumerically("<=", len(allApps.Applications)))
+
+			for _, app := range groupApps.Applications {
+				for _, vm := range app.Vms {
+					gm.Expect(vm.Name).To(gm.Equal(vmName),
+						"app %q should only contain VM %s", app.Name, vmName)
+				}
+			}
 		})
 	})
 })

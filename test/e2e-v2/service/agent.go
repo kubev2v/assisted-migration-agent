@@ -333,6 +333,18 @@ func (a *AgentSvc) CompareCollectionsDiff(aId, bId string, dimension v2.CompareC
 	return &result, nil
 }
 
+func (a *AgentSvc) DeleteCollections() error {
+	resp, err := a.doRequest(http.MethodDelete, "/api/v2/collections", nil)
+	if err != nil {
+		return err
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+	return nil
+}
+
 func (a *AgentSvc) DeleteCollection(id string) error {
 	resp, err := a.doRequest(http.MethodDelete, "/api/v2/collections/"+url.PathEscape(id), nil)
 	if err != nil {
@@ -559,6 +571,27 @@ func (a *AgentSvc) DeleteGroup(groupID string) (int, error) {
 
 func (a *AgentSvc) ListApplications(collectionID string) (*v2.ApplicationListResponse, error) {
 	path := fmt.Sprintf("/api/v2/collections/%s/applications", url.PathEscape(collectionID))
+	resp, err := a.doGet(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var result v2.ApplicationListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+	return &result, nil
+}
+
+// --- Group Applications (latest-collection shortcut) ---
+
+func (a *AgentSvc) ListGroupApplications(groupID string) (*v2.ApplicationListResponse, error) {
+	path := fmt.Sprintf("/api/v2/groups/%s/applications", url.PathEscape(groupID))
 	resp, err := a.doGet(path)
 	if err != nil {
 		return nil, err

@@ -57,11 +57,16 @@ func (s *ApplicationStore) ReplaceAll(ctx context.Context, records []models.Appl
 }
 
 // ListOverviews returns application overviews grouped by app name, sorted alphabetically.
-func (s *ApplicationStore) ListOverviews(ctx context.Context) ([]models.ApplicationOverview, error) {
-	query, args, err := sq.Select(appColAppName, appColAppDesc, appColVMID, appColVMName).
-		From(appTable).
-		OrderBy(appColAppName, appColVMName).
-		ToSql()
+func (s *ApplicationStore) ListOverviews(ctx context.Context, filter sq.Sqlizer) ([]models.ApplicationOverview, error) {
+	selectQuery := sq.Select(appColAppName, appColAppDesc, appColVMID, appColVMName).From(appTable)
+
+	if filter != nil {
+		selectQuery = selectQuery.Where(filter)
+	}
+
+	selectQuery = selectQuery.OrderBy(appColAppName, appColVMName)
+
+	query, args, err := selectQuery.ToSql()
 	if err != nil {
 		return nil, fmt.Errorf("building list query: %w", err)
 	}

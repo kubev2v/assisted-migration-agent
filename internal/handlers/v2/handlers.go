@@ -5,7 +5,7 @@ import (
 
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
-	svc "github.com/kubev2v/assisted-migration-agent/internal/services/v2"
+	svc "github.com/kubev2v/assisted-migration-agent/internal/services"
 )
 
 type ServiceProvider interface {
@@ -28,11 +28,15 @@ type ServiceProvider interface {
 	LatestGroupService() (*svc.GroupService, error)
 	LatestInventoryService() (*svc.InventoryService, error)
 	LatestRightsizingService() (*svc.RightsizingService, error)
+	LatestApplicationService() (*svc.ApplicationService, error)
 
 	GetCollectorStatus() models.CollectorStatus
 	StartCollecting(ctx context.Context) (models.CollectorStatus, error)
 	StopCollecting() error
 	StartRVToolsCollecting(rvtoolFiles []string) (models.CollectorStatus, error)
+
+	DeleteData(ctx context.Context) error
+	Stop(ctx context.Context)
 }
 
 type Handler struct {

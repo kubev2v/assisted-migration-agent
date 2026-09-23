@@ -2,127 +2,108 @@ package store_test
 
 import (
 	"context"
+	"os"
 	"path/filepath"
-	"testing"
+	"time"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
+	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 )
 
-func setupForecastStore(t *testing.T) *store.Store {
-	t.Helper()
-	db, err := store.NewConnection(nil, filepath.Join(t.TempDir(), "agent.duckdb"))
-	if err != nil {
-		t.Fatalf("failed to create db: %v", err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
+var _ = Describe("ForecastStore", func() {
+	var (
+		ctx    context.Context
+		s      *store.Store
+		pool   *store.Pool
+		tmpDir string
+	)
 
-	s := store.NewStore(db, nil)
-	if err := s.Migrate(context.Background(), ""); err != nil {
-		t.Fatalf("failed to run migrations: %v", err)
-	}
-	return s
-}
+	BeforeEach(func() {
+		ctx = context.Background()
+		var err error
+		tmpDir, err = os.MkdirTemp("", "forecast-store-test-*")
+		Expect(err).NotTo(HaveOccurred())
+		pool = store.NewPool(5 * time.Minute)
+		mainDB, dbErr := pool.NewDatabase(store.MainDatabaseID, filepath.Join(tmpDir, "agent.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		Expect(dbErr).NotTo(HaveOccurred())
+		Expect(mainDB.Migrate(ctx, migrations.RunMain)).To(Succeed())
+		pool.Add(mainDB)
+		s, err = mainDB.Store()
+		Expect(err).NotTo(HaveOccurred())
+	})
 
-func TestForecastStore_InsertAndListRuns(t *testing.T) {
-	s := setupForecastStore(t)
-	ctx := context.Background()
+	AfterEach(func() {
+		if pool != nil {
+			pool.Close()
+		}
+		if tmpDir != "" {
+			_ = os.RemoveAll(tmpDir)
+		}
+	})
 
-	run := models.BenchmarkRun{
-		SessionID:      1,
-		PairName:       "test-pair",
-		SourceDS:       "ds-source",
-		TargetDS:       "ds-target",
-		Iteration:      1,
-		DiskSizeGB:     10,
-		DurationSec:    5.5,
-		ThroughputMBps: 1861.8,
-		Method:         "vm_native",
-	}
+	It("should insert and list runs", func() {
+		run := models.BenchmarkRun{
+			SessionID:      1,
+			PairName:       "test-pair",
+			SourceDS:       "ds-source",
+			TargetDS:       "ds-target",
+			Iteration:      1,
+			DiskSizeGB:     10,
+			DurationSec:    5.5,
+			ThroughputMBps: 1861.8,
+			Method:         "vm_native",
+		}
 
-	if err := s.Forecast().InsertRun(ctx, run); err != nil {
-		t.Fatalf("failed to insert run: %v", err)
-	}
+		Expect(s.Forecast().InsertRun(ctx, run)).To(Succeed())
 
-	runs, err := s.Forecast().ListRuns(ctx, "test-pair")
-	if err != nil {
-		t.Fatalf("failed to list runs: %v", err)
-	}
+		runs, err := s.Forecast().ListRuns(ctx, "test-pair")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(runs).To(HaveLen(1))
+		Expect(runs[0].PairName).To(Equal("test-pair"))
+		Expect(runs[0].ThroughputMBps).To(Equal(1861.8))
+	})
 
-	if len(runs) != 1 {
-		t.Fatalf("expected 1 run, got %d", len(runs))
-	}
+	It("should delete a run", func() {
+		run := models.BenchmarkRun{
+			SessionID:      1,
+			PairName:       "test-pair",
+			SourceDS:       "ds-source",
+			TargetDS:       "ds-target",
+			Iteration:      1,
+			DiskSizeGB:     10,
+			DurationSec:    5.5,
+			ThroughputMBps: 1861.8,
+		}
 
-	if runs[0].PairName != "test-pair" {
-		t.Errorf("expected pair name 'test-pair', got %q", runs[0].PairName)
-	}
-	if runs[0].ThroughputMBps != 1861.8 {
-		t.Errorf("expected throughput 1861.8, got %f", runs[0].ThroughputMBps)
-	}
-}
+		Expect(s.Forecast().InsertRun(ctx, run)).To(Succeed())
 
-func TestForecastStore_DeleteRun(t *testing.T) {
-	s := setupForecastStore(t)
-	ctx := context.Background()
+		runs, err := s.Forecast().ListRuns(ctx, "test-pair")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(runs).NotTo(BeEmpty())
 
-	run := models.BenchmarkRun{
-		SessionID:      1,
-		PairName:       "test-pair",
-		SourceDS:       "ds-source",
-		TargetDS:       "ds-target",
-		Iteration:      1,
-		DiskSizeGB:     10,
-		DurationSec:    5.5,
-		ThroughputMBps: 1861.8,
-	}
+		Expect(s.Forecast().DeleteRun(ctx, runs[0].ID)).To(Succeed())
 
-	if err := s.Forecast().InsertRun(ctx, run); err != nil {
-		t.Fatalf("failed to insert run: %v", err)
-	}
+		runs, err = s.Forecast().ListRuns(ctx, "test-pair")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(runs).To(BeEmpty())
+	})
 
-	// Get the run to find its ID
-	runs, _ := s.Forecast().ListRuns(ctx, "test-pair")
-	if len(runs) == 0 {
-		t.Fatal("expected at least one run")
-	}
+	It("should return error when deleting non-existent run", func() {
+		err := s.Forecast().DeleteRun(ctx, 99999)
+		Expect(err).To(HaveOccurred())
+	})
 
-	// Delete it
-	if err := s.Forecast().DeleteRun(ctx, runs[0].ID); err != nil {
-		t.Fatalf("failed to delete run: %v", err)
-	}
+	It("should return incrementing session IDs", func() {
+		id1, err := s.Forecast().NextSessionID(ctx)
+		Expect(err).NotTo(HaveOccurred())
 
-	// Verify deleted
-	runs, _ = s.Forecast().ListRuns(ctx, "test-pair")
-	if len(runs) != 0 {
-		t.Errorf("expected 0 runs after delete, got %d", len(runs))
-	}
-}
+		id2, err := s.Forecast().NextSessionID(ctx)
+		Expect(err).NotTo(HaveOccurred())
 
-func TestForecastStore_DeleteRunNotFound(t *testing.T) {
-	s := setupForecastStore(t)
-	ctx := context.Background()
-
-	err := s.Forecast().DeleteRun(ctx, 99999)
-	if err == nil {
-		t.Error("expected error when deleting non-existent run")
-	}
-}
-
-func TestForecastStore_NextSessionID(t *testing.T) {
-	s := setupForecastStore(t)
-	ctx := context.Background()
-
-	id1, err := s.Forecast().NextSessionID(ctx)
-	if err != nil {
-		t.Fatalf("failed to get session ID: %v", err)
-	}
-
-	id2, err := s.Forecast().NextSessionID(ctx)
-	if err != nil {
-		t.Fatalf("failed to get second session ID: %v", err)
-	}
-
-	if id2 <= id1 {
-		t.Errorf("expected second session ID > first, got %d <= %d", id2, id1)
-	}
-}
+		Expect(id2).To(BeNumerically(">", id1))
+	})
+})

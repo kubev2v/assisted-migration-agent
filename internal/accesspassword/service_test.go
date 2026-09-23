@@ -9,24 +9,28 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/accesspassword"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
+	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	"github.com/kubev2v/assisted-migration-agent/pkg/crypto"
-	"github.com/kubev2v/assisted-migration-agent/test"
 )
 
 func newService(t *testing.T) (*accesspassword.Service, *store.Store) {
 	t.Helper()
-	db, err := store.NewConnection(nil, filepath.Join(t.TempDir(), "agent.duckdb"))
+	pool := store.NewPool(5 * time.Minute)
+	t.Cleanup(pool.Close)
+	db, err := pool.NewDatabase(store.MainDatabaseID, filepath.Join(t.TempDir(), "agent.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = db.Close() })
-
-	st := store.NewStore(db, test.NewMockValidator())
-	if err := st.Migrate(context.Background(), ""); err != nil {
+	if err := db.Migrate(context.Background(), migrations.RunMain); err != nil {
+		t.Fatal(err)
+	}
+	st, err := db.Store()
+	if err != nil {
 		t.Fatal(err)
 	}
 	return accesspassword.NewService(st.AccessPassword()), st

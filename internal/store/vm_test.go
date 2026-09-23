@@ -3,44 +3,70 @@ package store_test
 import (
 	"context"
 	"database/sql"
+	"os"
+	"path/filepath"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
+
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
+	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 	"github.com/kubev2v/assisted-migration-agent/test"
 )
 
 var _ = Describe("VMStore", func() {
 	var (
-		ctx context.Context
-		s   *store.Store
-		db  *sql.DB
+		ctx    context.Context
+		s      *store.Store
+		db     *sql.DB
+		pool   *store.Pool
+		tmpDir string
 	)
 
 	BeforeEach(func() {
 		ctx = context.Background()
 		var err error
-
-		db, err = store.NewConnection(nil, ":memory:")
+		tmpDir, err = os.MkdirTemp("", "vm-store-test-*")
 		Expect(err).NotTo(HaveOccurred())
 
-		s = store.NewStore(db, test.NewMockValidator())
-
-		Expect(s.InitCollection(ctx)).To(Succeed())
+		pool = store.NewPool(5 * time.Minute)
+		collDB, err := pool.NewDatabase("coll", filepath.Join(tmpDir, "collection.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		Expect(err).NotTo(HaveOccurred())
+		var rawDB *sql.DB
+		Expect(collDB.Migrate(ctx, func(mCtx context.Context, sqlDB *sql.DB) error {
+			rawDB = sqlDB
+			st, stErr := collDB.Store()
+			if stErr != nil {
+				return stErr
+			}
+			if pErr := duckdb_parser.New(st.Querier(), test.NewMockValidator()).Init(); pErr != nil {
+				return pErr
+			}
+			return migrations.RunCollection(mCtx, sqlDB, "collection")
+		})).To(Succeed())
+		db = rawDB
+		pool.Add(collDB)
+		s, err = collDB.Store()
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	AfterEach(func() {
-		if db != nil {
-			_ = db.Close()
+		if pool != nil {
+			pool.Close()
+		}
+		if tmpDir != "" {
+			_ = os.RemoveAll(tmpDir)
 		}
 	})
 
 	// Helper to insert test data into vinfo table
 	insertVM := func(id, name, powerState, cluster string, memory int32) {
-		_, err := db.ExecContext(ctx, `
+		_, err := s.Querier().ExecContext(ctx, `
 			INSERT INTO vinfo ("VM ID", "VM", "Powerstate", "Cluster", "Memory", "Template")
 			VALUES (?, ?, ?, ?, ?, false)
 		`, id, name, powerState, cluster, memory)
@@ -49,7 +75,7 @@ var _ = Describe("VMStore", func() {
 
 	// Helper to insert VM with template flag
 	insertVMWithTemplate := func(id, name, powerState, cluster string, memory int32, isTemplate bool) {
-		_, err := db.ExecContext(ctx, `
+		_, err := s.Querier().ExecContext(ctx, `
 			INSERT INTO vinfo ("VM ID", "VM", "Powerstate", "Cluster", "Memory", "Template")
 			VALUES (?, ?, ?, ?, ?, ?)
 		`, id, name, powerState, cluster, memory, isTemplate)
@@ -58,7 +84,7 @@ var _ = Describe("VMStore", func() {
 
 	// Helper to insert disk data into vdisk table
 	insertDisk := func(vmID string, capacityMiB int64) {
-		_, err := db.ExecContext(ctx, `
+		_, err := s.Querier().ExecContext(ctx, `
 			INSERT INTO vdisk ("VM ID", "Capacity MiB")
 			VALUES (?, ?)
 		`, vmID, capacityMiB)
@@ -67,7 +93,7 @@ var _ = Describe("VMStore", func() {
 
 	// Helper to insert concerns for a VM
 	insertConcern := func(vmID, concernID, label, category string) {
-		_, err := db.ExecContext(ctx, `
+		_, err := s.Querier().ExecContext(ctx, `
 			INSERT INTO concerns ("VM_ID", "Concern_ID", "Label", "Category", "Assessment")
 			VALUES (?, ?, ?, ?, 'Needs attention')
 		`, vmID, concernID, label, category)
@@ -76,7 +102,7 @@ var _ = Describe("VMStore", func() {
 
 	// Helper to insert VM with folder information
 	insertVMWithFolder := func(id, name, folderID, folderName string) {
-		_, err := db.ExecContext(ctx, `
+		_, err := s.Querier().ExecContext(ctx, `
 			INSERT INTO vinfo ("VM ID", "VM", "Powerstate", "Cluster", "Memory", "Template", "Folder ID", "Folder")
 			VALUES (?, ?, 'poweredOn', 'cluster-a', 4096, false, ?, ?)
 		`, id, name, folderID, folderName)
@@ -327,6 +353,31 @@ var _ = Describe("VMStore", func() {
 				Expect(vms[0].IssueCount).To(Equal(2)) // vm-3 has 2 issues
 			})
 
+			// Given VMs with mixed datacenter values that do not match id order
+			// When we sort by datacenter ascending
+			// Then the VM that owns DC-A moves as a whole row (id and other fields stay together)
+			It("should sort by datacenter ascending", func() {
+				_, err := s.Querier().ExecContext(ctx, `
+					UPDATE vinfo SET "Datacenter" = CASE "VM ID"
+						WHEN 'vm-1' THEN 'DC-C'
+						WHEN 'vm-2' THEN 'DC-B'
+						WHEN 'vm-3' THEN 'DC-A'
+						ELSE 'DC-B'
+					END
+				`)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Act
+				vms, err := s.VM().List(ctx, nil, store.WithSort([]store.SortParam{{Field: "datacenter", Desc: false}}))
+
+				// Assert
+				Expect(err).NotTo(HaveOccurred())
+				Expect(vms).To(HaveLen(5))
+				Expect(vms[0].Datacenter).To(Equal("DC-A"))
+				Expect(vms[0].ID).To(Equal("vm-3"))
+				Expect(vms[0].Name).To(Equal("db-server-1"))
+			})
+
 			// Given VMs with known CPU utilization values
 			// When we sort by cpuUsage descending
 			// Then VMs with highest CPU come first and VMs without data come last
@@ -339,7 +390,7 @@ var _ = Describe("VMStore", func() {
 				insertVM("vm-cpu-b", "cpu-low", "poweredOn", "cluster-a", 2048)
 				insertVM("vm-cpu-c", "cpu-high", "poweredOn", "cluster-a", 2048)
 
-				_, err := db.ExecContext(ctx, `
+				_, err := s.Querier().ExecContext(ctx, `
 					INSERT INTO rightsizing_reports
 						(id, vcenter, cluster_id, interval_id, window_start, window_end,
 						 expected_sample_count, expected_batch_count, written_batch_count)
@@ -349,7 +400,7 @@ var _ = Describe("VMStore", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				// vm-cpu-c: 80%, vm-cpu-b: 30%, vm-cpu-a: no data
-				_, err = db.ExecContext(ctx, `
+				_, err = s.Querier().ExecContext(ctx, `
 					INSERT INTO rightsizing_vm_utilization (report_id, moid, vm_name, cpu_max_pct)
 					VALUES ('r-sort-cpu', 'vm-cpu-c', 'cpu-high', 80.0),
 					       ('r-sort-cpu', 'vm-cpu-b', 'cpu-low', 30.0)
@@ -392,7 +443,7 @@ var _ = Describe("VMStore", func() {
 				insertVM("vm-disk-b", "disk-high", "poweredOn", "cluster-a", 2048)
 				insertVM("vm-disk-c", "disk-low", "poweredOn", "cluster-a", 2048)
 
-				_, err := db.ExecContext(ctx, `
+				_, err := s.Querier().ExecContext(ctx, `
 					INSERT INTO rightsizing_reports
 						(id, vcenter, cluster_id, interval_id, window_start, window_end,
 						 expected_sample_count, expected_batch_count, written_batch_count)
@@ -402,7 +453,7 @@ var _ = Describe("VMStore", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				// vm-disk-c: 10%, vm-disk-b: 90%, vm-disk-a: no data
-				_, err = db.ExecContext(ctx, `
+				_, err = s.Querier().ExecContext(ctx, `
 					INSERT INTO rightsizing_vm_utilization (report_id, moid, vm_name, disk_pct)
 					VALUES ('r-sort-disk', 'vm-disk-c', 'disk-low', 10.0),
 					       ('r-sort-disk', 'vm-disk-b', 'disk-high', 90.0)
@@ -444,7 +495,7 @@ var _ = Describe("VMStore", func() {
 				insertVM("vm-ram-b", "ram-low", "poweredOn", "cluster-a", 2048)
 				insertVM("vm-ram-c", "ram-high", "poweredOn", "cluster-a", 2048)
 
-				_, err := db.ExecContext(ctx, `
+				_, err := s.Querier().ExecContext(ctx, `
 					INSERT INTO rightsizing_reports
 						(id, vcenter, cluster_id, interval_id, window_start, window_end,
 						 expected_sample_count, expected_batch_count, written_batch_count)
@@ -454,7 +505,7 @@ var _ = Describe("VMStore", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				// vm-ram-c: 85%, vm-ram-b: 25%, vm-ram-a: no data
-				_, err = db.ExecContext(ctx, `
+				_, err = s.Querier().ExecContext(ctx, `
 					INSERT INTO rightsizing_vm_utilization (report_id, moid, vm_name, mem_max_pct)
 					VALUES ('r-sort-ram', 'vm-ram-c', 'ram-high', 85.0),
 					       ('r-sort-ram', 'vm-ram-b', 'ram-low', 25.0)
@@ -496,7 +547,7 @@ var _ = Describe("VMStore", func() {
 				insertVM("vm-cavg-b", "cavg-low", "poweredOn", "cluster-a", 2048)
 				insertVM("vm-cavg-c", "cavg-high", "poweredOn", "cluster-a", 2048)
 
-				_, err := db.ExecContext(ctx, `
+				_, err := s.Querier().ExecContext(ctx, `
 					INSERT INTO rightsizing_reports
 						(id, vcenter, cluster_id, interval_id, window_start, window_end,
 						 expected_sample_count, expected_batch_count, written_batch_count)
@@ -505,7 +556,7 @@ var _ = Describe("VMStore", func() {
 				`)
 				Expect(err).NotTo(HaveOccurred())
 
-				_, err = db.ExecContext(ctx, `
+				_, err = s.Querier().ExecContext(ctx, `
 					INSERT INTO rightsizing_vm_utilization (report_id, moid, vm_name, cpu_avg_pct)
 					VALUES ('r-sort-cavg', 'vm-cavg-c', 'cavg-high', 75.0),
 					       ('r-sort-cavg', 'vm-cavg-b', 'cavg-low',  25.0)
@@ -545,7 +596,7 @@ var _ = Describe("VMStore", func() {
 				insertVM("vm-mavg-b", "mavg-high", "poweredOn", "cluster-a", 2048)
 				insertVM("vm-mavg-c", "mavg-low", "poweredOn", "cluster-a", 2048)
 
-				_, err := db.ExecContext(ctx, `
+				_, err := s.Querier().ExecContext(ctx, `
 					INSERT INTO rightsizing_reports
 						(id, vcenter, cluster_id, interval_id, window_start, window_end,
 						 expected_sample_count, expected_batch_count, written_batch_count)
@@ -554,7 +605,7 @@ var _ = Describe("VMStore", func() {
 				`)
 				Expect(err).NotTo(HaveOccurred())
 
-				_, err = db.ExecContext(ctx, `
+				_, err = s.Querier().ExecContext(ctx, `
 					INSERT INTO rightsizing_vm_utilization (report_id, moid, vm_name, mem_avg_pct)
 					VALUES ('r-sort-mavg', 'vm-mavg-c', 'mavg-low',  8.0),
 					       ('r-sort-mavg', 'vm-mavg-b', 'mavg-high', 92.0)
@@ -893,7 +944,7 @@ var _ = Describe("VMStore", func() {
 		// Then the category should be normalized to "Other"
 		It("should normalize unknown categories to 'Other'", func() {
 			// Arrange - Insert a concern with an unknown category
-			_, err := db.ExecContext(ctx, `
+			_, err := s.Querier().ExecContext(ctx, `
 				INSERT INTO concerns ("VM_ID", "Concern_ID", "Label", "Category", "Assessment")
 				VALUES ('vm-001', 'test.unknown', 'Unknown Category Test', 'UnknownCategory', 'This is a test')
 			`)
@@ -914,7 +965,7 @@ var _ = Describe("VMStore", func() {
 		// Then categories should be normalized to proper case
 		It("should normalize category case variants", func() {
 			// Arrange - Insert concerns with different case variants
-			_, err := db.ExecContext(ctx, `
+			_, err := s.Querier().ExecContext(ctx, `
 				INSERT INTO concerns ("VM_ID", "Concern_ID", "Label", "Category", "Assessment")
 				VALUES
 					('vm-002', 'test.lowercase', 'Lowercase Test', 'critical', 'Test'),
@@ -948,7 +999,7 @@ var _ = Describe("VMStore", func() {
 		// Then InspectionStatus should be populated with state and error
 		It("should populate InspectionStatus from vm_inspection_status", func() {
 			// Arrange
-			_, err := db.ExecContext(ctx, `
+			_, err := s.Querier().ExecContext(ctx, `
 				INSERT INTO vm_inspection_status ("VM ID", status, details, error)
 				VALUES ('vm-001', 'error', 'VDDK connection failed', 'nbdkit-vddk-plugin: Unknown error')
 			`)
@@ -1205,7 +1256,7 @@ var _ = Describe("VMStore", func() {
 			It("should use concerns only from the newest result by max inspection_id", func() {
 				insertVM("vm-multi", "multi-vm", "poweredOn", "cluster-a", 4096)
 				const oldID, newID = 1, 2
-				_, err := db.ExecContext(ctx, `
+				_, err := s.Querier().ExecContext(ctx, `
 					INSERT INTO vm_inspection_concerns ("VM ID", inspection_id, category, label, msg) VALUES
 						('vm-multi', ?, 'stale', 'x', 'from-old'),
 						('vm-multi', ?, 'fresh', 'y', 'from-new')
@@ -1230,13 +1281,13 @@ var _ = Describe("VMStore", func() {
 
 	Context("NIC IP addresses", func() {
 		BeforeEach(func() {
-			_, err := db.ExecContext(ctx, `
+			_, err := s.Querier().ExecContext(ctx, `
 				INSERT INTO vinfo ("VM ID", "VM", "Powerstate", "Cluster", "Memory", "Template")
 				VALUES ('vm-ips', 'IP Test VM', 'poweredOn', 'cluster1', 4096, false)
 			`)
 			Expect(err).NotTo(HaveOccurred())
 
-			_, err = db.ExecContext(ctx, `
+			_, err = s.Querier().ExecContext(ctx, `
 				INSERT INTO vnetwork ("VM ID", "Network", "Mac Address", "IPv4 Address", "IPv6 Address")
 				VALUES ('vm-ips', 'VM Network', '00:50:56:aa:bb:cc', '10.0.0.5', 'fe80::1')
 			`)
@@ -1253,7 +1304,7 @@ var _ = Describe("VMStore", func() {
 		})
 
 		It("should return empty string for NICs with no IP", func() {
-			_, err := db.ExecContext(ctx, `
+			_, err := s.Querier().ExecContext(ctx, `
 				INSERT INTO vnetwork ("VM ID", "Network", "Mac Address")
 				VALUES ('vm-ips', 'Management', '00:50:56:ff:ff:ff')
 			`)
@@ -1344,6 +1395,43 @@ var _ = Describe("VMStore", func() {
 			Expect(err).ToNot(HaveOccurred())
 			// Fixture VMs span: production (vm-001..004), staging (vm-005..007), development (vm-008..010)
 			Expect(count).To(Equal(3))
+		})
+	})
+
+	Context("FaultToleranceEnabled predicate", func() {
+		// Helper to insert VM with FT State
+		insertVMWithFTState := func(id, name, ftState string) {
+			_, err := s.Querier().ExecContext(ctx, `
+				INSERT INTO vinfo ("VM ID", "VM", "Powerstate", "Cluster", "Memory", "Template", "FT State")
+				VALUES (?, ?, 'poweredOn', 'cluster-test', 4096, false, ?)
+			`, id, name, ftState)
+			Expect(err).NotTo(HaveOccurred())
+		}
+
+		BeforeEach(func() {
+			// Agent only writes two FT State values
+			insertVMWithFTState("vm-enabled", "VM with FT enabled", "enabled")
+			insertVMWithFTState("vm-notconfigured", "VM with FT not configured", "notConfigured")
+		})
+
+		// Given a VM with FT State = 'enabled'
+		// When we query the VM
+		// Then FaultToleranceEnabled should be true
+		It("should return true for FT State 'enabled'", func() {
+			vm, err := s.VM().Get(ctx, "vm-enabled")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vm).NotTo(BeNil())
+			Expect(vm.FaultToleranceEnabled).To(BeTrue())
+		})
+
+		// Given a VM with FT State = 'notConfigured'
+		// When we query the VM
+		// Then FaultToleranceEnabled should be false
+		It("should return false for FT State 'notConfigured'", func() {
+			vm, err := s.VM().Get(ctx, "vm-notconfigured")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vm).NotTo(BeNil())
+			Expect(vm.FaultToleranceEnabled).To(BeFalse())
 		})
 	})
 })

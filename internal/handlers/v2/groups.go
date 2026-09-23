@@ -12,7 +12,7 @@ import (
 	v2 "github.com/kubev2v/assisted-migration-agent/api/v2"
 	vmfilter "github.com/kubev2v/assisted-migration-agent/internal/filter"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
-	services "github.com/kubev2v/assisted-migration-agent/internal/services/v2"
+	services "github.com/kubev2v/assisted-migration-agent/internal/services"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
@@ -373,4 +373,64 @@ func (h *Handler) deleteGroup(c *gin.Context, groupSvc *services.GroupService, g
 	}
 
 	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) ListGroupApplications(c *gin.Context, groupId string) {
+	gid, err := uuid.Parse(groupId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid group ID"})
+		return
+	}
+
+	groupSvc, err := h.svc.LatestGroupService()
+	if err != nil {
+		if srvErrors.IsResourceNotFoundError(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "no collections found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	appSvc, err := h.svc.LatestApplicationService()
+	if err != nil {
+		if srvErrors.IsResourceNotFoundError(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "no collections found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	vms, _, err := groupSvc.ListVirtualMachines(c.Request.Context(), gid, services.GroupGetParams{})
+	if err != nil {
+		if srvErrors.IsResourceNotFoundError(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if len(vms) == 0 {
+		c.JSON(http.StatusOK, v2.ApplicationListResponse{Applications: []v2.ApplicationOverview{}})
+		return
+	}
+
+	ids := make([]string, 0, len(vms))
+	for _, vm := range vms {
+		ids = append(ids, fmt.Sprintf("'%s'", vm.ID))
+	}
+
+	groupApplications, err := appSvc.List(c.Request.Context(), fmt.Sprintf("vm_id in [%s]", strings.Join(ids, ",")))
+	if err != nil {
+		// the service could not return invalid filter so it must being something else
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, v2.ApplicationListResponse{
+		Applications: v2.NewApplicationList(groupApplications),
+	})
+
 }

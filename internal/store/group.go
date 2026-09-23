@@ -57,8 +57,21 @@ func NewGroupStore(db QueryInterceptor) *GroupStore {
 }
 
 // List returns groups with optional filters and pagination.
+// Includes vmCount computed from group_matches via LEFT JOIN.
 func (s *GroupStore) List(ctx context.Context, filters []sq.Sqlizer, limit, offset uint64) ([]models.Group, error) {
-	builder := selectStm.OrderBy(groupColID + " ASC")
+	builder := sq.Select(
+		"g."+groupColID,
+		"g."+groupColName,
+		"g."+groupColDescription,
+		"g."+groupColFilter,
+		"g."+groupColInventoryData,
+		"g."+groupColCreatedAt,
+		"g."+groupColUpdatedAt,
+		"COALESCE(len(gm.vm_ids), 0) AS vm_count",
+	).
+		From(groupTable + " g").
+		LeftJoin(fmt.Sprintf("%s gm ON g.%s = gm.%s", groupMatchesTable, groupColID, groupMatchesColGroupID)).
+		OrderBy("g." + groupColID + " ASC")
 
 	for _, f := range filters {
 		builder = builder.Where(f)
@@ -85,7 +98,7 @@ func (s *GroupStore) List(ctx context.Context, filters []sq.Sqlizer, limit, offs
 	for rows.Next() {
 		var g models.Group
 		var inventoryData []byte
-		if err := rows.Scan(&g.ID, &g.Name, &g.Description, &g.Filter, &inventoryData, &g.CreatedAt, &g.UpdatedAt); err != nil {
+		if err := rows.Scan(&g.ID, &g.Name, &g.Description, &g.Filter, &inventoryData, &g.CreatedAt, &g.UpdatedAt, &g.VmCount); err != nil {
 			return nil, fmt.Errorf("scanning group row: %w", err)
 		}
 		inv, err := unmarshalInventory(inventoryData)

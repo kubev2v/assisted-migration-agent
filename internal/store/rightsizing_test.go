@@ -4,38 +4,59 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"os"
+	"path/filepath"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
+
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
+	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 	"github.com/kubev2v/assisted-migration-agent/test"
 )
 
 var _ = Describe("RightSizingStore", func() {
 	var (
-		ctx context.Context
-		db  *sql.DB
-		s   *store.Store
+		ctx    context.Context
+		s      *store.Store
+		pool   *store.Pool
+		tmpDir string
 	)
 
 	BeforeEach(func() {
 		ctx = context.Background()
-
 		var err error
-		db, err = store.NewConnection(nil, ":memory:")
+		tmpDir, err = os.MkdirTemp("", "rightsizing-store-test-*")
 		Expect(err).NotTo(HaveOccurred())
-
-		s = store.NewStore(db, test.NewMockValidator())
-		Expect(s.InitCollection(ctx)).To(Succeed())
+		pool = store.NewPool(5 * time.Minute)
+		collDB, dbErr := pool.NewDatabase("coll", filepath.Join(tmpDir, "collection.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		Expect(dbErr).NotTo(HaveOccurred())
+		Expect(collDB.Migrate(ctx, func(mCtx context.Context, sqlDB *sql.DB) error {
+			st, stErr := collDB.Store()
+			if stErr != nil {
+				return stErr
+			}
+			if pErr := duckdb_parser.New(st.Querier(), test.NewMockValidator()).Init(); pErr != nil {
+				return pErr
+			}
+			return migrations.RunCollection(mCtx, sqlDB, "collection")
+		})).To(Succeed())
+		pool.Add(collDB)
+		s, err = collDB.Store()
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	AfterEach(func() {
-		if db != nil {
-			_ = db.Close()
+		if pool != nil {
+			pool.Close()
+		}
+		if tmpDir != "" {
+			_ = os.RemoveAll(tmpDir)
 		}
 	})
 
@@ -63,7 +84,7 @@ var _ = Describe("RightSizingStore", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			var expectedBatches, writtenBatches int
-			err = db.QueryRow(
+			err = s.Querier().QueryRowContext(ctx,
 				`SELECT expected_batch_count, written_batch_count FROM rightsizing_reports WHERE id = ?`, id,
 			).Scan(&expectedBatches, &writtenBatches)
 			Expect(err).NotTo(HaveOccurred())
@@ -77,7 +98,7 @@ var _ = Describe("RightSizingStore", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			var vcenter, clusterID string
-			err = db.QueryRow(
+			err = s.Querier().QueryRowContext(ctx,
 				`SELECT vcenter, cluster_id FROM rightsizing_reports WHERE id = ?`, id,
 			).Scan(&vcenter, &clusterID)
 			Expect(err).NotTo(HaveOccurred())
@@ -102,7 +123,7 @@ var _ = Describe("RightSizingStore", func() {
 			Expect(s.RightSizing().WriteBatch(ctx, id, metrics)).To(Succeed())
 
 			var count int
-			Expect(db.QueryRow(`SELECT COUNT(*) FROM rightsizing_metrics WHERE report_id = ?`, id).Scan(&count)).To(Succeed())
+			Expect(s.Querier().QueryRowContext(ctx, `SELECT COUNT(*) FROM rightsizing_metrics WHERE report_id = ?`, id).Scan(&count)).To(Succeed())
 			Expect(count).To(Equal(2))
 		})
 
@@ -115,7 +136,7 @@ var _ = Describe("RightSizingStore", func() {
 			Expect(s.RightSizing().WriteBatch(ctx, id, metrics)).To(Succeed())
 
 			var count int
-			Expect(db.QueryRow(`SELECT COUNT(*) FROM rightsizing_metrics WHERE report_id = ?`, id).Scan(&count)).To(Succeed())
+			Expect(s.Querier().QueryRowContext(ctx, `SELECT COUNT(*) FROM rightsizing_metrics WHERE report_id = ?`, id).Scan(&count)).To(Succeed())
 			Expect(count).To(Equal(0))
 		})
 
@@ -124,7 +145,7 @@ var _ = Describe("RightSizingStore", func() {
 			Expect(s.RightSizing().WriteBatch(ctx, id, nil)).To(Succeed())
 
 			var count int
-			Expect(db.QueryRow(`SELECT COUNT(*) FROM rightsizing_metrics WHERE report_id = ?`, id).Scan(&count)).To(Succeed())
+			Expect(s.Querier().QueryRowContext(ctx, `SELECT COUNT(*) FROM rightsizing_metrics WHERE report_id = ?`, id).Scan(&count)).To(Succeed())
 			Expect(count).To(Equal(0))
 		})
 
@@ -138,7 +159,7 @@ var _ = Describe("RightSizingStore", func() {
 			Expect(s.RightSizing().WriteBatch(ctx, id, metrics)).To(Succeed()) // duplicate
 
 			var count int
-			Expect(db.QueryRow(`SELECT COUNT(*) FROM rightsizing_metrics WHERE report_id = ?`, id).Scan(&count)).To(Succeed())
+			Expect(s.Querier().QueryRowContext(ctx, `SELECT COUNT(*) FROM rightsizing_metrics WHERE report_id = ?`, id).Scan(&count)).To(Succeed())
 			Expect(count).To(Equal(1))
 		})
 	})
@@ -151,7 +172,7 @@ var _ = Describe("RightSizingStore", func() {
 			Expect(s.RightSizing().IncrementWrittenBatchCount(ctx, id)).To(Succeed())
 
 			var written int
-			Expect(db.QueryRow(`SELECT written_batch_count FROM rightsizing_reports WHERE id = ?`, id).Scan(&written)).To(Succeed())
+			Expect(s.Querier().QueryRowContext(ctx, `SELECT written_batch_count FROM rightsizing_reports WHERE id = ?`, id).Scan(&written)).To(Succeed())
 			Expect(written).To(Equal(2))
 		})
 	})
@@ -175,11 +196,11 @@ var _ = Describe("RightSizingStore", func() {
 			Expect(err).To(HaveOccurred())
 
 			var count int
-			Expect(db.QueryRow(`SELECT COUNT(*) FROM rightsizing_metrics WHERE report_id = ?`, id).Scan(&count)).To(Succeed())
+			Expect(s.Querier().QueryRowContext(ctx, `SELECT COUNT(*) FROM rightsizing_metrics WHERE report_id = ?`, id).Scan(&count)).To(Succeed())
 			Expect(count).To(Equal(0))
 
 			var written int
-			Expect(db.QueryRow(`SELECT written_batch_count FROM rightsizing_reports WHERE id = ?`, id).Scan(&written)).To(Succeed())
+			Expect(s.Querier().QueryRowContext(ctx, `SELECT written_batch_count FROM rightsizing_reports WHERE id = ?`, id).Scan(&written)).To(Succeed())
 			Expect(written).To(Equal(0))
 		})
 	})
@@ -193,7 +214,7 @@ var _ = Describe("RightSizingStore", func() {
 			Expect(s.RightSizing().UpdateExpectedBatchCount(ctx, id, 10, 3)).To(Succeed())
 
 			var expected int
-			Expect(db.QueryRow(
+			Expect(s.Querier().QueryRowContext(ctx,
 				`SELECT expected_batch_count FROM rightsizing_reports WHERE id = ?`, id,
 			).Scan(&expected)).To(Succeed())
 			Expect(expected).To(Equal(4))
@@ -298,7 +319,7 @@ var _ = Describe("RightSizingStore", func() {
 			Expect(s.RightSizing().WriteVMWarnings(ctx, id, warnings)).To(Succeed())
 
 			var count int
-			Expect(db.QueryRow(`SELECT COUNT(*) FROM rightsizing_vm_warnings WHERE report_id = ?`, id).Scan(&count)).To(Succeed())
+			Expect(s.Querier().QueryRowContext(ctx, `SELECT COUNT(*) FROM rightsizing_vm_warnings WHERE report_id = ?`, id).Scan(&count)).To(Succeed())
 			Expect(count).To(Equal(2))
 		})
 
@@ -309,7 +330,7 @@ var _ = Describe("RightSizingStore", func() {
 			Expect(s.RightSizing().WriteVMWarnings(ctx, id, w)).To(Succeed())
 
 			var count int
-			Expect(db.QueryRow(`SELECT COUNT(*) FROM rightsizing_vm_warnings WHERE report_id = ?`, id).Scan(&count)).To(Succeed())
+			Expect(s.Querier().QueryRowContext(ctx, `SELECT COUNT(*) FROM rightsizing_vm_warnings WHERE report_id = ?`, id).Scan(&count)).To(Succeed())
 			Expect(count).To(Equal(1))
 		})
 
@@ -335,11 +356,11 @@ var _ = Describe("RightSizingStore", func() {
 			Expect(s.RightSizing().ComputeAndStoreUtilization(ctx, id)).To(Succeed())
 
 			var count int
-			Expect(db.QueryRow(`SELECT COUNT(*) FROM rightsizing_vm_utilization WHERE report_id = ?`, id).Scan(&count)).To(Succeed())
+			Expect(s.Querier().QueryRowContext(ctx, `SELECT COUNT(*) FROM rightsizing_vm_utilization WHERE report_id = ?`, id).Scan(&count)).To(Succeed())
 			Expect(count).To(Equal(1))
 
 			var cpuP95, diskPct float64
-			Expect(db.QueryRow(
+			Expect(s.Querier().QueryRowContext(ctx,
 				`SELECT cpu_p95_pct, disk_pct FROM rightsizing_vm_utilization WHERE report_id = ? AND moid = ?`,
 				id, "vm-100",
 			).Scan(&cpuP95, &diskPct)).To(Succeed())
@@ -358,7 +379,7 @@ var _ = Describe("RightSizingStore", func() {
 			Expect(s.RightSizing().ComputeAndStoreUtilization(ctx, id)).To(Succeed()) // second call
 
 			var count int
-			Expect(db.QueryRow(`SELECT COUNT(*) FROM rightsizing_vm_utilization WHERE report_id = ?`, id).Scan(&count)).To(Succeed())
+			Expect(s.Querier().QueryRowContext(ctx, `SELECT COUNT(*) FROM rightsizing_vm_utilization WHERE report_id = ?`, id).Scan(&count)).To(Succeed())
 			Expect(count).To(Equal(1))
 		})
 	})
@@ -413,7 +434,7 @@ var _ = Describe("RightSizingStore", func() {
 			Expect(s.RightSizing().ComputeAndStoreUtilization(ctx, id)).To(Succeed())
 
 			// Seed cluster_id and provisioned_cpus directly (vinfo is empty in test DB).
-			_, err := db.Exec(`
+			_, err := s.Querier().ExecContext(ctx, `
                 UPDATE rightsizing_vm_utilization
                 SET cluster_id = 'domain-c1', cluster_name = 'cluster-1', provisioned_cpus = 4
                 WHERE report_id = ?`, id)
@@ -445,12 +466,12 @@ var _ = Describe("RightSizingStore", func() {
 			Expect(s.RightSizing().ComputeAndStoreUtilization(ctx, id)).To(Succeed())
 
 			// Assign vm-100 and vm-200 to cluster-A, vm-300 and vm-400 to cluster-B.
-			_, err := db.Exec(`
+			_, err := s.Querier().ExecContext(ctx, `
                 UPDATE rightsizing_vm_utilization
                 SET cluster_id = 'domain-c1', cluster_name = 'cluster-A', provisioned_cpus = 4
                 WHERE report_id = ? AND moid IN ('vm-100', 'vm-200')`, id)
 			Expect(err).NotTo(HaveOccurred())
-			_, err = db.Exec(`
+			_, err = s.Querier().ExecContext(ctx, `
                 UPDATE rightsizing_vm_utilization
                 SET cluster_id = 'domain-c2', cluster_name = 'cluster-B', provisioned_cpus = 4
                 WHERE report_id = ? AND moid IN ('vm-300', 'vm-400')`, id)

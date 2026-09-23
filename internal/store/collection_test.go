@@ -2,44 +2,43 @@ package store_test
 
 import (
 	"context"
-	"database/sql"
 	"os"
 	"path/filepath"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
-	"github.com/kubev2v/assisted-migration-agent/test"
+	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 )
 
 var _ = Describe("CollectionStore", func() {
 	var (
 		ctx    context.Context
 		s      *store.Store
-		db     *sql.DB
+		pool   *store.Pool
 		tmpDir string
 	)
 
 	BeforeEach(func() {
 		ctx = context.Background()
-
 		var err error
 		tmpDir, err = os.MkdirTemp("", "collection-store-test-*")
 		Expect(err).NotTo(HaveOccurred())
-
-		db, err = store.NewConnection(nil, filepath.Join(tmpDir, "agent.duckdb"))
+		pool = store.NewPool(5 * time.Minute)
+		mainDB, dbErr := pool.NewDatabase(store.MainDatabaseID, filepath.Join(tmpDir, "agent.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		Expect(dbErr).NotTo(HaveOccurred())
+		Expect(mainDB.Migrate(ctx, migrations.RunMain)).To(Succeed())
+		pool.Add(mainDB)
+		s, err = mainDB.Store()
 		Expect(err).NotTo(HaveOccurred())
-
-		s = store.NewStore(db, test.NewMockValidator())
-		Expect(s.Migrate(ctx, "")).To(Succeed())
-		Expect(s.InitCollection(ctx)).To(Succeed())
 	})
 
 	AfterEach(func() {
-		if db != nil {
-			_ = db.Close()
+		if pool != nil {
+			pool.Close()
 		}
 		if tmpDir != "" {
 			_ = os.RemoveAll(tmpDir)

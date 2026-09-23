@@ -616,7 +616,7 @@ var _ = Describe("Run Command", func() {
 			tmpDir   string
 			cfg      *config.Configuration
 			seedPool *store.Pool
-			st       *store.Store2
+			st       *store.Store
 		)
 
 		BeforeEach(func() {

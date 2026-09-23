@@ -15,4 +15,5 @@ type Group struct {
 	Inventory   *inventory.Inventory
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+	VmCount     int
 }

@@ -92,6 +92,9 @@ func capabilityToAPI(c models.OperationCapability) v2.OperationCapability {
 }
 
 func (h *Handler) DeleteCredentials(c *gin.Context) {
+	// first stop all services that require credentials
+	h.svc.Stop(c.Request.Context())
+
 	if err := h.svc.CredentialsService().DeleteAll(c.Request.Context()); err != nil {
 		zap.S().Errorw("failed to delete credentials", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})

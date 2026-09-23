@@ -285,7 +285,7 @@ func NewCollectorStatus(status models.CollectorStatus) CollectorStatus {
 	case models.CollectorStateConnecting:
 		c.Status = CollectorStatusStatusConnecting
 		// TODO: fix rightsizing status
-	case models.CollectorStateCollecting, models.CollectorStateRightsizingConnecting: //nolint:staticcheck // deprecated; removed with v1
+	case models.CollectorStateCollecting:
 		c.Status = CollectorStatusStatusCollecting
 	case models.CollectorStateMetricsCollecting:
 		c.Status = CollectorStatusMetricsCollecting
@@ -559,6 +559,9 @@ func NewGroupFromModel(g models.Group) Group {
 	if g.Description != "" {
 		group.Description = &g.Description
 	}
+	if g.VmCount > 0 {
+		group.VmCount = &g.VmCount
+	}
 	return group
 }
 
@@ -621,4 +624,22 @@ func NewCollectionComparisonDiffFromModel(d models.ComparisonDiff) CollectionCom
 		OnlyInA:   toPage(d.OnlyInA),
 		OnlyInB:   toPage(d.OnlyInB),
 	}
+}
+
+func NewApplicationList(apps []models.ApplicationOverview) []ApplicationOverview {
+	apiApps := make([]ApplicationOverview, 0, len(apps))
+	for _, app := range apps {
+		vms := make([]ApplicationVM, 0, len(app.VMs))
+		for _, vm := range app.VMs {
+			vms = append(vms, ApplicationVM{Id: vm.ID, Name: vm.Name})
+		}
+		apiApps = append(apiApps, ApplicationOverview{
+			Name:        app.Name,
+			Description: app.Description,
+			VmCount:     app.VMCount,
+			Vms:         vms,
+		})
+	}
+
+	return apiApps
 }

@@ -40,9 +40,6 @@ const (
 	CollectorStateCollected CollectorStateType = "collected"
 	// CollectorStateError - error during connecting or collecting
 	CollectorStateError CollectorStateType = "error"
-
-	// Deprecated: only used by v1 collector_work and rightsizing; will be removed with v1.
-	CollectorStateRightsizingConnecting CollectorStateType = "rightsizing-connecting"
 )
 
 // CollectorStatus holds the current collector state and metadata.

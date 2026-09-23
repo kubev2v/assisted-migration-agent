@@ -272,6 +272,30 @@ paths:
         '500':
           description: Internal server error
 
+  /virtualmachines/{vmId}/inspection:
+    delete:
+      tags: [VirtualMachines]
+      summary: Cancel deep inspection for a specific VirtualMachine
+      operationId: cancelVirtualMachineInspection
+      parameters:
+        - name: vmId
+          in: path
+          required: true
+          description: VirtualMachine ID
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Inspection canceled for the VirtualMachine
+        '400':
+          description: Inspector not running
+        '404':
+          description: VirtualMachine not found in inspection queue
+        '409':
+          description: A collection or report is in progress
+        '500':
+          description: Internal server error
+
   /virtualmachines/{vmId}/utilization:
     get:
       tags: [Rightsizing]
@@ -457,18 +481,60 @@ paths:
         '500':
           description: Internal server error
 
+  /groups/{groupId}/applications:
+    get:
+      tags: [Groups]
+      summary: List detected applications for a group
+      operationId: listGroupApplications
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          description: Group ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of detected applications
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationListResponse'
+        '404':
+          description: No collections or group not found
+        '500':
+          description: Internal server error
+
   /inventory:
     get:
       tags: [Inventories]
       summary: Get inventory from the latest collection
       operationId: getLatestInventory
+      parameters:
+        - name: scope
+          in: query
+          required: false
+          description: >-
+            Selects which inventories to return. "main" (default) returns only the main
+            inventory as JSON. "all" returns a ZIP bundle containing the main inventory
+            (inventory.json) and every group subset inventory (subsets/<groupId>.json),
+            for manual upload in disconnected environments.
+          schema:
+            type: string
+            enum: [main, all]
+            default: main
       responses:
         '200':
-          description: Collected inventory
+          description: >-
+            Collected inventory. JSON when scope is "main"; a ZIP archive when scope is "all".
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Inventory'
+            application/zip:
+              schema:
+                type: string
+                format: binary
         '404':
           description: No collections or inventory not found
         '500':
@@ -487,6 +553,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CollectionListResponse'
+        '500':
+          description: Internal server error
+    delete:
+      tags: [Collections]
+      summary: Delete all collections
+      operationId: deleteCollections
+      responses:
+        '204':
+          description: Delete all collections
         '500':
           description: Internal server error
 
@@ -1652,7 +1727,7 @@ components:
         - inventory
       properties:
         inventory:
-          $ref: 'https://raw.githubusercontent.com/kubev2v/migration-planner/main/api/v1alpha1/openapi.yaml#/components/schemas/UpdateInventory'
+          $ref: 'https://raw.githubusercontent.com/kubev2v/migration-planner/a7aa1fcda3ed7acbb05e4636f39c4d764e82b6ac/api/v1alpha1/openapi.yaml#/components/schemas/UpdateInventory'
 
     # ── VCenter Credentials ──────────────────────────────────────────────
     VcenterCredentials:
@@ -2194,6 +2269,9 @@ components:
           type: string
           description: Filter expression (pkg/filter DSL)
           example: "memory >= 8GB and cluster = 'prod'"
+        vmCount:
+          type: integer
+          description: Number of VMs matching the group filter
         createdAt:
           type: string
           format: date-time
@@ -2232,7 +2310,7 @@ components:
         group:
           $ref: '#/components/schemas/Group'
         inventory:
-          $ref: 'https://raw.githubusercontent.com/kubev2v/migration-planner/main/api/v1alpha1/openapi.yaml#/components/schemas/Inventory'
+          $ref: 'https://raw.githubusercontent.com/kubev2v/migration-planner/a7aa1fcda3ed7acbb05e4636f39c4d764e82b6ac/api/v1alpha1/openapi.yaml#/components/schemas/Inventory'
         vms:
           type: array
           items:
