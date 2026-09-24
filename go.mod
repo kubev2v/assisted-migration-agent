@@ -196,8 +196,8 @@ require (
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/opencontainers/runtime-tools v0.9.1-0.20260316125833-8a4db579f5c8 // indirect
 	github.com/opencontainers/selinux v1.15.1 // indirect
-	github.com/openshift/api v0.0.0-20260715165912-72066cc9718b // indirect
-	github.com/openshift/client-go v0.0.0-20260715172546-dac61734e0ec // indirect
+	github.com/openshift/api v0.0.0-20260923043708-9abfa327cff2 // indirect
+	github.com/openshift/client-go v0.0.0-20260923093432-89e5bba1be29 // indirect
 	github.com/openshift/custom-resource-status v1.1.2 // indirect
 	github.com/openshift/imagebuilder v1.2.21 // indirect
 	github.com/pelletier/go-toml/v2 v2.4.3 // indirect
