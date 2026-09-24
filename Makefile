@@ -34,7 +34,7 @@ help:
 	@echo "    image:           build container image"
 	@echo "    run.image:       run container image locally (requires AGENT_ID and SOURCE_ID)"
 	@echo "    run.container:   run container with persistent volume (requires AGENT_ID and SOURCE_ID)"
-	@echo "    run:             run the agent"
+	@echo "    run:             run the agent locally"
 	@echo "    run.ui:          start React dev server"
 	@echo "    clean:           clean up binaries and tools"
 	@echo "    generate:        "
@@ -109,7 +109,7 @@ AGENT_ID ?= `uuidgen`
 SOURCE_ID ?= `uuidgen`
 CONTAINER_NAME ?= migration-planner-agent
 AGENT_VOLUME_NAME ?= agent-data
-container.run:
+run.container:
 	@if [ -z "$(AGENT_ID)" ] || [ -z "$(SOURCE_ID)" ]; then \
 		echo "Error: AGENT_ID and SOURCE_ID are required"; \
 		echo "Usage: make run.container AGENT_ID=<uuid> SOURCE_ID=<uuid>"; \
@@ -142,10 +142,10 @@ container.run:
 		--server-mode prod \
 		--server-statics-folder /app/static \
 		--data-folder /var/lib/agent \
-		--console-url http://host.containers.internal:7443
+		--console-url http://localhost:7443
 	@echo "Container started. View logs with: podman logs -f $(CONTAINER_NAME)"
 
-container.stop:
+stop.container:
 	$(PODMAN) rm --force $(CONTAINER_NAME)
 
 clean:
@@ -154,7 +154,7 @@ clean:
 	@echo "✅ Clean complete."
 
 run:
-	$(BINARY_PATH) run --opa-policies-folder $(OPA_POLICIES_FOLDER) --agent-id $(AGENT_ID) --source-id $(SOURCE_ID)
+	$(BINARY_PATH) run --opa-policies-folder $(OPA_POLICIES_FOLDER) --agent-id $(AGENT_ID) --source-id $(SOURCE_ID) --data-folder $(CURDIR)
 
 AGENT_LOCAL_DATA_DIR ?= $(CURDIR)/.local-data
 
@@ -164,29 +164,6 @@ build-local:
 		echo "📥 Setting up OPA policies..."; \
 		$(MAKE) setup-opa-policies; \
 	fi
-
-run-local:
-ifeq ($(origin AGENT_ID),file)
-	$(error AGENT_ID is required. Set it via environment variable)
-endif
-ifeq ($(origin SOURCE_ID),file)
-	$(error SOURCE_ID is required. Set it via environment variable)
-endif
-	@mkdir -p -- "$(AGENT_LOCAL_DATA_DIR)"
-	@echo ""
-	@echo "Agent API: http://localhost:8000"
-	@echo ""
-	$(BINARY_PATH) run \
-		--agent-id "$(AGENT_ID)" \
-		--source-id "$(SOURCE_ID)" \
-		--opa-policies-folder "$(OPA_POLICIES_FOLDER)" \
-		--data-folder "$(AGENT_LOCAL_DATA_DIR)" \
-		--mode disconnected \
-		--console-url http://localhost:7443
-
-stop-local:
-	@rm -rf -- "$(AGENT_LOCAL_DATA_DIR)"
-	@echo "✅ Agent local data cleaned"
 
 run.ui:
 	cd $(CURDIR)/ui && npm run start
