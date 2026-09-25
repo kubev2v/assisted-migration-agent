@@ -425,8 +425,8 @@ github.com/kubev2v/forklift v0.0.0-20260812070321-b33d2e55b079 h1:CV7rHMGb57psiw
 github.com/kubev2v/forklift v0.0.0-20260812070321-b33d2e55b079/go.mod h1:rRHkNP9XO6HVMRDgWATOP0nK2s7TmvpmKQjJPWfGT6U=
 github.com/kubev2v/migration-planner v0.18.1-0.20260917075834-a7aa1fcda3ed h1:YsNaZdI6JFY1rX/JrtH0cRSvO7fSUl2hI3a+Q36TAfM=
 github.com/kubev2v/migration-planner v0.18.1-0.20260917075834-a7aa1fcda3ed/go.mod h1:Fa0G8wkmLtgepZE8KsByBPlqZDoQR3+yeqKi6TabKEc=
-github.com/kubev2v/vm-migration-detective v0.0.0-20260908083350-a89447103cf3 h1:LyIswgk0L2AS5Idn176yZxbez6RWDXEt7Xq0Y4dE2u8=
-github.com/kubev2v/vm-migration-detective v0.0.0-20260908083350-a89447103cf3/go.mod h1:G/1I29xQDnu3LBZL/GUWrAGnECnVcktqMrGjvMK63ug=
+github.com/kubev2v/vm-migration-detective v0.0.0-20260922135345-57f60208a84e h1:fkxqAbY7anVT57Wq1TYJPbPNSmx4b0sf1M97ot8nmKU=
+github.com/kubev2v/vm-migration-detective v0.0.0-20260922135345-57f60208a84e/go.mod h1:G/1I29xQDnu3LBZL/GUWrAGnECnVcktqMrGjvMK63ug=
 github.com/lann/builder v0.0.0-20180802200727-47ae307949d0 h1:SOEGU9fKiNWd/HOJuq6+3iTQz8KNCLtVX6idSoTLdUw=
 github.com/lann/builder v0.0.0-20180802200727-47ae307949d0/go.mod h1:dXGbAdH5GtBTC4WfIxhKZfyBF/HBFgRZSWwZ9g/He9o=
 github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 h1:P6pPBnrTSX3DEVR4fDembhRWSsG5rVo6hYhAB/ADZrk=
