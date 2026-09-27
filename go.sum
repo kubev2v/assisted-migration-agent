@@ -691,8 +691,8 @@ github.com/vbatts/tar-split v0.12.3 h1:Cd46rkGXI3Td4yrVNwU8ripbxFaQbmesqhjBUUYAJ
 github.com/vbatts/tar-split v0.12.3/go.mod h1:sQOc6OlqGCr7HkGx/IDBeKiTIvqhmj8KffNhEXG4Nq0=
 github.com/vbauerster/mpb/v8 v8.12.1 h1:pyj3yQ2ZGQJgUXm4h17QpR+eERaNz5OQ1ftPSEE/sMM=
 github.com/vbauerster/mpb/v8 v8.12.1/go.mod h1:XLXRfStkw/6i5k0aQltijDHT1Z93fD1DVwmIdcFUp6k=
-github.com/vektah/gqlparser/v2 v2.5.37 h1:jbb1Ilv+xBklV6653tKb4oVUupPNTLb5LmrnBKVI12Y=
-github.com/vektah/gqlparser/v2 v2.5.37/go.mod h1:9O4Ox6Ngd3Y12bMD3w6i3CRQXh8W1oC1q0m6olCymDM=
+github.com/vektah/gqlparser/v2 v2.5.58 h1:yHxQ3EjU2OGuDMh6noxxmZova1HkBM3CbdGtL+rvjOc=
+github.com/vektah/gqlparser/v2 v2.5.58/go.mod h1:9O4Ox6Ngd3Y12bMD3w6i3CRQXh8W1oC1q0m6olCymDM=
 github.com/vmware/govmomi v0.52.0 h1:JyxQ1IQdllrY7PJbv2am9mRsv3p9xWlIQ66bv+XnyLw=
 github.com/vmware/govmomi v0.52.0/go.mod h1:Yuc9xjznU3BH0rr6g7MNS1QGvxnJlE1vOvTJ7Lx7dqI=
 github.com/x448/float16 v0.8.4 h1:qLwI1I70+NjRFUR3zs1JPUCgaCXSh3SW62uAKT1mSBM=
