@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -63,6 +64,9 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
   # Run agent in production mode
   agent run --agent-id 550e8400-e29b-41d4-a716-446655440000 --source-id 6ba7b810-9dad-11d1-80b4-00c04fd430c8 --server-mode prod --server-statics-folder /var/www/statics`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
+			if runtime.GOARCH == "arm64" && !cfg.Agent.RVToolsMode {
+				return errors.New("appliance mode is unavailable on ARM64; run with --rvtools-mode")
+			}
 			return validateConfiguration(cfg)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {

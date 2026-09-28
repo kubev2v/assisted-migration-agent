@@ -3,13 +3,14 @@
 # =============================================================================
 ARG AGENT_UI_IMAGE=quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent-ui
 ARG AGENT_UI_IMAGE_TAG=latest
+# Copy architecture-independent UI static files from the AMD64 UI image.
 FROM --platform=linux/amd64 ${AGENT_UI_IMAGE}:${AGENT_UI_IMAGE_TAG} AS ui-builder
 
 
 # =============================================================================
 # Stage 2: Extract UI metadata
 # =============================================================================
-FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/ubi-minimal AS ui-metadata-extractor
+FROM registry.access.redhat.com/ubi9/ubi-minimal AS ui-metadata-extractor
 
 ARG AGENT_UI_IMAGE=quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent-ui
 ARG AGENT_UI_IMAGE_TAG=latest
@@ -27,7 +28,7 @@ RUN echo "Inspecting image: ${AGENT_UI_IMAGE}:${AGENT_UI_IMAGE_TAG}" && \
 # =============================================================================
 # Stage 3: Build the backend
 # =============================================================================
-FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/go-toolset AS backend-builder
+FROM registry.access.redhat.com/ubi9/go-toolset AS backend-builder
 
 # Copy go module files first for better caching
 COPY go.mod go.sum ./
@@ -50,7 +51,7 @@ RUN UI_GIT_COMMIT=$(cat /tmp/ui-git-commit.txt) && \
 # =============================================================================
 # Stage 4: Setup OPA policies
 # =============================================================================
-FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/ubi-minimal AS opa-builder
+FROM registry.access.redhat.com/ubi9/ubi-minimal AS opa-builder
 
 RUN microdnf install -y wget tar gzip ca-certificates tzdata && \
     microdnf clean all
@@ -70,56 +71,69 @@ RUN mkdir -p /app/policies /app/forklift && \
 # =============================================================================
 # Stage 5: Build Alpine filler image for forecaster benchmarks
 # =============================================================================
-FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/ubi AS filler-builder
+FROM registry.access.redhat.com/ubi9/ubi AS filler-builder
 
 # Fetch the CentOS Stream signing key and verify it against a pinned SHA-256 before trusting it
 ARG CENTOS_GPG_KEY_SHA256=146059788b214d7ba0dd70c1cf21111e594c6cfde201da8a9a88fe7101be8a78
-RUN curl -fsSL -o /etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-Official https://www.centos.org/keys/RPM-GPG-KEY-CentOS-Official && \
+RUN if [ "$(uname -m)" = x86_64 ]; then \
+    curl -fsSL -o /etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-Official https://www.centos.org/keys/RPM-GPG-KEY-CentOS-Official && \
     echo "${CENTOS_GPG_KEY_SHA256}  /etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-Official" | sha256sum -c - && \
     echo -e '[centos-stream-baseos]\nname=CentOS Stream 9 - BaseOS\nbaseurl=https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/\ngpgcheck=1\ngpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-Official\nenabled=1' > /etc/yum.repos.d/centos-stream-baseos.repo && \
-    echo -e '[centos-stream-appstream]\nname=CentOS Stream 9 - AppStream\nbaseurl=https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/\ngpgcheck=1\ngpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-Official\nenabled=1' > /etc/yum.repos.d/centos-stream-appstream.repo
+    echo -e '[centos-stream-appstream]\nname=CentOS Stream 9 - AppStream\nbaseurl=https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/\ngpgcheck=1\ngpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-Official\nenabled=1' > /etc/yum.repos.d/centos-stream-appstream.repo; \
+    fi
 
-RUN dnf install -y --allowerasing qemu-img libguestfs-tools genisoimage && \
-    dnf clean all
+RUN if [ "$(uname -m)" = x86_64 ]; then \
+    dnf install -y --allowerasing qemu-img libguestfs-tools genisoimage && dnf clean all; \
+    fi
 
 ENV LIBGUESTFS_BACKEND=direct
 
 COPY scripts/build-filler-image.sh /tmp/
-RUN FILLER_OUTPUT_DIR=/tmp/filler-assets SKIP_BOOT_TEST=1 bash /tmp/build-filler-image.sh
+RUN mkdir -p /tmp/filler-assets && \
+    if [ "$(uname -m)" = x86_64 ]; then \
+    FILLER_OUTPUT_DIR=/tmp/filler-assets SKIP_BOOT_TEST=1 bash /tmp/build-filler-image.sh; \
+    fi
 
 
 # =============================================================================
 # Stage 6: Download DuckDB extensions (for air-gapped environments)
 # =============================================================================
-FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/ubi-minimal AS duckdb-extensions
+FROM registry.access.redhat.com/ubi9/ubi-minimal AS duckdb-extensions
 
 RUN microdnf install -y wget gzip && \
     microdnf clean all
 
 WORKDIR /extensions
 
-# Download sqlite_scanner extension for DuckDB v1.4.3 linux_amd64, verified against a pinned SHA-256
+# Download the target architecture's sqlite_scanner extension, verified against a pinned SHA-256
 ARG DUCKDB_VERSION=v1.4.3
-ARG DUCKDB_SQLITE_SCANNER_SHA256=75ead0bb623cd67c8c7e40d30f96e5fc2823fd3df90eb2ecd289aae177b15820
-RUN wget -q "https://extensions.duckdb.org/${DUCKDB_VERSION}/linux_amd64/sqlite_scanner.duckdb_extension.gz" && \
-    echo "${DUCKDB_SQLITE_SCANNER_SHA256}  sqlite_scanner.duckdb_extension.gz" | sha256sum -c - && \
+RUN case "$(uname -m)" in \
+      x86_64) platform=linux_amd64; checksum=75ead0bb623cd67c8c7e40d30f96e5fc2823fd3df90eb2ecd289aae177b15820 ;; \
+      aarch64) platform=linux_arm64; checksum=03aa6ee4f8c4044d179b08632f3836cfd1cc426a50b8d687444847adb801888b ;; \
+      *) echo "unsupported architecture: $(uname -m)" >&2; exit 1 ;; \
+    esac && \
+    wget -q "https://extensions.duckdb.org/${DUCKDB_VERSION}/${platform}/sqlite_scanner.duckdb_extension.gz" && \
+    echo "${checksum}  sqlite_scanner.duckdb_extension.gz" | sha256sum -c - && \
     gunzip sqlite_scanner.duckdb_extension.gz
 
 # =============================================================================
 # Stage 7: Final runtime image
 # =============================================================================
-FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/ubi
+FROM registry.access.redhat.com/ubi9/ubi
 
 # Add CentOS Stream 9 repos for virt-v2v and dependencies
 # Fetch the CentOS Stream signing key and verify it against a pinned SHA-256 before trusting it
 ARG CENTOS_GPG_KEY_SHA256=146059788b214d7ba0dd70c1cf21111e594c6cfde201da8a9a88fe7101be8a78
-RUN curl -fsSL -o /etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-Official https://www.centos.org/keys/RPM-GPG-KEY-CentOS-Official && \
+RUN if [ "$(uname -m)" = x86_64 ]; then \
+    curl -fsSL -o /etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-Official https://www.centos.org/keys/RPM-GPG-KEY-CentOS-Official && \
     echo "${CENTOS_GPG_KEY_SHA256}  /etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-Official" | sha256sum -c - && \
     echo -e '[centos-stream-baseos]\nname=CentOS Stream 9 - BaseOS\nbaseurl=https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/os/\ngpgcheck=1\ngpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-Official\nenabled=1' > /etc/yum.repos.d/centos-stream-baseos.repo && \
     echo -e '[centos-stream-appstream]\nname=CentOS Stream 9 - AppStream\nbaseurl=https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/\ngpgcheck=1\ngpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-Official\nenabled=1' > /etc/yum.repos.d/centos-stream-appstream.repo && \
-    echo -e '[centos-stream-crb]\nname=CentOS Stream 9 - CRB\nbaseurl=https://mirror.stream.centos.org/9-stream/CRB/x86_64/os/\ngpgcheck=1\ngpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-Official\nenabled=1' > /etc/yum.repos.d/centos-stream-crb.repo
+    echo -e '[centos-stream-crb]\nname=CentOS Stream 9 - CRB\nbaseurl=https://mirror.stream.centos.org/9-stream/CRB/x86_64/os/\ngpgcheck=1\ngpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-Official\nenabled=1' > /etc/yum.repos.d/centos-stream-crb.repo; \
+    fi
 
-RUN dnf install -y ca-certificates tzdata \
+RUN if [ "$(uname -m)" = x86_64 ]; then \
+    dnf install -y ca-certificates tzdata \
     libguestfs \
     libguestfs-tools \
     libguestfs-tools-c \
@@ -127,8 +141,9 @@ RUN dnf install -y ca-certificates tzdata \
     qemu-kvm \
     nbdkit \
     nbdkit-vddk-plugin \
-    && rm -rf /usr/share/virtio-win # ~1G of unneeded files \
-    && dnf clean all
+    && rm -rf /usr/share/virtio-win; \
+    else dnf install -y ca-certificates tzdata; \
+    fi && dnf clean all
 
 WORKDIR /app
 
@@ -136,8 +151,7 @@ WORKDIR /app
 COPY --from=backend-builder /tmp/agent /app/agent
 
 # Copy filler image assets (Alpine boot image + seed ISO for forecaster)
-COPY --from=filler-builder /tmp/filler-assets/alpine-filler.raw.gz /app/assets/
-COPY --from=filler-builder /tmp/filler-assets/seed.iso.gz /app/assets/
+COPY --from=filler-builder /tmp/filler-assets /app/assets
 
 # Copy UI static files from ui builder
 COPY --from=ui-builder /apps/agent-ui/dist /app/static
@@ -158,7 +172,7 @@ ENV LIBGUESTFS_BACKEND=direct
 RUN printf '#!/bin/sh\n\
 # Copy DuckDB extensions to persistent data folder\n\
 if [ -d /app/extensions ] && [ -d /var/lib/agent ]; then\n\
-    cp -n /app/extensions/*.duckdb_extension /var/lib/agent/ 2>/dev/null || true\n\
+    cp --remove-destination /app/extensions/*.duckdb_extension /var/lib/agent/ || exit 1\n\
 fi\n\
 exec /app/agent "$@"\n' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 

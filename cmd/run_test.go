@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -30,6 +31,22 @@ func setupViperForEnvVars(envPrefix string) {
 func TestCmd(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Cmd Suite")
+}
+
+func TestARM64RequiresRVToolsMode(t *testing.T) {
+	if runtime.GOARCH != "arm64" {
+		t.Skip("ARM64 startup check")
+	}
+	cfg := config.NewConfigurationWithOptionsAndDefaults()
+	cfg.Auth.Enabled = false
+	command := NewRunCommand(cfg)
+	if err := command.PreRunE(command, nil); err == nil || !strings.Contains(err.Error(), "--rvtools-mode") {
+		t.Fatalf("expected ARM64 mode guidance, got %v", err)
+	}
+	cfg.Agent.RVToolsMode = true
+	if err := command.PreRunE(command, nil); err != nil {
+		t.Fatalf("RVTools mode rejected on ARM64: %v", err)
+	}
 }
 
 var _ = Describe("Run Command", func() {
