@@ -196,15 +196,16 @@
 // The query is split into two steps so that the filter DSL can reference any
 // raw column from any table, while the output remains one row per VM:
 //
-//  1. Filter step — flat JOIN of vinfo, disks, inventory concerns, inspection
-//     status, inspection concerns (latest run per VM), CPU/mem/net, aggregates,
-//     datastore; apply WHERE; extract DISTINCT VM IDs
+//  1. Filter step — flat JOIN of vinfo, vcluster (cluster_id), disks, inventory
+//     concerns, inspection status, inspection concerns (latest run per VM),
+//     CPU/mem/net, aggregates, datastore; apply WHERE; extract DISTINCT VM IDs
 //  2. Output step — aggregated query (subquery JOINs) restricted to matched IDs
 //
 // Filter Subquery (flat JOIN, all columns available):
 //
 //	SELECT DISTINCT v."VM ID"
 //	FROM vinfo v
+//	LEFT JOIN vcluster vc        ON vc."Name" = v."Cluster"
 //	LEFT JOIN vdisk dk           ON v."VM ID" = dk."VM ID"
 //	LEFT JOIN concerns c         ON v."VM ID" = c."VM_ID"
 //	LEFT JOIN vm_inspection_status i ON v."VM ID" = i."VM ID"

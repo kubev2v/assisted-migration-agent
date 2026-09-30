@@ -211,6 +211,7 @@ var vmOutputQuery = sq.Select(
 // Filters should be applied via Where clauses, then use the result to get DISTINCT VM IDs.
 var vmFilterSubquery = sq.Select(`DISTINCT v."VM ID"`).
 	From("vinfo v").
+	LeftJoin(`vcluster vc ON vc."Name" = v."Cluster"`).
 	LeftJoin(`vdisk dk ON v."VM ID" = dk."VM ID"`).
 	LeftJoin(`concerns c ON v."VM ID" = c."VM_ID"`).
 	LeftJoin(`vm_inspection_status i ON v."VM ID" = i."VM ID"`).

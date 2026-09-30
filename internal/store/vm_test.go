@@ -170,6 +170,33 @@ var _ = Describe("VMStore", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(vms).To(HaveLen(3))
 			})
+
+			// Given VMs whose cluster names differ from the inventory cluster ids
+			// When we filter by cluster_id
+			// Then it should return only VMs in the cluster with that object id
+			It("should filter by inventory cluster id", func() {
+				_, err := s.Querier().ExecContext(ctx, `
+					INSERT INTO vcluster ("Name", "Object ID")
+					VALUES ('cluster-a', 'cluster-fb55d09a08ee0c0f'),
+					       ('cluster-b', 'domain-c2')
+				`)
+				Expect(err).NotTo(HaveOccurred())
+
+				vms, err := s.VM().List(ctx, store.ByFilter("cluster_id = 'cluster-fb55d09a08ee0c0f'"))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(vms).To(HaveLen(2))
+				for _, vm := range vms {
+					Expect(vm.Cluster).To(Equal("cluster-a"))
+				}
+
+				count, err := s.VM().Count(ctx, store.ByFilter("cluster_id = 'domain-c2'"))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(count).To(Equal(1))
+
+				none, err := s.VM().List(ctx, store.ByFilter("cluster_id = 'domain-c999'"))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(none).To(BeEmpty())
+			})
 		})
 
 		Context("ByStatus", func() {
