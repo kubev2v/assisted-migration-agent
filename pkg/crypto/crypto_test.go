@@ -1,6 +1,8 @@
 package crypto_test
 
 import (
+	"strings"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -27,6 +29,26 @@ var _ = Describe("Crypto", func() {
 
 		It("should return different hashes for different inputs", func() {
 			Expect(c.Hash256("a")).NotTo(Equal(c.Hash256("b")))
+		})
+	})
+
+	Context("Verify", func() {
+		It("rejects malformed or unsafe stored hashes", func() {
+			hash, err := c.Hash("password")
+			Expect(err).NotTo(HaveOccurred())
+
+			for _, malformed := range []string{
+				"invalid",
+				strings.Replace(hash, "m=65536", "m=0", 1),
+				strings.Replace(hash, "t=1", "t=0", 1),
+				strings.Replace(hash, "p=4", "p=0", 1),
+				strings.Replace(hash, "m=65536", "m=65537", 1),
+				strings.Replace(hash, "$argon2id$v=19$", "$argon2id$v=19,extra$", 1),
+				strings.Replace(hash, "$argon2id$v=19$m=65536,t=1,p=4$", "$argon2id$v=19$m=65536,t=1,p=4$YQ$", 1),
+			} {
+				_, err := c.Verify("password", malformed)
+				Expect(err).To(HaveOccurred())
+			}
 		})
 	})
 

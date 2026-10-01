@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"golang.org/x/crypto/argon2"
@@ -19,6 +20,9 @@ const (
 	hashFormat       = "$argon2id$v=%d$m=%d,t=%d,p=%d$%s$%s"
 	defaultKeyLength = 32
 	defaultSaltSize  = 16
+	maxHashMemory    = 64 * 1024
+	maxHashTime      = 3
+	maxHashThreads   = 4
 )
 
 // Crypto provides password hashing and field-level encryption.
@@ -91,24 +95,17 @@ func (c *Crypto) Verify(password, encodedHash string) (bool, error) {
 		return false, errors.New("unsupported algorithm variant")
 	}
 
-	// Extract version information
-	var version int
-	if _, err := fmt.Sscanf(components[2], "v=%d", &version); err != nil {
+	version, err := parseUintParameter(components[2], "v", uint64(argon2.Version))
+	if err != nil {
 		return false, err
 	}
 
-	if version != argon2.Version {
+	if version != uint64(argon2.Version) {
 		return false, errors.New("unsupported argon2 version")
 	}
 
-	// Parse configuration parameters
-	var (
-		memory  uint32
-		time    uint32
-		threads uint8
-	)
-
-	if _, err := fmt.Sscanf(components[3], "m=%d,t=%d,p=%d", &memory, &time, &threads); err != nil {
+	memory, time, threads, err := parseHashParameters(components[3])
+	if err != nil {
 		return false, err
 	}
 
@@ -117,14 +114,18 @@ func (c *Crypto) Verify(password, encodedHash string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("salt decoding failed: %w", err)
 	}
+	if len(salt) != int(c.saltSize) {
+		return false, errors.New("unexpected salt length")
+	}
 
 	// Decode hash component
 	hash, err := base64.RawStdEncoding.DecodeString(components[5])
 	if err != nil {
 		return false, fmt.Errorf("hash decoding failed: %w", err)
 	}
-
-	keyLength := uint32(len(hash))
+	if len(hash) != int(c.keyLength) {
+		return false, errors.New("unexpected hash length")
+	}
 
 	// Generate hash using identical parameters
 	computedHash := argon2.IDKey(
@@ -133,10 +134,42 @@ func (c *Crypto) Verify(password, encodedHash string) (bool, error) {
 		time,
 		memory,
 		threads,
-		keyLength,
+		c.keyLength,
 	)
 
 	return subtle.ConstantTimeCompare(hash, computedHash) == 1, nil
+}
+
+func parseUintParameter(parameter, name string, max uint64) (uint64, error) {
+	prefix := name + "="
+	if !strings.HasPrefix(parameter, prefix) {
+		return 0, fmt.Errorf("invalid %s parameter", name)
+	}
+	value, err := strconv.ParseUint(strings.TrimPrefix(parameter, prefix), 10, 64)
+	if err != nil || value > max {
+		return 0, fmt.Errorf("invalid %s parameter", name)
+	}
+	return value, nil
+}
+
+func parseHashParameters(encoded string) (uint32, uint32, uint8, error) {
+	parameters := strings.Split(encoded, ",")
+	if len(parameters) != 3 {
+		return 0, 0, 0, errors.New("invalid hash parameters")
+	}
+	memory, err := parseUintParameter(parameters[0], "m", maxHashMemory)
+	if err != nil || memory == 0 {
+		return 0, 0, 0, errors.New("invalid hash memory")
+	}
+	time, err := parseUintParameter(parameters[1], "t", maxHashTime)
+	if err != nil || time == 0 {
+		return 0, 0, 0, errors.New("invalid hash time")
+	}
+	threads, err := parseUintParameter(parameters[2], "p", maxHashThreads)
+	if err != nil || threads == 0 || memory < 8*threads {
+		return 0, 0, 0, errors.New("invalid hash threads")
+	}
+	return uint32(memory), uint32(time), uint8(threads), nil
 }
 
 func (c *Crypto) Encrypt(hash []byte, creds models.Credentials) (models.Credentials, error) {

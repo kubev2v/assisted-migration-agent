@@ -20,9 +20,6 @@ const (
 	credentialsColPassword = "password"
 	credentialsColSkipTLS  = "skip_tls"
 	credentialsColCACert   = "ca_cert"
-
-	masterPasswordTable       = "agent.main.master_password"
-	masterPasswordColPassword = "password"
 )
 
 type CredentialsStore struct {
@@ -91,41 +88,6 @@ func (s *CredentialsStore) Save(ctx context.Context, id string, creds models.Cre
 		Columns(credentialsColID, credentialsColURL, credentialsColUsername, credentialsColPassword, credentialsColSkipTLS, credentialsColCACert).
 		Values(id, creds.URL, creds.Username, creds.Password, creds.SkipTLS, string(creds.CACert)).
 		Suffix("ON CONFLICT (id) DO UPDATE SET url = EXCLUDED.url, username = EXCLUDED.username, password = EXCLUDED.password, skip_tls = EXCLUDED.skip_tls, ca_cert = EXCLUDED.ca_cert").
-		ToSql()
-	if err != nil {
-		return fmt.Errorf("building save query: %w", err)
-	}
-
-	_, err = s.db.ExecContext(ctx, query, args...)
-	return err
-}
-
-func (s *CredentialsStore) GetPassword(ctx context.Context) (string, error) {
-	query, args, err := sq.Select(masterPasswordColPassword).
-		From(masterPasswordTable).
-		Where(sq.Eq{"id": 1}).
-		ToSql()
-	if err != nil {
-		return "", fmt.Errorf("building get query: %w", err)
-	}
-
-	var password string
-	err = s.db.QueryRowContext(ctx, query, args...).Scan(&password)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", srvErrors.NewResourceNotFoundError("master_password", "")
-	}
-	if err != nil {
-		return "", fmt.Errorf("scanning master password: %w", err)
-	}
-
-	return password, nil
-}
-
-func (s *CredentialsStore) SavePassword(ctx context.Context, password string) error {
-	query, args, err := sq.Insert(masterPasswordTable).
-		Columns("id", masterPasswordColPassword).
-		Values(1, password).
-		Suffix("ON CONFLICT (id) DO UPDATE SET password = EXCLUDED.password").
 		ToSql()
 	if err != nil {
 		return fmt.Errorf("building save query: %w", err)
