@@ -76,6 +76,7 @@ func (s *Store) Checkpoint(ctx context.Context) error {
 
 func (s *Store) Configuration() *ConfigurationStore { return NewConfigurationStore(s.qi) }
 func (s *Store) Inventory() *InventoryStore         { return NewInventoryStore(s.qi) }
+func (s *Store) Metadata() *MetadataStore           { return NewMetadataStore(s.qi) }
 func (s *Store) VM() *VMStore                       { return NewVMStore(s.qi) }
 func (s *Store) Inspection() *InspectionStore       { return NewInspectionStore(s.qi) }
 func (s *Store) Group() *GroupStore                 { return NewGroupStore(s.qi) }

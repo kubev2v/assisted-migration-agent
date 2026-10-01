@@ -1,11 +1,23 @@
 package filter
 
 import (
+	sq "github.com/Masterminds/squirrel"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("VM Mapper Tests", func() {
+	It("tracks metadata fields through composed filters without inspecting string values", func() {
+		metadata, err := ParseWithDefaultMap([]byte("METADATA.KEY = 'owner'"))
+		Expect(err).NotTo(HaveOccurred())
+		ordinary, err := ParseWithDefaultMap([]byte("name = 'metadata.key'"))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(UsesMetadata(ordinary)).To(BeFalse())
+		Expect(UsesMetadata(metadata)).To(BeTrue())
+		Expect(UsesMetadata(sq.And{ordinary, sq.Or{ordinary, metadata}})).To(BeTrue())
+		Expect(UsesMetadata(sq.And{ordinary, ordinary})).To(BeFalse())
+	})
+
 	Context("DefaultMapper field mappings", func() {
 		type fieldCase struct {
 			field  string
@@ -38,6 +50,8 @@ var _ = Describe("VM Mapper Tests", func() {
 			{"datacenter", `v."Datacenter"`},
 			{"cluster", `v."Cluster"`},
 			{"cluster_id", `vc."Object ID"`},
+			{"metadata.key", `metadata.key`},
+			{"metadata.value", `metadata.value`},
 			{"hw_version", `v."HW version"`},
 			{"total_disk_capacity", `d.total_disk`},
 			{"provisioned", `v."Provisioned MiB"`},

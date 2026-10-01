@@ -383,6 +383,7 @@ func (h *Handler) getVMFilterOptions(c *gin.Context, vmSvc *services.VMService) 
 		ConcernLabels:     opts.ConcernLabels,
 		ConcernCategories: opts.ConcernCategories,
 		Applications:      opts.Applications,
+		Metadata:          opts.Metadata,
 	})
 }
 

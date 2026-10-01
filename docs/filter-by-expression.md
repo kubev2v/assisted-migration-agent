@@ -261,6 +261,20 @@ Identifiers are **case-insensitive**. Dotted names refer to joined tables (e.g. 
 | `resource_pool`  | string  | Resource pool                       |
 | `issues_count`   | integer | Number of concerns/issues for the VM |
 
+### Metadata — tags and custom attributes
+
+| Identifier | Type | Meaning |
+| --- | --- | --- |
+| `metadata.key` | string | Tag category, custom attribute name, or RVTools column header. |
+| `metadata.value` | string | Tag name or original attribute value. |
+
+```text
+metadata.key = 'Environment' and metadata.value = 'Production'
+metadata.value like 'Finance'
+```
+
+Conditions on the key and value apply to the same entry. Results contain each VM once, even when multiple entries match. Metadata has no origin field. Like other joined fields, `!=` matches a different entry; it does not mean the VM has no matching entry. Collections without metadata still support ordinary VM filters.
+
 ### vdisk (disk.*) — disk attributes
 
 | Identifier        | Type    | Description (backing column) |

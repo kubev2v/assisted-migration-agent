@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -18,6 +19,16 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	"github.com/kubev2v/assisted-migration-agent/test"
 )
+
+type metadataFilterQueryDB struct {
+	*sql.DB
+	query string
+}
+
+func (db *metadataFilterQueryDB) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	db.query = query
+	return db.DB.QueryContext(ctx, query, args...)
+}
 
 var _ = Describe("VMStore cross-table filters", func() {
 	var (
@@ -63,6 +74,10 @@ var _ = Describe("VMStore cross-table filters", func() {
 		s, err = collDB.Store()
 		Expect(err).NotTo(HaveOccurred())
 
+		_, err = db.Exec(`CREATE TABLE IF NOT EXISTS vm_metadata (
+            vm_id VARCHAR NOT NULL, key VARCHAR NOT NULL, value VARCHAR NOT NULL,
+            PRIMARY KEY (vm_id, key, value), FOREIGN KEY (vm_id) REFERENCES vinfo("VM ID"))`)
+		Expect(err).NotTo(HaveOccurred())
 		Expect(test.InsertVMs(ctx, db)).To(Succeed())
 		Expect(test.InsertVMMemory(ctx, db)).To(Succeed())
 		Expect(test.InsertVMDatastores(ctx, db)).To(Succeed())
@@ -79,6 +94,21 @@ var _ = Describe("VMStore cross-table filters", func() {
 	})
 
 	Context("vinfo columns", func() {
+		It("joins metadata rows only when the filter references metadata fields", func() {
+			recorder := &metadataFilterQueryDB{DB: db}
+			for expression, expanded := range map[string]bool{
+				"cpus >= 4":                               false,
+				"name = 'metadata.key'":                   false,
+				"metadata.key = 'Owner'":                  true,
+				"metadata.value = 'Finance' or cpus >= 4": true,
+			} {
+				_, err := store.NewVMStore(recorder).List(ctx, store.ByFilter(expression))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(strings.Contains(recorder.query, "JOIN vm_metadata metadata")).To(Equal(expanded), expression)
+				Expect(recorder.query).NotTo(ContainSubstring("map_entries("))
+			}
+		})
+
 		It("should filter by firmware", func() {
 			f := store.ByFilter("firmware = 'efi'")
 			vms, err := s.VM().List(ctx, f, store.WithDefaultSort())

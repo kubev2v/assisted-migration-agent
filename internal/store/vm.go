@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	sq "github.com/Masterminds/squirrel"
+	duckdb "github.com/duckdb/duckdb-go/v2"
 	duckdb_models "github.com/kubev2v/migration-planner/pkg/duckdb_parser/models"
 	"go.uber.org/zap"
 
@@ -46,9 +47,7 @@ func (s *VMStore) List(ctx context.Context, filter sq.Sqlizer, opts ...ListOptio
 
 	// Apply external filters via subquery (filters reference table aliases in vmFilterSubquery)
 	if filter != nil {
-		subquery := vmFilterSubquery.Where(filter)
-
-		subSQL, subArgs, err := subquery.ToSql()
+		subSQL, subArgs, err := buildVMFilterQuery(ctx, s.db, filter)
 		if err != nil {
 			return nil, err
 		}
@@ -128,8 +127,7 @@ func (s *VMStore) Count(ctx context.Context, filter sq.Sqlizer) (int, error) {
 	builder := sq.Select("COUNT(*)").From("vinfo v")
 
 	if filter != nil {
-		subquery := vmFilterSubquery.Where(filter)
-		subSQL, subArgs, err := subquery.ToSql()
+		subSQL, subArgs, err := buildVMFilterQuery(ctx, s.db, filter)
 		if err != nil {
 			return 0, err
 		}
@@ -148,7 +146,11 @@ func (s *VMStore) Count(ctx context.Context, filter sq.Sqlizer) (int, error) {
 
 // Get returns full VM details by ID, including utilization data from the latest rightsizing report.
 func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
-	rows, err := s.db.QueryContext(ctx, vmGetQuery, id)
+	query, err := metadataQuery(ctx, s.db, vmGetQuery)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.db.QueryContext(ctx, query, id)
 	if err != nil {
 		return nil, fmt.Errorf("querying VM %s: %w", id, err)
 	}
@@ -163,6 +165,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 
 	var pvm duckdb_models.VM
 	var groups StringArray
+	var metadata duckdb.Composite[map[string][]string]
 	var (
 		uMoid                                               sql.NullString
 		uVmName                                             sql.NullString
@@ -192,6 +195,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 		&uCpuAvg, &uCpuP95, &uCpuMax, &uCpuLatest,
 		&uMemAvg, &uMemP95, &uMemMax, &uMemLatest,
 		&uDisk, &uConfidence, &pvm.GuestApps,
+		&metadata,
 		&inspectionState, &inspectionDetails, &inspectionError,
 	); err != nil {
 		return nil, fmt.Errorf("scanning VM %s: %w", id, err)
@@ -202,6 +206,10 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 	}
 
 	result := fromDB(pvm)
+	result.Metadata = metadata.Get()
+	if result.Metadata == nil {
+		result.Metadata = make(map[string][]string)
+	}
 	result.Groups = groups
 	result.InspectionStatus.State = models.InspectionState(inspectionState)
 	result.InspectionStatus.Details = inspectionDetails
@@ -234,19 +242,29 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 
 // GetFilterOptions returns the distinct values available for VM filtering.
 func (s *VMStore) GetFilterOptions(ctx context.Context) (models.VMFilterOptions, error) {
-	row := s.db.QueryRowContext(ctx, vmFilterOptionsQuery)
+	query, err := metadataQuery(ctx, s.db, vmFilterOptionsQuery)
+	if err != nil {
+		return models.VMFilterOptions{}, err
+	}
+	row := s.db.QueryRowContext(ctx, query)
 
 	var clusters, datacenters, concernLabels, concernCategories, applications StringArray
-	if err := row.Scan(&clusters, &datacenters, &concernLabels, &concernCategories, &applications); err != nil {
+	var metadata duckdb.Composite[map[string][]string]
+	if err := row.Scan(&clusters, &datacenters, &concernLabels, &concernCategories, &applications, &metadata); err != nil {
 		return models.VMFilterOptions{}, err
 	}
 
+	values := metadata.Get()
+	if values == nil {
+		values = make(map[string][]string)
+	}
 	return models.VMFilterOptions{
 		Clusters:          clusters,
 		Datacenters:       datacenters,
 		ConcernLabels:     concernLabels,
 		ConcernCategories: concernCategories,
 		Applications:      applications,
+		Metadata:          values,
 	}, nil
 }
 
@@ -369,7 +387,6 @@ func fromDB(pvm duckdb_models.VM) models.VM {
 			Version: g.Version,
 		})
 	}
-
 	return models.VM{
 		ID:                    pvm.ID,
 		Name:                  pvm.Name,

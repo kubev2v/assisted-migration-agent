@@ -342,8 +342,7 @@ func (s *GroupStore) RefreshMatches(ctx context.Context, groupIDs ...uuid.UUID) 
 			continue
 		}
 
-		subquery := vmFilterSubquery.Where(filterSQL)
-		subSQL, subArgs, err := subquery.ToSql()
+		subSQL, subArgs, err := buildVMFilterQuery(ctx, s.db, filterSQL)
 		if err != nil {
 			return fmt.Errorf("building filter query for group %s: %w", g.ID, err)
 		}
