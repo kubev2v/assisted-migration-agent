@@ -28,10 +28,8 @@ spec:
     value: .
   pipelineSpec:
     description: |
-      This pipeline is ideal for building container images from a Containerfile while reducing network traffic.
-
-      _Uses `buildah` to create a container image. It also optionally creates a source image and runs some build-time tests. EC will flag a violation for [`trusted_task.trusted`](https://conforma.dev/docs/policy/packages/release_trusted_task.html#trusted_task__trusted) if any tasks are added to the pipeline.
-      This pipeline is pushed as a Tekton bundle to [quay.io](https://quay.io/repository/konflux-ci/tekton-catalog/pipeline-docker-build?tab=tags)_
+      Builds the agent for linux/amd64 and linux/arm64, then publishes both under one OCI image
+      index. Requires the Konflux Multi Platform Controller with ARM64 builder support.
     params:
     - description: Source Repository URL
       name: git-url
@@ -74,8 +72,8 @@ spec:
       description: Build a source image.
       name: build-source-image
       type: string
-    - default: "false"
-      description: Add built image into an OCI image index
+    - default: "true"
+      description: Add built images into an OCI image index
       name: build-image-index
       type: string
     - default: docker
@@ -107,6 +105,13 @@ spec:
         VMs
       name: privileged-nested
       type: string
+    - default:
+      - linux/amd64
+      - linux/arm64
+      description: List of platforms to build. Non-local platforms require the Konflux Multi
+        Platform Controller.
+      name: build-platforms
+      type: array
     - default: ""
       description: Sets the image created time and the SOURCE_DATE_EPOCH build argument.
         On its own, it does not change file timestamps inside the layers (set rewrite-timestamp
@@ -196,7 +201,11 @@ spec:
         workspace: git-auth
       - name: netrc
         workspace: netrc
-    - name: build-container
+    - matrix:
+        params:
+        - name: PLATFORM
+          value: $(params.build-platforms[*])
+      name: build-container
       params:
       - name: IMAGE
         value: $(params.output-image)
@@ -233,14 +242,18 @@ spec:
         value: $(params.rewrite-timestamp)
       - name: OMIT_HISTORY
         value: $(params.omit-history)
+      - name: IMAGE_APPEND_PLATFORM
+        value: "true"
+      - name: ALLOW_CROSS_PLATFORM_IMAGES
+        value: "true"
       runAfter:
       - prefetch-dependencies
       taskRef:
         params:
         - name: name
-          value: buildah
+          value: buildah-remote
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-buildah:0.10.5@sha256:28c2d07681152e749aaa8014f62c62a8f51288c3f2da82cbfcfb038bbcf34437
+          value: quay.io/konflux-ci/tekton-catalog/task-buildah-remote:0.12.3@sha256:7d9b403f42b6af26efd910ce62a50bda425d8c84c66f0790742abf29197f0110
         - name: kind
           value: task
         resolver: bundles
@@ -255,7 +268,7 @@ spec:
         value: $(params.build-image-index)
       - name: IMAGES
         value:
-        - $(tasks.build-container.results.IMAGE_URL)@$(tasks.build-container.results.IMAGE_DIGEST)
+        - $(tasks.build-container.results.IMAGE_REF[*])
       - name: BUILDAH_FORMAT
         value: $(params.buildah-format)
       runAfter:
