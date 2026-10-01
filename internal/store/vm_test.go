@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -869,6 +870,112 @@ var _ = Describe("VMStore", func() {
 		BeforeEach(func() {
 			err := test.InsertVMs(ctx, db)
 			Expect(err).NotTo(HaveOccurred())
+		})
+
+		Context("Metadata", func() {
+			BeforeEach(func() {
+				_, err := db.Exec(`ALTER TABLE vinfo ADD COLUMN IF NOT EXISTS metadata MAP(VARCHAR, VARCHAR[]) DEFAULT map()`)
+				Expect(err).NotTo(HaveOccurred())
+				insertVM("vm-metadata", "metadata-vm", "poweredOn", "cluster-a", 4096)
+			})
+
+			It("filters by a metadata key and value from the same entry", func() {
+				_, err := db.Exec(`UPDATE vinfo SET metadata = MAP {'Environment': ['Production', 'QA'], 'Owner': ['Finance']} WHERE "VM ID" = 'vm-metadata'`)
+				Expect(err).NotTo(HaveOccurred())
+				insertVM("vm-options", "options-vm", "poweredOn", "cluster-a", 4096)
+				_, err = db.Exec(`UPDATE vinfo SET metadata = MAP {'Owner': ['Finance', 'Payments']} WHERE "VM ID" = 'vm-options'`)
+				Expect(err).NotTo(HaveOccurred())
+				for expression, expected := range map[string]int{
+					"metadata.key = 'Environment' and metadata.value = 'Production'": 1,
+					"metadata.key = 'Environment' and metadata.value = 'Finance'":    0,
+					"metadata.key = 'Environment' and metadata.value = 'QA'":         1,
+					"metadata.value = 'Finance'":                                     2,
+					"metadata.value like 'Prod'":                                     1,
+					"metadata.key = 'Missing' or name = 'db-server-1'":               1,
+				} {
+					vms, err := s.VM().List(ctx, store.ByFilter(expression))
+					Expect(err).NotTo(HaveOccurred())
+					Expect(vms).To(HaveLen(expected), expression)
+					count, err := s.VM().Count(ctx, store.ByFilter(expression))
+					Expect(err).NotTo(HaveOccurred())
+					Expect(count).To(BeNumerically("==", expected), expression)
+				}
+				opts, err := s.VM().GetFilterOptions(ctx)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(opts.Metadata).To(Equal(map[string][]string{"Environment": {"Production", "QA"}, "Owner": {"Finance", "Payments"}}))
+				group, err := s.Group().Create(ctx, models.Group{Name: "metadata-group", Filter: "metadata.key = 'Environment' and metadata.value = 'Production'"})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(s.Group().RefreshMatches(ctx, group.ID)).To(Succeed())
+				groups, err := s.Group().GetGroupsContainingVM(ctx, "vm-metadata")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(groups).To(ContainElement(group.ID))
+			})
+
+			It("returns metadata separately from labels", func() {
+				_, err := db.Exec(`UPDATE vinfo SET metadata = MAP {'Environment': ['Production', 'Finance']}, labels = '["editable"]' WHERE "VM ID" = 'vm-metadata'`)
+				Expect(err).NotTo(HaveOccurred())
+				vm, err := s.VM().Get(ctx, "vm-metadata")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(vm.Metadata).To(Equal(map[string][]string{"Environment": {"Production", "Finance"}}))
+				Expect(vm.Labels).To(Equal([]string{"editable"}))
+			})
+
+			It("keeps metadata while editing labels and exclusions on a referenced VM", func() {
+				_, err := db.Exec(`UPDATE vinfo SET metadata = MAP {'Owner': ['Finance']} WHERE "VM ID" = 'vm-metadata'`)
+				Expect(err).NotTo(HaveOccurred())
+				insertDisk("vm-metadata", 1024)
+				Expect(s.VM().UpdateLabels(ctx, "vm-metadata", []string{"editable"})).To(Succeed())
+				Expect(s.VM().UpdateMigrationExcluded(ctx, "vm-metadata", true)).To(Succeed())
+				vm, err := s.VM().Get(ctx, "vm-metadata")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(vm.Metadata).To(Equal(map[string][]string{"Owner": {"Finance"}}))
+				Expect(vm.Labels).To(Equal([]string{"editable"}))
+				Expect(vm.MigrationExcluded).To(BeTrue())
+			})
+
+			It("returns an empty object for absent metadata values", func() {
+				for _, value := range []string{"NULL", "map()"} {
+					_, err := db.Exec(`UPDATE vinfo SET metadata = ` + value + ` WHERE "VM ID" = 'vm-metadata'`)
+					Expect(err).NotTo(HaveOccurred())
+					vm, err := s.VM().Get(ctx, "vm-metadata")
+					Expect(err).NotTo(HaveOccurred())
+					Expect(vm.Metadata).NotTo(BeNil())
+					Expect(vm.Metadata).To(BeEmpty())
+				}
+			})
+
+			It("rejects invalid metadata at the database boundary", func() {
+				_, err := db.Exec(`UPDATE vinfo SET metadata = 'invalid JSON' WHERE "VM ID" = 'vm-metadata'`)
+				Expect(err).To(HaveOccurred())
+				vm, err := s.VM().Get(ctx, "vm-metadata")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(vm.Metadata).To(BeEmpty())
+			})
+		})
+
+		It("reads historical collections without adding a metadata column", func() {
+			historicalDB, err := sql.Open("duckdb", filepath.Join(tmpDir, "historical.duckdb"))
+			Expect(err).NotTo(HaveOccurred())
+			defer func() { _ = historicalDB.Close() }()
+			schema, err := duckdb_parser.NewBuilder().CreateSchemaQuery()
+			Expect(err).NotTo(HaveOccurred())
+			_, err = historicalDB.Exec(strings.Replace(schema, ",\n    \"metadata\" MAP(VARCHAR, VARCHAR[]) DEFAULT map()", "", 1))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(migrations.RunCollection(ctx, historicalDB, "historical")).To(Succeed())
+			Expect(test.InsertVMs(ctx, historicalDB)).To(Succeed())
+			vm, err := store.NewVMStore(historicalDB).Get(ctx, "vm-003")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vm.Metadata).NotTo(BeNil())
+			Expect(vm.Metadata).To(BeEmpty())
+			var count int
+			opts, err := store.NewVMStore(historicalDB).GetFilterOptions(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(opts.Metadata).NotTo(BeNil())
+			Expect(opts.Metadata).To(BeEmpty())
+			_, err = store.NewVMStore(historicalDB).List(ctx, store.ByFilter("metadata.key = 'Owner'"))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(historicalDB.QueryRow(`SELECT count(*) FROM information_schema.columns WHERE table_name='vinfo' AND column_name='metadata'`).Scan(&count)).To(Succeed())
+			Expect(count).To(BeZero())
 		})
 
 		// Given a VM exists in the database

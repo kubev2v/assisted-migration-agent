@@ -2025,6 +2025,14 @@ components:
         faultToleranceEnabled:
           type: boolean
           description: Whether Fault Tolerance is enabled
+        metadata:
+          type: object
+          readOnly: true
+          description: Source metadata grouped by category, custom attribute name, or RVTools column header. Empty when absent.
+          additionalProperties:
+            type: array
+            items:
+              type: string
         nestedHVEnabled:
           type: boolean
           description: Whether nested virtualization is enabled
@@ -2452,7 +2460,15 @@ components:
         - concernLabels
         - concernCategories
         - applications
+        - metadata
       properties:
+        metadata:
+          type: object
+          description: Distinct metadata values grouped by key, available for VM filtering.
+          additionalProperties:
+            type: array
+            items:
+              type: string
         clusters:
           type: array
           items:
