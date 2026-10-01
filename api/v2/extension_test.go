@@ -1,6 +1,7 @@
 package v2_test
 
 import (
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -17,6 +18,31 @@ func TestExtension(t *testing.T) {
 }
 
 var _ = Describe("NewVirtualMachineDetailFromModel", func() {
+	It("serializes empty source metadata as an array", func() {
+		detail := v2.NewVirtualMachineDetailFromModel(models.VM{})
+		raw, err := json.Marshal(detail)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(string(raw)).To(ContainSubstring(`"sourceMetadata":[]`))
+	})
+
+	It("preserves source facts and their origin", func() {
+		detail := v2.NewVirtualMachineDetailFromModel(models.VM{SourceMetadata: []models.SourceMetadataEntry{
+			{Key: "Environment", Value: "Production", Kind: "tag"},
+			{Key: "Owner", Value: "Finance", Kind: "customAttribute"},
+			{Key: "Team", Value: "Payments; QA", Kind: "unknown"},
+		}})
+		Expect(detail.SourceMetadata).NotTo(BeNil())
+		entries := *detail.SourceMetadata
+		Expect(entries).To(HaveLen(3))
+		raw, err := json.Marshal(entries)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(string(raw)).To(MatchJSON(`[
+			{"key":"Environment","value":"Production","kind":"tag"},
+			{"key":"Owner","value":"Finance","kind":"customAttribute"},
+			{"key":"Team","value":"Payments; QA","kind":"unknown"}
+		]`))
+		Expect(detail.Labels).To(BeNil())
+	})
 	It("should include inspectionStatus when state is not not_started", func() {
 		vm := models.VM{
 			ID:              "vm-1",

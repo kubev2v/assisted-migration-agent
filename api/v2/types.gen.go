@@ -77,6 +77,13 @@ const (
 	InspectorStatusStateRunning InspectorStatusState = "running"
 )
 
+// Defines values for SourceMetadataEntryKind.
+const (
+	CustomAttribute SourceMetadataEntryKind = "customAttribute"
+	Tag             SourceMetadataEntryKind = "tag"
+	Unknown         SourceMetadataEntryKind = "unknown"
+)
+
 // Defines values for VirtualMachineIssueCategory.
 const (
 	VirtualMachineIssueCategoryAdvisory    VirtualMachineIssueCategory = "Advisory"
@@ -544,6 +551,21 @@ type RightsizingClusterUtilization struct {
 	VmCount                  int     `json:"vm_count"`
 }
 
+// SourceMetadataEntry Source-provided VM metadata, separate from editable OMA labels and annotations.
+type SourceMetadataEntry struct {
+	// Key Tag category name (category ID when unresolved), custom attribute name, or RVTools column header.
+	Key string `json:"key"`
+
+	// Kind RVTools entries use unknown when the export does not identify their origin.
+	Kind SourceMetadataEntryKind `json:"kind"`
+
+	// Value Tag name or original attribute/exported cell value. Exported values are not split.
+	Value string `json:"value"`
+}
+
+// SourceMetadataEntryKind RVTools entries use unknown when the export does not identify their origin.
+type SourceMetadataEntryKind string
+
 // StartForecasterRequest defines model for StartForecasterRequest.
 type StartForecasterRequest struct {
 	Concurrency *int                   `json:"concurrency,omitempty"`
@@ -784,6 +806,9 @@ type VirtualMachineDetail struct {
 
 	// Processes List of processes detected on this VM
 	Processes *[]Process `json:"processes,omitempty"`
+
+	// SourceMetadata Source facts from the current collection. Empty when absent; historical collections are supported.
+	SourceMetadata *[]SourceMetadataEntry `json:"sourceMetadata,omitempty"`
 
 	// StorageUsed Storage consumed in bytes
 	StorageUsed *int64 `json:"storageUsed,omitempty"`

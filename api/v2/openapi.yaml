@@ -1918,6 +1918,22 @@ components:
           format: double
           description: Data confidence -- sample_count / expected_sample_count x 100
 
+    SourceMetadataEntry:
+      type: object
+      description: Source-provided VM metadata, separate from editable OMA labels and annotations.
+      required: [key, value, kind]
+      properties:
+        key:
+          type: string
+          description: Tag category name (category ID when unresolved), custom attribute name, or RVTools column header.
+        value:
+          type: string
+          description: Tag name or original attribute/exported cell value. Exported values are not split.
+        kind:
+          type: string
+          enum: [tag, customAttribute, unknown]
+          description: RVTools entries use unknown when the export does not identify their origin.
+
     VirtualMachineDetail:
       type: object
       required:
@@ -2025,6 +2041,12 @@ components:
         faultToleranceEnabled:
           type: boolean
           description: Whether Fault Tolerance is enabled
+        sourceMetadata:
+          type: array
+          readOnly: true
+          description: Source facts from the current collection. Empty when absent; historical collections are supported.
+          items:
+            $ref: '#/components/schemas/SourceMetadataEntry'
         nestedHVEnabled:
           type: boolean
           description: Whether nested virtualization is enabled
