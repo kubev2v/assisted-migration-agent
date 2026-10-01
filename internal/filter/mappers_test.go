@@ -6,6 +6,15 @@ import (
 )
 
 var _ = Describe("VM Mapper Tests", func() {
+	It("maps metadata fields and keeps values as query arguments", func() {
+		parsed, err := ParseWithDefaultMap([]byte("METADATA.KEY = 'owner' and metadata.value = 'metadata.key'"))
+		Expect(err).NotTo(HaveOccurred())
+		query, args, err := parsed.ToSql()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(query).To(Equal("((metadata.key = ?) AND (metadata.value = ?))"))
+		Expect(args).To(Equal([]any{"owner", "metadata.key"}))
+	})
+
 	Context("DefaultMapper field mappings", func() {
 		type fieldCase struct {
 			field  string
@@ -38,6 +47,8 @@ var _ = Describe("VM Mapper Tests", func() {
 			{"datacenter", `v."Datacenter"`},
 			{"cluster", `v."Cluster"`},
 			{"cluster_id", `vc."Object ID"`},
+			{"metadata.key", `metadata.key`},
+			{"metadata.value", `metadata.value`},
 			{"hw_version", `v."HW version"`},
 			{"total_disk_capacity", `d.total_disk`},
 			{"provisioned", `v."Provisioned MiB"`},

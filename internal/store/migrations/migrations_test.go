@@ -124,6 +124,21 @@ var _ = Describe("Migrations", func() {
 	})
 
 	Context("Collection migrations", func() {
+		It("preserves tag categories when the collection is cloned", func() {
+			_, err := collSt.Querier().ExecContext(ctx, `INSERT INTO tag_categories VALUES ('cat1', 'Owner')`)
+			Expect(err).NotTo(HaveOccurred())
+			db, err := pool.Get("coll")
+			Expect(err).NotTo(HaveOccurred())
+			clone, err := db.Clone(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			DeferCleanup(clone.Close)
+			st, err := clone.Store()
+			Expect(err).NotTo(HaveOccurred())
+			var name string
+			Expect(st.Querier().QueryRowContext(ctx, `SELECT name FROM tag_categories WHERE id = 'cat1'`).Scan(&name)).To(Succeed())
+			Expect(name).To(Equal("Owner"))
+		})
+
 		It("should create inventory table", func() {
 			_, err := collSt.Querier().ExecContext(ctx, `
 				INSERT INTO inventory (id, data)

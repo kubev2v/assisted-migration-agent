@@ -127,3 +127,8 @@ CREATE TABLE IF NOT EXISTS vm_applications (
     vm_name  VARCHAR NOT NULL,
     PRIMARY KEY (app_name, vm_id)
 );
+
+CREATE TABLE IF NOT EXISTS tag_categories (
+    id VARCHAR,
+    name VARCHAR
+);

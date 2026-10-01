@@ -63,6 +63,10 @@ var _ = Describe("VMStore cross-table filters", func() {
 		s, err = collDB.Store()
 		Expect(err).NotTo(HaveOccurred())
 
+		_, err = db.Exec(`CREATE TABLE IF NOT EXISTS vm_metadata (
+            vm_id VARCHAR NOT NULL, key VARCHAR NOT NULL, value VARCHAR NOT NULL,
+            PRIMARY KEY (vm_id, key, value), FOREIGN KEY (vm_id) REFERENCES vinfo("VM ID"))`)
+		Expect(err).NotTo(HaveOccurred())
 		Expect(test.InsertVMs(ctx, db)).To(Succeed())
 		Expect(test.InsertVMMemory(ctx, db)).To(Succeed())
 		Expect(test.InsertVMDatastores(ctx, db)).To(Succeed())
@@ -79,6 +83,16 @@ var _ = Describe("VMStore cross-table filters", func() {
 	})
 
 	Context("vinfo columns", func() {
+		It("preserves ordinary matches when metadata is empty", func() {
+			filter := store.ByFilter("metadata.value = 'Finance' or cpus >= 4")
+			vms, err := s.VM().List(ctx, filter)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vmIDs(vms)).To(Equal([]string{"vm-003", "vm-004", "vm-005", "vm-006"}))
+			count, err := s.VM().Count(ctx, filter)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(count).To(Equal(len(vms)))
+		})
+
 		It("should filter by firmware", func() {
 			f := store.ByFilter("firmware = 'efi'")
 			vms, err := s.VM().List(ctx, f, store.WithDefaultSort())

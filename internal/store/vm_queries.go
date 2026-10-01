@@ -10,6 +10,16 @@ const vmGetQuery = `
 WITH filtered_vm AS (
     SELECT * FROM vinfo WHERE "VM ID" = ?
 ),
+metadata_values AS (
+    SELECT metadata.key, list(metadata.value ORDER BY metadata.value) AS values
+    FROM vm_metadata metadata
+    JOIN filtered_vm fv ON metadata.vm_id = fv."VM ID"
+    GROUP BY metadata.key
+),
+metadata_agg AS (
+    SELECT map(list(key ORDER BY key), list(values ORDER BY key)) AS entries
+    FROM metadata_values
+),
 disks AS (
     SELECT
         dk."VM ID",
@@ -136,10 +146,12 @@ SELECT
     u.disk_pct,
     u.confidence_pct,
     COALESCE(i."guest_apps", '[]') AS "GuestApps",
+    COALESCE(metadata.entries, map()) AS "Metadata",
     COALESCE(ins.status, 'not_started') AS "InspectionState",
     COALESCE(ins.details, '') AS "InspectionDetails",
     COALESCE(ins.error, '') AS "InspectionError"
 FROM filtered_vm i
+CROSS JOIN metadata_agg metadata
 LEFT JOIN vcpu c ON i."VM ID" = c."VM ID"
 LEFT JOIN vmemory m ON i."VM ID" = m."VM ID"
 LEFT JOIN disks d ON i."VM ID" = d."VM ID"
@@ -157,9 +169,13 @@ LEFT JOIN vm_inspection_status ins ON i."VM ID" = ins."VM ID"
 
 `
 
-// vmFilterOptionsQuery returns distinct clusters, datacenters, concern labels,
-// and concern categories in a single row.
+// vmFilterOptionsQuery returns distinct values available for VM filters.
 const vmFilterOptionsQuery = `
+WITH metadata_values AS (
+    SELECT key, list(DISTINCT value ORDER BY value) AS values
+    FROM vm_metadata
+    GROUP BY key
+)
 SELECT
     (SELECT COALESCE(list(DISTINCT "Cluster" ORDER BY "Cluster"), [])
      FROM vinfo WHERE "Cluster" IS NOT NULL AND "Cluster" != '') AS clusters,
@@ -170,7 +186,9 @@ SELECT
     (SELECT COALESCE(list(DISTINCT "Category" ORDER BY "Category"), [])
      FROM concerns WHERE "Category" IS NOT NULL AND "Category" != '') AS concern_categories,
     (SELECT COALESCE(list(DISTINCT app_name ORDER BY app_name), [])
-     FROM vm_applications) AS applications
+     FROM vm_applications) AS applications,
+    (SELECT COALESCE(map(list(key ORDER BY key), list(values ORDER BY key)), map())
+     FROM metadata_values) AS metadata
 `
 
 // vmOutputQuery is the base aggregated output query that produces one row per VM.
@@ -207,10 +225,10 @@ var vmOutputQuery = sq.Select(
 	) g ON v."VM ID" = g.vm_id`)
 
 // vmFilterSubquery is the base flat JOIN query for filtering.
-// It joins all tables so WHERE clauses can reference any raw column.
 // Filters should be applied via Where clauses, then use the result to get DISTINCT VM IDs.
 var vmFilterSubquery = sq.Select(`DISTINCT v."VM ID"`).
 	From("vinfo v").
+	LeftJoin(`vm_metadata metadata ON metadata.vm_id = v."VM ID"`).
 	LeftJoin(`vcluster vc ON vc."Name" = v."Cluster"`).
 	LeftJoin(`vdisk dk ON v."VM ID" = dk."VM ID"`).
 	LeftJoin(`concerns c ON v."VM ID" = c."VM_ID"`).

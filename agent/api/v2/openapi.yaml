@@ -1727,7 +1727,7 @@ components:
         - inventory
       properties:
         inventory:
-          $ref: 'https://raw.githubusercontent.com/kubev2v/migration-planner/a9ac212f476f426fb0aa0437afff4e3f96cfd21b/api/v1alpha1/openapi.yaml#/components/schemas/UpdateInventory'
+          $ref: 'https://raw.githubusercontent.com/kubev2v/migration-planner/5692d9489e56c4c2563494ff019fd132d0d54c62/api/v1alpha1/openapi.yaml#/components/schemas/UpdateInventory'
 
     # ── VCenter Credentials ──────────────────────────────────────────────
     VcenterCredentials:
@@ -2025,6 +2025,14 @@ components:
         faultToleranceEnabled:
           type: boolean
           description: Whether Fault Tolerance is enabled
+        metadata:
+          type: object
+          readOnly: true
+          description: Tags and custom attributes collected from vCenter or RVTools, grouped by tag category name, custom attribute name, or RVTools column header. Empty object when absent. vCenter tags with unresolved category names are omitted.
+          additionalProperties:
+            type: array
+            items:
+              type: string
         nestedHVEnabled:
           type: boolean
           description: Whether nested virtualization is enabled
@@ -2310,7 +2318,7 @@ components:
         group:
           $ref: '#/components/schemas/Group'
         inventory:
-          $ref: 'https://raw.githubusercontent.com/kubev2v/migration-planner/a9ac212f476f426fb0aa0437afff4e3f96cfd21b/api/v1alpha1/openapi.yaml#/components/schemas/Inventory'
+          $ref: 'https://raw.githubusercontent.com/kubev2v/migration-planner/5692d9489e56c4c2563494ff019fd132d0d54c62/api/v1alpha1/openapi.yaml#/components/schemas/Inventory'
         vms:
           type: array
           items:
@@ -2452,7 +2460,15 @@ components:
         - concernLabels
         - concernCategories
         - applications
+        - metadata
       properties:
+        metadata:
+          type: object
+          description: Distinct metadata values grouped by key, available for VM filtering.
+          additionalProperties:
+            type: array
+            items:
+              type: string
         clusters:
           type: array
           items:

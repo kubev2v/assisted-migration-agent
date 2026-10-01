@@ -7,12 +7,16 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/vmware/govmomi/vapi/rest"
+	"github.com/vmware/govmomi/vapi/tags"
 	"go.uber.org/zap"
 
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
@@ -47,7 +51,7 @@ func newVCenterCollectorWorkFactory(credSrv *CredentialsService, pool *store.Poo
 
 // Build creates the collector work pipeline for a single collection run.
 //
-// The pipeline executes 12 sequential work units against a dedicated collection
+// The pipeline executes sequential work units against a dedicated collection
 // DuckDB database (one per run). On completion, Finalize either promotes the
 // collection DB into the pool (success), marks it failed (error), or cleans it
 // up (cancelled).
@@ -56,6 +60,7 @@ func newVCenterCollectorWorkFactory(credSrv *CredentialsService, pool *store.Poo
 //  1. Provision — record a collection marker, create and migrate the collection DB.
 //  2. Verify — validate vCenter credentials and open a govmomi client for rightsizing.
 //  3. Collect — run the vSphere collector, producing a SQLite database of raw inventory.
+//     3b. Tag categories — resolve and save category names before ingestion.
 //  4. Ingest — import the SQLite output into the collection DuckDB, validate schema.
 //  5. Applications — match guest processes against known application definitions.
 //  6. Rightsizing:
@@ -173,8 +178,7 @@ func (f *vCenterCollectorWorkFactory) Build() work.WorkBuilder[models.CollectorS
 				}
 				log.Info("vCenter credentials verified")
 
-				// since forklift collector does not expose the client
-				// we need to create a separate client for rightsizing
+				// Forklift does not expose its client; reuse this one for metadata and rightsizing.
 				client, err := vmware.Connect(ctx, &credentials)
 				if err != nil {
 					r.Err = err
@@ -208,6 +212,60 @@ func (f *vCenterCollectorWorkFactory) Build() work.WorkBuilder[models.CollectorS
 				log.Info("vSphere inventory collection completed")
 
 				r.SQLitePath = dbPath
+				return r, nil
+			},
+		},
+		// 3b. Tag categories: save category names before importing vCenter tags.
+		{
+			Status: func() models.CollectorStatus {
+				return models.CollectorStatus{State: models.CollectorStateCollecting}
+			},
+			Work: func(ctx context.Context, r models.CollectorResult) (models.CollectorResult, error) {
+				st, err := collectionDb.Store()
+				if err != nil {
+					r.Err = fmt.Errorf("getting collection store: %w", err)
+					return r, r.Err
+				}
+
+				lookupCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+				defer cancel()
+				rc := rest.NewClient(r.Client.Client)
+				if err := rc.Login(lookupCtx, url.UserPassword(credentials.Username, credentials.Password)); err != nil {
+					log.Warnw("tag category login failed; tags without category names will be skipped", "error", err)
+					return r, nil
+				}
+				defer func() {
+					logoutCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+					defer cancel()
+					if err := rc.Logout(logoutCtx); err != nil {
+						log.Warnw("tag category logout failed", "error", err)
+					}
+				}()
+
+				manager := tags.NewManager(rc)
+				ids, err := manager.ListCategories(lookupCtx)
+				if err != nil {
+					log.Warnw("listing tag categories failed; tags without category names will be skipped", "error", err)
+					return r, nil
+				}
+
+				names := make(map[string]string)
+				for _, id := range ids {
+					if lookupCtx.Err() != nil {
+						break
+					}
+					category, err := manager.GetCategory(lookupCtx, id)
+					if err != nil || strings.TrimSpace(category.Name) == "" {
+						log.Warnw("tag category lookup failed or returned an empty name; tags in this category will be skipped", "category_id", id, "error", err)
+						continue
+					}
+					names[id] = category.Name
+				}
+
+				if err := st.Metadata().SaveTagCategories(ctx, names); err != nil {
+					r.Err = err
+					return r, err
+				}
 				return r, nil
 			},
 		},
