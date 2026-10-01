@@ -163,6 +163,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 
 	var pvm duckdb_models.VM
 	var groups StringArray
+	var sourceMetadataJSON string
 	var (
 		uMoid                                               sql.NullString
 		uVmName                                             sql.NullString
@@ -192,6 +193,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 		&uCpuAvg, &uCpuP95, &uCpuMax, &uCpuLatest,
 		&uMemAvg, &uMemP95, &uMemMax, &uMemLatest,
 		&uDisk, &uConfidence, &pvm.GuestApps,
+		&sourceMetadataJSON,
 		&inspectionState, &inspectionDetails, &inspectionError,
 	); err != nil {
 		return nil, fmt.Errorf("scanning VM %s: %w", id, err)
@@ -202,6 +204,12 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 	}
 
 	result := fromDB(pvm)
+	if err := json.Unmarshal([]byte(sourceMetadataJSON), &result.SourceMetadata); err != nil {
+		return nil, fmt.Errorf("parsing source metadata for VM %s: %w", id, err)
+	}
+	if result.SourceMetadata == nil {
+		result.SourceMetadata = []models.SourceMetadataEntry{}
+	}
 	result.Groups = groups
 	result.InspectionStatus.State = models.InspectionState(inspectionState)
 	result.InspectionStatus.Details = inspectionDetails
@@ -369,7 +377,6 @@ func fromDB(pvm duckdb_models.VM) models.VM {
 			Version: g.Version,
 		})
 	}
-
 	return models.VM{
 		ID:                    pvm.ID,
 		Name:                  pvm.Name,

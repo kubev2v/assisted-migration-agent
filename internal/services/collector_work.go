@@ -237,6 +237,9 @@ func (f *vCenterCollectorWorkFactory) Build() work.WorkBuilder[models.CollectorS
 					r.Err = err
 					return r, err
 				}
+				if !result.HasErrors() {
+					enrichSourceMetadata(ctx, st.Querier(), r.Client, credentials)
+				}
 
 				if err := st.Checkpoint(ctx); err != nil {
 					log.Warnw("checkpoint after ingest failed", "error", err)

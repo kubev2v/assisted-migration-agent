@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -869,6 +870,63 @@ var _ = Describe("VMStore", func() {
 		BeforeEach(func() {
 			err := test.InsertVMs(ctx, db)
 			Expect(err).NotTo(HaveOccurred())
+		})
+
+		Context("Source metadata", func() {
+			BeforeEach(func() {
+				_, err := db.Exec(`ALTER TABLE vinfo ADD COLUMN IF NOT EXISTS source_metadata VARCHAR DEFAULT '[]'`)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("returns source metadata separately from labels", func() {
+				_, err := db.Exec(`UPDATE vinfo SET source_metadata = ?, labels = '["editable"]' WHERE "VM ID" = 'vm-003'`,
+					`[{"key":"Environment","value":"Production","kind":"tag"},{"key":"Environment","value":"Finance","kind":"customAttribute"}]`)
+				Expect(err).NotTo(HaveOccurred())
+				vm, err := s.VM().Get(ctx, "vm-003")
+				Expect(err).NotTo(HaveOccurred())
+				Expect(vm.SourceMetadata).To(HaveLen(2))
+				Expect(vm.SourceMetadata[0]).To(Equal(models.SourceMetadataEntry{Key: "Environment", Value: "Production", Kind: "tag"}))
+				Expect(vm.SourceMetadata[1].Kind).To(Equal("customAttribute"))
+				Expect(vm.Labels).To(Equal([]string{"editable"}))
+			})
+
+			It("returns an empty array for absent metadata values", func() {
+				for _, value := range []any{nil, "[]", "null"} {
+					_, err := db.Exec(`UPDATE vinfo SET source_metadata = ? WHERE "VM ID" = 'vm-003'`, value)
+					Expect(err).NotTo(HaveOccurred())
+					vm, err := s.VM().Get(ctx, "vm-003")
+					Expect(err).NotTo(HaveOccurred())
+					Expect(vm.SourceMetadata).NotTo(BeNil())
+					Expect(vm.SourceMetadata).To(BeEmpty())
+				}
+			})
+
+			It("reports malformed metadata", func() {
+				_, err := db.Exec(`UPDATE vinfo SET source_metadata = ? WHERE "VM ID" = 'vm-003'`, "invalid JSON")
+				Expect(err).NotTo(HaveOccurred())
+				vm, err := s.VM().Get(ctx, "vm-003")
+				Expect(err).To(MatchError(ContainSubstring("parsing source metadata for VM vm-003")))
+				Expect(vm).To(BeNil())
+			})
+		})
+
+		It("reads historical collections without adding a metadata column", func() {
+			historicalDB, err := sql.Open("duckdb", filepath.Join(tmpDir, "historical.duckdb"))
+			Expect(err).NotTo(HaveOccurred())
+			defer func() { _ = historicalDB.Close() }()
+			schema, err := duckdb_parser.NewBuilder().CreateSchemaQuery()
+			Expect(err).NotTo(HaveOccurred())
+			_, err = historicalDB.Exec(strings.Replace(schema, ",\n    \"source_metadata\" VARCHAR DEFAULT '[]'", "", 1))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(migrations.RunCollection(ctx, historicalDB, "historical")).To(Succeed())
+			Expect(test.InsertVMs(ctx, historicalDB)).To(Succeed())
+			vm, err := store.NewVMStore(historicalDB).Get(ctx, "vm-003")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vm.SourceMetadata).NotTo(BeNil())
+			Expect(vm.SourceMetadata).To(BeEmpty())
+			var count int
+			Expect(historicalDB.QueryRow(`SELECT count(*) FROM information_schema.columns WHERE table_name='vinfo' AND column_name='source_metadata'`).Scan(&count)).To(Succeed())
+			Expect(count).To(BeZero())
 		})
 
 		// Given a VM exists in the database

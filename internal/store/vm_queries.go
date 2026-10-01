@@ -136,6 +136,7 @@ SELECT
     u.disk_pct,
     u.confidence_pct,
     COALESCE(i."guest_apps", '[]') AS "GuestApps",
+    COALESCE(to_json(i)->>'source_metadata', '[]') AS "SourceMetadata",
     COALESCE(ins.status, 'not_started') AS "InspectionState",
     COALESCE(ins.details, '') AS "InspectionDetails",
     COALESCE(ins.error, '') AS "InspectionError"

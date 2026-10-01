@@ -77,7 +77,15 @@ type VM struct {
 	Labels []string
 	Groups []string
 
-	GuestApps []GuestApp
+	GuestApps      []GuestApp
+	SourceMetadata []SourceMetadataEntry
+}
+
+// SourceMetadataEntry is a fact collected from vCenter or an RVTools export.
+type SourceMetadataEntry struct {
+	Key   string
+	Value string
+	Kind  string
 }
 
 type GuestApp struct {

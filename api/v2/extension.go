@@ -162,6 +162,13 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 	if len(vm.Labels) > 0 {
 		details.Labels = &vm.Labels
 	}
+	metadata := make([]SourceMetadataEntry, 0, len(vm.SourceMetadata))
+	for _, entry := range vm.SourceMetadata {
+		metadata = append(metadata, SourceMetadataEntry{
+			Key: entry.Key, Value: entry.Value, Kind: SourceMetadataEntryKind(entry.Kind),
+		})
+	}
+	details.SourceMetadata = &metadata
 
 	for _, d := range vm.Disks {
 		capacityBytes := d.Capacity * 1024 * 1024
