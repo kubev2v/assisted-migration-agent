@@ -12,7 +12,7 @@ type exportScopeSpec struct {
 // Shared SQL for overview and vms scopes: total disk per VM from vdisk.
 const vmDiskTotalsJoin = `
 			LEFT JOIN (
-				SELECT "VM ID", SUM("Capacity MiB") AS total_disk_mib
+				SELECT "VM ID", SUM("Capacity MiB") AS total_disk_mib, COUNT(*) AS virtual_disk_count
 				FROM vdisk
 				GROUP BY "VM ID"
 			) d ON v."VM ID" = d."VM ID"
@@ -124,6 +124,7 @@ var overviewQuery = `
 				v."CPUs" AS cpu_count,
 				v."Memory" AS memory_mib,
 				ROUND(v."Memory" / 1024.0, 2) AS memory_gib,
+				COALESCE(d.virtual_disk_count, 0) AS virtual_disk_count,
 				COALESCE(d.total_disk_mib, 0) AS disk_mib,
 				ROUND(COALESCE(d.total_disk_mib, 0) / 1024.0, 2) AS disk_gib,
 				v."OS according to the VMware Tools" AS guest_os,
@@ -163,6 +164,7 @@ var vmsQuery = `
 				v."Firmware" AS firmware,
 
 				-- Storage
+				COALESCE(d.virtual_disk_count, 0) AS virtual_disk_count,
 				COALESCE(d.total_disk_mib, 0) AS disk_capacity_mib,
 				ROUND(COALESCE(d.total_disk_mib, 0) / 1024.0, 2) AS disk_capacity_gib,
 				v."In Use MiB" AS disk_used_mib,
