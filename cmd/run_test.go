@@ -301,6 +301,7 @@ var _ = Describe("Run Command", func() {
 			cfg.Agent.ID = "550e8400-e29b-41d4-a716-446655440000"
 			cfg.Agent.SourceID = "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
 			cfg.Agent.Mode = "disconnected"
+			cfg.Agent.DataFolder = "/tmp/test-data"
 			cfg.Server.ServerMode = "dev"
 			cfg.Server.HTTPPort = 8000
 			cfg.Auth.Enabled = false

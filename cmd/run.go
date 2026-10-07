@@ -288,6 +288,10 @@ func registerFlags(cmd *cobra.Command, config *config.Configuration) {
 }
 
 func validateConfiguration(cfg *config.Configuration) error {
+	if cfg.Agent.DataFolder == "" {
+		return errors.New("data folder must be set")
+	}
+
 	if config.ServerModeType(cfg.Server.ServerMode) == config.ServerModeProd && cfg.Server.StaticsFolder == "" {
 		return errors.New("statics folder must be set when server mode is production")
 	}

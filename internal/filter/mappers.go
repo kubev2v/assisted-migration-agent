@@ -24,7 +24,7 @@ import (
 //	id, name, folder_id, folder, host, smbios_uuid, vm_uuid, firmware,
 //	powerstate (alias: status), connection_state, ft_state, cpus, memory,
 //	os_config, os_tools, dns_name, ip_address, storage_used, template,
-//	cbt, enable_uuid, datacenter, cluster, hw_version, total_disk_capacity,
+//	cbt, enable_uuid, datacenter, cluster, cluster_id, hw_version, total_disk_capacity,
 //	provisioned, resource_pool, labels, groups
 //
 // vdisk (dk) — disk.* prefix:
@@ -114,6 +114,10 @@ var DefaultMapper filter.MapFunc = func(name string) (string, filter.FieldType, 
 		return `v."Datacenter"`, filter.StringField, nil
 	case "cluster":
 		return `v."Cluster"`, filter.StringField, nil
+	// Inventory cluster key: vSphere Object ID, or the generated cluster-{hash}.
+	// Joined in vmFilterSubquery; this is not the cluster name in v."Cluster".
+	case "cluster_id":
+		return `vc."Object ID"`, filter.StringField, nil
 
 	// vinfo (v) — numeric fields
 	case "cpus":
