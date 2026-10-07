@@ -50,6 +50,13 @@ var _ = Describe("HTTP Server", func() {
 					})
 				},
 			},
+			"/api/v2": {
+				RegisterFn: func(router *gin.RouterGroup) {
+					router.GET("/status", func(c *gin.Context) {
+						c.JSON(200, gin.H{"status": "ok"})
+					})
+				},
+			},
 		}
 	})
 
@@ -124,10 +131,26 @@ var _ = Describe("HTTP Server", func() {
 				},
 			}
 
-			resp, err := client.Get(fmt.Sprintf("https://localhost:%d/api/v1/vms", cfg.Server.HTTPPort))
-			Expect(err).ToNot(HaveOccurred())
-			Expect(resp.StatusCode).To(Equal(200))
-			_ = resp.Body.Close()
+			for _, route := range []string{"/", "/api/v1/vms", "/api/v2/status"} {
+				resp, err := client.Get(fmt.Sprintf("https://localhost:%d%s", cfg.Server.HTTPPort, route))
+				Expect(err).ToNot(HaveOccurred())
+				Expect(resp.StatusCode).To(Equal(200))
+				Expect(resp.TLS).NotTo(BeNil())
+				Expect(resp.TLS.Version).To(BeNumerically(">=", tls.VersionTLS12))
+				_ = resp.Body.Close()
+			}
+
+			legacyClient := &http.Client{
+				Transport: &http.Transport{
+					TLSClientConfig: &tls.Config{
+						InsecureSkipVerify: true,
+						MinVersion:         tls.VersionTLS11,
+						MaxVersion:         tls.VersionTLS11,
+					},
+				},
+			}
+			_, err = legacyClient.Get(fmt.Sprintf("https://localhost:%d/api/v2/status", cfg.Server.HTTPPort))
+			Expect(err).To(HaveOccurred())
 		})
 
 		// Given a production server with static files
@@ -174,10 +197,13 @@ var _ = Describe("HTTP Server", func() {
 				},
 			}
 
-			resp, err := client.Get(fmt.Sprintf("https://localhost:%d/api/v1/nonexistent", cfg.Server.HTTPPort))
-			Expect(err).ToNot(HaveOccurred())
-			Expect(resp.StatusCode).To(Equal(404))
-			_ = resp.Body.Close()
+			for _, route := range []string{"/api", "/api/v1/nonexistent", "/api/v2/nonexistent"} {
+				resp, err := client.Get(fmt.Sprintf("https://localhost:%d%s", cfg.Server.HTTPPort, route))
+				Expect(err).ToNot(HaveOccurred())
+				Expect(resp.StatusCode).To(Equal(404))
+				Expect(resp.Header.Get("Content-Type")).To(ContainSubstring("application/json"))
+				_ = resp.Body.Close()
+			}
 		})
 
 		// Given a production server
@@ -199,10 +225,12 @@ var _ = Describe("HTTP Server", func() {
 				},
 			}
 
-			resp, err := client.Get(fmt.Sprintf("https://localhost:%d/some/spa/route", cfg.Server.HTTPPort))
-			Expect(err).ToNot(HaveOccurred())
-			Expect(resp.StatusCode).To(Equal(200))
-			_ = resp.Body.Close()
+			for _, route := range []string{"/some/spa/route", "/apiculture"} {
+				resp, err := client.Get(fmt.Sprintf("https://localhost:%d%s", cfg.Server.HTTPPort, route))
+				Expect(err).ToNot(HaveOccurred())
+				Expect(resp.StatusCode).To(Equal(200))
+				_ = resp.Body.Close()
+			}
 		})
 
 		// Given a running production server

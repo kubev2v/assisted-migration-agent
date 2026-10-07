@@ -59,7 +59,7 @@ func NewServer(cfg *config.Configuration, groups map[string]APIGroup) (*Server, 
 		engine.StaticFile("/favicon.ico", path.Join(cfg.Server.StaticsFolder, "favicon.ico"))
 
 		engine.NoRoute(func(c *gin.Context) {
-			if strings.HasPrefix(c.Request.URL.Path, "/api") {
+			if c.Request.URL.Path == "/api" || strings.HasPrefix(c.Request.URL.Path, "/api/") {
 				c.JSON(404, gin.H{
 					"error": "API endpoint not found",
 				})

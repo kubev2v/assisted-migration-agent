@@ -78,6 +78,18 @@ bin/agent run \
 | `--log-format` | `console` | `console` \| `json` |
 | `--log-level` | `debug` | `debug` \| `info` \| `warn` \| `error` |
 
+### Browser transport
+
+Use `--server-mode prod` when serving the Agent UI. It serves the UI and both
+API versions from the same HTTPS origin with a self-signed certificate. The
+browser shows a certificate warning that must be accepted before using the UI.
+Browser session authentication requires Secure cookies and this HTTPS origin.
+
+`--server-mode dev` serves the API over HTTP for local development. Use
+production mode when testing browser sessions. The `--authentication-enabled`
+flag controls Agent-to-console authentication; it does not control browser
+authentication.
+
 ## Development
 
 ### Local Setup
