@@ -86,7 +86,7 @@ func (c *Crypto) Hash(password string) (string, error) {
 
 func (c *Crypto) Verify(password, encodedHash string) (bool, error) {
 	components := strings.Split(encodedHash, "$")
-	if len(components) != 6 {
+	if len(components) != 6 || components[0] != "" {
 		return false, errors.New("invalid hash format structure")
 	}
 
@@ -110,6 +110,9 @@ func (c *Crypto) Verify(password, encodedHash string) (bool, error) {
 	}
 
 	// Decode salt component
+	if len(components[4]) != base64.RawStdEncoding.EncodedLen(int(c.saltSize)) {
+		return false, errors.New("unexpected salt length")
+	}
 	salt, err := base64.RawStdEncoding.DecodeString(components[4])
 	if err != nil {
 		return false, fmt.Errorf("salt decoding failed: %w", err)
@@ -119,6 +122,9 @@ func (c *Crypto) Verify(password, encodedHash string) (bool, error) {
 	}
 
 	// Decode hash component
+	if len(components[5]) != base64.RawStdEncoding.EncodedLen(int(c.keyLength)) {
+		return false, errors.New("unexpected hash length")
+	}
 	hash, err := base64.RawStdEncoding.DecodeString(components[5])
 	if err != nil {
 		return false, fmt.Errorf("hash decoding failed: %w", err)

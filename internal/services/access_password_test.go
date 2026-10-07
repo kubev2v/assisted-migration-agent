@@ -148,6 +148,18 @@ func TestReplacePreservesCredentials(t *testing.T) {
 	}
 }
 
+func TestReplaceRequiresExistingPassword(t *testing.T) {
+	svc, _ := newAccessPasswordService(t)
+	ctx := context.Background()
+	if err := svc.Replace(ctx, "password-one"); err == nil {
+		t.Fatal("replacement created a password during first-use setup")
+	}
+	has, err := svc.Has(ctx)
+	if err != nil || has {
+		t.Fatalf("replacement changed initial password state: has=%t err=%v", has, err)
+	}
+}
+
 func TestRejectsInvalidPasswordsAndCorruptHashes(t *testing.T) {
 	svc, st := newAccessPasswordService(t)
 	ctx := context.Background()

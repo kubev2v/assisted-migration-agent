@@ -39,12 +39,14 @@ var _ = Describe("Crypto", func() {
 
 			for _, malformed := range []string{
 				"invalid",
+				"x" + hash,
 				strings.Replace(hash, "m=65536", "m=0", 1),
 				strings.Replace(hash, "t=1", "t=0", 1),
 				strings.Replace(hash, "p=4", "p=0", 1),
 				strings.Replace(hash, "m=65536", "m=65537", 1),
 				strings.Replace(hash, "$argon2id$v=19$", "$argon2id$v=19,extra$", 1),
 				strings.Replace(hash, "$argon2id$v=19$m=65536,t=1,p=4$", "$argon2id$v=19$m=65536,t=1,p=4$YQ$", 1),
+				strings.Replace(hash, "$argon2id$v=19$m=65536,t=1,p=4$", "$argon2id$v=19$m=65536,t=1,p=4$"+strings.Repeat("A", 100), 1),
 			} {
 				_, err := c.Verify("password", malformed)
 				Expect(err).To(HaveOccurred())
