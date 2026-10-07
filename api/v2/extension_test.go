@@ -1,6 +1,7 @@
 package v2_test
 
 import (
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -17,6 +18,25 @@ func TestExtension(t *testing.T) {
 }
 
 var _ = Describe("NewVirtualMachineDetailFromModel", func() {
+	It("serializes empty metadata as an object", func() {
+		detail := v2.NewVirtualMachineDetailFromModel(models.VM{})
+		raw, err := json.Marshal(detail)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(string(raw)).To(ContainSubstring(`"metadata":{}`))
+	})
+
+	It("preserves metadata keys and values", func() {
+		detail := v2.NewVirtualMachineDetailFromModel(models.VM{Metadata: map[string][]string{
+			"Environment": {"Production", "QA"}, "Owner": {"Finance"}, "Team": {"Payments; QA"},
+		}})
+		Expect(detail.Metadata).NotTo(BeNil())
+		entries := *detail.Metadata
+		Expect(entries).To(HaveLen(3))
+		raw, err := json.Marshal(entries)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(string(raw)).To(MatchJSON(`{"Environment":["Production","QA"],"Owner":["Finance"],"Team":["Payments; QA"]}`))
+		Expect(detail.Labels).To(BeNil())
+	})
 	It("should include inspectionStatus when state is not not_started", func() {
 		vm := models.VM{
 			ID:              "vm-1",

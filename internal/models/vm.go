@@ -78,6 +78,7 @@ type VM struct {
 	Groups []string
 
 	GuestApps []GuestApp
+	Metadata  map[string][]string
 }
 
 type GuestApp struct {
@@ -129,6 +130,7 @@ type VMFilterOptions struct {
 	ConcernLabels     []string
 	ConcernCategories []string
 	Applications      []string
+	Metadata          map[string][]string
 }
 
 // Folder represents a VM folder in the vCenter hierarchy.

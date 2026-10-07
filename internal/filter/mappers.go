@@ -73,6 +73,10 @@ import (
 // vm_applications (va) — application.* prefix:
 //
 //	application, application.name, application.description
+//
+// metadata — key/value entries:
+//
+//	metadata.key, metadata.value
 var DefaultMapper filter.MapFunc = func(name string) (string, filter.FieldType, error) {
 	switch strings.ToLower(name) {
 	// vinfo (v) — string fields
@@ -150,6 +154,12 @@ var DefaultMapper filter.MapFunc = func(name string) (string, filter.FieldType, 
 		return `v."labels"`, filter.ArrayField, nil
 	case "groups":
 		return `g.groups`, filter.ArrayField, nil
+
+	// metadata — key/value entries
+	case "metadata.key":
+		return `metadata.key`, filter.StringField, nil
+	case "metadata.value":
+		return `metadata.value`, filter.StringField, nil
 
 	// vdisk (dk) — disk.* prefix
 	case "disk.path":

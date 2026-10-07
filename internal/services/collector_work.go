@@ -173,8 +173,7 @@ func (f *vCenterCollectorWorkFactory) Build() work.WorkBuilder[models.CollectorS
 				}
 				log.Info("vCenter credentials verified")
 
-				// since forklift collector does not expose the client
-				// we need to create a separate client for rightsizing
+				// Forklift does not expose its client; reuse this one for metadata and rightsizing.
 				client, err := vmware.Connect(ctx, &credentials)
 				if err != nil {
 					r.Err = err
@@ -231,7 +230,18 @@ func (f *vCenterCollectorWorkFactory) Build() work.WorkBuilder[models.CollectorS
 					return r, err
 				}
 
+				categories := tagCategoryNames(ctx, r.Client, credentials)
+				if err := saveTagCategoryNames(ctx, st.Querier(), categories); err != nil {
+					r.Err = err
+					return r, err
+				}
 				result, err := parser.IngestSqlite(ctx, r.SQLitePath)
+				if cleanupErr := dropTagCategoryNames(ctx, st.Querier()); cleanupErr != nil {
+					log.Errorw("failed to drop tag category names", "error", cleanupErr)
+					if err == nil {
+						err = cleanupErr
+					}
+				}
 				if err != nil {
 					log.Errorw("failed to ingest sqlite data", "error", err)
 					r.Err = err

@@ -38,6 +38,8 @@ var _ = Describe("VM Mapper Tests", func() {
 			{"datacenter", `v."Datacenter"`},
 			{"cluster", `v."Cluster"`},
 			{"cluster_id", `vc."Object ID"`},
+			{"metadata.key", `metadata.key`},
+			{"metadata.value", `metadata.value`},
 			{"hw_version", `v."HW version"`},
 			{"total_disk_capacity", `d.total_disk`},
 			{"provisioned", `v."Provisioned MiB"`},

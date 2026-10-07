@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	sq "github.com/Masterminds/squirrel"
+	duckdb "github.com/duckdb/duckdb-go/v2"
 	duckdb_models "github.com/kubev2v/migration-planner/pkg/duckdb_parser/models"
 	"go.uber.org/zap"
 
@@ -163,6 +164,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 
 	var pvm duckdb_models.VM
 	var groups StringArray
+	var metadata duckdb.Composite[map[string][]string]
 	var (
 		uMoid                                               sql.NullString
 		uVmName                                             sql.NullString
@@ -192,6 +194,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 		&uCpuAvg, &uCpuP95, &uCpuMax, &uCpuLatest,
 		&uMemAvg, &uMemP95, &uMemMax, &uMemLatest,
 		&uDisk, &uConfidence, &pvm.GuestApps,
+		&metadata,
 		&inspectionState, &inspectionDetails, &inspectionError,
 	); err != nil {
 		return nil, fmt.Errorf("scanning VM %s: %w", id, err)
@@ -202,6 +205,10 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 	}
 
 	result := fromDB(pvm)
+	result.Metadata = metadata.Get()
+	if result.Metadata == nil {
+		result.Metadata = make(map[string][]string)
+	}
 	result.Groups = groups
 	result.InspectionStatus.State = models.InspectionState(inspectionState)
 	result.InspectionStatus.Details = inspectionDetails
@@ -237,7 +244,8 @@ func (s *VMStore) GetFilterOptions(ctx context.Context) (models.VMFilterOptions,
 	row := s.db.QueryRowContext(ctx, vmFilterOptionsQuery)
 
 	var clusters, datacenters, concernLabels, concernCategories, applications StringArray
-	if err := row.Scan(&clusters, &datacenters, &concernLabels, &concernCategories, &applications); err != nil {
+	var metadata duckdb.Composite[map[string][]string]
+	if err := row.Scan(&clusters, &datacenters, &concernLabels, &concernCategories, &applications, &metadata); err != nil {
 		return models.VMFilterOptions{}, err
 	}
 
@@ -247,6 +255,7 @@ func (s *VMStore) GetFilterOptions(ctx context.Context) (models.VMFilterOptions,
 		ConcernLabels:     concernLabels,
 		ConcernCategories: concernCategories,
 		Applications:      applications,
+		Metadata:          metadata.Get(),
 	}, nil
 }
 
@@ -369,7 +378,6 @@ func fromDB(pvm duckdb_models.VM) models.VM {
 			Version: g.Version,
 		})
 	}
-
 	return models.VM{
 		ID:                    pvm.ID,
 		Name:                  pvm.Name,
