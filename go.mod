@@ -1,6 +1,6 @@
 module github.com/kubev2v/assisted-migration-agent
 
-go 1.26.4
+go 1.27
 
 require (
 	github.com/Masterminds/squirrel v1.5.4
