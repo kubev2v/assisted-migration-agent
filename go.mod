@@ -19,7 +19,7 @@ require (
 	github.com/jzelinskie/cobrautil/v2 v2.0.0-20260331224425-513c88b62ffe
 	github.com/kubev2v/forklift v0.0.0-20260812070321-b33d2e55b079
 	github.com/kubev2v/migration-planner v0.26.1-0.20261005134834-27992947c82e
-	github.com/kubev2v/vm-migration-detective v0.0.0-20260908083350-a89447103cf3
+	github.com/kubev2v/vm-migration-detective v0.0.0-20261006023354-140bc9526c2c
 	github.com/oapi-codegen/gin-middleware v1.0.2
 	github.com/oapi-codegen/runtime v1.1.2
 	github.com/onsi/ginkgo/v2 v2.29.0
