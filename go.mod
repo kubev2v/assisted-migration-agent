@@ -1,6 +1,6 @@
 module github.com/kubev2v/assisted-migration-agent
 
-go 1.26.4
+go 1.27.0
 
 require (
 	github.com/Masterminds/squirrel v1.5.4
@@ -222,7 +222,7 @@ require (
 	github.com/secure-systems-lab/go-securesystemslib v0.11.1 // indirect
 	github.com/sigstore/fulcio v1.8.8 // indirect
 	github.com/sigstore/protobuf-specs v0.5.2 // indirect
-	github.com/sigstore/sigstore v1.10.11 // indirect
+	github.com/sigstore/sigstore v1.11.0 // indirect
 	github.com/skeema/knownhosts v1.3.2 // indirect
 	github.com/smallstep/pkcs7 v0.2.1 // indirect
 	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 // indirect
