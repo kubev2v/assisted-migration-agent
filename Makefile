@@ -186,7 +186,7 @@ tidy-check: tidy
 	@echo "✅ go.mod and go.sum are tidy."
 
 ##################### "make lint" support start ##########################
-GOLANGCI_LINT_VERSION := v2.13.2
+GOLANGCI_LINT_VERSION := v2.14.0
 GOLANGCI_LINT := $(GOBIN)/golangci-lint
 
 # Run every time: if installed version != required, remove binary so $(GOLANGCI_LINT) will re-install

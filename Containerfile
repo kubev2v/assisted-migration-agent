@@ -31,6 +31,7 @@ FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/go-toolset AS backen
 
 # Copy go module files first for better caching
 COPY go.mod go.sum ./
+ENV GOTOOLCHAIN=auto
 RUN go mod download
 
 USER 0
