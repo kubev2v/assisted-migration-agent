@@ -26,6 +26,7 @@ spec:
     value: Containerfile.rvtools
   - name: build-platforms
     value:
+    - linux/amd64
     - linux/arm64
   - name: path-context
     value: .
