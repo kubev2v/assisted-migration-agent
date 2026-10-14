@@ -16,6 +16,7 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/services"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
+	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
 // newSyncTestDB creates a migrated collection DuckDB database for sync tests.
@@ -216,24 +217,42 @@ var _ = Describe("Collection sync", func() {
 	})
 
 	Describe("RefreshGroupInventories", func() {
-		It("re-evaluates group filters against new VMs and rebuilds inventory", func() {
+		It("re-evaluates copied groups and saves the new collection date after reopening", func() {
 			newSt, err := newDB.Store()
 			Expect(err).NotTo(HaveOccurred())
 
 			insertSyncTestVM(ctx, newSt, "vm-prod-1", "prod-alpha")
 			_, err = newSt.Querier().ExecContext(ctx, `UPDATE vinfo SET "Cluster" = 'prod' WHERE "VM ID" = 'vm-prod-1'`)
 			Expect(err).NotTo(HaveOccurred())
+			Expect(prevSt.Inventory().Save(ctx, []byte(`{"collection_time":"2026-09-20T10:30:00Z"}`))).To(Succeed())
 
 			groupID := uuid.New()
 			now := time.Now()
-			_, err = newSt.Querier().ExecContext(ctx,
+			_, err = prevSt.Querier().ExecContext(ctx,
 				`INSERT INTO groups (id, name, description, filter, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
 				groupID, "prod-group", "", "cluster = 'prod'", now, now)
 			Expect(err).NotTo(HaveOccurred())
 
-			groupSvc := services.NewGroupService(newSt, &mockInventoryBuilder{})
-			_, err = services.RefreshGroupInventories(ctx, newSt, groupSvc)
-			Expect(err).To(BeNil())
+			detach := attachNew()
+			Expect(services.SyncAttached(ctx, prevSt, attachedSchema, now)).To(Succeed())
+			detach()
+			newSt, err = newDB.Store()
+			Expect(err).NotTo(HaveOccurred())
+			_, err = newSt.Inventory().Get(ctx)
+			Expect(srvErrors.IsResourceNotFoundError(err)).To(BeTrue())
+
+			parser := duckdb_parser.New(newSt.Querier(), nil)
+			_, err = newSt.Querier().ExecContext(ctx, `INSERT INTO about ("CollectionTime") VALUES (?)`, newDB.CreatedAt.UTC())
+			Expect(err).NotTo(HaveOccurred())
+			collectedAt := newDB.CreatedAt.UTC().Truncate(time.Microsecond)
+			groupSvc := services.NewGroupService(newSt, parser)
+			changed, err := services.RefreshGroupInventories(ctx, newSt, groupSvc)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(changed).To(HaveLen(1))
+			Expect(changed[0].Inventory.CollectionTime).To(Equal(&collectedAt))
+			group, err := newSt.Group().Get(ctx, groupID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(group.Inventory.CollectionTime).To(Equal(&collectedAt))
 
 			vmIDs, err := newSt.Group().GetMatchedIDs(ctx, groupID)
 			Expect(err).NotTo(HaveOccurred())

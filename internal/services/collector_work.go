@@ -296,6 +296,11 @@ func (f *vCenterCollectorWorkFactory) Build() work.WorkBuilder[models.CollectorS
 					return r, err
 				}
 
+				if err := st.Inventory().SetCollectionTime(ctx, collectionDb.CreatedAt); err != nil {
+					r.Err = fmt.Errorf("recording collection time: %w", err)
+					return r, r.Err
+				}
+
 				if err := st.Checkpoint(ctx); err != nil {
 					log.Warnw("checkpoint after ingest failed", "error", err)
 					r.Err = fmt.Errorf("checkpoint failed: %w", err)

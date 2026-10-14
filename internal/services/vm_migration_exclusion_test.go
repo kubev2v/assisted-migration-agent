@@ -75,9 +75,12 @@ var _ = Describe("VMService Migration Exclusion", func() {
 		It("should successfully exclude a VM", func() {
 			// Arrange
 			insertVM("vm-1", "Test VM 1", "cluster-a")
+			collectedAt := time.Date(2026, 9, 20, 10, 30, 0, 0, time.UTC)
+			_, err := st.Querier().ExecContext(ctx, `INSERT INTO about ("CollectionTime") VALUES (?)`, collectedAt)
+			Expect(err).NotTo(HaveOccurred())
 
 			// Act
-			err := svc.UpdateMigrationExcluded(ctx, "vm-1", true)
+			err = svc.UpdateMigrationExcluded(ctx, "vm-1", true)
 
 			// Assert
 			Expect(err).NotTo(HaveOccurred())
@@ -91,6 +94,13 @@ var _ = Describe("VMService Migration Exclusion", func() {
 			Expect(vms).To(HaveLen(1))
 			Expect(vms[0].ID).To(Equal("vm-1"))
 			Expect(vms[0].MigrationExcluded).To(BeTrue())
+			saved, err := st.Inventory().Get(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			var inventory struct {
+				CollectionTime *time.Time `json:"collection_time"`
+			}
+			Expect(json.Unmarshal(saved.Data, &inventory)).To(Succeed())
+			Expect(inventory.CollectionTime).To(Equal(&collectedAt))
 
 			// Verify via Get
 			vm, err := svc.Get(ctx, "vm-1")
