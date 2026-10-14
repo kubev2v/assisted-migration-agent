@@ -520,6 +520,12 @@ type Process struct {
 	Version *string `json:"version,omitempty"`
 }
 
+// RDMBacking Source-provided backing identity for an RDM disk; omitted when unavailable
+type RDMBacking struct {
+	// LunUuid LUN UUID reported directly by the RDM disk backing, when available
+	LunUuid *string `json:"lunUuid,omitempty"`
+}
+
 // RightsizingClusterResponse defines model for RightsizingClusterResponse.
 type RightsizingClusterResponse struct {
 	Cluster  RightsizingClusterUtilization `json:"cluster"`
@@ -708,6 +714,39 @@ type VirtualMachine struct {
 	VCenterState string `json:"vCenterState"`
 }
 
+// VirtualMachineDatastore Datastore backing this virtual disk
+type VirtualMachineDatastore struct {
+	// BackingDeviceIds Canonical identifiers for devices backing the datastore (for example, an NAA identifier for a SCSI LUN); may be unavailable for some datastore types
+	BackingDeviceIds *[]string `json:"backingDeviceIds,omitempty"`
+
+	// FilesystemMajorVersion Datastore filesystem major version when available
+	FilesystemMajorVersion *int32 `json:"filesystemMajorVersion,omitempty"`
+
+	// FilesystemType Datastore filesystem type
+	FilesystemType *string `json:"filesystemType,omitempty"`
+
+	// Id Datastore object ID
+	Id *string `json:"id,omitempty"`
+
+	// Model Model reported by matching backing devices when available
+	Model *string `json:"model,omitempty"`
+
+	// Name Datastore name
+	Name *string `json:"name,omitempty"`
+
+	// ProtocolType Backing storage transport protocol when available (for example FC, iSCSI, or NFS)
+	ProtocolType *string `json:"protocolType,omitempty"`
+
+	// StorageProtocol Datastore storage access category when available (Block, File, or Object)
+	StorageProtocol *string `json:"storageProtocol,omitempty"`
+
+	// Type Datastore type (VMFS, NFS, vSAN, vVol)
+	Type *string `json:"type,omitempty"`
+
+	// Vendor Vendor reported by matching backing devices when available
+	Vendor *string `json:"vendor,omitempty"`
+}
+
 // VirtualMachineDetail defines model for VirtualMachineDetail.
 type VirtualMachineDetail struct {
 	// Cluster Cluster name
@@ -825,6 +864,9 @@ type VirtualMachineDisk struct {
 	// Capacity Disk capacity in bytes
 	Capacity *int64 `json:"capacity,omitempty"`
 
+	// Datastore Datastore backing this virtual disk
+	Datastore *VirtualMachineDatastore `json:"datastore,omitempty"`
+
 	// File VMDK file path in the datastore
 	File *string `json:"file,omitempty"`
 
@@ -836,6 +878,9 @@ type VirtualMachineDisk struct {
 
 	// Rdm Whether this is a Raw Device Mapping
 	Rdm *bool `json:"rdm,omitempty"`
+
+	// RdmBacking Source-provided backing identity for an RDM disk; omitted when unavailable
+	RdmBacking *RDMBacking `json:"rdmBacking,omitempty"`
 
 	// Shared Whether the disk is shared between multiple VirtualMachines
 	Shared *bool `json:"shared,omitempty"`

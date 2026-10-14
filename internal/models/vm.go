@@ -94,13 +94,32 @@ type Issue struct {
 }
 
 type Disk struct {
-	Key      int32
-	File     string
-	Capacity int64
-	Shared   bool
-	RDM      bool
-	Bus      string
-	Mode     string
+	Key        int32
+	File       string
+	Capacity   int64
+	Shared     bool
+	RDM        bool
+	RDMBacking *RDMBacking
+	Bus        string
+	Mode       string
+	Datastore  *DiskDatastore
+}
+
+type RDMBacking struct {
+	LunUUID string
+}
+
+type DiskDatastore struct {
+	ID                     string
+	Name                   string
+	Type                   string
+	FilesystemType         string
+	FilesystemMajorVersion int32
+	ProtocolType           string
+	StorageProtocol        string
+	BackingDeviceIDs       []string
+	Vendor                 string
+	Model                  string
 }
 
 type NIC struct {

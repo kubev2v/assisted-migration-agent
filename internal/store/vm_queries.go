@@ -1,13 +1,16 @@
 package store
 
-import sq "github.com/Masterminds/squirrel"
+import (
+	sq "github.com/Masterminds/squirrel"
+	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
+)
 
 // vmGetQuery fetches a single VM by ID with full details (disks, NICs, concerns)
 // plus utilization data from the latest rightsizing report.
 // filtered_vm is resolved first to scope all subsequent CTEs to one VM,
 // preventing full-table aggregations.
 const vmGetQuery = `
-WITH filtered_vm AS (
+filtered_vm AS (
     SELECT * FROM vinfo WHERE "VM ID" = ?
 ),
 metadata_values AS (
@@ -20,6 +23,56 @@ metadata_agg AS (
     SELECT map(list(key ORDER BY key), list(values ORDER BY key)) AS entries
     FROM metadata_values
 ),
+-- Datastores referenced by this VM's disks.
+vm_datastores AS (
+    SELECT ds.*
+    FROM storage_datastores ds
+    WHERE EXISTS (
+        SELECT 1
+        FROM storage_disk_datastores resolved
+        JOIN filtered_vm fv ON resolved."VM ID" = fv."VM ID"
+        WHERE resolved.datastore_row_id = ds.datastore_row_id
+    )
+),
+-- Resolve each datastore backing device's transport and vendor/model through datastore hosts, SCSI LUNs, and HBAs.
+backing_paths AS (
+    SELECT
+        ds.datastore_row_id,
+        CASE
+            WHEN LOWER(TRIM(hba."Protocol")) IN ('fibrechannel', 'fibre channel', 'fc') THEN 'FibreChannel'
+            ELSE NULLIF(TRIM(hba."Protocol"), '')
+        END AS protocol,
+        NULLIF(TRIM(scsi."LUN Vendor"), '') AS vendor,
+        NULLIF(TRIM(scsi."LUN Model"), '') AS model
+    FROM vm_datastores ds
+    CROSS JOIN UNNEST(COALESCE(
+        TRY(from_json(NULLIF(ds."Backing Devices", ''), '["VARCHAR"]')),
+        []::VARCHAR[]
+    )) AS backing(device)
+    JOIN storage_datastore_hosts member_host
+        ON member_host.datastore_row_id = ds.datastore_row_id
+    LEFT JOIN storage_scsi scsi
+        ON scsi."Host ID" = member_host.host_id
+        AND LOWER(TRIM(scsi."Canonical Name")) = LOWER(TRIM(backing.device))
+    LEFT JOIN storage_hbas hba
+        ON hba."Host ID" = scsi."Host ID"
+        AND hba."Device" = scsi."HBA Device"
+),
+-- Aggregate distinct protocols, vendors, and models per datastore, excluding unknown protocols.
+backing_info AS (
+    SELECT
+        datastore_row_id,
+        string_agg(DISTINCT protocol, ', ' ORDER BY protocol)
+            FILTER (WHERE protocol IS NOT NULL AND LOWER(TRIM(protocol)) != 'unknown') AS protocols,
+        string_agg(
+            DISTINCT vendor, ', ' ORDER BY vendor
+        ) FILTER (WHERE vendor IS NOT NULL) AS vendor,
+        string_agg(
+            DISTINCT model, ', ' ORDER BY model
+        ) FILTER (WHERE model IS NOT NULL) AS model
+    FROM backing_paths
+    GROUP BY datastore_row_id
+),
 disks AS (
     SELECT
         dk."VM ID",
@@ -30,6 +83,8 @@ disks AS (
             'Capacity': COALESCE(dk."Capacity MiB", 0),
             'Shared': dk."Sharing mode",
             'RDM': dk."Raw",
+            -- Row JSON keeps older read-only collections without this column queryable.
+            'RDMLunUUID': to_json(dk)->>'RDM LUN UUID',
             'Bus': dk."Shared Bus",
             'Mode': dk."Disk Mode",
             'Serial': dk."Disk UUID",
@@ -37,11 +92,32 @@ disks AS (
             'Controller': dk."Controller",
             'Label': dk."Label",
             'SCSIUnit': dk."SCSI Unit #",
-            'Datastore': COALESCE(ds."Object ID", '')
+            'Datastore': COALESCE(ds."Object ID", ''),
+            'DatastoreName': COALESCE(ds."Name", ''),
+            'DatastoreType': COALESCE(ds."Type", ''),
+            'DatastoreFilesystemType': COALESCE(to_json(ds)->>'Filesystem Type', ''),
+            'DatastoreFilesystemMajorVersion': COALESCE(TRY_CAST(to_json(ds)->>'Filesystem Major Version' AS INTEGER), 0),
+            'DatastoreStorageProtocol': COALESCE(
+                NULLIF(backing_info.protocols, ''),
+                CASE
+                    WHEN LOWER(TRIM(to_json(ds)->>'Storage Protocol')) IN ('fibrechannel', 'fibre channel', 'fc') THEN 'FibreChannel'
+                    ELSE NULLIF(TRIM(to_json(ds)->>'Storage Protocol'), '')
+                END,
+                ''
+            ),
+            'DatastoreBackingDeviceIDs': COALESCE(
+                TRY(from_json(NULLIF(ds."Backing Devices", ''), '["VARCHAR"]')),
+                []::VARCHAR[]
+            ),
+            'DatastoreVendor': COALESCE(backing_info.vendor, ''),
+            'DatastoreModel': COALESCE(backing_info.model, '')
         }) AS disks
     FROM vdisk dk
     JOIN filtered_vm fv ON dk."VM ID" = fv."VM ID"
-    LEFT JOIN vdatastore ds ON ds."Name" = regexp_extract(COALESCE(dk."Path", dk."Disk Path"), '\[([^\]]+)\]', 1)
+    LEFT JOIN storage_disk_datastores resolved
+        ON resolved.disk_row_id = dk.rowid AND resolved."VM ID" = dk."VM ID"
+    LEFT JOIN storage_datastores ds ON ds.datastore_row_id = resolved.datastore_row_id
+    LEFT JOIN backing_info ON backing_info.datastore_row_id = ds.datastore_row_id
     GROUP BY dk."VM ID"
 ),
 nics AS (
@@ -239,7 +315,11 @@ var vmFilterSubquery = sq.Select(`DISTINCT v."VM ID"`).
 	LeftJoin(`(SELECT "VM_ID", COUNT(*) AS issues_count FROM concerns GROUP BY "VM_ID") cc ON v."VM ID" = cc."VM_ID"`).
 	LeftJoin(`(SELECT "VM_ID", COUNT(*) AS critical_count FROM concerns WHERE "Category" = 'Critical' GROUP BY "VM_ID") crit ON v."VM ID" = crit."VM_ID"`).
 	LeftJoin(`(SELECT "VM ID", SUM("Capacity MiB") AS total_disk FROM vdisk GROUP BY "VM ID") d ON v."VM ID" = d."VM ID"`).
-	LeftJoin(`vdatastore ds ON ds."Name" = regexp_extract(COALESCE(dk."Path", dk."Disk Path"), '\[([^\]]+)\]', 1)`).
+	LeftJoin(`(WITH ` + duckdb_parser.DatastoreResolutionQuery() + `
+		SELECT ds.*, resolved.disk_row_id, resolved."VM ID" AS resolved_vm_id
+		FROM storage_disk_datastores resolved
+		JOIN storage_datastores ds ON ds.datastore_row_id = resolved.datastore_row_id
+	) ds ON ds.disk_row_id = dk.rowid AND ds.resolved_vm_id = v."VM ID"`).
 	LeftJoin(`vm_inspection_concerns ic ON v."VM ID" = ic."VM ID" AND ic.inspection_id = (SELECT MAX(inspection_id) FROM vm_inspection_concerns imx WHERE imx."VM ID" = v."VM ID")`).
 	LeftJoin(`(
 SELECT moid, vm_name,

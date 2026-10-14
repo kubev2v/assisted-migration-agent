@@ -11,6 +11,7 @@ import (
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/provider/container/vsphere"
 	"github.com/kubev2v/forklift/pkg/controller/provider/model"
+	vspheremodel "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	webprovider "github.com/kubev2v/forklift/pkg/controller/provider/web"
 	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
 	web "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
@@ -67,6 +68,13 @@ func (c *VSphereCollector) Collect(ctx context.Context, creds *models.Credential
 		return err
 	}
 	c.container = container
+
+	datastoreCount, err := db.Count(&vspheremodel.Datastore{}, nil)
+	if err != nil {
+		zap.S().Warnw("failed to count collected vSphere datastores", "error", err)
+	} else {
+		zap.S().Infow("Forklift datastore records collected", "count", datastoreCount)
+	}
 
 	zap.S().Info("forklift vSphere collection completed (parity reached)")
 	return nil
