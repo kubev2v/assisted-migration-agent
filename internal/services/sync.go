@@ -75,6 +75,9 @@ func RefreshGroupInventories(ctx context.Context, newSt *store.Store, groupSvc *
 				if err != nil {
 					return fmt.Errorf("building filtered inventory: %w", err)
 				}
+				if err := preserveCollectionTime(txCtx, newSt, inv); err != nil {
+					return err
+				}
 			}
 
 			if err := newSt.Group().UpdateInventory(txCtx, g.ID, inv); err != nil {
