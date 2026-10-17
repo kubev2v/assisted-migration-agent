@@ -156,8 +156,8 @@ github.com/duckdb/duckdb-go/mapping v0.0.27 h1:QEta+qPEKmfhd89U8vnm4MVslj1Uscmky
 github.com/duckdb/duckdb-go/mapping v0.0.27/go.mod h1:7C4QWJWG6UOV9b0iWanfF5ML1ivJPX45Kz+VmlvRlTA=
 github.com/duckdb/duckdb-go/v2 v2.5.4 h1:+ip+wPCwf7Eu/dXxp19aLCxwpLUaeOy2UV/peBphXK0=
 github.com/duckdb/duckdb-go/v2 v2.5.4/go.mod h1:CeobOFmWpf7MTDb+MW08/zIWP8TQ2jbPbMgGo5761tY=
-github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=
-github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
+github.com/dustin/go-humanize v1.1.0 h1:dbKTrvD0klcbBV/h4AWJdMuZogJACoMlvWIWZ5b2xWg=
+github.com/dustin/go-humanize v1.1.0/go.mod h1:hc1CvRkJMsgxqjmjMQF3QNRAZBwY8AXBAzKYoSX9sFI=
 github.com/ecordell/optgen v0.1.1 h1:ovcjYgTfxQzDgNVTVfr+ziHBfoCcetsar6v/gE93ezs=
 github.com/ecordell/optgen v0.1.1/go.mod h1:+YZ4tk5pNGMoeH+Y4F4HeDDj0SLOlIgMMNae7az4h5g=
 github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153/go.mod h1:/Zj4wYkgs4iZTTu3o/KG3Itv/qCCa8VVMlb3i9OVuzc=
