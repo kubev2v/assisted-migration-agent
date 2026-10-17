@@ -22,16 +22,17 @@ type ServiceManager struct {
 	keyMgr        *crypto.KeyManager
 	pool          *store.Pool
 
-	console     *Console
-	collection  *CollectionService
-	credentials *CredentialsService
-	mu          sync.Mutex
-	inspector   *InspectorService
-	vddk        *VddkService
-	forecaster  *ForecasterService
-	validator   *opa.Validator
-	collector   *CollectorService
-	workBuilder CollectorWorkBuilder
+	console        *Console
+	collection     *CollectionService
+	credentials    *CredentialsService
+	accessPassword *AccessPasswordService
+	mu             sync.Mutex
+	inspector      *InspectorService
+	vddk           *VddkService
+	forecaster     *ForecasterService
+	validator      *opa.Validator
+	collector      *CollectorService
+	workBuilder    CollectorWorkBuilder
 }
 
 type ServiceManagerOption func(*ServiceManager)
@@ -114,6 +115,7 @@ func (m *ServiceManager) Initialize() error {
 
 	m.credentials = NewCredentialsService(mainStore)
 	m.credentials.WithKeyManager(m.keyMgr)
+	m.accessPassword = NewAccessPasswordService(mainStore.AccessPassword())
 
 	m.vddk = NewVddkService(m.cfg.Agent.DataFolder, m.pool)
 
@@ -257,6 +259,10 @@ func (m *ServiceManager) CollectionService() *CollectionService {
 
 func (m *ServiceManager) CredentialsService() *CredentialsService {
 	return m.credentials
+}
+
+func (m *ServiceManager) AccessPasswordService() *AccessPasswordService {
+	return m.accessPassword
 }
 
 func (m *ServiceManager) ConsoleService() *Console {
