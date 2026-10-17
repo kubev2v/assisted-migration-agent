@@ -73,6 +73,10 @@ import (
 // vm_applications (va) — application.* prefix:
 //
 //	application, application.name, application.description
+//
+// metadata — key/value entries:
+//
+//	metadata.key, metadata.value
 var DefaultMapper filter.MapFunc = func(name string) (string, filter.FieldType, error) {
 	switch strings.ToLower(name) {
 	// vinfo (v) — string fields
@@ -150,6 +154,12 @@ var DefaultMapper filter.MapFunc = func(name string) (string, filter.FieldType, 
 		return `v."labels"`, filter.ArrayField, nil
 	case "groups":
 		return `g.groups`, filter.ArrayField, nil
+
+	// metadata — key/value entries
+	case "metadata.key":
+		return `metadata.key`, filter.StringField, nil
+	case "metadata.value":
+		return `metadata.value`, filter.StringField, nil
 
 	// vdisk (dk) — disk.* prefix
 	case "disk.path":
@@ -377,7 +387,19 @@ var ApplicationMapper filter.MapFunc = func(name string) (string, filter.FieldTy
 // ParseWithDefaultMap parses a filter expression using the DefaultMapper (VM fields).
 // This is a convenience wrapper around filter.Parse() for VM filtering operations.
 func ParseWithDefaultMap(src []byte) (sq.Sqlizer, error) {
-	return filter.Parse(src, DefaultMapper)
+	usesMetadata := false
+	mapper := func(name string) (string, filter.FieldType, error) {
+		column, fieldType, err := DefaultMapper(name)
+		if err == nil && (column == "metadata.key" || column == "metadata.value") {
+			usesMetadata = true
+		}
+		return column, fieldType, err
+	}
+	parsed, err := filter.Parse(src, mapper)
+	if err != nil {
+		return nil, err
+	}
+	return vmFilter{Sqlizer: parsed, metadata: usesMetadata}, nil
 }
 
 // ParseWithGroupMap parses a filter expression using the GroupMapper (group fields).
@@ -402,4 +424,30 @@ func ParseWithCollectionMap(src []byte) (sq.Sqlizer, error) {
 // This is a convenience wrapper around filter.Parse() for application filtering operations.
 func ParseWithApplicationMap(src []byte) (sq.Sqlizer, error) {
 	return filter.Parse(src, ApplicationMapper)
+}
+
+type vmFilter struct {
+	sq.Sqlizer
+	metadata bool
+}
+
+// UsesMetadata reports whether a parsed VM filter references a metadata field.
+func UsesMetadata(filter sq.Sqlizer) bool {
+	switch parsed := filter.(type) {
+	case vmFilter:
+		return parsed.metadata
+	case sq.And:
+		for _, child := range parsed {
+			if UsesMetadata(child) {
+				return true
+			}
+		}
+	case sq.Or:
+		for _, child := range parsed {
+			if UsesMetadata(child) {
+				return true
+			}
+		}
+	}
+	return false
 }

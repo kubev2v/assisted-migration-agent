@@ -590,6 +590,9 @@ type VMFilterOptionsResponse struct {
 
 	// Datacenters Distinct datacenter names
 	Datacenters []string `json:"datacenters"`
+
+	// Metadata Distinct metadata values grouped by key, available for VM filtering.
+	Metadata map[string][]string `json:"metadata"`
 }
 
 // VMLabelsResponse defines model for VMLabelsResponse.
@@ -765,6 +768,9 @@ type VirtualMachineDetail struct {
 
 	// MemoryMB Memory in megabytes
 	MemoryMB int32 `json:"memoryMB"`
+
+	// Metadata Tags and custom attributes collected from vCenter or RVTools, grouped by tag category name, custom attribute name, or RVTools column header. Empty object when absent. vCenter tags with unresolved category names are omitted.
+	Metadata *map[string][]string `json:"metadata,omitempty"`
 
 	// Migratable Whether the VirtualMachine can be migrated
 	Migratable *bool `json:"migratable,omitempty"`

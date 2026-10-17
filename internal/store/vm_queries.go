@@ -1,6 +1,12 @@
 package store
 
-import sq "github.com/Masterminds/squirrel"
+import (
+	"context"
+
+	sq "github.com/Masterminds/squirrel"
+
+	vmfilter "github.com/kubev2v/assisted-migration-agent/internal/filter"
+)
 
 // vmGetQuery fetches a single VM by ID with full details (disks, NICs, concerns)
 // plus utilization data from the latest rightsizing report.
@@ -9,6 +15,16 @@ import sq "github.com/Masterminds/squirrel"
 const vmGetQuery = `
 WITH filtered_vm AS (
     SELECT * FROM vinfo WHERE "VM ID" = ?
+),
+metadata_values AS (
+    SELECT metadata.key, list(metadata.value ORDER BY metadata.value) AS values
+    FROM vm_metadata metadata
+    JOIN filtered_vm fv ON metadata.vm_id = fv."VM ID"
+    GROUP BY metadata.key
+),
+metadata_agg AS (
+    SELECT map(list(key ORDER BY key), list(values ORDER BY key)) AS entries
+    FROM metadata_values
 ),
 disks AS (
     SELECT
@@ -136,10 +152,12 @@ SELECT
     u.disk_pct,
     u.confidence_pct,
     COALESCE(i."guest_apps", '[]') AS "GuestApps",
+    COALESCE(metadata.entries, map()) AS "Metadata",
     COALESCE(ins.status, 'not_started') AS "InspectionState",
     COALESCE(ins.details, '') AS "InspectionDetails",
     COALESCE(ins.error, '') AS "InspectionError"
 FROM filtered_vm i
+CROSS JOIN metadata_agg metadata
 LEFT JOIN vcpu c ON i."VM ID" = c."VM ID"
 LEFT JOIN vmemory m ON i."VM ID" = m."VM ID"
 LEFT JOIN disks d ON i."VM ID" = d."VM ID"
@@ -157,8 +175,7 @@ LEFT JOIN vm_inspection_status ins ON i."VM ID" = ins."VM ID"
 
 `
 
-// vmFilterOptionsQuery returns distinct clusters, datacenters, concern labels,
-// and concern categories in a single row.
+// vmFilterOptionsQuery returns distinct values available for VM filters.
 const vmFilterOptionsQuery = `
 SELECT
     (SELECT COALESCE(list(DISTINCT "Cluster" ORDER BY "Cluster"), [])
@@ -170,7 +187,13 @@ SELECT
     (SELECT COALESCE(list(DISTINCT "Category" ORDER BY "Category"), [])
      FROM concerns WHERE "Category" IS NOT NULL AND "Category" != '') AS concern_categories,
     (SELECT COALESCE(list(DISTINCT app_name ORDER BY app_name), [])
-     FROM vm_applications) AS applications
+     FROM vm_applications) AS applications,
+    (SELECT COALESCE(map(list(key ORDER BY key), list(values ORDER BY key)), map())
+     FROM (
+         SELECT metadata.key, list(DISTINCT metadata.value ORDER BY metadata.value) AS values
+         FROM vm_metadata metadata
+         GROUP BY metadata.key
+     ) entries) AS metadata
 `
 
 // vmOutputQuery is the base aggregated output query that produces one row per VM.
@@ -207,7 +230,7 @@ var vmOutputQuery = sq.Select(
 	) g ON v."VM ID" = g.vm_id`)
 
 // vmFilterSubquery is the base flat JOIN query for filtering.
-// It joins all tables so WHERE clauses can reference any raw column.
+// Metadata is joined only when the filter references it.
 // Filters should be applied via Where clauses, then use the result to get DISTINCT VM IDs.
 var vmFilterSubquery = sq.Select(`DISTINCT v."VM ID"`).
 	From("vinfo v").
@@ -243,3 +266,15 @@ WHERE report_id = (
 		, UNNEST(gm.vm_ids) AS u(vm_id)
 		GROUP BY u.vm_id
 	) g ON v."VM ID" = g.vm_id`)
+
+func buildVMFilterQuery(ctx context.Context, db QueryInterceptor, filter sq.Sqlizer) (string, []any, error) {
+	query := vmFilterSubquery
+	if vmfilter.UsesMetadata(filter) {
+		table, err := metadataQuery(ctx, db, "vm_metadata")
+		if err != nil {
+			return "", nil, err
+		}
+		query = query.LeftJoin(table + ` metadata ON metadata.vm_id = v."VM ID"`)
+	}
+	return query.Where(filter).ToSql()
+}
