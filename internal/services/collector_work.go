@@ -143,6 +143,9 @@ func (f *vCenterCollectorWorkFactory) Build() work.WorkBuilder[models.CollectorS
 					if err := parser.Init(); err != nil {
 						return err
 					}
+					if err := parser.SetCollectionTime(ctx, &collectionDb.CreatedAt); err != nil {
+						return err
+					}
 
 					return migrations.RunCollection(ctx, sqlDb, database)
 				}); err != nil {
@@ -450,6 +453,10 @@ func (f *vCenterCollectorWorkFactory) Build() work.WorkBuilder[models.CollectorS
 				}
 
 				parser = duckdb_parser.New(newSt.Querier(), f.validator)
+				if err := parser.SetCollectionTime(ctx, &collectionDb.CreatedAt); err != nil {
+					result.Err = fmt.Errorf("setting collection time: %w", err)
+					return result, result.Err
+				}
 
 				changedGroups, err := RefreshGroupInventories(ctx, newSt, NewGroupService(newSt, parser))
 				if err != nil {

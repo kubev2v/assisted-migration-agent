@@ -185,6 +185,9 @@ func (s *VMService) buildAndSaveMainInventory(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("building main inventory: %w", err)
 	}
+	if err := preserveCollectionTime(ctx, s.store, mainInventory); err != nil {
+		return err
+	}
 
 	mainInventoryData, err := json.Marshal(converters.ToAPI(mainInventory))
 	if err != nil {
@@ -211,6 +214,9 @@ func (s *VMService) buildAndSaveGroupInventory(ctx context.Context, groupID uuid
 		inv, err = duckdb_parser.New(s.store.Querier(), nil).BuildInventory(ctx, vmIDs)
 		if err != nil {
 			return fmt.Errorf("building inventory for group %s: %w", groupID, err)
+		}
+		if err := preserveCollectionTime(ctx, s.store, inv); err != nil {
+			return err
 		}
 	}
 

@@ -146,6 +146,9 @@ func (s *GroupService) Create(ctx context.Context, group models.Group) (*models.
 		if err != nil {
 			return fmt.Errorf("building filtered inventory: %w", err)
 		}
+		if err := preserveCollectionTime(txCtx, s.store, inv); err != nil {
+			return err
+		}
 
 		if err := s.store.Group().UpdateInventory(txCtx, created.ID, inv); err != nil {
 			return fmt.Errorf("updating group inventory: %w", err)
@@ -203,6 +206,9 @@ func (s *GroupService) Update(ctx context.Context, id uuid.UUID, group models.Gr
 		inv, err := s.inventoryBuilder.BuildInventory(txCtx, vmIDs)
 		if err != nil {
 			return fmt.Errorf("building filtered inventory: %w", err)
+		}
+		if err := preserveCollectionTime(txCtx, s.store, inv); err != nil {
+			return err
 		}
 
 		if err := s.store.Group().UpdateInventory(txCtx, id, inv); err != nil {
