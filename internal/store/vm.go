@@ -171,6 +171,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 	var pvm duckdb_models.VM
 	var groups StringArray
 	var metadata duckdb.Composite[map[string][]string]
+	var annotation string
 	var (
 		uMoid                                               sql.NullString
 		uVmName                                             sql.NullString
@@ -184,7 +185,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 	)
 
 	if err := rows.Scan(
-		&pvm.ID, &pvm.Name, &pvm.Folder, &pvm.Host, &pvm.UUID,
+		&pvm.ID, &pvm.Name, &annotation, &pvm.Folder, &pvm.Host, &pvm.UUID,
 		&pvm.Firmware, &pvm.PowerState, &pvm.ConnectionState,
 		&pvm.FaultToleranceEnabled, &pvm.CpuCount, &pvm.MemoryMB,
 		&pvm.GuestName, &pvm.GuestNameFromVmwareTools, &pvm.HostName,
@@ -211,6 +212,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 	}
 
 	result := fromDB(pvm)
+	result.Annotation = annotation
 	result.Metadata = metadata.Get()
 	if result.Metadata == nil {
 		result.Metadata = make(map[string][]string)

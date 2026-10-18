@@ -31,6 +31,7 @@ type VM struct {
 	NICCount        int32
 	ID              string
 	Name            string
+	Annotation      string
 	VCenterID       string
 	UUID            string
 	Firmware        string
