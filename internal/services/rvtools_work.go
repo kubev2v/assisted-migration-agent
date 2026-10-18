@@ -128,7 +128,14 @@ func (f *rvtoolsWorkFactory) Build() work.WorkBuilder[models.CollectorStatus, mo
 
 				if result.HasErrors() {
 					log.Errorw("rvtools validation failed", "file", file, "errors", result.Errors)
-					r.Err = fmt.Errorf("validation failed for %s: %v", file, result.Errors)
+					issue := result.Errors[0]
+					switch issue.Code {
+					case duckdb_parser.CodeNoVMs, duckdb_parser.CodeMissingVMID, duckdb_parser.CodeMissingVMName,
+						duckdb_parser.CodeMissingCluster, duckdb_parser.CodeMissingVISDKUUID:
+						r.Err = fmt.Errorf("RVTools validation failed: %s", issue.Message)
+					default:
+						r.Err = fmt.Errorf("RVTools file could not be validated")
+					}
 					return r, r.Err
 				}
 
