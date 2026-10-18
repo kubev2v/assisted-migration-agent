@@ -30,6 +30,7 @@ type VirtualMachineSummary struct {
 type VM struct {
 	ID              string
 	Name            string
+	Annotation      string
 	VCenterID       string
 	UUID            string
 	Firmware        string
