@@ -356,6 +356,36 @@ const networkQuery = `
 	
 `
 
+// disksQuery — scope "disks": one row per stored virtual disk with its VM identity.
+const disksQuery = `
+		COPY (
+			SELECT
+				COALESCE(v."VM", '') AS vm_name,
+				d."VM ID" AS vm_id,
+				COALESCE(v."Datacenter", '') AS datacenter,
+				COALESCE(v."Cluster", '') AS cluster,
+				COALESCE(v."Host", '') AS host,
+				COALESCE(d."Disk Key", '') AS disk_key,
+				COALESCE(d."Unit #", '') AS unit_number,
+				COALESCE(d."Path", '') AS path,
+				COALESCE(d."Disk Path", '') AS disk_path,
+				COALESCE(d."Capacity MiB", 0) AS capacity_mib,
+				COALESCE(d."Sharing mode", false) AS sharing_mode,
+				COALESCE(d."Raw", false) AS raw,
+				COALESCE(d."Shared Bus", '') AS shared_bus,
+				COALESCE(d."Disk Mode", '') AS disk_mode,
+				COALESCE(d."Disk UUID", '') AS disk_uuid,
+				COALESCE(d."Thin", false) AS thin,
+				COALESCE(d."Controller", '') AS controller,
+				COALESCE(d."Label", '') AS label,
+				COALESCE(d."SCSI Unit #", '') AS scsi_unit_number
+			FROM vdisk d
+			LEFT JOIN vinfo v ON d."VM ID" = v."VM ID"
+			ORDER BY v."VM", d."VM ID", TRY_CAST(d."Disk Key" AS BIGINT), d."Disk Key",
+				TRY_CAST(d."Unit #" AS BIGINT), d."Unit #", d."Path", d."Disk Path"
+		) TO ? (FORMAT CSV, HEADER TRUE)
+`
+
 // applicationsQuery — scope "applications": detected applications rolled up with VM count and id list.
 const applicationsQuery = `
 
@@ -556,6 +586,7 @@ var exportScopes = map[string]exportScopeSpec{
 	"datastores":       {filename: "datastores.csv", query: datastoresQuery},
 	"vms":              {filename: "vms.csv", query: vmsQuery},
 	"network":          {filename: "networks.csv", query: networkQuery},
+	"disks":            {filename: "disks.csv", query: disksQuery},
 	"applications":     {filename: "applications.csv", query: applicationsQuery},
 	"groups":           {filename: "groups.csv", query: groupsQuery},
 	"inspection":       {filename: "inspection.csv", query: inspectionQuery},

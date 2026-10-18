@@ -145,6 +145,7 @@ var sheetNames = map[string]string{
 	"datastores":       "Datastores",
 	"vms":              "VMs",
 	"network":          "Networks",
+	"disks":            "Virtual Disks",
 	"applications":     "Applications",
 	"groups":           "Groups",
 	"inspection":       "Inspection",
