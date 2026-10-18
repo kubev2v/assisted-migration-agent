@@ -18,6 +18,23 @@ func TestExtension(t *testing.T) {
 }
 
 var _ = Describe("NewVirtualMachineDetailFromModel", func() {
+	DescribeTable("serializes an optional annotation using the singular JSON field", func(annotation string) {
+		detail := v2.NewVirtualMachineDetailFromModel(models.VM{Annotation: annotation})
+		raw, err := json.Marshal(detail)
+		Expect(err).NotTo(HaveOccurred())
+		var fields map[string]any
+		Expect(json.Unmarshal(raw, &fields)).To(Succeed())
+		Expect(fields).NotTo(HaveKey("annotations"))
+		if annotation == "" {
+			Expect(fields).NotTo(HaveKey("annotation"))
+		} else {
+			Expect(fields).To(HaveKeyWithValue("annotation", annotation))
+		}
+	},
+		Entry("reported annotation", "Database VM notes"),
+		Entry("unavailable annotation", ""),
+	)
+
 	It("serializes empty metadata as an object", func() {
 		detail := v2.NewVirtualMachineDetailFromModel(models.VM{})
 		raw, err := json.Marshal(detail)

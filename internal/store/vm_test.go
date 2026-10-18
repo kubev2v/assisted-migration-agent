@@ -3,6 +3,7 @@ package store_test
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"time"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
 
+	v2 "github.com/kubev2v/assisted-migration-agent/agent/api/v2"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
@@ -887,6 +889,44 @@ var _ = Describe("VMStore", func() {
 			err := test.InsertVMs(ctx, db)
 			Expect(err).NotTo(HaveOccurred())
 		})
+
+		DescribeTable("preserves annotation and VM identity fields in the API response", func(annotation sql.NullString, expected string) {
+			insertVMWithFolder("vm-annotation", "annotation-vm-name", "folder-annotation", "annotation-folder-name")
+			_, err := s.Querier().ExecContext(ctx, `
+				UPDATE vinfo SET "Annotation" = ?, "Host" = ?, "SMBIOS UUID" = ? WHERE "VM ID" = ?
+			`, annotation, "annotation-host", "annotation-uuid", "vm-annotation")
+			Expect(err).NotTo(HaveOccurred())
+
+			vm, err := s.VM().Get(ctx, "vm-annotation")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vm.Annotation).To(Equal(expected))
+			Expect(vm.ID).To(Equal("vm-annotation"))
+			Expect(vm.Name).To(Equal("annotation-vm-name"))
+			Expect(vm.Folder).To(Equal("folder-annotation"))
+			Expect(vm.Host).To(Equal("annotation-host"))
+			Expect(vm.UUID).To(Equal("annotation-uuid"))
+
+			raw, err := json.Marshal(v2.NewVirtualMachineDetailFromModel(*vm))
+			Expect(err).NotTo(HaveOccurred())
+			var fields map[string]any
+			Expect(json.Unmarshal(raw, &fields)).To(Succeed())
+			Expect(fields).To(HaveKeyWithValue("id", "vm-annotation"))
+			Expect(fields).To(HaveKeyWithValue("name", "annotation-vm-name"))
+			Expect(fields).To(HaveKeyWithValue("folder", "folder-annotation"))
+			Expect(fields).To(HaveKeyWithValue("host", "annotation-host"))
+			Expect(fields).To(HaveKeyWithValue("uuid", "annotation-uuid"))
+			Expect(fields).NotTo(HaveKey("annotations"))
+			if expected == "" {
+				Expect(fields).NotTo(HaveKey("annotation"))
+			} else {
+				Expect(fields).To(HaveKeyWithValue("annotation", expected))
+			}
+		},
+			Entry("reported annotation", sql.NullString{String: "Database VM notes", Valid: true}, "Database VM notes"),
+			Entry("empty annotation", sql.NullString{Valid: true}, ""),
+			Entry("NULL annotation", sql.NullString{}, ""),
+			Entry("literal VM annotation", sql.NullString{String: "VM", Valid: true}, "VM"),
+		)
 
 		Context("Metadata", func() {
 			BeforeEach(func() {
