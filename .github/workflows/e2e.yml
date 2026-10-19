@@ -8,7 +8,24 @@ on:
     branches: [main, stable]
 
 jobs:
+  config:
+    runs-on: ubuntu-latest
+    outputs:
+      run-code-validations: ${{ steps.filter.outputs.code }}
+    steps:
+      - name: Check out path filters
+        uses: actions/checkout@v4
+
+      - name: Detect whether code validations are needed
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: .github/path-filters.yml
+          predicate-quantifier: 'every'
+
   e2e:
+    needs: [config]
+    if: needs.config.outputs.run-code-validations == 'true'
     runs-on: ubuntu-latest
     name: e2e
     env:
@@ -73,3 +90,30 @@ jobs:
             -podman-socket=${{ env.PODMAN_SOCKET }} \
             -iso-path=${{ github.workspace }}/iso \
             --ginkgo.v
+
+  # Always runs so branch protection can require this single check.
+  required:
+    name: Required e2e validations
+    needs:
+      - config
+      - e2e
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify required jobs
+        env:
+          RUN_CODE: ${{ needs.config.outputs.run-code-validations }}
+          CONFIG: ${{ needs.config.result }}
+          E2E: ${{ needs.e2e.result }}
+        run: |
+          echo "config=$CONFIG e2e=$E2E run_code=$RUN_CODE"
+
+          fail() { echo "::error::$1"; exit 1; }
+
+          [[ "$CONFIG" == success ]] || fail "config did not succeed ($CONFIG)"
+
+          if [[ "$RUN_CODE" == true ]]; then
+            [[ "$E2E" == success ]] || fail "e2e did not succeed ($E2E)"
+          else
+            echo "Only skippable files changed; e2e tests were skipped"
+          fi

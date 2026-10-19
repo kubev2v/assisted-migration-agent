@@ -18,6 +18,7 @@ jobs:
       jira-pattern: ${{ steps.set-config.outputs.jira-pattern }}
       jira-required-types: ${{ steps.set-config.outputs.jira-required-types }}
       bot-authors: ${{ steps.set-config.outputs.bot-authors }}
+      run-code-validations: ${{ steps.filter.outputs.code }}
     steps:
       - id: set-config
         run: |
@@ -25,6 +26,16 @@ jobs:
           echo 'jira-pattern=(ECOPROJECT|OMA)-[0-9]+' >> $GITHUB_OUTPUT
           echo 'jira-required-types=["feat","fix"]' >> $GITHUB_OUTPUT
           echo 'bot-authors=["red-hat-konflux[bot]","dependabot[bot]"]' >> $GITHUB_OUTPUT
+
+      - name: Check out path filters
+        uses: actions/checkout@v4
+
+      - name: Detect whether code validations are needed
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: .github/path-filters.yml
+          predicate-quantifier: 'every'
 
   # Validate commit messages
   validate-commits:
@@ -48,7 +59,8 @@ jobs:
 
   lint:
     name: Lint
-    needs: [validate-commits, validate-pr-title]
+    needs: [config, validate-commits, validate-pr-title]
+    if: needs.config.outputs.run-code-validations == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -64,7 +76,8 @@ jobs:
 
   format-check:
     name: Format Check
-    needs: [validate-commits, validate-pr-title]
+    needs: [config, validate-commits, validate-pr-title]
+    if: needs.config.outputs.run-code-validations == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -80,7 +93,8 @@ jobs:
 
   tidy-check:
     name: Go Mod Tidy Check
-    needs: [validate-commits, validate-pr-title]
+    needs: [config, validate-commits, validate-pr-title]
+    if: needs.config.outputs.run-code-validations == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -95,7 +109,8 @@ jobs:
         run: make tidy-check
 
   check-generate:
-    needs: [validate-commits, validate-pr-title]
+    needs: [config, validate-commits, validate-pr-title]
+    if: needs.config.outputs.run-code-validations == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
@@ -115,7 +130,8 @@ jobs:
 
   verify-build:
     name: Verify Build
-    needs: [validate-commits, validate-pr-title]
+    needs: [config, validate-commits, validate-pr-title]
+    if: needs.config.outputs.run-code-validations == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -130,7 +146,8 @@ jobs:
         run: make build
 
   unit-test:
-    needs: [validate-commits, validate-pr-title]
+    needs: [config, validate-commits, validate-pr-title]
+    if: needs.config.outputs.run-code-validations == 'true'
     runs-on: ubuntu-latest
     steps:
     - name: Check out code
@@ -143,3 +160,55 @@ jobs:
 
     - name: Run the tests
       run: make test
+
+  # Always runs so branch protection can require this single check.
+  # Skipped jobs count as success, but a failed commit check would also skip
+  # them — this job fails unless commit/title checks passed and, when code
+  # changed, the code validations passed.
+  required:
+    name: Required validations
+    needs:
+      - config
+      - validate-commits
+      - validate-pr-title
+      - lint
+      - format-check
+      - tidy-check
+      - check-generate
+      - verify-build
+      - unit-test
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify required jobs
+        env:
+          RUN_CODE: ${{ needs.config.outputs.run-code-validations }}
+          CONFIG: ${{ needs.config.result }}
+          COMMITS: ${{ needs.validate-commits.result }}
+          TITLE: ${{ needs.validate-pr-title.result }}
+          LINT: ${{ needs.lint.result }}
+          FORMAT: ${{ needs.format-check.result }}
+          TIDY: ${{ needs.tidy-check.result }}
+          GENERATE: ${{ needs.check-generate.result }}
+          BUILD: ${{ needs.verify-build.result }}
+          TEST: ${{ needs.unit-test.result }}
+        run: |
+          echo "config=$CONFIG commits=$COMMITS title=$TITLE run_code=$RUN_CODE"
+          echo "lint=$LINT format=$FORMAT tidy=$TIDY generate=$GENERATE build=$BUILD test=$TEST"
+
+          fail() { echo "::error::$1"; exit 1; }
+
+          [[ "$CONFIG" == success ]] || fail "config did not succeed ($CONFIG)"
+          [[ "$COMMITS" == success ]] || fail "validate-commits did not succeed ($COMMITS)"
+          [[ "$TITLE" == success ]] || fail "validate-pr-title did not succeed ($TITLE)"
+
+          if [[ "$RUN_CODE" == true ]]; then
+            [[ "$LINT" == success ]] || fail "lint did not succeed ($LINT)"
+            [[ "$FORMAT" == success ]] || fail "format-check did not succeed ($FORMAT)"
+            [[ "$TIDY" == success ]] || fail "tidy-check did not succeed ($TIDY)"
+            [[ "$GENERATE" == success ]] || fail "check-generate did not succeed ($GENERATE)"
+            [[ "$BUILD" == success ]] || fail "verify-build did not succeed ($BUILD)"
+            [[ "$TEST" == success ]] || fail "unit-test did not succeed ($TEST)"
+          else
+            echo "Only skippable files changed; code validations were skipped"
+          fi
