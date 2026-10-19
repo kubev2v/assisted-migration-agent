@@ -2,7 +2,7 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "description": "Renovate configuration for assisted-migration-agent",
   "extends": [
-    "config:recommended"
+    "github>kubev2v/migration-planner-workflows//renovate-config/default.json"
   ],
   "postUpdateOptions": [
     "gomodTidy"
