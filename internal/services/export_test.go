@@ -118,3 +118,88 @@ var _ = Describe("Virtual disk export", func() {
 		Entry("empty Excel", "xlsx", false),
 	)
 })
+
+var _ = Describe("Guest process export", func() {
+	var (
+		ctx  context.Context
+		pool *store.Pool
+		st   *store.Store
+		svc  *services.ExportService
+	)
+
+	BeforeEach(func() {
+		ctx = context.Background()
+		pool = store.NewPool(5 * time.Minute)
+		db, err := pool.NewDatabase("export", filepath.Join(GinkgoT().TempDir(), "collection.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		Expect(err).NotTo(HaveOccurred())
+		pool.Add(db)
+		DeferCleanup(pool.Close)
+		st, err = db.Store()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(duckdb_parser.New(st.Querier(), nil).Init()).To(Succeed())
+		Expect(db.Migrate(ctx, func(ctx context.Context, sqlDB *sql.DB) error {
+			return migrations.RunCollection(ctx, sqlDB, "collection")
+		})).To(Succeed())
+		svc = services.NewExportService(st)
+	})
+
+	DescribeTable("exports guest processes alongside overview", func(format string, populated bool) {
+		Expect(svc.SupportedScopes()).To(ContainElement("processes"))
+		Expect(svc.IsValidScope("processes")).To(BeTrue())
+
+		expected := [][]string{{"vm_name", "vm_id", "cluster", "process_name"}}
+		if populated {
+			_, err := st.Querier().ExecContext(ctx, `
+				INSERT INTO vinfo ("VM ID", "VM", "Cluster", "Template", "guest_apps")
+				VALUES ('vm-1', '=inventory', 'cluster', false,
+					'[{"name":"nginx","version":"1.25"},{"name":"=calc","version":""},{"name":""}]'),
+				       ('vm-2', 'other-vm', NULL, false, '[{"name":"sshd","version":"9.0"}]'),
+				       ('vm-3', 'empty-apps', 'cluster', false, '[]'),
+				       ('vm-4', 'null-apps', 'cluster', false, NULL)
+			`)
+			Expect(err).NotTo(HaveOccurred())
+			expected = append(expected,
+				// vm_name sorts before letters because '=' precedes them; the leading
+				// apostrophes come from CSV-injection sanitization.
+				[]string{"'=inventory", "vm-1", "cluster", "'=calc"},
+				[]string{"'=inventory", "vm-1", "cluster", "nginx"},
+				[]string{"other-vm", "vm-2", "", "sshd"},
+			)
+		}
+
+		var buf bytes.Buffer
+		scopes := []string{"overview", "processes"}
+		if format == "zip" {
+			Expect(svc.WriteZip(ctx, scopes, &buf)).To(Succeed())
+			archive, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(archive.File).To(HaveLen(2))
+			file, err := archive.Open("processes.csv")
+			Expect(err).NotTo(HaveOccurred())
+			DeferCleanup(file.Close)
+			rows, err := csv.NewReader(file).ReadAll()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(rows).To(Equal(expected))
+		} else {
+			Expect(svc.WriteExcel(ctx, scopes, &buf)).To(Succeed())
+			workbook, err := excelize.OpenReader(bytes.NewReader(buf.Bytes()))
+			Expect(err).NotTo(HaveOccurred())
+			DeferCleanup(workbook.Close)
+			Expect(workbook.GetSheetList()).To(Equal([]string{"Overview", "Processes"}))
+			rows, err := workbook.GetRows("Processes")
+			Expect(err).NotTo(HaveOccurred())
+			// Excel omits trailing empty cells when reading rows.
+			for i := range rows {
+				for len(rows[i]) < len(expected[0]) {
+					rows[i] = append(rows[i], "")
+				}
+			}
+			Expect(rows).To(Equal(expected))
+		}
+	},
+		Entry("CSV ZIP", "zip", true),
+		Entry("Excel", "xlsx", true),
+		Entry("empty CSV ZIP", "zip", false),
+		Entry("empty Excel", "xlsx", false),
+	)
+})

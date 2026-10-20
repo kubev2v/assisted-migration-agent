@@ -147,6 +147,7 @@ var sheetNames = map[string]string{
 	"network":          "Networks",
 	"disks":            "Virtual Disks",
 	"applications":     "Applications",
+	"processes":        "Processes",
 	"groups":           "Groups",
 	"inspection":       "Inspection",
 	"storage-forecast": "Storage Forecast",
