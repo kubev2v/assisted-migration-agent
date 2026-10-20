@@ -1,4 +1,4 @@
-# The UI image supplies static files; the agent and runtime build for ARM64.
+# The UI image supplies architecture-independent static files.
 ARG AGENT_UI_IMAGE=quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent-ui
 ARG AGENT_UI_IMAGE_TAG=latest
 FROM --platform=linux/amd64 ${AGENT_UI_IMAGE}:${AGENT_UI_IMAGE_TAG} AS ui-builder
@@ -34,13 +34,16 @@ RUN mkdir -p /app/policies /app/forklift && \
         -exec cp {} /app/policies/ \;
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal AS duckdb-extensions
-RUN test "$(uname -m)" = aarch64 || { echo "Containerfile.rvtools requires linux/arm64" >&2; exit 1; }
 RUN microdnf install -y wget gzip && microdnf clean all
 WORKDIR /extensions
 ARG DUCKDB_VERSION=v1.4.3
-ARG DUCKDB_SQLITE_SCANNER_SHA256=03aa6ee4f8c4044d179b08632f3836cfd1cc426a50b8d687444847adb801888b
-RUN wget -q "https://extensions.duckdb.org/${DUCKDB_VERSION}/linux_arm64/sqlite_scanner.duckdb_extension.gz" && \
-    echo "${DUCKDB_SQLITE_SCANNER_SHA256}  sqlite_scanner.duckdb_extension.gz" | sha256sum -c - && \
+RUN case "$(uname -m)" in \
+      x86_64) platform=linux_amd64; checksum=75ead0bb623cd67c8c7e40d30f96e5fc2823fd3df90eb2ecd289aae177b15820 ;; \
+      aarch64) platform=linux_arm64; checksum=03aa6ee4f8c4044d179b08632f3836cfd1cc426a50b8d687444847adb801888b ;; \
+      *) echo "Unsupported architecture: $(uname -m)" >&2; exit 1 ;; \
+    esac && \
+    wget -q "https://extensions.duckdb.org/${DUCKDB_VERSION}/${platform}/sqlite_scanner.duckdb_extension.gz" && \
+    echo "${checksum}  sqlite_scanner.duckdb_extension.gz" | sha256sum -c - && \
     gunzip sqlite_scanner.duckdb_extension.gz
 
 FROM registry.access.redhat.com/ubi9/ubi
