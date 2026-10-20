@@ -1,17 +1,23 @@
 package vmware
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"math/big"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/vmware/govmomi/vim25/soap"
 )
 
 // generateSelfSignedCert returns a PEM-encoded self-signed certificate for testing.
@@ -114,5 +120,83 @@ func TestNewSoapClient_ErrorDoesNotLeakCertContent(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), sentinel) {
 		t.Errorf("error must not contain cert content; got: %v", err)
+	}
+}
+
+func TestGetVCenterThumbprint(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	defer server.Close()
+	caPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw})
+	want := soap.ThumbprintSHA1(server.Certificate())
+
+	for _, tc := range []struct {
+		name             string
+		skipTLS          bool
+		caCert           []byte
+		hostnameMismatch bool
+		wantUntrusted    bool
+	}{
+		{name: "skip verification preserves legacy behavior", skipTLS: true},
+		{name: "verify with supplied CA", caCert: caPEM},
+		{name: "system trust rejects untrusted certificate", wantUntrusted: true},
+		{name: "supplied CA does not bypass hostname verification", caCert: caPEM, hostnameMismatch: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			u, err := url.Parse(server.URL + "/sdk")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.hostnameMismatch {
+				u.Host = "localhost:" + u.Port()
+			}
+			client, err := NewSoapClient(u, tc.skipTLS, tc.caCert)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(client.CloseIdleConnections)
+			got, err := GetVCenterThumbprint(context.Background(), client)
+			if tc.wantUntrusted || tc.hostnameMismatch {
+				if err == nil || got != "" {
+					t.Fatalf("expected certificate rejection and no thumbprint; got %q, %v", got, err)
+				}
+				if tc.wantUntrusted {
+					var unknownCA x509.UnknownAuthorityError
+					if !errors.As(err, &unknownCA) {
+						t.Fatalf("expected unknown CA error, got %v", err)
+					}
+				} else {
+					var hostnameError x509.HostnameError
+					if !errors.As(err, &hostnameError) {
+						t.Fatalf("expected hostname verification error, got %v", err)
+					}
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != want || len(got) != 59 || got != strings.ToUpper(got) {
+				t.Fatalf("expected VMware SHA-1 thumbprint %q, got %q", want, got)
+			}
+		})
+	}
+}
+
+func TestGetVCenterThumbprint_Canceled(t *testing.T) {
+	u, err := url.Parse("https://vcenter.example.com/sdk")
+	if err != nil {
+		t.Fatal(err)
+	}
+	client, err := NewSoapClient(u, true, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(client.CloseIdleConnections)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	got, err := GetVCenterThumbprint(ctx, client)
+	if !errors.Is(err, context.Canceled) || got != "" {
+		t.Fatalf("expected cancellation and no thumbprint, got %q, %v", got, err)
 	}
 }

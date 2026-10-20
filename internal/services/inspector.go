@@ -104,11 +104,17 @@ func (i *InspectorService) Start(ctx context.Context, vmIDs []string) (err error
 		}
 	}()
 
+	thumbprint, err := vmware.GetVCenterThumbprint(ctx, vClient.Client.Client)
+	if err != nil {
+		return srvErrors.NewVCenterError(err)
+	}
+
 	detector, err := vmdetect.NewDetector(vmdetect.DetectorConfig{
 		Credentials: vmdetect.Credentials{
-			VCenterURL: creds.URL,
-			Username:   creds.Username,
-			Password:   creds.Password,
+			VCenterURL:    creds.URL,
+			Username:      creds.Username,
+			Password:      creds.Password,
+			TLSThumbprint: thumbprint,
 		},
 		VDDKLibDir: i.vddkLibDir,
 		Logger:     logrus.StandardLogger(),
