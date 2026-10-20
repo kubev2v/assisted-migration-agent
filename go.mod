@@ -221,7 +221,7 @@ require (
 	github.com/secure-systems-lab/go-securesystemslib v0.11.1 // indirect
 	github.com/sigstore/fulcio v1.8.8 // indirect
 	github.com/sigstore/protobuf-specs v0.5.2 // indirect
-	github.com/sigstore/sigstore v1.11.0 // indirect
+	github.com/sigstore/sigstore v1.11.1 // indirect
 	github.com/skeema/knownhosts v1.3.3 // indirect
 	github.com/smallstep/pkcs7 v0.2.3 // indirect
 	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 // indirect
@@ -264,7 +264,7 @@ require (
 	golang.org/x/exp v0.0.0-20260908205506-85c1c2202aba // indirect
 	golang.org/x/mod v0.41.0 // indirect
 	golang.org/x/net v0.59.0 // indirect
-	golang.org/x/oauth2 v0.36.0 // indirect
+	golang.org/x/oauth2 v0.37.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/telemetry v0.0.0-20260924152758-ed294f943157 // indirect
