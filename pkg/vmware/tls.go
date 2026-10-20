@@ -1,9 +1,14 @@
 package vmware
 
 import (
+	"context"
+	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"fmt"
+	"net"
 	"net/url"
+	"time"
 
 	"github.com/vmware/govmomi/vim25/soap"
 )
@@ -27,4 +32,38 @@ func NewSoapClient(u *url.URL, insecure bool, caCert []byte) (*soap.Client, erro
 	transport := sc.DefaultTransport()
 	transport.TLSClientConfig.RootCAs = pool
 	return sc, nil
+}
+
+// GetVCenterThumbprint retrieves the vCenter certificate using the authenticated
+// client's TLS policy, then returns the SHA-1 thumbprint required by VDDK.
+// In skip-verification mode this preserves the legacy behavior of accepting the
+// presented certificate; otherwise the handshake must verify it successfully.
+func GetVCenterThumbprint(ctx context.Context, client *soap.Client) (string, error) {
+	u := client.URL()
+	if u.Scheme != "https" || u.Hostname() == "" {
+		return "", errors.New("vCenter URL must use HTTPS and specify a host")
+	}
+	port := u.Port()
+	if port == "" {
+		port = "443"
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	dialer := tls.Dialer{Config: client.DefaultTransport().TLSClientConfig.Clone()}
+	conn, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(u.Hostname(), port))
+	if err != nil {
+		return "", fmt.Errorf("failed to retrieve vCenter certificate: %w", err)
+	}
+	defer func() { _ = conn.Close() }()
+
+	certs := conn.(*tls.Conn).ConnectionState().PeerCertificates
+	if len(certs) == 0 {
+		return "", errors.New("vCenter did not present a TLS certificate")
+	}
+	thumbprint := soap.ThumbprintSHA1(certs[0])
+	if thumbprint == "" {
+		return "", errors.New("SHA-1 certificate thumbprints required by VDDK are unavailable")
+	}
+	return thumbprint, nil
 }

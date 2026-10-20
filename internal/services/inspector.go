@@ -104,11 +104,20 @@ func (i *InspectorService) Start(ctx context.Context, vmIDs []string) (err error
 		}
 	}()
 
+	thumbprint, err := vmware.GetVCenterThumbprint(ctx, vClient.Client.Client)
+	if err != nil {
+		return srvErrors.NewVCenterError(err)
+	}
+
 	detector, err := vmdetect.NewDetector(vmdetect.DetectorConfig{
 		Credentials: vmdetect.Credentials{
 			VCenterURL: creds.URL,
 			Username:   creds.Username,
 			Password:   creds.Password,
+			// Always provide a thumbprint: TLSInsecure=true makes the library
+			// omit it, but VDDK requires it even when the appliance skips trust
+			// verification. Certificate trust was checked above when enabled.
+			TLSThumbprint: thumbprint,
 		},
 		VDDKLibDir: i.vddkLibDir,
 		Logger:     logrus.StandardLogger(),
