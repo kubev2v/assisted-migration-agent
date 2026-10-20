@@ -138,7 +138,8 @@ SELECT
     COALESCE(i."guest_apps", '[]') AS "GuestApps",
     COALESCE(ins.status, 'not_started') AS "InspectionState",
     COALESCE(ins.details, '') AS "InspectionDetails",
-    COALESCE(ins.error, '') AS "InspectionError"
+    COALESCE(ins.error, '') AS "InspectionError",
+    i."NICs" AS "NICCount"
 FROM filtered_vm i
 LEFT JOIN vcpu c ON i."VM ID" = c."VM ID"
 LEFT JOIN vmemory m ON i."VM ID" = m."VM ID"

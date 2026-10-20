@@ -161,6 +161,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 		return nil, srvErrors.NewResourceNotFoundError("vm", id)
 	}
 
+	var nicCount *int32
 	var pvm duckdb_models.VM
 	var groups StringArray
 	var (
@@ -192,7 +193,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 		&uCpuAvg, &uCpuP95, &uCpuMax, &uCpuLatest,
 		&uMemAvg, &uMemP95, &uMemMax, &uMemLatest,
 		&uDisk, &uConfidence, &pvm.GuestApps,
-		&inspectionState, &inspectionDetails, &inspectionError,
+		&inspectionState, &inspectionDetails, &inspectionError, &nicCount,
 	); err != nil {
 		return nil, fmt.Errorf("scanning VM %s: %w", id, err)
 	}
@@ -202,6 +203,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 	}
 
 	result := fromDB(pvm)
+	result.NICCount = nicCount
 	result.Groups = groups
 	result.InspectionStatus.State = models.InspectionState(inspectionState)
 	result.InspectionStatus.Details = inspectionDetails
@@ -354,6 +356,7 @@ func fromDB(pvm duckdb_models.VM) models.VM {
 	nics := make([]models.NIC, 0, len(pvm.NICs))
 	for i, n := range pvm.NICs {
 		nics = append(nics, models.NIC{
+			Adapter:     n.Adapter,
 			MAC:         n.MAC,
 			Network:     n.Network.ID,
 			Index:       i,
