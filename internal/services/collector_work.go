@@ -238,12 +238,6 @@ func (f *vCenterCollectorWorkFactory) Build() work.WorkBuilder[models.CollectorS
 					return r, err
 				}
 
-				if err := st.Checkpoint(ctx); err != nil {
-					log.Warnw("checkpoint after ingest failed", "error", err)
-					r.Err = fmt.Errorf("checkpoint failed: %w", err)
-					return r, err
-				}
-
 				if result.HasErrors() {
 					log.Errorw("schema validation errors", "errors", result.Errors)
 					r.Err = result.Error()
@@ -264,6 +258,18 @@ func (f *vCenterCollectorWorkFactory) Build() work.WorkBuilder[models.CollectorS
 							log.Warnw("schema validation warning", "code", w.Code, "message", w.Message)
 						}
 					}
+				}
+
+				if err := ingestVAppProducts(ctx, st.Querier(), r.SQLitePath); err != nil {
+					log.Errorw("failed to ingest vApp products", "error", err)
+					r.Err = err
+					return r, err
+				}
+
+				if err := st.Checkpoint(ctx); err != nil {
+					log.Warnw("checkpoint after ingest failed", "error", err)
+					r.Err = fmt.Errorf("checkpoint failed: %w", err)
+					return r, err
 				}
 
 				log.Info("sqlite data successfully ingested into duckdb")

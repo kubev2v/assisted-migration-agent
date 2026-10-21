@@ -2063,6 +2063,11 @@ components:
           items:
             $ref: '#/components/schemas/Process'
           description: List of processes detected on this VM
+        vAppProducts:
+          type: array
+          items:
+            $ref: '#/components/schemas/VAppProduct'
+          description: Products configured in the VM's vApp settings
 
     Process:
       type: object
@@ -2075,6 +2080,43 @@ components:
         version:
           type: string
           description: Version of the process
+
+    VAppProduct:
+      type: object
+      required:
+        - key
+      properties:
+        key:
+          type: integer
+          format: int32
+          description: Product key
+        classId:
+          type: string
+          description: Product class identifier
+        instanceId:
+          type: string
+          description: Product instance identifier
+        name:
+          type: string
+          description: Product name
+        vendor:
+          type: string
+          description: Product vendor
+        version:
+          type: string
+          description: Product version
+        fullVersion:
+          type: string
+          description: Full product version
+        vendorUrl:
+          type: string
+          description: Product vendor URL
+        productUrl:
+          type: string
+          description: Product URL
+        appUrl:
+          type: string
+          description: Application URL
 
     VirtualMachineListResponse:
       type: object

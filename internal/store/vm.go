@@ -173,6 +173,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 		uMemAvg, uMemP95, uMemMax, uMemLatest               sql.NullFloat64
 		uDisk, uConfidence                                  sql.NullFloat64
 		inspectionState, inspectionDetails, inspectionError string
+		vAppProductsJSON                                    sql.NullString
 	)
 
 	if err := rows.Scan(
@@ -191,7 +192,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 		&uMoid, &uVmName, &uProvCpus, &uProvMemMb, &uProvDiskKb,
 		&uCpuAvg, &uCpuP95, &uCpuMax, &uCpuLatest,
 		&uMemAvg, &uMemP95, &uMemMax, &uMemLatest,
-		&uDisk, &uConfidence, &pvm.GuestApps,
+		&uDisk, &uConfidence, &pvm.GuestApps, &vAppProductsJSON,
 		&inspectionState, &inspectionDetails, &inspectionError,
 	); err != nil {
 		return nil, fmt.Errorf("scanning VM %s: %w", id, err)
@@ -202,6 +203,11 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 	}
 
 	result := fromDB(pvm)
+	if vAppProductsJSON.Valid && vAppProductsJSON.String != "" {
+		if err := json.Unmarshal([]byte(vAppProductsJSON.String), &result.VAppProducts); err != nil {
+			return nil, fmt.Errorf("parsing vApp products for VM %s: %w", id, err)
+		}
+	}
 	result.Groups = groups
 	result.InspectionStatus.State = models.InspectionState(inspectionState)
 	result.InspectionStatus.Details = inspectionDetails

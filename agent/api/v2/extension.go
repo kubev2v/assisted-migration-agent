@@ -263,7 +263,33 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 		details.Processes = &apps
 	}
 
+	if len(vm.VAppProducts) > 0 {
+		products := make([]VAppProduct, 0, len(vm.VAppProducts))
+		for _, p := range vm.VAppProducts {
+			products = append(products, VAppProduct{
+				Key:         p.Key,
+				ClassId:     optionalString(p.ClassId),
+				InstanceId:  optionalString(p.InstanceId),
+				Name:        optionalString(p.Name),
+				Vendor:      optionalString(p.Vendor),
+				Version:     optionalString(p.Version),
+				FullVersion: optionalString(p.FullVersion),
+				VendorUrl:   optionalString(p.VendorUrl),
+				ProductUrl:  optionalString(p.ProductUrl),
+				AppUrl:      optionalString(p.AppUrl),
+			})
+		}
+		details.VAppProducts = &products
+	}
+
 	return details
+}
+
+func optionalString(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
 }
 
 func NewCollectionFromDatabase(db *store.Database) Collection {

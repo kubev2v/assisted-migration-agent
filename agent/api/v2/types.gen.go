@@ -574,6 +574,39 @@ type UpdateLabelVMsRequest struct {
 	Remove *[]string `binding:"omitempty,dive,required" json:"remove,omitempty"`
 }
 
+// VAppProduct defines model for VAppProduct.
+type VAppProduct struct {
+	// AppUrl Application URL
+	AppUrl *string `json:"appUrl,omitempty"`
+
+	// ClassId Product class identifier
+	ClassId *string `json:"classId,omitempty"`
+
+	// FullVersion Full product version
+	FullVersion *string `json:"fullVersion,omitempty"`
+
+	// InstanceId Product instance identifier
+	InstanceId *string `json:"instanceId,omitempty"`
+
+	// Key Product key
+	Key int32 `json:"key"`
+
+	// Name Product name
+	Name *string `json:"name,omitempty"`
+
+	// ProductUrl Product URL
+	ProductUrl *string `json:"productUrl,omitempty"`
+
+	// Vendor Product vendor
+	Vendor *string `json:"vendor,omitempty"`
+
+	// VendorUrl Product vendor URL
+	VendorUrl *string `json:"vendorUrl,omitempty"`
+
+	// Version Product version
+	Version *string `json:"version,omitempty"`
+}
+
 // VMFilterOptionsResponse defines model for VMFilterOptionsResponse.
 type VMFilterOptionsResponse struct {
 	// Applications Distinct detected application names
@@ -800,6 +833,9 @@ type VirtualMachineDetail struct {
 
 	// Uuid Universally unique identifier assigned by vCenter
 	Uuid *string `json:"uuid,omitempty"`
+
+	// VAppProducts Products configured in the VM's vApp settings
+	VAppProducts *[]VAppProduct `json:"vAppProducts,omitempty"`
 
 	// VCenterID Identifier of the vCenter this VirtualMachine belongs to
 	VCenterID string `json:"vCenterID"`
