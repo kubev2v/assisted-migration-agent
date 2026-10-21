@@ -520,6 +520,39 @@ type Process struct {
 	Version *string `json:"version,omitempty"`
 }
 
+// Product defines model for Product.
+type Product struct {
+	// AppUrl Application URL
+	AppUrl *string `json:"appUrl,omitempty"`
+
+	// ClassId Product class identifier
+	ClassId *string `json:"classId,omitempty"`
+
+	// FullVersion Full product version
+	FullVersion *string `json:"fullVersion,omitempty"`
+
+	// InstanceId Product instance identifier
+	InstanceId *string `json:"instanceId,omitempty"`
+
+	// Key Product key
+	Key int32 `json:"key"`
+
+	// Name Product name
+	Name *string `json:"name,omitempty"`
+
+	// ProductUrl Product URL
+	ProductUrl *string `json:"productUrl,omitempty"`
+
+	// Vendor Product vendor
+	Vendor *string `json:"vendor,omitempty"`
+
+	// VendorUrl Product vendor URL
+	VendorUrl *string `json:"vendorUrl,omitempty"`
+
+	// Version Product version
+	Version *string `json:"version,omitempty"`
+}
+
 // RightsizingClusterResponse defines model for RightsizingClusterResponse.
 type RightsizingClusterResponse struct {
 	Cluster  RightsizingClusterUtilization `json:"cluster"`
@@ -572,39 +605,6 @@ type UpdateLabelVMsRequest struct {
 
 	// Remove VMs to remove the label from
 	Remove *[]string `binding:"omitempty,dive,required" json:"remove,omitempty"`
-}
-
-// VAppProduct defines model for VAppProduct.
-type VAppProduct struct {
-	// AppUrl Application URL
-	AppUrl *string `json:"appUrl,omitempty"`
-
-	// ClassId Product class identifier
-	ClassId *string `json:"classId,omitempty"`
-
-	// FullVersion Full product version
-	FullVersion *string `json:"fullVersion,omitempty"`
-
-	// InstanceId Product instance identifier
-	InstanceId *string `json:"instanceId,omitempty"`
-
-	// Key Product key
-	Key int32 `json:"key"`
-
-	// Name Product name
-	Name *string `json:"name,omitempty"`
-
-	// ProductUrl Product URL
-	ProductUrl *string `json:"productUrl,omitempty"`
-
-	// Vendor Product vendor
-	Vendor *string `json:"vendor,omitempty"`
-
-	// VendorUrl Product vendor URL
-	VendorUrl *string `json:"vendorUrl,omitempty"`
-
-	// Version Product version
-	Version *string `json:"version,omitempty"`
 }
 
 // VMFilterOptionsResponse defines model for VMFilterOptionsResponse.
@@ -819,7 +819,7 @@ type VirtualMachineDetail struct {
 	Processes *[]Process `json:"processes,omitempty"`
 
 	// Products Products configured in the VM's vApp settings
-	Products *[]VAppProduct `json:"products,omitempty"`
+	Products *[]Product `json:"products,omitempty"`
 
 	// StorageUsed Storage consumed in bytes
 	StorageUsed *int64 `json:"storageUsed,omitempty"`

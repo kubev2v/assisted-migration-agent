@@ -2066,7 +2066,7 @@ components:
         products:
           type: array
           items:
-            $ref: '#/components/schemas/VAppProduct'
+            $ref: '#/components/schemas/Product'
           description: Products configured in the VM's vApp settings
 
     Process:
@@ -2081,7 +2081,7 @@ components:
           type: string
           description: Version of the process
 
-    VAppProduct:
+    Product:
       type: object
       required:
         - key

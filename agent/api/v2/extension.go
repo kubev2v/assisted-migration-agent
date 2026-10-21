@@ -264,9 +264,9 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 	}
 
 	if len(vm.VAppProducts) > 0 {
-		products := make([]VAppProduct, 0, len(vm.VAppProducts))
+		products := make([]Product, 0, len(vm.VAppProducts))
 		for _, p := range vm.VAppProducts {
-			products = append(products, VAppProduct{
+			products = append(products, Product{
 				Key:         p.Key,
 				ClassId:     optionalString(p.ClassId),
 				InstanceId:  optionalString(p.InstanceId),
