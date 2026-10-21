@@ -216,6 +216,7 @@ spec:
       - name: BUILD_ARGS
         value:
         - $(params.build-args[*])
+        - "RELEASE_TAGS={{target_branch}}"
       - name: PRIVILEGED_NESTED
         value: $(params.privileged-nested)
       - name: SOURCE_URL
@@ -471,6 +472,8 @@ spec:
         value: $(tasks.build-image-index.results.IMAGE_DIGEST)
       - name: ADDITIONAL_TAGS
         value: ["latest"]
+      - name: ADDITIONAL_TAGS_FROM_LABEL
+        value: "konflux.additional-tags"
       runAfter:
       - build-image-index
       taskRef:
@@ -495,6 +498,8 @@ spec:
         value: $(tasks.build-image-index.results.IMAGE_DIGEST)
       - name: ADDITIONAL_TAGS
         value: ["stable"]
+      - name: ADDITIONAL_TAGS_FROM_LABEL
+        value: "konflux.additional-tags"
       runAfter:
       - build-image-index
       taskRef:

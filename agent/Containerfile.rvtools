@@ -58,6 +58,9 @@ RUN mkdir -p /var/lib/agent && \
 RUN printf '#!/bin/sh\n\
 cp --remove-destination /app/extensions/*.duckdb_extension /var/lib/agent/ || exit 1\n\
 exec /app/agent "$@"\n' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+ARG RELEASE_TAGS=""
+LABEL konflux.additional-tags="${RELEASE_TAGS}"
+
 USER 1001
 EXPOSE 8000
 ENTRYPOINT ["/app/entrypoint.sh"]

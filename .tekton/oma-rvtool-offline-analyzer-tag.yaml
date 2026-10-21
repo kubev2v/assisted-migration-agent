@@ -232,6 +232,7 @@ spec:
       - name: BUILD_ARGS
         value:
         - $(params.build-args[*])
+        - "RELEASE_TAGS=prod {{git_tag}}"
       - name: BUILD_ARGS_FILE
         value: $(params.build-args-file)
       - name: PRIVILEGED_NESTED
@@ -510,6 +511,8 @@ spec:
         value: $(tasks.build-image-index.results.IMAGE_DIGEST)
       - name: ADDITIONAL_TAGS
         value: ["prod"]
+      - name: ADDITIONAL_TAGS_FROM_LABEL
+        value: "konflux.additional-tags"
       runAfter:
       - build-image-index
       taskRef:
