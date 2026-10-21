@@ -279,7 +279,7 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 				AppUrl:      optionalString(p.AppUrl),
 			})
 		}
-		details.VAppProducts = &products
+		details.Products = &products
 	}
 
 	return details

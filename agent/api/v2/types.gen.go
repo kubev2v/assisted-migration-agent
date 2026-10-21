@@ -818,6 +818,9 @@ type VirtualMachineDetail struct {
 	// Processes List of processes detected on this VM
 	Processes *[]Process `json:"processes,omitempty"`
 
+	// Products Products configured in the VM's vApp settings
+	Products *[]VAppProduct `json:"products,omitempty"`
+
 	// StorageUsed Storage consumed in bytes
 	StorageUsed *int64 `json:"storageUsed,omitempty"`
 
@@ -833,9 +836,6 @@ type VirtualMachineDetail struct {
 
 	// Uuid Universally unique identifier assigned by vCenter
 	Uuid *string `json:"uuid,omitempty"`
-
-	// VAppProducts Products configured in the VM's vApp settings
-	VAppProducts *[]VAppProduct `json:"vAppProducts,omitempty"`
 
 	// VCenterID Identifier of the vCenter this VirtualMachine belongs to
 	VCenterID string `json:"vCenterID"`

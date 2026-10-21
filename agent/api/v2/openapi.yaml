@@ -2063,7 +2063,7 @@ components:
           items:
             $ref: '#/components/schemas/Process'
           description: List of processes detected on this VM
-        vAppProducts:
+        products:
           type: array
           items:
             $ref: '#/components/schemas/VAppProduct'
