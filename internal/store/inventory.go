@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
 
 	sq "github.com/Masterminds/squirrel"
 
@@ -45,6 +46,17 @@ func (s *InventoryStore) Save(ctx context.Context, data []byte) error {
 		Columns("id", "data", "updated_at").
 		Values(1, data, sq.Expr("now()")).
 		Suffix("ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()").
+		ToSql()
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, query, args...)
+	return err
+}
+
+func (s *InventoryStore) SetCollectionTime(ctx context.Context, collectedAt time.Time) error {
+	query, args, err := sq.Update("about").
+		Set(`"CollectionTime"`, collectedAt.UTC()).
 		ToSql()
 	if err != nil {
 		return err
