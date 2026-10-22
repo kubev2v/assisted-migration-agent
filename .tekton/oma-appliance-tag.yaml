@@ -215,6 +215,8 @@ spec:
       - name: BUILD_ARGS
         value:
         - $(params.build-args[*])
+        - "RELEASE_TAGS=prod {{git_tag}}"
+        - "IMAGE_VERSION={{git_tag}}"
       - name: PRIVILEGED_NESTED
         value: $(params.privileged-nested)
       - name: SOURCE_URL
@@ -470,6 +472,8 @@ spec:
         value: $(tasks.build-image-index.results.IMAGE_DIGEST)
       - name: ADDITIONAL_TAGS
         value: ["prod"]
+      - name: ADDITIONAL_TAGS_FROM_LABEL
+        value: "konflux.additional-tags"
       runAfter:
       - build-image-index
       taskRef:

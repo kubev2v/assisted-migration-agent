@@ -197,6 +197,36 @@ spec:
         workspace: git-auth
       - name: netrc
         workspace: netrc
+    - name: compute-version
+      runAfter:
+      - clone-repository
+      workspaces:
+      - name: source
+        workspace: workspace
+      taskSpec:
+        workspaces:
+        - name: source
+        results:
+        - name: release-tags
+          description: Space-separated tags for konflux.additional-tags label
+        - name: image-version
+          description: Version string for org.opencontainers.image.version label
+        steps:
+        - name: compute
+          image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+          script: |
+            #!/bin/bash
+            BRANCH="{{target_branch}}"
+            SHORT_SHA="$(echo '{{revision}}' | cut -c1-7)"
+            RELEASE_CONFIG="$(workspaces.source.path)/.github/release-config.txt"
+            if [ -f "$RELEASE_CONFIG" ]; then
+              VERSION_BRANCH="$(cat "$RELEASE_CONFIG" | tr -d '\n\r ')"
+              VERSION="${BRANCH}-${VERSION_BRANCH}-${SHORT_SHA}"
+            else
+              VERSION="${BRANCH}-${SHORT_SHA}"
+            fi
+            printf "%s %s" "$BRANCH" "$VERSION" > "$(results.release-tags.path)"
+            printf "%s" "$VERSION" > "$(results.image-version.path)"
     - name: build-container
       params:
       - name: IMAGE
@@ -216,6 +246,8 @@ spec:
       - name: BUILD_ARGS
         value:
         - $(params.build-args[*])
+        - "RELEASE_TAGS=$(tasks.compute-version.results.release-tags)"
+        - "IMAGE_VERSION=$(tasks.compute-version.results.image-version)"
       - name: PRIVILEGED_NESTED
         value: $(params.privileged-nested)
       - name: SOURCE_URL
@@ -237,6 +269,7 @@ spec:
         - $(params.build-args-file)
       runAfter:
       - prefetch-dependencies
+      - compute-version
       taskRef:
         params:
         - name: name
@@ -471,6 +504,8 @@ spec:
         value: $(tasks.build-image-index.results.IMAGE_DIGEST)
       - name: ADDITIONAL_TAGS
         value: ["latest"]
+      - name: ADDITIONAL_TAGS_FROM_LABEL
+        value: "konflux.additional-tags"
       runAfter:
       - build-image-index
       taskRef:
@@ -495,6 +530,8 @@ spec:
         value: $(tasks.build-image-index.results.IMAGE_DIGEST)
       - name: ADDITIONAL_TAGS
         value: ["stable"]
+      - name: ADDITIONAL_TAGS_FROM_LABEL
+        value: "konflux.additional-tags"
       runAfter:
       - build-image-index
       taskRef:

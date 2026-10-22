@@ -163,6 +163,12 @@ if [ -d /app/extensions ] && [ -d /var/lib/agent ]; then\n\
 fi\n\
 exec /app/agent "$@"\n' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
+ARG RELEASE_TAGS=""
+LABEL konflux.additional-tags="${RELEASE_TAGS}"
+
+ARG IMAGE_VERSION=""
+LABEL org.opencontainers.image.version="${IMAGE_VERSION}"
+
 USER 1001
 
 # Expose HTTP port (configurable via --server-http-port, default: 8000)
