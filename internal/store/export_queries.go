@@ -405,6 +405,27 @@ const applicationsQuery = `
 	
 `
 
+// processesQuery — scope "processes": one row per guest process reported for a VM.
+const processesQuery = `
+		COPY (
+			SELECT
+				COALESCE(p.vm_name, '') AS vm_name,
+				p.vm_id AS vm_id,
+				COALESCE(p.cluster, '') AS cluster,
+				json_extract_string(p.app, '$.name') AS process_name
+			FROM (
+				SELECT
+					v."VM" AS vm_name,
+					v."VM ID" AS vm_id,
+					v."Cluster" AS cluster,
+					unnest(json_extract(COALESCE(v."guest_apps", '[]'), '$[*]')) AS app
+				FROM vinfo v
+			) p
+			WHERE COALESCE(json_extract_string(p.app, '$.name'), '') <> ''
+			ORDER BY p.vm_name, p.vm_id, process_name
+		) TO ? (FORMAT CSV, HEADER TRUE)
+`
+
 // groupsQuery — scope "groups": user-defined VM groups with metadata and matched VM count.
 const groupsQuery = `
 
@@ -588,6 +609,7 @@ var exportScopes = map[string]exportScopeSpec{
 	"network":          {filename: "networks.csv", query: networkQuery},
 	"disks":            {filename: "disks.csv", query: disksQuery},
 	"applications":     {filename: "applications.csv", query: applicationsQuery},
+	"processes":        {filename: "processes.csv", query: processesQuery},
 	"groups":           {filename: "groups.csv", query: groupsQuery},
 	"inspection":       {filename: "inspection.csv", query: inspectionQuery},
 	"storage-forecast": {filename: "storage-forecast.csv", query: storageForecastQuery},
