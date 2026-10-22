@@ -77,12 +77,26 @@ type VM struct {
 	Labels []string
 	Groups []string
 
-	GuestApps []GuestApp
+	GuestApps    []GuestApp
+	VAppProducts []VAppProduct
 }
 
 type GuestApp struct {
 	Name    string
 	Version string
+}
+
+type VAppProduct struct {
+	Key         int32  `json:"key"`
+	ClassId     string `json:"classId,omitempty"`
+	InstanceId  string `json:"instanceId,omitempty"`
+	Name        string `json:"name,omitempty"`
+	Vendor      string `json:"vendor,omitempty"`
+	Version     string `json:"version,omitempty"`
+	FullVersion string `json:"fullVersion,omitempty"`
+	VendorUrl   string `json:"vendorUrl,omitempty"`
+	ProductUrl  string `json:"productUrl,omitempty"`
+	AppUrl      string `json:"appUrl,omitempty"`
 }
 
 type Issue struct {

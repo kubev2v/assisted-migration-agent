@@ -17,7 +17,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/jzelinskie/cobrautil/v2 v2.0.0-20260922163232-4fb24ed00480
-	github.com/kubev2v/forklift v0.0.0-20260812070321-b33d2e55b079
+	github.com/kubev2v/forklift v0.0.0-20261021084440-89a1e22196e6
 	github.com/kubev2v/migration-planner v0.28.1-0.20261014115110-a9ac212f476f
 	github.com/kubev2v/vm-migration-detective v0.0.0-20261006023354-140bc9526c2c
 	github.com/oapi-codegen/gin-middleware v1.0.2
@@ -302,3 +302,5 @@ require (
 )
 
 replace github.com/go-ini/ini => gopkg.in/ini.v1 v1.67.1
+
+replace github.com/kubev2v/forklift => github.com/machacekondra/forklift v0.0.0-20261021084440-89a1e22196e6

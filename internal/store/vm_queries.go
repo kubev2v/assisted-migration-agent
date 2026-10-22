@@ -136,6 +136,7 @@ SELECT
     u.disk_pct,
     u.confidence_pct,
     COALESCE(i."guest_apps", '[]') AS "GuestApps",
+    vapp.products_json AS "VAppProducts",
     COALESCE(ins.status, 'not_started') AS "InspectionState",
     COALESCE(ins.details, '') AS "InspectionDetails",
     COALESCE(ins.error, '') AS "InspectionError"
@@ -154,6 +155,7 @@ LEFT JOIN rightsizing_vm_utilization u
         ORDER BY created_at DESC LIMIT 1
     )
 LEFT JOIN vm_inspection_status ins ON i."VM ID" = ins."VM ID"
+LEFT JOIN vm_vapp_products vapp ON i."VM ID" = vapp.vm_id
 
 `
 
