@@ -1,0 +1,1752 @@
+openapi: 3.0.3
+info:
+  title: Standalone RVTools Analyzer API
+  version: 1.0.0
+servers:
+- url: /api/v1
+tags:
+- name: Collections
+  description: Collection database management
+- name: Collector
+  description: Inventory collection operations
+- name: Inventories
+  description: Collected inventory resources
+- name: VirtualMachines
+  description: Virtual machine queries across all vCenters
+- name: Groups
+  description: VirtualMachine group management
+- name: Rightsizing
+  description: Rightsizing reports and cluster/VM utilization
+- name: Version
+  description: Analyzer version information
+- name: Analyzer
+  description: Analyzer status
+paths:
+  /virtualmachines:
+    get:
+      tags:
+      - VirtualMachines
+      summary: List VirtualMachines from the latest collection
+      operationId: listLatestVirtualMachines
+      parameters:
+      - name: byExpression
+        in: query
+        description: Filter by expression
+        schema:
+          type: string
+      - name: sort
+        in: query
+        description: Sort fields with direction (e.g., "name:asc", "cluster:desc"). Valid fields are name, vCenterState,
+          cluster, diskSize, memory, issues, cpuUsage, diskUsage, ramUsage, cpuAvg, memAvg.
+        schema:
+          type: array
+          items:
+            type: string
+        style: form
+        explode: true
+        example:
+        - cluster:asc
+        - name:desc
+      - name: page
+        in: query
+        description: Page number for pagination
+        schema:
+          type: integer
+          default: 1
+          minimum: 1
+      - name: pageSize
+        in: query
+        description: Number of items per page
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: List of VirtualMachines
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VirtualMachineListResponse'
+        '400':
+          description: Invalid request parameters
+        '404':
+          description: No collections found
+        '500':
+          description: Internal server error
+  /virtualmachines/batch-update-exclusion:
+    post:
+      tags:
+      - VirtualMachines
+      summary: Batch update migration exclusion for multiple VMs in the latest collection
+      operationId: batchUpdateLatestVMExclusion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchUpdateExclusionRequest'
+      responses:
+        '200':
+          description: Exclusion updated
+        '400':
+          description: Invalid request
+        '404':
+          description: No collections found
+        '500':
+          description: Internal server error
+  /virtualmachines/filter-options:
+    get:
+      tags:
+      - VirtualMachines
+      summary: Get available filter option values from the latest collection
+      operationId: getLatestVMFilterOptions
+      responses:
+        '200':
+          description: Filter options
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VMFilterOptionsResponse'
+        '404':
+          description: No collections found
+        '500':
+          description: Internal server error
+  /virtualmachines/labels:
+    get:
+      tags:
+      - VirtualMachines
+      summary: Get all distinct labels with counts from the latest collection
+      operationId: getLatestVMLabels
+      responses:
+        '200':
+          description: Labels with counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VMLabelsResponse'
+        '404':
+          description: No collections found
+        '500':
+          description: Internal server error
+  /virtualmachines/labels/{label}:
+    patch:
+      tags:
+      - VirtualMachines
+      summary: Add or remove a label from multiple VMs in the latest collection
+      operationId: updateLatestLabelVMs
+      parameters:
+      - name: label
+        in: path
+        required: true
+        description: Label name
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLabelVMsRequest'
+      responses:
+        '200':
+          description: Label updated
+        '400':
+          description: Invalid request
+        '404':
+          description: No collections found
+        '500':
+          description: Internal server error
+    delete:
+      tags:
+      - VirtualMachines
+      summary: Remove a label from all VMs in the latest collection
+      operationId: deleteLatestLabelGlobally
+      parameters:
+      - name: label
+        in: path
+        required: true
+        description: Label name
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Label removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteLabelGloballyResponse'
+        '400':
+          description: Invalid request
+        '500':
+          description: Internal server error
+  /virtualmachines/{vmId}:
+    get:
+      tags:
+      - VirtualMachines
+      summary: Get VirtualMachine details from the latest collection
+      operationId: getLatestVirtualMachine
+      parameters:
+      - name: vmId
+        in: path
+        required: true
+        description: VirtualMachine ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: VirtualMachine details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VirtualMachineDetail'
+        '404':
+          description: No collections or VirtualMachine not found
+        '500':
+          description: Internal server error
+    patch:
+      tags:
+      - VirtualMachines
+      summary: Update VirtualMachine properties in the latest collection
+      operationId: updateLatestVirtualMachine
+      parameters:
+      - name: vmId
+        in: path
+        required: true
+        description: VirtualMachine ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VirtualMachineUpdateRequest'
+      responses:
+        '200':
+          description: VirtualMachine updated
+        '400':
+          description: Invalid request
+        '404':
+          description: No collections or VirtualMachine not found
+        '500':
+          description: Internal server error
+  /virtualmachines/{vmId}/utilization:
+    get:
+      tags:
+      - Rightsizing
+      summary: Get utilization breakdown for a specific VM from the latest collection
+      operationId: getLatestVMUtilization
+      parameters:
+      - name: vmId
+        in: path
+        required: true
+        description: VirtualMachine MoRef ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: VM utilization details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VmUtilizationDetails'
+        '404':
+          description: No collections or no utilization data for this VM
+        '500':
+          description: Internal server error
+  /groups:
+    get:
+      tags:
+      - Groups
+      summary: List groups from the latest collection
+      operationId: listLatestGroups
+      parameters:
+      - name: byName
+        in: query
+        required: false
+        description: Filter groups by name (case-insensitive substring match)
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        description: Page number (1-indexed)
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: pageSize
+        in: query
+        required: false
+        description: Number of groups per page
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+      responses:
+        '200':
+          description: List of groups
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupListResponse'
+        '400':
+          description: Invalid filter expression
+        '404':
+          description: No collections found
+        '500':
+          description: Internal server error
+    post:
+      tags:
+      - Groups
+      summary: Create a new group in the latest collection
+      operationId: createLatestGroup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGroupRequest'
+      responses:
+        '201':
+          description: Group created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+        '400':
+          description: Invalid request
+        '404':
+          description: No collections found
+        '500':
+          description: Internal server error
+  /groups/{groupId}:
+    get:
+      tags:
+      - Groups
+      summary: Get group by ID from the latest collection
+      operationId: getLatestGroup
+      parameters:
+      - name: groupId
+        in: path
+        required: true
+        description: Group ID
+        schema:
+          type: string
+      - name: sort
+        in: query
+        description: Sort fields with direction (e.g., "name:asc", "cluster:desc"). Valid fields are name, vCenterState,
+          cluster, diskSize, memory, issues, cpuUsage, diskUsage, ramUsage, cpuAvg, memAvg.
+        schema:
+          type: array
+          items:
+            type: string
+        style: form
+        explode: true
+        example:
+        - cluster:asc
+        - name:desc
+      - name: page
+        in: query
+        description: Page number for pagination
+        schema:
+          type: integer
+          default: 1
+          minimum: 1
+      - name: pageSize
+        in: query
+        description: Number of items per page
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: Group details with VirtualMachines
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupResponse'
+        '404':
+          description: No collections or group not found
+        '500':
+          description: Internal server error
+    patch:
+      tags:
+      - Groups
+      summary: Update group in the latest collection
+      operationId: updateLatestGroup
+      parameters:
+      - name: groupId
+        in: path
+        required: true
+        description: Group ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateGroupRequest'
+      responses:
+        '200':
+          description: Group updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+        '400':
+          description: Invalid request
+        '404':
+          description: No collections or group not found
+        '500':
+          description: Internal server error
+    delete:
+      tags:
+      - Groups
+      summary: Delete group from the latest collection
+      operationId: deleteLatestGroup
+      parameters:
+      - name: groupId
+        in: path
+        required: true
+        description: Group ID
+        schema:
+          type: string
+      responses:
+        '204':
+          description: Group deleted
+        '404':
+          description: No collections or group not found
+        '500':
+          description: Internal server error
+  /groups/{groupId}/applications:
+    get:
+      tags:
+      - Groups
+      summary: List detected applications for a group
+      operationId: listGroupApplications
+      parameters:
+      - name: groupId
+        in: path
+        required: true
+        description: Group ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: List of detected applications
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationListResponse'
+        '404':
+          description: No collections or group not found
+        '500':
+          description: Internal server error
+  /inventory:
+    get:
+      tags:
+      - Inventories
+      summary: Get inventory from the latest collection
+      operationId: getLatestInventory
+      parameters:
+      - name: scope
+        in: query
+        required: false
+        description: Selects which inventories to return. "main" (default) returns only the main inventory as JSON.
+          "all" returns a ZIP bundle containing the main inventory (inventory.json) and every group subset inventory
+          (subsets/<groupId>.json), for manual upload in disconnected environments.
+        schema:
+          type: string
+          enum:
+          - main
+          - all
+          default: main
+      responses:
+        '200':
+          description: Collected inventory. JSON when scope is "main"; a ZIP archive when scope is "all".
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Inventory'
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: No collections or inventory not found
+        '500':
+          description: Internal server error
+  /collections:
+    get:
+      tags:
+      - Collections
+      summary: List all collections
+      operationId: listCollections
+      responses:
+        '200':
+          description: List of collections
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectionListResponse'
+        '500':
+          description: Internal server error
+    delete:
+      tags:
+      - Collections
+      summary: Delete all collections
+      operationId: deleteCollections
+      responses:
+        '204':
+          description: Delete all collections
+        '500':
+          description: Internal server error
+  /collector:
+    get:
+      tags:
+      - Collector
+      summary: Get collector status
+      operationId: getCollectorStatus
+      responses:
+        '200':
+          description: Collector status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectorStatus'
+        '500':
+          description: Internal server error
+    delete:
+      tags:
+      - Collector
+      summary: Stop collector
+      operationId: stopCollector
+      responses:
+        '204':
+          description: Collector stopped
+        '500':
+          description: Internal server error
+  /collector/rvtools:
+    post:
+      tags:
+      - Collector
+      summary: Start a collection from RVTools files
+      operationId: startRvtoolsCollector
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - files
+              properties:
+                files:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+      responses:
+        '202':
+          description: Collection started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectorStatus'
+        '400':
+          description: No files provided
+        '409':
+          description: Collection already in progress
+        '500':
+          description: Internal server error
+  /collections/{id}/inventory:
+    get:
+      tags:
+      - Inventories
+      summary: Get collected inventory for a collection
+      operationId: getInventory
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Collection ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Collected inventory
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Inventory'
+        '404':
+          description: Collection or inventory not found
+        '500':
+          description: Internal server error
+  /collections/{id}/virtualmachines:
+    get:
+      tags:
+      - VirtualMachines
+      summary: List VirtualMachines in a collection
+      operationId: listVirtualMachines
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Collection ID
+        schema:
+          type: string
+      - name: byExpression
+        in: query
+        description: Filter by expression
+        schema:
+          type: string
+      - name: sort
+        in: query
+        description: Sort fields with direction (e.g., "name:asc", "cluster:desc"). Valid fields are name, vCenterState,
+          cluster, diskSize, memory, issues, cpuUsage, diskUsage, ramUsage, cpuAvg, memAvg.
+        schema:
+          type: array
+          items:
+            type: string
+        style: form
+        explode: true
+        example:
+        - cluster:asc
+        - name:desc
+      - name: page
+        in: query
+        description: Page number for pagination
+        schema:
+          type: integer
+          default: 1
+          minimum: 1
+      - name: pageSize
+        in: query
+        description: Number of items per page
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: List of VirtualMachines
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VirtualMachineListResponse'
+        '400':
+          description: Invalid request parameters
+        '404':
+          description: Collection not found
+        '500':
+          description: Internal server error
+  /collections/{id}/virtualmachines/filter-options:
+    get:
+      tags:
+      - VirtualMachines
+      summary: Get available filter option values
+      operationId: getVMFilterOptions
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Collection ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Filter options
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VMFilterOptionsResponse'
+        '404':
+          description: Collection not found
+        '500':
+          description: Internal server error
+  /collections/{id}/virtualmachines/labels:
+    get:
+      tags:
+      - VirtualMachines
+      summary: Get all distinct labels with counts
+      operationId: getVMLabels
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Collection ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Labels with counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VMLabelsResponse'
+        '404':
+          description: Collection not found
+        '500':
+          description: Internal server error
+  /collections/{id}/virtualmachines/{vmId}:
+    get:
+      tags:
+      - VirtualMachines
+      summary: Get VirtualMachine details
+      operationId: getVirtualMachine
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Collection ID
+        schema:
+          type: string
+      - name: vmId
+        in: path
+        required: true
+        description: VirtualMachine ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: VirtualMachine details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VirtualMachineDetail'
+        '404':
+          description: Collection or VirtualMachine not found
+        '500':
+          description: Internal server error
+  /collections/{id}/virtualmachines/{vmId}/utilization:
+    get:
+      tags:
+      - VirtualMachines
+      summary: Get utilization breakdown for a specific VM
+      operationId: getVMUtilization
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Collection ID
+        schema:
+          type: string
+      - name: vmId
+        in: path
+        required: true
+        description: VirtualMachine MoRef ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: VM utilization details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VmUtilizationDetails'
+        '404':
+          description: Collection not found or no utilization data for this VM
+        '500':
+          description: Internal server error
+  /collections/{id}/export:
+    get:
+      tags:
+      - Collections
+      summary: Export collection data as CSV ZIP archive or Excel workbook
+      operationId: exportCollection
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Collection ID
+        schema:
+          type: string
+      - name: scope
+        in: query
+        required: false
+        description: Comma-separated export scopes (e.g., "overview,vms,groups"). Defaults to "overview".
+        schema:
+          type: string
+      - name: format
+        in: query
+        required: false
+        description: 'Output format: zip (CSV files in a ZIP archive) or xlsx (Excel workbook with one sheet per
+          scope)'
+        schema:
+          type: string
+          enum:
+          - zip
+          - xlsx
+          default: zip
+      responses:
+        '200':
+          description: ZIP archive containing CSV files or Excel workbook
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Invalid scope
+        '404':
+          description: Collection not found
+        '500':
+          description: Internal server error
+  /collections/{id}/groups:
+    get:
+      tags:
+      - Groups
+      summary: List all groups in a collection
+      operationId: listGroups
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Collection ID
+        schema:
+          type: string
+      - name: byName
+        in: query
+        required: false
+        description: Filter groups by name (case-insensitive substring match)
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        description: Page number (1-indexed)
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: pageSize
+        in: query
+        required: false
+        description: Number of groups per page
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+      responses:
+        '200':
+          description: List of groups
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupListResponse'
+        '400':
+          description: Invalid filter expression
+        '404':
+          description: Collection not found
+        '500':
+          description: Internal server error
+  /collections/{id}/groups/{groupId}:
+    get:
+      tags:
+      - Groups
+      summary: Get group by ID with its VirtualMachines
+      operationId: getGroup
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Collection ID
+        schema:
+          type: string
+      - name: groupId
+        in: path
+        required: true
+        description: Group ID
+        schema:
+          type: string
+      - name: sort
+        in: query
+        description: Sort fields with direction (e.g., "name:asc", "cluster:desc"). Valid fields are name, vCenterState,
+          cluster, diskSize, memory, issues, cpuUsage, diskUsage, ramUsage, cpuAvg, memAvg.
+        schema:
+          type: array
+          items:
+            type: string
+        style: form
+        explode: true
+        example:
+        - cluster:asc
+        - name:desc
+      - name: page
+        in: query
+        description: Page number for pagination
+        schema:
+          type: integer
+          default: 1
+          minimum: 1
+      - name: pageSize
+        in: query
+        description: Number of items per page
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: Group details with VirtualMachines
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupResponse'
+        '404':
+          description: Collection or group not found
+        '500':
+          description: Internal server error
+  /version:
+    get:
+      tags:
+      - Version
+      summary: Get analyzer version information
+      operationId: getVersion
+      responses:
+        '200':
+          description: Version information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionInfo'
+  /status:
+    get:
+      tags:
+      - Analyzer
+      summary: Get analyzer status
+      operationId: getAnalyzerStatus
+      responses:
+        '200':
+          description: Analyzer status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyzerStatus'
+components:
+  schemas:
+    Collection:
+      type: object
+      required:
+      - id
+      - name
+      - createdAt
+      properties:
+        id:
+          type: string
+          description: Collection identifier
+        name:
+          type: string
+          description: Collection name
+        createdAt:
+          type: string
+          format: date-time
+          description: When the collection was created
+    CollectionListResponse:
+      type: object
+      required:
+      - collections
+      properties:
+        collections:
+          type: array
+          items:
+            $ref: '#/components/schemas/Collection'
+    CollectorStatus:
+      type: object
+      required:
+      - status
+      properties:
+        status:
+          type: string
+          enum:
+          - ready
+          - connecting
+          - collecting
+          - collecting metrics
+          - parsing
+          - collected
+          - error
+          x-enum-varnames:
+          - CollectorStatusStatusReady
+          - CollectorStatusStatusConnecting
+          - CollectorStatusStatusCollecting
+          - CollectorStatusMetricsCollecting
+          - CollectorStatusStatusParsing
+          - CollectorStatusStatusCollected
+          - CollectorStatusStatusError
+        error:
+          type: string
+          description: Error message when status is error
+    Inventory:
+      type: object
+      required:
+      - inventory
+      properties:
+        inventory:
+          $ref: https://raw.githubusercontent.com/kubev2v/migration-planner/a9ac212f476f426fb0aa0437afff4e3f96cfd21b/api/v1alpha1/openapi.yaml#/components/schemas/Inventory
+    VirtualMachine:
+      type: object
+      required:
+      - name
+      - id
+      - vCenterID
+      - vCenterState
+      - cluster
+      - datacenter
+      - diskSize
+      - memory
+      - issueCount
+      properties:
+        name:
+          type: string
+          description: VirtualMachine name
+        id:
+          type: string
+          description: VirtualMachine ID in vCenter
+        vCenterID:
+          type: string
+          description: Identifier of the vCenter this VirtualMachine belongs to
+        vCenterState:
+          type: string
+          description: vCenter state (e.g., poweredOn, poweredOff, suspended)
+        cluster:
+          type: string
+          description: Cluster name
+        datacenter:
+          type: string
+          description: Datacenter name
+        diskSize:
+          type: integer
+          format: int64
+          description: Total disk size in MB
+        memory:
+          type: integer
+          format: int64
+          description: Memory size in MB
+        issueCount:
+          type: integer
+          description: Number of issues found for this VirtualMachine
+        migratable:
+          type: boolean
+          description: True if the VirtualMachine is migratable for MTV
+        template:
+          type: boolean
+          description: True if the VirtualMachine is a template
+        inspectionStatus:
+          description: Current inspection status of the virtual machine
+          $ref: '#/components/schemas/InspectionStatus'
+        inspectionConcernCount:
+          type: integer
+          description: Number of inspection concerns for the latest persisted result
+        migrationExcluded:
+          type: boolean
+          description: Whether this VM is excluded from migration
+          default: false
+        groups:
+          type: array
+          items:
+            type: string
+          description: Names of groups this VM matches
+        labels:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 100
+            pattern: \S
+          description: User-defined labels for this VM
+          x-oapi-codegen-extra-tags:
+            binding: omitempty,dive,min=1,max=100
+        utilization_cpu_p95:
+          type: number
+          format: double
+          description: CPU utilization at p95 (%); absent when no utilization data
+        utilization_mem_p95:
+          type: number
+          format: double
+          description: Memory utilization at p95 (%); absent when no utilization data
+        utilization_cpu_max:
+          type: number
+          format: double
+          description: CPU utilization at max (%); absent when no utilization data
+        utilization_mem_max:
+          type: number
+          format: double
+          description: Memory utilization at max (%); absent when no utilization data
+        utilization_disk:
+          type: number
+          format: double
+          description: Disk utilization (%); absent when no utilization data
+        utilization_confidence:
+          type: number
+          format: double
+          description: Data confidence -- sample_count / expected_sample_count x 100
+    VirtualMachineDetail:
+      type: object
+      required:
+      - id
+      - name
+      - vCenterID
+      - powerState
+      - connectionState
+      - cpuCount
+      - coresPerSocket
+      - memoryMB
+      - disks
+      - nics
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the VirtualMachine in vCenter
+        name:
+          type: string
+          description: Display name of the VirtualMachine
+        vCenterID:
+          type: string
+          description: Identifier of the vCenter this VirtualMachine belongs to
+        uuid:
+          type: string
+          description: Universally unique identifier assigned by vCenter
+        firmware:
+          type: string
+          description: Firmware type (bios or efi)
+        powerState:
+          type: string
+          description: Current power state (poweredOn, poweredOff, suspended)
+        connectionState:
+          type: string
+          description: Connection state (connected, disconnected, orphaned, inaccessible)
+        host:
+          type: string
+          description: ESXi host reference
+        datacenter:
+          type: string
+          description: Datacenter name
+        cluster:
+          type: string
+          description: Cluster name
+        folder:
+          type: string
+          description: Inventory folder reference
+        cpuCount:
+          type: integer
+          format: int32
+          description: Total virtual CPUs
+        coresPerSocket:
+          type: integer
+          format: int32
+          description: CPU cores per virtual socket
+        cpuAffinity:
+          type: array
+          items:
+            type: integer
+            format: int32
+          description: Physical CPU IDs the VirtualMachine is pinned to
+        memoryMB:
+          type: integer
+          format: int32
+          description: Memory in megabytes
+        guestName:
+          type: string
+          description: Guest OS full name
+        guestId:
+          type: string
+          description: VMware guest OS identifier
+        hostName:
+          type: string
+          description: Guest hostname
+        ipAddress:
+          type: string
+          description: Guest primary IP address
+        storageUsed:
+          type: integer
+          format: int64
+          description: Storage consumed in bytes
+        template:
+          type: boolean
+          description: Whether the VirtualMachine is a template
+        migratable:
+          type: boolean
+          description: Whether the VirtualMachine can be migrated
+        migrationExcluded:
+          type: boolean
+          description: Whether this VM is excluded from migration
+          default: false
+        inspectionStatus:
+          description: Current inspection status of the virtual machine
+          $ref: '#/components/schemas/InspectionStatus'
+        labels:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 100
+            pattern: \S
+          description: User-defined labels for this VM
+          x-oapi-codegen-extra-tags:
+            binding: omitempty,dive,min=1,max=100
+        faultToleranceEnabled:
+          type: boolean
+          description: Whether Fault Tolerance is enabled
+        nestedHVEnabled:
+          type: boolean
+          description: Whether nested virtualization is enabled
+        toolsStatus:
+          type: string
+          description: VMware Tools installation status
+        toolsRunningStatus:
+          type: string
+          description: Whether VMware Tools is running
+        disks:
+          type: array
+          items:
+            $ref: '#/components/schemas/VirtualMachineDisk'
+        nics:
+          type: array
+          items:
+            $ref: '#/components/schemas/VirtualMachineNIC'
+        devices:
+          type: array
+          items:
+            $ref: '#/components/schemas/VirtualMachineDevice'
+        guestNetworks:
+          type: array
+          items:
+            $ref: '#/components/schemas/GuestNetwork'
+        issues:
+          type: array
+          items:
+            $ref: '#/components/schemas/VirtualMachineIssue'
+        inspection:
+          $ref: '#/components/schemas/VirtualMachineInspectionResults'
+        utilization:
+          $ref: '#/components/schemas/VmUtilizationDetails'
+        processes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Process'
+          description: List of processes detected on this VM
+    Process:
+      type: object
+      required:
+      - name
+      properties:
+        name:
+          type: string
+          description: Name of the process
+        version:
+          type: string
+          description: Version of the process
+    VirtualMachineListResponse:
+      type: object
+      required:
+      - virtualMachines
+      - total
+      - page
+      - pageCount
+      properties:
+        virtualMachines:
+          type: array
+          items:
+            $ref: '#/components/schemas/VirtualMachine'
+        total:
+          type: integer
+          description: Total number of VirtualMachines matching the filter
+        page:
+          type: integer
+          description: Current page number
+        pageCount:
+          type: integer
+          description: Total number of pages
+    VirtualMachineDisk:
+      type: object
+      properties:
+        key:
+          type: integer
+          format: int32
+          description: Unique disk key within the VirtualMachine
+        file:
+          type: string
+          description: VMDK file path in the datastore
+        capacity:
+          type: integer
+          format: int64
+          description: Disk capacity in bytes
+        shared:
+          type: boolean
+          description: Whether the disk is shared between multiple VirtualMachines
+        rdm:
+          type: boolean
+          description: Whether this is a Raw Device Mapping
+        bus:
+          type: string
+          description: Bus type (scsi, ide, sata, nvme)
+        mode:
+          type: string
+          description: Disk mode (persistent, independent_persistent, independent_nonpersistent)
+    VirtualMachineNIC:
+      type: object
+      properties:
+        mac:
+          type: string
+          description: MAC address
+        network:
+          type: string
+          description: Network reference
+        index:
+          type: integer
+          description: NIC index within the VirtualMachine
+    VirtualMachineDevice:
+      type: object
+      properties:
+        kind:
+          type: string
+          description: Device type (cdrom, floppy, usb, serial, parallel)
+    GuestNetwork:
+      type: object
+      properties:
+        device:
+          type: string
+          description: Network device name inside the guest
+        mac:
+          type: string
+          description: MAC address as seen by the guest
+        ip:
+          type: string
+          description: IP address
+        prefixLength:
+          type: integer
+          format: int32
+          description: Network prefix length (CIDR)
+        network:
+          type: string
+          description: Network name from the guest
+    VirtualMachineIssue:
+      type: object
+      required:
+      - label
+      - category
+      - description
+      properties:
+        label:
+          type: string
+          description: Short label
+        description:
+          type: string
+          description: Detailed description with context and recommendations
+        category:
+          type: string
+          enum:
+          - Critical
+          - Warning
+          - Information
+          - Advisory
+          - Error
+          - Other
+          x-enum-varnames:
+          - VirtualMachineIssueCategoryCritical
+          - VirtualMachineIssueCategoryWarning
+          - VirtualMachineIssueCategoryInformation
+          - VirtualMachineIssueCategoryAdvisory
+          - VirtualMachineIssueCategoryError
+          - VirtualMachineIssueCategoryOther
+    InspectionStatus:
+      type: object
+      required:
+      - state
+      properties:
+        state:
+          type: string
+          enum:
+          - pending
+          - running
+          - completed
+          - canceled
+          - error
+          x-enum-varnames:
+          - InspectionStatusStatePending
+          - InspectionStatusStateRunning
+          - InspectionStatusStateCompleted
+          - InspectionStatusStateCanceled
+          - InspectionStatusStateError
+          description: Current inspection state
+        details:
+          type: string
+          description: Human-readable details about the current inspection state
+        error:
+          type: string
+          description: Error message when state is error
+    VirtualMachineInspectionResults:
+      type: object
+      description: VirtualMachines Inspection results
+      properties:
+        concerns:
+          type: array
+          items:
+            $ref: '#/components/schemas/VirtualMachineInspectionConcern'
+    VirtualMachineInspectionConcern:
+      type: object
+      required:
+      - message
+      - category
+      - label
+      properties:
+        label:
+          type: string
+          description: Short label identifying the concern
+        message:
+          type: string
+        category:
+          type: string
+    Group:
+      type: object
+      required:
+      - id
+      - name
+      - filter
+      properties:
+        id:
+          type: string
+          description: Unique group identifier
+        name:
+          type: string
+          description: Group display name
+        description:
+          type: string
+          description: Optional group description
+        filter:
+          type: string
+          description: Filter expression (pkg/filter DSL)
+          example: memory >= 8GB and cluster = 'prod'
+        vmCount:
+          type: integer
+          description: Number of VMs matching the group filter
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    GroupListResponse:
+      type: object
+      required:
+      - groups
+      - total
+      - page
+      - pageCount
+      properties:
+        groups:
+          type: array
+          items:
+            $ref: '#/components/schemas/Group'
+        total:
+          type: integer
+        page:
+          type: integer
+        pageCount:
+          type: integer
+    GroupResponse:
+      type: object
+      required:
+      - group
+      - vms
+      - total
+      - page
+      - pageCount
+      properties:
+        group:
+          $ref: '#/components/schemas/Group'
+        inventory:
+          $ref: https://raw.githubusercontent.com/kubev2v/migration-planner/a9ac212f476f426fb0aa0437afff4e3f96cfd21b/api/v1alpha1/openapi.yaml#/components/schemas/Inventory
+        vms:
+          type: array
+          items:
+            $ref: '#/components/schemas/VirtualMachine'
+        total:
+          type: integer
+        page:
+          type: integer
+        pageCount:
+          type: integer
+    CreateGroupRequest:
+      type: object
+      required:
+      - name
+      - filter
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          x-oapi-codegen-extra-tags:
+            binding: required,min=1,max=100
+        description:
+          type: string
+          maxLength: 500
+          x-oapi-codegen-extra-tags:
+            binding: omitempty,max=500
+        filter:
+          type: string
+          minLength: 1
+          x-oapi-codegen-extra-tags:
+            binding: required,min=1
+    UpdateGroupRequest:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          x-oapi-codegen-extra-tags:
+            binding: omitempty,min=1,max=100
+        description:
+          type: string
+          maxLength: 500
+          x-oapi-codegen-extra-tags:
+            binding: omitempty,max=500
+        filter:
+          type: string
+          minLength: 1
+          x-oapi-codegen-extra-tags:
+            binding: omitempty,min=1
+    ApplicationListResponse:
+      type: object
+      required:
+      - applications
+      properties:
+        applications:
+          type: array
+          items:
+            $ref: '#/components/schemas/ApplicationOverview'
+    ApplicationOverview:
+      type: object
+      required:
+      - name
+      - description
+      - vmCount
+      - vms
+      properties:
+        name:
+          type: string
+          description: Application name
+        description:
+          type: string
+          description: Application description
+        vmCount:
+          type: integer
+          description: Number of VMs running this application
+        vms:
+          type: array
+          items:
+            $ref: '#/components/schemas/ApplicationVM'
+    ApplicationVM:
+      type: object
+      required:
+      - id
+      - name
+      properties:
+        id:
+          type: string
+          description: VM ID
+        name:
+          type: string
+          description: VM name
+    VirtualMachineUpdateRequest:
+      type: object
+      properties:
+        migrationExcluded:
+          type: boolean
+          description: Whether to exclude this VM from migration
+          x-oapi-codegen-extra-tags:
+            binding: omitempty
+        labels:
+          type: array
+          items:
+            type: string
+          description: User-defined labels (replaces existing labels)
+          x-oapi-codegen-extra-tags:
+            binding: omitempty,dive,notblank,min=1,max=100
+    BatchUpdateExclusionRequest:
+      type: object
+      required:
+      - vmIds
+      - migrationExcluded
+      properties:
+        vmIds:
+          type: array
+          items:
+            type: string
+          description: VM IDs to update
+          x-oapi-codegen-extra-tags:
+            binding: required,min=1,dive,required
+        migrationExcluded:
+          type: boolean
+          description: Exclusion state to set for all VMs
+    VMFilterOptionsResponse:
+      type: object
+      required:
+      - clusters
+      - datacenters
+      - concernLabels
+      - concernCategories
+      - applications
+      properties:
+        clusters:
+          type: array
+          items:
+            type: string
+          description: Distinct cluster names
+        datacenters:
+          type: array
+          items:
+            type: string
+          description: Distinct datacenter names
+        concernLabels:
+          type: array
+          items:
+            type: string
+          description: Distinct concern labels
+        concernCategories:
+          type: array
+          items:
+            type: string
+          description: Distinct concern categories
+        applications:
+          type: array
+          items:
+            type: string
+          description: Distinct detected application names
+    VMLabelsResponse:
+      type: object
+      required:
+      - labels
+      - counts
+      properties:
+        labels:
+          type: array
+          items:
+            type: string
+          description: Distinct labels currently in use
+        counts:
+          type: array
+          items:
+            type: integer
+          description: Number of VMs with each label (same order as labels array)
+    UpdateLabelVMsRequest:
+      type: object
+      properties:
+        add:
+          type: array
+          items:
+            type: string
+          description: VMs to add the label to
+          x-oapi-codegen-extra-tags:
+            binding: omitempty,dive,required
+        remove:
+          type: array
+          items:
+            type: string
+          description: VMs to remove the label from
+          x-oapi-codegen-extra-tags:
+            binding: omitempty,dive,required
+    DeleteLabelGloballyResponse:
+      type: object
+      required:
+      - label
+      - affected
+      properties:
+        label:
+          type: string
+          description: The label that was removed
+        affected:
+          type: integer
+          description: Number of VMs that had the label removed
+    VmUtilizationDetails:
+      type: object
+      required:
+      - moid
+      - vm_name
+      - provisioned_cpus
+      - provisioned_memory_mb
+      - provisioned_disk_kb
+      - cpu_avg
+      - cpu_p95
+      - cpu_max
+      - cpu_latest
+      - mem_avg
+      - mem_p95
+      - mem_max
+      - mem_latest
+      - disk
+      - confidence
+      properties:
+        moid:
+          type: string
+        vm_name:
+          type: string
+        provisioned_cpus:
+          type: integer
+        provisioned_memory_mb:
+          type: integer
+        provisioned_disk_kb:
+          type: number
+          format: double
+        cpu_avg:
+          type: number
+          format: double
+        cpu_p95:
+          type: number
+          format: double
+        cpu_max:
+          type: number
+          format: double
+        cpu_latest:
+          type: number
+          format: double
+        mem_avg:
+          type: number
+          format: double
+        mem_p95:
+          type: number
+          format: double
+        mem_max:
+          type: number
+          format: double
+        mem_latest:
+          type: number
+          format: double
+        disk:
+          type: number
+          format: double
+        confidence:
+          type: number
+          format: double
+    VersionInfo:
+      type: object
+      required:
+      - version
+      - gitCommit
+      properties:
+        version:
+          type: string
+          description: Analyzer version
+        gitCommit:
+          type: string
+          description: Git commit SHA
+    AnalyzerStatus:
+      type: object
+      required:
+      - status
+      properties:
+        status:
+          type: string
+          enum:
+          - ready

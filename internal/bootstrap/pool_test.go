@@ -1,4 +1,4 @@
-package app
+package bootstrap_test
 
 import (
 	"context"
@@ -10,21 +10,20 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/kubev2v/assisted-migration-agent/internal/config"
+	"github.com/kubev2v/assisted-migration-agent/internal/bootstrap"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 )
 
-func TestApp(t *testing.T) {
+func TestPool(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "App Suite")
+	RunSpecs(t, "Bootstrap Pool Suite")
 }
 
-var _ = Describe("App", func() {
-	Describe("initPool stale collection cleanup", func() {
+var _ = Describe("Pool", func() {
+	Describe("InitPool stale collection cleanup", func() {
 		var (
 			tmpDir   string
-			cfg      *config.Configuration
 			seedPool *store.Pool
 			st       *store.Store
 		)
@@ -33,9 +32,6 @@ var _ = Describe("App", func() {
 			var err error
 			tmpDir, err = os.MkdirTemp("", "initpool-test-*")
 			Expect(err).NotTo(HaveOccurred())
-
-			cfg = config.NewConfigurationWithOptionsAndDefaults()
-			cfg.Agent.DataFolder = tmpDir
 
 			seedPool = store.NewPool(5 * time.Minute)
 			db, err := seedPool.NewDatabase(store.MainDatabaseID, filepath.Join(tmpDir, "agent.duckdb"), time.Now(), store.EagerConnectionInitilization, 256, store.ReadWriteDatabase)
@@ -62,7 +58,7 @@ var _ = Describe("App", func() {
 
 			seedPool.Close()
 
-			pool, err := initPool(cfg)
+			pool, err := bootstrap.InitPool(tmpDir)
 			Expect(err).NotTo(HaveOccurred())
 			defer pool.Close()
 
@@ -88,7 +84,7 @@ var _ = Describe("App", func() {
 
 			seedPool.Close()
 
-			pool, err := initPool(cfg)
+			pool, err := bootstrap.InitPool(tmpDir)
 			Expect(err).NotTo(HaveOccurred())
 			defer pool.Close()
 
@@ -112,7 +108,7 @@ var _ = Describe("App", func() {
 
 			seedPool.Close()
 
-			pool, err := initPool(cfg)
+			pool, err := bootstrap.InitPool(tmpDir)
 			Expect(err).NotTo(HaveOccurred())
 			defer pool.Close()
 
@@ -129,7 +125,7 @@ var _ = Describe("App", func() {
 		It("should be a no-op when no stale collections exist", func() {
 			seedPool.Close()
 
-			pool, err := initPool(cfg)
+			pool, err := bootstrap.InitPool(tmpDir)
 			Expect(err).NotTo(HaveOccurred())
 			defer pool.Close()
 
@@ -158,7 +154,7 @@ var _ = Describe("App", func() {
 
 			seedPool.Close()
 
-			pool, err := initPool(cfg)
+			pool, err := bootstrap.InitPool(tmpDir)
 			Expect(err).NotTo(HaveOccurred())
 			defer pool.Close()
 

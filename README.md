@@ -14,7 +14,30 @@ Agent-specific code lives under `agent/`: `main.go` is the CLI entry point,
 `cmd/` defines its commands, and `app/` assembles the application. `api/v2/`
 defines the HTTP contract, and `handlers/v2/` implements it. Shared
 implementation remains in `internal/` and `pkg/`. The RVTools proof of
-concept is still an Agent mode and uses `agent/Containerfile.rvtools`.
+concept remains available as an Agent mode and uses `agent/Containerfile.rvtools`.
+
+## RVTools Analyzer
+
+The Analyzer runs independently of Agent IDs and the Migration Planner console. It has its own API under `/api/v1`; the Agent's `--rvtools-mode` and `/api/v2/collector/rvtools` remain available.
+
+Build and run it locally with separate data and policy folders:
+
+```bash
+make build.analyzer
+bin/rvtools-analyzer run --data-folder ./analyzer/data --opa-policies-folder ./policies --server-http-port 8001
+```
+
+Upload an RVTools workbook and query the result:
+
+```bash
+curl -F 'files=@/path/to/rvtools.xlsx' http://localhost:8001/api/v1/collector/rvtools
+curl http://localhost:8001/api/v1/collector
+curl http://localhost:8001/api/v1/virtualmachines
+```
+
+`GET /api/v1/collector` reports when analysis is `collected`. The full API contract is in [analyzer/api/v1/openapi.yaml](analyzer/api/v1/openapi.yaml). Native runs need DuckDB's SQLite scanner extension available in the data folder or downloadable on first use.
+
+Build the Analyzer image with `make image.analyzer`. It includes OPA policies and the DuckDB extension and uses `/var/lib/analyzer` for persistent data. The Agent image remains `make image`.
 
 ## Run
 

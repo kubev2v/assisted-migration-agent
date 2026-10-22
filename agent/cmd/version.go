@@ -13,10 +13,9 @@ func NewVersionCommand(cfg *config.Configuration) *cobra.Command {
 		Use:   "version",
 		Short: "Print version information",
 		Args:  cobra.NoArgs,
-		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("Agent Version:   %s\n", cfg.Agent.Version)
-			fmt.Printf("Git Commit:      %s\n", cfg.Agent.GitCommit)
-			fmt.Printf("UI Git Commit:   %s\n", cfg.Agent.UIGitCommit)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			_, err := fmt.Fprintf(cmd.OutOrStdout(), "Agent Version:   %s\nGit Commit:      %s\nUI Git Commit:   %s\n", cfg.Agent.Version, cfg.Agent.GitCommit, cfg.Agent.UIGitCommit)
+			return err
 		},
 	}
 }

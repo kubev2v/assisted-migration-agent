@@ -204,7 +204,7 @@ var vmOutputQuery = sq.Select(
 	`COALESCE(c.issues_count, 0) AS issue_count`,
 	`COALESCE(i.status, 'not_started') AS status`,
 	`COALESCE(i.details, '') AS details`,
-	`v."Template" as template`,
+	`COALESCE(v."Template", false) AS template`,
 	`COALESCE(crit.critical_count, 0) = 0 AS migratable`,
 	`COALESCE(i.error, '') AS error`,
 	`COALESCE((SELECT COUNT(*)::BIGINT FROM vm_inspection_concerns ic WHERE ic."VM ID" = v."VM ID" AND ic.inspection_id = (SELECT MAX(inspection_id) FROM vm_inspection_concerns imx WHERE imx."VM ID" = v."VM ID")), 0) AS inspection_concern_count`,

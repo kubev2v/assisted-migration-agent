@@ -1,0 +1,60 @@
+FROM registry.access.redhat.com/ubi9/go-toolset AS backend-builder
+WORKDIR /src
+COPY go.mod go.sum ./
+ENV GOTOOLCHAIN=auto
+RUN go mod download
+USER 0
+COPY analyzer/main.go ./analyzer/main.go
+COPY analyzer/api ./analyzer/api
+COPY analyzer/app ./analyzer/app
+COPY analyzer/cmd ./analyzer/cmd
+COPY analyzer/config ./analyzer/config
+COPY analyzer/handlers ./analyzer/handlers
+COPY internal ./internal
+COPY pkg ./pkg
+ARG ANALYZER_GIT_COMMIT=unknown
+ARG ANALYZER_VERSION=v0.0.0
+RUN go build -buildvcs=false -ldflags="-X main.gitCommit=${ANALYZER_GIT_COMMIT} -X main.version=${ANALYZER_VERSION}" \
+    -o /tmp/rvtools-analyzer ./analyzer/main.go
+
+FROM registry.access.redhat.com/ubi9/ubi-minimal AS opa-builder
+RUN microdnf install -y wget tar gzip ca-certificates && microdnf clean all
+WORKDIR /app
+RUN mkdir -p /app/policies /app/forklift && \
+    cd /app/forklift && \
+    wget https://github.com/kubev2v/forklift/archive/main.tar.gz && \
+    tar -xzf main.tar.gz --strip-components=1 && \
+    find validation/policies/io/konveyor/forklift/vmware \
+        -name "*.rego" ! -name "*_test.rego" \
+        -exec cp {} /app/policies/ \;
+
+FROM registry.access.redhat.com/ubi9/ubi-minimal AS duckdb-extensions
+RUN microdnf install -y wget gzip ca-certificates && microdnf clean all
+WORKDIR /extensions
+ARG DUCKDB_VERSION=v1.4.3
+ARG DUCKDB_SQLITE_SCANNER_SHA256_AMD64=75ead0bb623cd67c8c7e40d30f96e5fc2823fd3df90eb2ecd289aae177b15820
+ARG DUCKDB_SQLITE_SCANNER_SHA256_ARM64=03aa6ee4f8c4044d179b08632f3836cfd1cc426a50b8d687444847adb801888b
+RUN case "$(uname -m)" in \
+        x86_64) platform=linux_amd64; checksum=${DUCKDB_SQLITE_SCANNER_SHA256_AMD64} ;; \
+        aarch64) platform=linux_arm64; checksum=${DUCKDB_SQLITE_SCANNER_SHA256_ARM64} ;; \
+        *) echo "unsupported architecture" >&2; exit 1 ;; \
+    esac && \
+    wget -q "https://extensions.duckdb.org/${DUCKDB_VERSION}/${platform}/sqlite_scanner.duckdb_extension.gz" && \
+    echo "${checksum}  sqlite_scanner.duckdb_extension.gz" | sha256sum -c - && \
+    gunzip sqlite_scanner.duckdb_extension.gz
+
+FROM registry.access.redhat.com/ubi9/ubi
+RUN dnf install -y ca-certificates tzdata && dnf clean all
+WORKDIR /app
+COPY --from=backend-builder /tmp/rvtools-analyzer /app/rvtools-analyzer
+COPY --from=opa-builder /app/policies /app/policies
+COPY --from=duckdb-extensions /extensions /app/extensions
+RUN mkdir -p /var/lib/analyzer && \
+    chown -R 1001:0 /app/policies /app/extensions /var/lib/analyzer
+RUN printf '#!/bin/sh\n\
+cp --remove-destination /app/extensions/*.duckdb_extension /var/lib/analyzer/ || exit 1\n\
+exec /app/rvtools-analyzer "$@"\n' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+USER 1001
+EXPOSE 8000
+ENTRYPOINT ["/app/entrypoint.sh"]
+CMD ["run", "--server-mode", "prod", "--opa-policies-folder", "/app/policies", "--data-folder", "/var/lib/analyzer"]

@@ -26,10 +26,10 @@ import (
 
 	v2api "github.com/kubev2v/assisted-migration-agent/agent/api/v2"
 
+	agentapp "github.com/kubev2v/assisted-migration-agent/agent/app"
 	handlers "github.com/kubev2v/assisted-migration-agent/agent/handlers/v2"
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
-	svc "github.com/kubev2v/assisted-migration-agent/internal/services"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	"github.com/kubev2v/assisted-migration-agent/pkg/crypto"
@@ -90,12 +90,8 @@ var _ = Describe("Inventory handler", func() {
 			}),
 		)
 
-		mgr := svc.NewServiceManager(
-			svc.WithConfig(cfg),
-			svc.WithPool(pool),
-			svc.WithKeyManager(keyMgr),
-		)
-		Expect(mgr.Initialize()).To(Succeed())
+		mgr, err := agentapp.NewAgentServiceManager(cfg, pool, nil, keyMgr)
+		Expect(err).NotTo(HaveOccurred())
 		stop = func() { mgr.Stop(ctx) }
 
 		handler := handlers.NewHandler(*cfg, mgr)

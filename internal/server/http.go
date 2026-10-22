@@ -40,23 +40,28 @@ type APIGroup struct {
 }
 
 func NewServer(cfg *config.Configuration, groups map[string]APIGroup) (*Server, error) {
+	return NewServerWithConfig(cfg.Server, groups)
+}
+
+// NewServerWithConfig constructs an API server from product-neutral server settings.
+func NewServerWithConfig(cfg config.Server, groups map[string]APIGroup) (*Server, error) {
 	gin.SetMode(gin.DebugMode)
-	if cfg.Server.ServerMode == ProductionServer {
+	if cfg.ServerMode == ProductionServer {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	engine := gin.New()
 	engine.MaxMultipartMemory = 64 << 20 // max 64Mb
 
 	srv := &http.Server{
-		Addr:    fmt.Sprintf("0.0.0.0:%d", cfg.Server.HTTPPort),
+		Addr:    fmt.Sprintf("0.0.0.0:%d", cfg.HTTPPort),
 		Handler: engine,
 	}
 
-	if cfg.Server.ServerMode == ProductionServer {
-		engine.Static("/static", cfg.Server.StaticsFolder)
-		engine.Static("/assets", path.Join(cfg.Server.StaticsFolder, "assets"))
-		engine.StaticFile("/", path.Join(cfg.Server.StaticsFolder, "index.html"))
-		engine.StaticFile("/favicon.ico", path.Join(cfg.Server.StaticsFolder, "favicon.ico"))
+	if cfg.ServerMode == ProductionServer && cfg.StaticsFolder != "" {
+		engine.Static("/static", cfg.StaticsFolder)
+		engine.Static("/assets", path.Join(cfg.StaticsFolder, "assets"))
+		engine.StaticFile("/", path.Join(cfg.StaticsFolder, "index.html"))
+		engine.StaticFile("/favicon.ico", path.Join(cfg.StaticsFolder, "favicon.ico"))
 
 		engine.NoRoute(func(c *gin.Context) {
 			if strings.HasPrefix(c.Request.URL.Path, "/api") {
@@ -65,9 +70,11 @@ func NewServer(cfg *config.Configuration, groups map[string]APIGroup) (*Server, 
 				})
 				return
 			}
-			c.File(path.Join(cfg.Server.StaticsFolder, "index.html"))
+			c.File(path.Join(cfg.StaticsFolder, "index.html"))
 		})
+	}
 
+	if cfg.ServerMode == ProductionServer {
 		cert, key, err := certificates.GenerateSelfSignedCertificate(time.Now().AddDate(1, 0, 0))
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate server's certificates: %w", err)

@@ -1,4 +1,4 @@
-.PHONY: generate generate.proto build build.e2e e2e e2e.container e2e.vm e2e.container.clean run container.run container.stop help tidy tidy-check clean lint format check-format check-generate validate-all image setup-opa-policies clean-opa-policies build-filler-image test test.fuzz build-local run-local stop-local
+.PHONY: generate generate.proto build build.analyzer build.e2e e2e e2e.container e2e.vm e2e.container.clean run run.analyzer container.run container.stop help tidy tidy-check clean lint format check-format check-generate validate-all image image.analyzer setup-opa-policies clean-opa-policies build-filler-image test test.fuzz build-local run-local stop-local
 
 PODMAN ?= podman
 PLANNER_AGENT_GIT_COMMIT ?= $(shell git rev-list -1 HEAD --abbrev-commit)
@@ -11,6 +11,12 @@ FORKLIFT_POLICIES_TMP_DIR ?= /tmp/forklift-policies
 BINARY_NAME=agent
 BINARY_PATH=bin/$(BINARY_NAME)
 MAIN_PATH=./agent/main.go
+ANALYZER_BINARY_PATH ?= bin/rvtools-analyzer
+ANALYZER_DATA_FOLDER ?= $(CURDIR)/analyzer/data
+ANALYZER_GIT_COMMIT ?= $(PLANNER_AGENT_GIT_COMMIT)
+ANALYZER_VERSION ?= $(PLANNER_AGENT_VERSION)
+ANALYZER_IMAGE_NAME ?= rvtools-analyzer
+ANALYZER_IMAGE_TAG ?= latest
 
 IMAGE_NAME ?= assisted-migration-agent
 IMAGE_TAG ?= latest
@@ -26,6 +32,8 @@ GO_BUILD_FLAGS := ${GO_BUILD_FLAGS}
 help:
 	@echo "Targets:"
 	@echo "    build:           build the agent binary"
+	@echo "    build.analyzer:  build the RVTools Analyzer binary"
+	@echo "    image.analyzer:  build the RVTools Analyzer container image"
 	@echo "    build.e2e:       build the e2e test binary (v1 API)"
 	@echo "    e2e:             run e2e tests (default: container mode, v1 API)"
 	@echo "    e2e.container:   run e2e tests in container mode (Podman, v1 API)"
@@ -35,6 +43,7 @@ help:
 	@echo "    run.image:       run container image locally (requires AGENT_ID and SOURCE_ID)"
 	@echo "    run.container:   run container with persistent volume (requires AGENT_ID and SOURCE_ID)"
 	@echo "    run:             run the agent locally"
+	@echo "    run.analyzer:    run the RVTools Analyzer locally"
 	@echo "    run.ui:          start React dev server"
 	@echo "    clean:           clean up binaries and tools"
 	@echo "    generate:        "
@@ -58,6 +67,11 @@ build:
 	@echo "Building $(BINARY_NAME)..."
 	go build -ldflags="-X main.gitCommit=${PLANNER_AGENT_GIT_COMMIT} -X main.version=${PLANNER_AGENT_VERSION} -X main.uiGitCommit=${UI_GIT_COMMIT}" -o $(BINARY_PATH) $(MAIN_PATH)
 	@echo "Build complete: $(BINARY_PATH)"
+
+build.analyzer:
+	@echo "Building RVTools Analyzer..."
+	go build $(GO_BUILD_FLAGS) -ldflags="-X main.gitCommit=${ANALYZER_GIT_COMMIT} -X main.version=${ANALYZER_VERSION}" -o $(ANALYZER_BINARY_PATH) ./analyzer/main.go
+	@echo "Build complete: $(ANALYZER_BINARY_PATH)"
 
 build.e2e:
 	@echo "Building e2e binary..."
@@ -101,6 +115,14 @@ image:
 		-t $(IMAGE_NAME):$(IMAGE_TAG) \
 		-f agent/Containerfile .
 	@echo "✅ Image built: $(IMAGE_NAME):$(IMAGE_TAG)"
+
+image.analyzer:
+	@echo "Building RVTools Analyzer image $(ANALYZER_IMAGE_NAME):$(ANALYZER_IMAGE_TAG)..."
+	$(PODMAN) build \
+		--build-arg ANALYZER_GIT_COMMIT=$(ANALYZER_GIT_COMMIT) \
+		--build-arg ANALYZER_VERSION=$(ANALYZER_VERSION) \
+		-t $(ANALYZER_IMAGE_NAME):$(ANALYZER_IMAGE_TAG) \
+		-f analyzer/Containerfile .
 
 # Run container image locally
 # Usage: make run.image AGENT_ID=<uuid> SOURCE_ID=<uuid>
@@ -155,6 +177,9 @@ clean:
 
 run:
 	$(BINARY_PATH) run --opa-policies-folder $(OPA_POLICIES_FOLDER) --agent-id $(AGENT_ID) --source-id $(SOURCE_ID) --data-folder $(CURDIR)
+
+run.analyzer: build.analyzer
+	$(ANALYZER_BINARY_PATH) run --opa-policies-folder $(OPA_POLICIES_FOLDER) --data-folder $(ANALYZER_DATA_FOLDER)
 
 AGENT_LOCAL_DATA_DIR ?= $(CURDIR)/.local-data
 

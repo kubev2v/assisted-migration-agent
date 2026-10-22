@@ -13,6 +13,7 @@ import (
 
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
 
+	agentapp "github.com/kubev2v/assisted-migration-agent/agent/app"
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/services"
@@ -66,41 +67,28 @@ var _ = Describe("ServiceManager", func() {
 	Describe("NewServiceManager", func() {
 		It("creates a service manager with all options", func() {
 			mgr := services.NewServiceManager(
-				services.WithConfig(cfg),
+				services.WithDataFolder(cfg.Agent.DataFolder),
 				services.WithPool(pool),
-				services.WithKeyManager(keyMgr),
 			)
 			Expect(mgr).NotTo(BeNil())
 		})
 	})
 
-	Describe("Initialize", func() {
+	Describe("Agent service initialization", func() {
 		It("fails when config is nil", func() {
-			mgr := services.NewServiceManager(
-				services.WithPool(pool),
-				services.WithKeyManager(keyMgr),
-			)
-			err := mgr.Initialize()
+			_, err := newAgentManager(nil, pool, keyMgr)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(Equal("config is required"))
 		})
 
 		It("fails when pool is nil", func() {
-			mgr := services.NewServiceManager(
-				services.WithConfig(cfg),
-				services.WithKeyManager(keyMgr),
-			)
-			err := mgr.Initialize()
+			_, err := newAgentManager(cfg, nil, keyMgr)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(Equal("pool is required"))
 		})
 
 		It("fails when key manager is nil", func() {
-			mgr := services.NewServiceManager(
-				services.WithConfig(cfg),
-				services.WithPool(pool),
-			)
-			err := mgr.Initialize()
+			_, err := newAgentManager(cfg, pool, nil)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(Equal("key manager is required"))
 		})
@@ -124,12 +112,9 @@ var _ = Describe("ServiceManager", func() {
 		})
 
 		It("returns ready when no collector and no collection exists", func() {
-			mgr = services.NewServiceManager(
-				services.WithConfig(cfg),
-				services.WithPool(pool),
-				services.WithKeyManager(keyMgr),
-			)
-			Expect(mgr.Initialize()).To(Succeed())
+			var err error
+			mgr, err = newAgentManager(cfg, pool, keyMgr)
+			Expect(err).NotTo(HaveOccurred())
 			defer mgr.Stop(ctx)
 
 			status := mgr.GetCollectorStatus()
@@ -157,12 +142,8 @@ var _ = Describe("ServiceManager", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(st.Inventory().Save(ctx, []byte(`{"vms":1}`))).To(Succeed())
 
-			mgr = services.NewServiceManager(
-				services.WithConfig(cfg),
-				services.WithPool(pool),
-				services.WithKeyManager(keyMgr),
-			)
-			Expect(mgr.Initialize()).To(Succeed())
+			mgr, err = newAgentManager(cfg, pool, keyMgr)
+			Expect(err).NotTo(HaveOccurred())
 			defer mgr.Stop(ctx)
 
 			status := mgr.GetCollectorStatus()
@@ -186,12 +167,8 @@ var _ = Describe("ServiceManager", func() {
 			})).To(Succeed())
 			pool.Add(collDB)
 
-			mgr = services.NewServiceManager(
-				services.WithConfig(cfg),
-				services.WithPool(pool),
-				services.WithKeyManager(keyMgr),
-			)
-			Expect(mgr.Initialize()).To(Succeed())
+			mgr, err = newAgentManager(cfg, pool, keyMgr)
+			Expect(err).NotTo(HaveOccurred())
 			defer mgr.Stop(ctx)
 
 			status := mgr.GetCollectorStatus()
@@ -256,12 +233,8 @@ var _ = Describe("ServiceManager", func() {
 				SkipTLS:  true,
 			})).To(Succeed())
 
-			mgr = services.NewServiceManager(
-				services.WithConfig(cfg),
-				services.WithPool(pool),
-				services.WithKeyManager(keyMgr),
-			)
-			Expect(mgr.Initialize()).To(Succeed())
+			mgr, err = newAgentManager(cfg, pool, keyMgr)
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		AfterEach(func() {
@@ -269,16 +242,13 @@ var _ = Describe("ServiceManager", func() {
 		})
 
 		It("allows StartCollecting when no inspector is running", func() {
-			completingMgr := services.NewServiceManager(
-				services.WithConfig(cfg),
-				services.WithPool(pool),
-				services.WithKeyManager(keyMgr),
+			completingMgr, err := newAgentManager(cfg, pool, keyMgr,
 				services.WithCollectorWorkBuilder(completingCollectorBuilder()),
 			)
-			Expect(completingMgr.Initialize()).To(Succeed())
+			Expect(err).NotTo(HaveOccurred())
 			defer completingMgr.Stop(ctx)
 
-			_, err := completingMgr.StartCollecting(ctx)
+			_, err = completingMgr.StartCollecting(ctx)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -292,11 +262,11 @@ var _ = Describe("ServiceManager", func() {
 			gate := make(chan struct{})
 			defer close(gate)
 
-			blockingMgr := newBlockingManager(cfg, pool, keyMgr, gate)
-			Expect(blockingMgr.Initialize()).To(Succeed())
+			blockingMgr, err := newBlockingManager(cfg, pool, keyMgr, gate)
+			Expect(err).NotTo(HaveOccurred())
 			defer blockingMgr.Stop(ctx)
 
-			_, err := blockingMgr.StartCollecting(ctx)
+			_, err = blockingMgr.StartCollecting(ctx)
 			Expect(err).NotTo(HaveOccurred())
 			Eventually(func() bool {
 				return blockingMgr.GetCollectorStatus().State.IsRunning()
@@ -326,11 +296,11 @@ var _ = Describe("ServiceManager", func() {
 			gate := make(chan struct{})
 			defer close(gate)
 
-			blockingMgr := newBlockingManager(cfg, pool, keyMgr, gate)
-			Expect(blockingMgr.Initialize()).To(Succeed())
+			blockingMgr, err := newBlockingManager(cfg, pool, keyMgr, gate)
+			Expect(err).NotTo(HaveOccurred())
 			defer blockingMgr.Stop(ctx)
 
-			_, err := blockingMgr.StartCollecting(ctx)
+			_, err = blockingMgr.StartCollecting(ctx)
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() bool {
@@ -345,13 +315,10 @@ var _ = Describe("ServiceManager", func() {
 		})
 
 		It("allows StartCollecting after inspector finishes", func() {
-			completingMgr := services.NewServiceManager(
-				services.WithConfig(cfg),
-				services.WithPool(pool),
-				services.WithKeyManager(keyMgr),
+			completingMgr, err := newAgentManager(cfg, pool, keyMgr,
 				services.WithCollectorWorkBuilder(completingCollectorBuilder()),
 			)
-			Expect(completingMgr.Initialize()).To(Succeed())
+			Expect(err).NotTo(HaveOccurred())
 			defer completingMgr.Stop(ctx)
 
 			inspector, err := completingMgr.InspectorService()
@@ -399,10 +366,10 @@ var _ = Describe("ServiceManager", func() {
 			gate := make(chan struct{})
 			defer close(gate)
 
-			blockingMgr := newBlockingManager(cfg, pool, keyMgr, gate)
-			Expect(blockingMgr.Initialize()).To(Succeed())
+			blockingMgr, err := newBlockingManager(cfg, pool, keyMgr, gate)
+			Expect(err).NotTo(HaveOccurred())
 
-			_, err := blockingMgr.StartCollecting(ctx)
+			_, err = blockingMgr.StartCollecting(ctx)
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func() bool {
@@ -418,13 +385,12 @@ var _ = Describe("ServiceManager", func() {
 	})
 })
 
-func newBlockingManager(cfg *config.Configuration, pool *store.Pool, keyMgr *crypto.KeyManager, gate chan struct{}) *services.ServiceManager {
-	return services.NewServiceManager(
-		services.WithConfig(cfg),
-		services.WithPool(pool),
-		services.WithKeyManager(keyMgr),
-		services.WithCollectorWorkBuilder(blockingCollectorBuilder(gate)),
-	)
+func newAgentManager(cfg *config.Configuration, pool *store.Pool, keyMgr *crypto.KeyManager, opts ...services.ServiceManagerOption) (*services.ServiceManager, error) {
+	return agentapp.NewAgentServiceManager(cfg, pool, nil, keyMgr, opts...)
+}
+
+func newBlockingManager(cfg *config.Configuration, pool *store.Pool, keyMgr *crypto.KeyManager, gate chan struct{}) (*services.ServiceManager, error) {
+	return newAgentManager(cfg, pool, keyMgr, services.WithCollectorWorkBuilder(blockingCollectorBuilder(gate)))
 }
 
 func completingCollectorBuilder() services.CollectorWorkBuilder {

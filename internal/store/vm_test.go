@@ -826,6 +826,23 @@ var _ = Describe("VMStore", func() {
 					}
 				}
 			})
+
+			It("should treat a missing RVTools Template value as false", func() {
+				_, err := s.Querier().ExecContext(ctx, `
+					INSERT INTO vinfo ("VM ID", "VM", "Powerstate", "Cluster", "Memory")
+					VALUES ('vm-no-template', 'rvtools-vm', 'poweredOn', 'cluster-a', 4096)
+				`)
+				Expect(err).NotTo(HaveOccurred())
+
+				vms, err := s.VM().List(ctx, nil, store.WithDefaultSort())
+				Expect(err).NotTo(HaveOccurred())
+				Expect(vms).To(ContainElement(HaveField("ID", "vm-no-template")))
+				for _, vm := range vms {
+					if vm.ID == "vm-no-template" {
+						Expect(vm.IsTemplate).To(BeFalse())
+					}
+				}
+			})
 		})
 	})
 
