@@ -1938,6 +1938,9 @@ components:
         name:
           type: string
           description: Display name of the VirtualMachine
+        annotations:
+          type: string
+          description: Free-text notes/description for the VirtualMachine in vSphere
         vCenterID:
           type: string
           description: Identifier of the vCenter this VirtualMachine belongs to

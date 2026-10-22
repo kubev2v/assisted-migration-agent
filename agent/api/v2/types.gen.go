@@ -707,6 +707,9 @@ type VirtualMachine struct {
 
 // VirtualMachineDetail defines model for VirtualMachineDetail.
 type VirtualMachineDetail struct {
+	// Annotations Free-text notes/description for the VirtualMachine in vSphere
+	Annotations *string `json:"annotations,omitempty"`
+
 	// Cluster Cluster name
 	Cluster *string `json:"cluster,omitempty"`
 
