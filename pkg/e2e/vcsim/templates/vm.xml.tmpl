@@ -351,6 +351,24 @@
       </extraConfig>
 {{- end}}
       <bootOptions></bootOptions>
+{{- if .VAppProducts}}
+      <vAppConfig _XMLSchema-instance:type="VmConfigInfo">
+{{- range .VAppProducts}}
+        <product>
+          <key>{{.Key}}</key>
+          <classId>{{.ClassID}}</classId>
+          <instanceId>{{.InstanceID}}</instanceId>
+          <name>{{.Name}}</name>
+          <vendor>{{.Vendor}}</vendor>
+          <version>{{.Version}}</version>
+          <fullVersion>{{.FullVersion}}</fullVersion>
+          <vendorUrl>{{.VendorURL}}</vendorUrl>
+          <productUrl>{{.ProductURL}}</productUrl>
+          <appUrl>{{.AppURL}}</appUrl>
+        </product>
+{{- end}}
+      </vAppConfig>
+{{- end}}
       <firmware>bios</firmware>
     </val>
   </propSet>

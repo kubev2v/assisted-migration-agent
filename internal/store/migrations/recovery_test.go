@@ -145,8 +145,8 @@ func TestRecoveryPreservesBaselineData(t *testing.T) {
 			require.NoError(t, err)
 			var manifest Manifest
 			require.NoError(t, json.Unmarshal(original, &manifest))
-			require.Equal(t, []int{1, 2}, manifest.Databases[0].Versions)
-			require.Equal(t, []int{1, 2}, manifest.Databases[1].Versions)
+			require.Equal(t, []int{1, 2, 3}, manifest.Databases[0].Versions)
+			require.Equal(t, []int{1, 2, 3}, manifest.Databases[1].Versions)
 			require.Equal(t, []int{1}, manifest.Databases[2].Versions)
 			_, err = r.Run(context.Background(), request)
 			require.ErrorContains(t, err, "creating new attempt")
@@ -157,8 +157,8 @@ func TestRecoveryPreservesBaselineData(t *testing.T) {
 			request.Operation = "apply"
 			result, err := r.Run(context.Background(), request)
 			require.NoError(t, err)
-			require.Equal(t, []int{3}, result.Databases[0].Steps)
-			require.Equal(t, []int{3}, result.Databases[1].Steps)
+			require.Equal(t, []int{4}, result.Databases[0].Steps)
+			require.Equal(t, []int{4}, result.Databases[1].Steps)
 			request.Operation = "verify"
 			_, err = r.Run(context.Background(), request)
 			require.Error(t, err)
@@ -167,7 +167,7 @@ func TestRecoveryPreservesBaselineData(t *testing.T) {
 			request.Operation, request.DryRun = "rollback", true
 			result, err = r.Run(context.Background(), request)
 			require.NoError(t, err)
-			require.Equal(t, []int{3}, result.Databases[0].Steps)
+			require.Equal(t, []int{4}, result.Databases[0].Steps)
 			after, err = os.ReadFile(filepath.Join(folder, "collection_100.duckdb"))
 			require.NoError(t, err)
 			require.Equal(t, before, after, "dry-run must not change database bytes")
@@ -291,7 +291,7 @@ func TestRecoveryPreflightsEveryDatabase(t *testing.T) {
 	db = testDatabase(t, filepath.Join(folder, "collection_100.duckdb"))
 	var version int
 	require.NoError(t, db.QueryRow(`SELECT max(version) FROM collection_schema_migrations`).Scan(&version))
-	require.Equal(t, 3, version, "earlier databases must stay unchanged when a later preflight fails")
+	require.Equal(t, 4, version, "earlier databases must stay unchanged when a later preflight fails")
 	require.NoError(t, db.Close())
 }
 
@@ -434,13 +434,13 @@ func TestRecoveryResumesBetweenDatabases(t *testing.T) {
 	// Model a process stopping after the first database's committed down step.
 	baseline := manifest.Databases[0]
 	db := testDatabase(t, filepath.Join(folder, baseline.Path))
-	require.NoError(t, executeMigration(context.Background(), db, historyTable(CollectionSchema), 3, r.registries[CollectionSchema][2].Down, true))
+	require.NoError(t, executeMigration(context.Background(), db, historyTable(CollectionSchema), 4, r.registries[CollectionSchema][3].Down, true))
 	require.NoError(t, db.Close())
 	request.Operation = "rollback"
 	result, err := r.Run(context.Background(), request)
 	require.NoError(t, err)
 	require.Empty(t, result.Databases[0].Steps)
-	require.Equal(t, []int{3}, result.Databases[1].Steps)
+	require.Equal(t, []int{4}, result.Databases[1].Steps)
 	request.Operation = "verify"
 	_, err = r.Run(context.Background(), request)
 	require.NoError(t, err)
@@ -480,7 +480,7 @@ func TestRecoveryIgnoresUnrelatedSchemaChanges(t *testing.T) {
 		db := testDatabase(t, filepath.Join(folder, name))
 		var version int
 		require.NoError(t, db.QueryRow(`SELECT max(version) FROM collection_schema_migrations`).Scan(&version))
-		require.Equal(t, 2, version)
+		require.Equal(t, 3, version)
 		require.NoError(t, db.Close())
 	}
 
@@ -545,7 +545,7 @@ func TestRecoveryRejectsManifestBelowPermanentBaseline(t *testing.T) {
 	db := testDatabase(t, filepath.Join(folder, "collection_100.duckdb"))
 	var version int
 	require.NoError(t, db.QueryRow(`SELECT max(version) FROM collection_schema_migrations`).Scan(&version))
-	require.Equal(t, 3, version)
+	require.Equal(t, 4, version)
 	require.NoError(t, db.Close())
 }
 
@@ -557,7 +557,7 @@ func TestRecoveryResumesAfterLaterDownSQLFails(t *testing.T) {
 	seedCollection(t, folder, "collection_100.duckdb", false, true)
 	seedCollection(t, folder, "collection_200.duckdb", false, true)
 	r.registries[CollectionSchema] = append(r.registries[CollectionSchema], migration{
-		Version: 3,
+		Version: 4,
 		Name:    "rollback_gate",
 		Up:      `CREATE TABLE rollback_gate (allow_down BOOLEAN); INSERT INTO rollback_gate VALUES (false);`,
 		Down:    `SELECT CASE WHEN (SELECT allow_down FROM rollback_gate) THEN 1 ELSE error('blocked') END; DROP TABLE rollback_gate;`,
@@ -576,15 +576,15 @@ func TestRecoveryResumesAfterLaterDownSQLFails(t *testing.T) {
 	request.Operation = "rollback"
 	_, err = r.Run(context.Background(), request)
 	require.ErrorContains(t, err, "collection_200.duckdb")
-	require.ErrorContains(t, err, "migration 3")
+	require.ErrorContains(t, err, "migration 4")
 	for _, name := range []string{"collection_100.duckdb", "collection_200.duckdb"} {
 		db := testDatabase(t, filepath.Join(folder, name))
 		var version int
 		require.NoError(t, db.QueryRow(`SELECT max(version) FROM collection_schema_migrations`).Scan(&version))
 		if name == "collection_100.duckdb" {
-			require.Equal(t, 2, version, "earlier down steps commit without previewing later SQL")
+			require.Equal(t, 3, version, "earlier down steps commit without previewing later SQL")
 		} else {
-			require.Equal(t, 3, version, "the failed step retains its migration history")
+			require.Equal(t, 4, version, "the failed step retains its migration history")
 		}
 		require.NoError(t, db.Close())
 	}
@@ -627,10 +627,10 @@ func TestRecoveryStopsAtRecordedStartingVersion(t *testing.T) {
 	seedCollection(t, folder, "collection_100.duckdb", true, true)
 	addCollectionUpgrade(r)
 	db := testDatabase(t, filepath.Join(folder, "collection_100.duckdb"))
-	require.NoError(t, executeMigration(context.Background(), db, historyTable(CollectionSchema), 3, r.registries[CollectionSchema][2].Up, false))
+	require.NoError(t, executeMigration(context.Background(), db, historyTable(CollectionSchema), 4, r.registries[CollectionSchema][3].Up, false))
 	require.NoError(t, db.Close())
 	r.registries[CollectionSchema] = append(r.registries[CollectionSchema], migration{
-		Version: 4,
+		Version: 5,
 		Name:    "next_upgrade",
 		Up:      `ALTER TABLE upgrade_notes ADD COLUMN extra VARCHAR;`,
 		Down:    `ALTER TABLE upgrade_notes DROP COLUMN extra;`,
@@ -644,8 +644,8 @@ func TestRecoveryStopsAtRecordedStartingVersion(t *testing.T) {
 	request.Operation = "rollback"
 	result, err := r.Run(context.Background(), request)
 	require.NoError(t, err)
-	require.Equal(t, []int{4}, result.Databases[0].Steps)
-	require.Equal(t, []int{1, 2, 3}, result.Databases[0].Versions)
+	require.Equal(t, []int{5}, result.Databases[0].Steps)
+	require.Equal(t, []int{1, 2, 3, 4}, result.Databases[0].Versions)
 	request.Operation = "verify"
 	_, err = r.Run(context.Background(), request)
 	require.NoError(t, err)
@@ -658,7 +658,7 @@ func TestRecoveryStopsAtRecordedStartingVersion(t *testing.T) {
 
 func addCollectionUpgrade(r *Recovery) {
 	r.registries[CollectionSchema] = append(r.registries[CollectionSchema], migration{
-		Version: 3,
+		Version: 4,
 		Name:    "upgrade_notes",
 		Up:      `CREATE TABLE upgrade_notes (value VARCHAR); INSERT INTO upgrade_notes VALUES ('candidate');`,
 		Down:    `DROP TABLE upgrade_notes;`,

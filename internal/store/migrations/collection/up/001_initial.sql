@@ -132,3 +132,4 @@ CREATE TABLE IF NOT EXISTS tag_categories (
     id VARCHAR,
     name VARCHAR
 );
+
