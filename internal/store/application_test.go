@@ -67,6 +67,9 @@ var _ = Describe("ApplicationStore", func() {
 		}
 
 		Expect(s.Application().ReplaceAll(ctx, records)).To(Succeed())
+		var confidence int
+		Expect(s.Querier().QueryRowContext(ctx, `SELECT confidence FROM vm_applications WHERE app_name = 'Apache'`).Scan(&confidence)).To(Succeed())
+		Expect(confidence).To(BeZero())
 
 		overviews, err := s.Application().ListOverviews(ctx, nil)
 		Expect(err).NotTo(HaveOccurred())
@@ -79,6 +82,20 @@ var _ = Describe("ApplicationStore", func() {
 		Expect(overviews[1].VMCount).To(Equal(2))
 		Expect(overviews[1].VMs[0].ID).To(Equal("vm-1"))
 		Expect(overviews[1].VMs[1].ID).To(Equal("vm-2"))
+	})
+
+	It("loads seeded application definitions from the collection database", func() {
+		defs, err := s.Application().ListDefinitions(ctx)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(defs).To(HaveLen(299))
+		byName := make(map[string]models.ApplicationDefinition, len(defs))
+		for _, def := range defs {
+			byName[def.Name] = def
+		}
+		Expect(byName["Apache HTTP Server"].Confidence).To(BeZero())
+		Expect(byName["Apache HTTP Server"].Processes.Names).To(ContainElement("httpd"))
+		Expect(byName["Tenable Core"].Confidence).To(Equal(75))
+		Expect(byName["Tenable Core"].Products[0].Names).To(ContainElement("Tenable Core"))
 	})
 
 	It("should clear previous data on replace", func() {

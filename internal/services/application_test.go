@@ -13,6 +13,7 @@ import (
 
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
 
+	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/services"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
@@ -126,6 +127,40 @@ var _ = Describe("ApplicationService", func() {
 	})
 
 	Context("MatchApplications", func() {
+		It("matches a product-only definition without guest processes", func() {
+			Expect(insertVMWithGuestApps(ctx, sqlDB, "vm-1", "datasync-vm", nil)).To(Succeed())
+			Expect(insertVMWithGuestApps(ctx, sqlDB, "vm-2", "other-vm", nil)).To(Succeed())
+			_, err := sqlDB.ExecContext(ctx, `
+				INSERT INTO vm_vapp_products (vm_id, key, name, vendor, version)
+				VALUES ('vm-1', 7, 'DataSync', 'AWS', '1.2'), ('vm-2', 8, 'DataSync Extended', 'Example', '2.0')
+			`)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(srv.MatchApplications(ctx)).To(Succeed())
+			apps, err := srv.List(ctx, "name = 'DataSync'")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(apps).To(HaveLen(1))
+			Expect(apps[0].VMs).To(Equal([]models.ApplicationVM{{ID: "vm-1", Name: "datasync-vm"}}))
+			Expect(apps[0].VMCount).To(Equal(1))
+		})
+
+		It("requires both signals for an all-match definition", func() {
+			Expect(insertVMWithGuestApps(ctx, sqlDB, "vm-both", "both-signals", []string{"nessusd"})).To(Succeed())
+			Expect(insertVMWithGuestApps(ctx, sqlDB, "vm-process", "process-only", []string{"nessusd"})).To(Succeed())
+			Expect(insertVMWithGuestApps(ctx, sqlDB, "vm-product", "product-only", nil)).To(Succeed())
+			_, err := sqlDB.ExecContext(ctx, `
+				INSERT INTO vm_vapp_products (vm_id, key, name)
+				VALUES ('vm-both', 1, 'Tenable Core'), ('vm-product', 2, 'Tenable Core')
+			`)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(srv.MatchApplications(ctx)).To(Succeed())
+			apps, err := srv.List(ctx, "name = 'Tenable Core'")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(apps).To(HaveLen(1))
+			Expect(apps[0].VMs).To(Equal([]models.ApplicationVM{{ID: "vm-both", Name: "both-signals"}}))
+		})
+
 		It("should match VMs with single-process apps", func() {
 			Expect(insertVMWithGuestApps(ctx, sqlDB, "vm-1", "web-01", []string{"httpd"})).To(Succeed())
 

@@ -23,6 +23,34 @@ func TestMigrations(t *testing.T) {
 	RunSpecs(t, "Migrations Suite")
 }
 
+func TestApplicationCatalogMigrationUpgradesExistingCollection(t *testing.T) {
+	ctx := context.Background()
+	db, err := sql.Open("duckdb", "")
+	require.NoError(t, err)
+	defer func() { _ = db.Close() }()
+
+	_, err = db.ExecContext(ctx, `
+		CREATE TABLE collection_schema_migrations (version INTEGER PRIMARY KEY);
+		INSERT INTO collection_schema_migrations VALUES (1), (2);
+		CREATE TABLE vm_applications (
+			app_name VARCHAR NOT NULL, app_desc VARCHAR NOT NULL,
+			vm_id VARCHAR NOT NULL, vm_name VARCHAR NOT NULL,
+			PRIMARY KEY (app_name, vm_id)
+		);
+		INSERT INTO vm_applications VALUES ('Existing App', 'Existing', 'vm-1', 'old-vm');
+	`)
+	require.NoError(t, err)
+	require.NoError(t, migrations.RunCollection(ctx, db, "memory"))
+
+	var confidence, count int
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT confidence FROM vm_applications WHERE app_name = 'Existing App'`).Scan(&confidence))
+	require.Zero(t, confidence)
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT COUNT(*) FROM application_definitions`).Scan(&count))
+	require.Equal(t, 299, count)
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT COUNT(*) FROM vm_vapp_products`).Scan(&count))
+	require.Zero(t, count)
+}
+
 var _ = Describe("Migrations", func() {
 	var (
 		ctx    context.Context
