@@ -3,8 +3,10 @@ package store_test
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -85,6 +87,47 @@ var _ = Describe("VMStore Application Methods", func() {
 			}
 			Expect(vm1.Name).To(Equal("db-01"))
 			Expect(vm1.AppNames).To(ConsistOf("postgres", "nginx"))
+		})
+
+		It("ingests vApp products and returns them in VM application and detail views", func() {
+			insertVMWithApps("vm-1", "appliance", `[]`)
+			insertVMWithApps("vm-2", "plain-vm", `[]`)
+
+			sqlitePath := filepath.Join(tmpDir, "forklift.db")
+			escapedPath := strings.ReplaceAll(sqlitePath, "'", "''")
+			_, err := s.Querier().ExecContext(ctx, fmt.Sprintf("ATTACH '%s' AS product_fixture (TYPE sqlite)", escapedPath))
+			Expect(err).NotTo(HaveOccurred())
+			_, err = s.Querier().ExecContext(ctx, `CREATE TABLE product_fixture.VM ("ID" VARCHAR, "VAppProducts" VARCHAR)`)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = s.Querier().ExecContext(ctx, `INSERT INTO product_fixture.VM VALUES (?, ?), (?, ?)`,
+				"vm-1", `[{"key":7,"classId":"com.example.datasync","instanceId":"datasync-01","name":"DataSync","vendor":"AWS","version":"1.2"},{"key":8,"name":"Other Product","vendor":"Example"}]`,
+				"vm-2", `[{"key":0}]`)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = s.Querier().ExecContext(ctx, `DETACH product_fixture`)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(s.Application().InsertProducts(ctx, sqlitePath)).To(Succeed())
+
+			var count int
+			Expect(s.Querier().QueryRowContext(ctx, `SELECT COUNT(*) FROM vm_vapp_products`).Scan(&count)).To(Succeed())
+			Expect(count).To(Equal(2))
+
+			vms, err := s.VM().GetGuestApps(ctx)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vms).To(HaveLen(2))
+			byID := make(map[string]models.VMGuestApps, len(vms))
+			for _, vm := range vms {
+				byID[vm.ID] = vm
+			}
+			Expect(byID["vm-1"].Products).To(ConsistOf(
+				models.AppProduct{Key: 7, ClassId: "com.example.datasync", InstanceId: "datasync-01", Name: "DataSync", Vendor: "AWS", Version: "1.2"},
+				models.AppProduct{Key: 8, Name: "Other Product", Vendor: "Example"},
+			))
+			Expect(byID["vm-2"].Products).To(BeEmpty())
+
+			detail, err := s.VM().Get(ctx, "vm-1")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(detail.AppProducts).To(ConsistOf(byID["vm-1"].Products[0], byID["vm-1"].Products[1]))
 		})
 
 		It("should return empty app names for VMs with no guest apps", func() {

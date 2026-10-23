@@ -467,7 +467,7 @@ var _ = Describe("Startup migration policy", func() {
 			db = openStartupDatabase(folder, "collection_100.duckdb")
 			var unchanged int
 			Expect(db.QueryRow(`SELECT count(*) FROM collection_schema_migrations WHERE applied_at='2000-01-01'`).Scan(&unchanged)).To(Succeed())
-			Expect(unchanged).To(Equal(2))
+			Expect(unchanged).To(Equal(3))
 		})
 
 		DescribeTable("rejects invalid main histories without repairing them",
@@ -626,7 +626,14 @@ func seedStartupCollection(folder string) {
 	_, err := db.Exec(`CREATE TABLE collection_schema_migrations (version INTEGER PRIMARY KEY, applied_at TIMESTAMP DEFAULT now());
 		INSERT INTO collection_schema_migrations(version) VALUES (1);
 		CREATE TABLE vdisk ("VM ID" VARCHAR);
-		CREATE TABLE vdatastore ("Name" VARCHAR);`)
+		CREATE TABLE vdatastore ("Name" VARCHAR);
+		CREATE TABLE vm_applications (
+			app_name VARCHAR NOT NULL,
+			app_desc VARCHAR NOT NULL,
+			vm_id VARCHAR NOT NULL,
+			vm_name VARCHAR NOT NULL,
+			PRIMARY KEY (app_name, vm_id)
+		);`)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(db.Close()).To(Succeed())
 }

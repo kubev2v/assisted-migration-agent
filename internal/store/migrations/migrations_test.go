@@ -23,6 +23,34 @@ func TestMigrations(t *testing.T) {
 	RunSpecs(t, "Migrations Suite")
 }
 
+func TestApplicationCatalogMigrationUpgradesExistingCollection(t *testing.T) {
+	ctx := context.Background()
+	db, err := sql.Open("duckdb", "")
+	require.NoError(t, err)
+	defer func() { _ = db.Close() }()
+
+	_, err = db.ExecContext(ctx, `
+		CREATE TABLE collection_schema_migrations (version INTEGER PRIMARY KEY);
+		INSERT INTO collection_schema_migrations VALUES (1), (2);
+		CREATE TABLE vm_applications (
+			app_name VARCHAR NOT NULL, app_desc VARCHAR NOT NULL,
+			vm_id VARCHAR NOT NULL, vm_name VARCHAR NOT NULL,
+			PRIMARY KEY (app_name, vm_id)
+		);
+		INSERT INTO vm_applications VALUES ('Existing App', 'Existing', 'vm-1', 'old-vm');
+	`)
+	require.NoError(t, err)
+	require.NoError(t, migrations.RunCollection(ctx, db, "memory"))
+
+	var confidence, count int
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT confidence FROM vm_applications WHERE app_name = 'Existing App'`).Scan(&confidence))
+	require.Zero(t, confidence)
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT COUNT(*) FROM application_definitions`).Scan(&count))
+	require.Equal(t, 299, count)
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT COUNT(*) FROM vm_vapp_products`).Scan(&count))
+	require.Zero(t, count)
+}
+
 var _ = Describe("Migrations", func() {
 	var (
 		ctx    context.Context
@@ -181,28 +209,53 @@ var _ = Describe("Migrations", func() {
 	})
 })
 
-func TestRDMLunUUIDCollectionMigration(t *testing.T) {
-	ctx := context.Background()
-	db, err := sql.Open("duckdb", "")
-	require.NoError(t, err)
-	defer func() { _ = db.Close() }()
-	require.NoError(t, duckdb_parser.New(db, nil).Init())
-	require.NoError(t, migrations.RunCollection(ctx, db, "memory"))
-	_, err = db.Exec(`DELETE FROM collection_schema_migrations WHERE version=2;
- ALTER TABLE vdisk DROP COLUMN "RDM LUN UUID";
- INSERT INTO vinfo ("VM ID","VM") VALUES ('vm-1','legacy-vm');
- INSERT INTO vdisk ("VM ID","Raw","Capacity MiB","Disk UUID") VALUES ('vm-1',true,100,'not-a-lun-uuid');`)
-	require.NoError(t, err)
-	require.NoError(t, migrations.RunCollection(ctx, db, "memory"))
-	require.NoError(t, migrations.RunCollection(ctx, db, "memory"))
-	var capacity int64
-	var uuid sql.NullString
-	require.NoError(t, db.QueryRow(`SELECT "Capacity MiB","RDM LUN UUID" FROM vdisk`).Scan(&capacity, &uuid))
-	require.Equal(t, int64(100), capacity)
-	require.False(t, uuid.Valid)
-	_, err = db.Exec(`UPDATE vdisk SET "RDM LUN UUID"='collected-lun-uuid'; DELETE FROM collection_schema_migrations WHERE version=2;`)
-	require.NoError(t, err)
-	require.NoError(t, migrations.RunCollection(ctx, db, "memory"))
-	require.NoError(t, db.QueryRow(`SELECT "RDM LUN UUID" FROM vdisk`).Scan(&uuid))
-	require.Equal(t, "collected-lun-uuid", uuid.String, "idempotent column addition must preserve supplied UUIDs")
-}
+var _ = Describe("RDM LUN UUID collection migration", func() {
+	It("preserves disk data when the migration is applied again", func() {
+		ctx := context.Background()
+		db, err := sql.Open("duckdb", "")
+		Expect(err).NotTo(HaveOccurred())
+		DeferCleanup(db.Close)
+
+		Expect(duckdb_parser.New(db, nil).Init()).To(Succeed())
+		Expect(migrations.RunCollection(ctx, db, "memory")).To(Succeed())
+
+		downSQL, err := os.ReadFile("collection/down/003_application_catalog.sql")
+		Expect(err).NotTo(HaveOccurred())
+
+		By("migrating a legacy disk with no LUN UUID column")
+		_, err = db.ExecContext(ctx, string(downSQL))
+		Expect(err).NotTo(HaveOccurred())
+
+		_, err = db.ExecContext(ctx, `
+			DELETE FROM collection_schema_migrations WHERE version IN (2, 3);
+			ALTER TABLE vdisk DROP COLUMN "RDM LUN UUID";
+			INSERT INTO vinfo ("VM ID", "VM") VALUES ('vm-1', 'legacy-vm');
+			INSERT INTO vdisk ("VM ID", "Raw", "Capacity MiB", "Disk UUID")
+			VALUES ('vm-1', true, 100, 'not-a-lun-uuid');
+		`)
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(migrations.RunCollection(ctx, db, "memory")).To(Succeed())
+		Expect(migrations.RunCollection(ctx, db, "memory")).To(Succeed())
+
+		var capacity int64
+		var uuid sql.NullString
+		Expect(db.QueryRowContext(ctx, `SELECT "Capacity MiB", "RDM LUN UUID" FROM vdisk`).Scan(&capacity, &uuid)).To(Succeed())
+		Expect(capacity).To(Equal(int64(100)))
+		Expect(uuid.Valid).To(BeFalse())
+
+		By("preserving a collected LUN UUID when the migration runs again")
+		_, err = db.ExecContext(ctx, string(downSQL))
+		Expect(err).NotTo(HaveOccurred())
+
+		_, err = db.ExecContext(ctx, `
+			UPDATE vdisk SET "RDM LUN UUID" = 'collected-lun-uuid';
+			DELETE FROM collection_schema_migrations WHERE version IN (2, 3);
+		`)
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(migrations.RunCollection(ctx, db, "memory")).To(Succeed())
+		Expect(db.QueryRowContext(ctx, `SELECT "RDM LUN UUID" FROM vdisk`).Scan(&uuid)).To(Succeed())
+		Expect(uuid.String).To(Equal("collected-lun-uuid"))
+	})
+})
