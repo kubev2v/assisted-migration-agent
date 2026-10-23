@@ -85,6 +85,25 @@ groups_agg AS (
     , UNNEST(gm.vm_ids) AS u(vm_id)
     JOIN filtered_vm fv ON u.vm_id = fv."VM ID"
     GROUP BY u.vm_id
+),
+products_agg AS (
+	SELECT 
+		"VM_ID",
+		list({
+				'key':"key",
+				'classId':"class_id",
+				'instanceId':"instance_id",
+				'name':"name",
+				'vendor':"vendor",
+				'version':"version",
+				'fullVersion':"full_version",
+				'vendorUrl':"vendor_url",
+				'productUrl':"product_url",
+				'appUrl':"app_url"
+			}) as products 
+		FROM vm_vapp_products
+		JOIN filtered_vm fv ON vm_vapp_products."VM_ID" = fv."VM ID"
+		GROUP BY "VM_ID"
 )
 SELECT
     COALESCE(i."VM ID", '') AS "ID",
@@ -149,7 +168,8 @@ SELECT
     COALESCE(metadata.entries, map()) AS "Metadata",
     COALESCE(ins.status, 'not_started') AS "InspectionState",
     COALESCE(ins.details, '') AS "InspectionDetails",
-    COALESCE(ins.error, '') AS "InspectionError"
+    COALESCE(ins.error, '') AS "InspectionError",
+    COALESCE(vapp.products, []) AS "products",
 FROM filtered_vm i
 CROSS JOIN metadata_agg metadata
 LEFT JOIN vcpu c ON i."VM ID" = c."VM ID"
@@ -166,7 +186,7 @@ LEFT JOIN rightsizing_vm_utilization u
         ORDER BY created_at DESC LIMIT 1
     )
 LEFT JOIN vm_inspection_status ins ON i."VM ID" = ins."VM ID"
-
+LEFT JOIN products_agg vapp ON i."VM ID" = vapp.vm_id
 `
 
 // vmFilterOptionsQuery returns distinct values available for VM filters.
@@ -260,4 +280,5 @@ WHERE report_id = (
 		JOIN groups grp ON gm.group_id = grp.id
 		, UNNEST(gm.vm_ids) AS u(vm_id)
 		GROUP BY u.vm_id
-	) g ON v."VM ID" = g.vm_id`)
+	) g ON v."VM ID" = g.vm_id`).
+	LeftJoin(`vm_vapp_products ON vm_vapp_products."VM_ID" = v."VM ID"`)

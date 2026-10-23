@@ -144,11 +144,23 @@ type ApplicationListResponse struct {
 
 // ApplicationOverview defines model for ApplicationOverview.
 type ApplicationOverview struct {
+	// Category Application category
+	Category string `json:"category"`
+
+	// Confidence Detection confidence percentage; defaults to 75 for process-only application definitions and 50 otherwise when omitted
+	Confidence *int `json:"confidence,omitempty"`
+
+	// ContainerizationCandidate Whether the application has a known container deployment option
+	ContainerizationCandidate *bool `json:"containerizationCandidate,omitempty"`
+
 	// Description Application description
 	Description string `json:"description"`
 
 	// Name Application name
 	Name string `json:"name"`
+
+	// Vendor Application vendor
+	Vendor string `json:"vendor"`
 
 	// VmCount Number of VMs running this application
 	VmCount int             `json:"vmCount"`
@@ -520,6 +532,39 @@ type Process struct {
 	Version *string `json:"version,omitempty"`
 }
 
+// Product defines model for Product.
+type Product struct {
+	// AppUrl Application URL
+	AppUrl *string `json:"appUrl,omitempty"`
+
+	// ClassId Product class identifier
+	ClassId *string `json:"classId,omitempty"`
+
+	// FullVersion Full product version
+	FullVersion *string `json:"fullVersion,omitempty"`
+
+	// InstanceId Product instance identifier
+	InstanceId *string `json:"instanceId,omitempty"`
+
+	// Key Product key
+	Key int32 `json:"key"`
+
+	// Name Product name
+	Name *string `json:"name,omitempty"`
+
+	// ProductUrl Product URL
+	ProductUrl *string `json:"productUrl,omitempty"`
+
+	// Vendor Product vendor
+	Vendor *string `json:"vendor,omitempty"`
+
+	// VendorUrl Product vendor URL
+	VendorUrl *string `json:"vendorUrl,omitempty"`
+
+	// Version Product version
+	Version *string `json:"version,omitempty"`
+}
+
 // RightsizingClusterResponse defines model for RightsizingClusterResponse.
 type RightsizingClusterResponse struct {
 	Cluster  RightsizingClusterUtilization `json:"cluster"`
@@ -790,6 +835,9 @@ type VirtualMachineDetail struct {
 
 	// Processes List of processes detected on this VM
 	Processes *[]Process `json:"processes,omitempty"`
+
+	// Products Products configured in the VM's vApp settings
+	Products *[]Product `json:"products,omitempty"`
 
 	// StorageUsed Storage consumed in bytes
 	StorageUsed *int64 `json:"storageUsed,omitempty"`

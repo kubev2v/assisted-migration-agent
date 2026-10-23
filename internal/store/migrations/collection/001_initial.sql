@@ -125,10 +125,33 @@ CREATE TABLE IF NOT EXISTS vm_applications (
     app_desc VARCHAR NOT NULL,
     vm_id    VARCHAR NOT NULL,
     vm_name  VARCHAR NOT NULL,
+    confidence INTEGER NOT NULL DEFAULT 0,
+    app_vendor VARCHAR,
+    app_category VARCHAR,
     PRIMARY KEY (app_name, vm_id)
 );
 
 CREATE TABLE IF NOT EXISTS tag_categories (
     id VARCHAR,
     name VARCHAR
+);
+
+CREATE TABLE IF NOT EXISTS vm_vapp_products_tmp (
+    vm_id VARCHAR PRIMARY KEY,
+    products_json   VARCHAR,
+);
+
+CREATE TABLE IF NOT EXISTS vm_vapp_products (
+    vm_id           VARCHAR,
+    key             INTEGER NOT NULL DEFAULT 0,
+	class_id        VARCHAR,
+	instance_id     VARCHAR,
+	name            VARCHAR,
+	vendor          VARCHAR,
+	version         VARCHAR,
+	full_version    VARCHAR,
+	vendor_url      VARCHAR,
+	product_url     VARCHAR,
+	app_url         VARCHAR,
+    UNIQUE (vm_id, key)
 );

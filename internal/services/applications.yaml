@@ -1,0 +1,3044 @@
+# Confidence scores: High=75, Medium=50, Low=25.
+# Scores are configured values and do not change based on the signals matched for a VM.
+# Definitions without an explicit score default to 75 when only processes are configured, otherwise 50.
+# When both processes and products are configured, matching defaults to requiring both.
+# Set match to any or all to override the default for an individual application.
+# Certification status: yes requires explicit certification, partner validation, or a released catalog listing.
+# no indicates a documented compatibility blocker or an unsupported VMware appliance.
+# maybe means migration is plausible or certification evidence is missing or conflicting.
+# Each certification_comment explains the evidence; an OpenShift integration does not make a VMware OVA portable.
+
+- name: "Active Directory Domain Services"
+  desc: "Hosts identified as running Active Directory Domain Services"
+  vendor: "Microsoft"
+  category: "Identity / access"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["lsass", "winlogon", "services"]
+    min_matched: 1
+
+- name: "Apache HTTP Server"
+  desc: "Hosts identified as Apache HTTP Server Servers"
+  vendor: "Apache Software Foundation"
+  category: "Web server"
+  containerization_candidate: true
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["httpd"]
+    min_matched: 1
+
+- name: "Apache Kafka"
+  desc: "Hosts identified as Apache Kafka brokers"
+  vendor: "Apache Software Foundation"
+  category: "Messaging / streaming"
+  containerization_candidate: true
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["kafka.Kafka"]
+    min_matched: 1
+
+- name: "Automic Automation Engine"
+  desc: "Hosts identified as Automic Automation Engine Servers"
+  vendor: "Broadcom"
+  category: "Workload automation"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["ucsrvwp", "ucsrvcp"]
+    min_matched: 2
+
+- name: "Automic ServiceManager"
+  desc: "Hosts identified as Automic ServiceManager Servers"
+  vendor: "Broadcom"
+  category: "Workload automation"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["ucybsmgr", "ucxjap6"]
+    min_matched: 2
+
+- name: "Batch Teradata Query"
+  desc: "Hosts identified as Batch Teradata Query Servers"
+  vendor: "Teradata"
+  category: "Data management"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["bteq"]
+    min_matched: 1
+
+- name: "BMC Patrol Agent"
+  desc: "Hosts identified as BMC Patrol Agent Servers"
+  vendor: "BMC"
+  category: "Monitoring"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["PatrolAgent"]
+    min_matched: 1
+
+- name: "CA SystemEdge Client"
+  desc: "Hosts identified as CA SystemEdge Client Servers"
+  vendor: "Broadcom (CA Technologies)"
+  category: "Monitoring"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["sysedge"]
+    min_matched: 1
+
+- name: "CA Workload Automation Agent"
+  desc: "Hosts identified as CA Workload Automation Agent Servers"
+  vendor: "Broadcom (CA Technologies)"
+  category: "Workload automation"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["cybAgent.bin"]
+    min_matched: 1
+
+- name: "Catalyst Warehouse Management System"
+  desc: "Hosts identified as Catalyst Warehouse Management System Servers"
+  vendor: "Catalyst International"
+  category: "Warehouse management"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["catalyst"]
+    min_matched: 1
+
+- name: "Commvault Agent"
+  desc: "Hosts identified as Commvault Agent, Cloud VSA proxy, or MediaAgent systems"
+  vendor: "Commvault"
+  category: "Storage / backup / data protection"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  confidence: 50
+  processes:
+    names: ["cvlaunchd", "cvd", "EvMgrC"]
+    min_matched: 2
+
+- name: "Docker"
+  desc: "Hosts identified as running Docker Daemon"
+  vendor: "Docker"
+  category: "DevOps tooling"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["dockerd"]
+    min_matched: 1
+
+- name: "IBM BigFix Agent"
+  desc: "Hosts identified as IBM BigFix Agent"
+  vendor: "IBM"
+  category: "Endpoint management"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["BESClient"]
+    min_matched: 1
+
+- name: "IBM Cognos Analytics"
+  desc: "Hosts identified as IBM Cognos Analytics Servers"
+  vendor: "IBM"
+  category: "Data management"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["cogbootstrapservice", "CognosCMDerby.jar"]
+    min_matched: 2
+
+- name: "IBM Cognos Business Intelligence"
+  desc: "Hosts identified as IBM Cognos Business Intelligence Servers"
+  vendor: "IBM"
+  category: "Data management"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["cgsServer.sh", "CAM_LPSvr"]
+    min_matched: 2
+
+- name: "IBM DB2 Database Server"
+  desc: "Hosts identified as IBM DB2 Database Servers"
+  vendor: "IBM"
+  category: "Database"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["db2fmp", "db2ckpwd", "db2sysc", "db2wdog"]
+    min_matched: 3
+
+- name: "IBM InfoSphere DataStage"
+  desc: "Hosts identified as IBM InfoSphere DataStage Servers"
+  vendor: "IBM"
+  category: "Data management"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["dscs", "dsapi_slave", "dsjob"]
+    min_matched: 2
+
+- name: "IBM InfoSphere Information Server"
+  desc: "Hosts identified as IBM InfoSphere Information Servers"
+  vendor: "IBM"
+  category: "Data management"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["dsrpcd", "resource_tracker"]
+    min_matched: 2
+
+- name: "IBM Rational ClearCase"
+  desc: "Hosts identified as IBM Rational ClearCase Servers"
+  vendor: "IBM"
+  category: "DevOps tooling"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["albd_server"]
+    min_matched: 1
+
+- name: "IBM Sterling Commerce"
+  desc: "Hosts identified as IBM Sterling Commerce Servers"
+  vendor: "IBM"
+  category: "Middleware / integration"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["agentserverJVM.sh", "startHealthMonitor.sh", "startIntegrationServerJVM.sh"]
+    min_matched: 2
+
+- name: "IBM Tivoli Monitoring"
+  desc: "Hosts identified as IBM Tivoli Monitoring Servers"
+  vendor: "IBM"
+  category: "Monitoring"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["kuxagent"]
+    min_matched: 1
+
+- name: "IBM TSM Backup Client"
+  desc: "Hosts identified as IBM TSM Backup/Archive Client Servers"
+  vendor: "IBM"
+  category: "Backup"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["dsmcad"]
+    min_matched: 1
+
+- name: "IBM TSM Server"
+  desc: "Hosts identified as IBM TSM Servers"
+  vendor: "IBM"
+  category: "Backup"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["dsmserv"]
+    min_matched: 1
+
+- name: "IBM WebSphere Application Server"
+  desc: "Hosts identified as IBM WebSphere Application Servers"
+  vendor: "IBM"
+  category: "Middleware / integration"
+  certified: "yes"
+  certification_comment: "The Red Hat Ecosystem Catalog lists IBM WebSphere Application Server as certified for RHEL 7 and 8, which Red Hat considers compatible with OpenShift Virtualization."
+  confidence: 75
+  processes:
+    names: ["com.ibm.ws.runtime.WsServer"]
+    min_matched: 1
+
+- name: "IBM WebSphere Message Broker"
+  desc: "Hosts identified as IBM WebSphere Message Broker Servers"
+  vendor: "IBM"
+  category: "Middleware / integration"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["bipbroker", "bipservice"]
+    min_matched: 2
+
+- name: "IBM WebSphere MQ Everyplace"
+  desc: "Hosts identified as IBM WebSphere MQ Everyplace Servers"
+  vendor: "IBM"
+  category: "Middleware / integration"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["MQeGateway.jar"]
+    min_matched: 1
+
+- name: "IBM WebSphere MQ File Transfer Edition"
+  desc: "Hosts identified as IBM WebSphere MQ File Transfer Edition Servers"
+  vendor: "IBM"
+  category: "Secure file transfer"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["com.ibm.wmqfte.agent.Agent"]
+    min_matched: 1
+
+- name: "IBM WebSphere MQ Server"
+  desc: "Hosts identified as IBM WebSphere MQ Servers"
+  vendor: "IBM"
+  category: "Middleware / integration"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["amqzxma0"]
+    min_matched: 1
+
+- name: "Informatica PowerCenter"
+  desc: "Hosts identified as Informatica PowerCenter Servers"
+  vendor: "Informatica"
+  category: "Data management"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["pmserver", "pmrepagent", "pmdtm"]
+    min_matched: 2
+
+- name: "IRI Cosort"
+  desc: "Hosts identified as IRI Cosort Servers"
+  vendor: "IRI"
+  category: "Data management"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["sortcl"]
+    min_matched: 1
+
+- name: "JBoss Application Server"
+  desc: "Hosts identified as JBoss Application Servers"
+  vendor: "Red Hat"
+  category: "Middleware / integration"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["jboss"]
+    min_matched: 1
+
+- name: "Java"
+  desc: "Hosts identified as running Java applications"
+  vendor: "Multiple vendors"
+  category: "Application runtime"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["java"]
+    min_matched: 1
+
+- name: "Kubernetes Kubelet"
+  desc: "Hosts identified as running Kubernetes Kubelet"
+  vendor: "Kubernetes project"
+  category: "Container orchestration"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["kubelet"]
+    min_matched: 1
+
+- name: "LPAR2RRD Agent"
+  desc: "Hosts identified as LPAR2RRD Agent Servers"
+  vendor: "LPAR2RRD"
+  category: "Monitoring"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["lpar2rrd-agent.pl"]
+    min_matched: 1
+
+- name: "Manhattan Warehouse Management"
+  desc: "Hosts identified as Manhattan Warehouse Management Servers"
+  vendor: "Manhattan Associates"
+  category: "Warehouse management"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["PkManager.py"]
+    min_matched: 1
+
+- name: "Memcached"
+  desc: "Hosts identified as running Memcached Server"
+  vendor: "Memcached project"
+  category: "Data management"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["memcached"]
+    min_matched: 1
+
+- name: "MicroStrategy Intelligence Server"
+  desc: "Hosts identified as MicroStrategy Intelligence Servers"
+  vendor: "MicroStrategy"
+  category: "Data analytics"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["MSTRSvr"]
+    min_matched: 1
+
+- name: "Microsoft Exchange Server"
+  desc: "Hosts identified as running Microsoft Exchange Server"
+  vendor: "Microsoft"
+  category: "Email / collaboration"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["store", "mad", "MSExchangeIS"]
+    min_matched: 1
+
+- name: "Microsoft IIS"
+  desc: "Hosts identified as running Microsoft Internet Information Services (IIS)"
+  vendor: "Microsoft"
+  category: "Web server"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["w3wp", "inetinfo"]
+    min_matched: 1
+
+- name: "Microsoft Remote Desktop Services"
+  desc: "Hosts identified as running Microsoft Remote Desktop Services"
+  vendor: "Microsoft"
+  category: "Remote access / EUC"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["TermService", "rdpinit"]
+    min_matched: 1
+
+- name: "Microsoft SQL Server"
+  desc: "Hosts identified as running Microsoft SQL Server"
+  vendor: "Microsoft"
+  category: "Database"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["sqlservr", "sqlbrowser"]
+    min_matched: 1
+
+- name: "MySQL"
+  desc: "Hosts identified as running MySQL Database Server"
+  vendor: "Oracle (MySQL)"
+  category: "Database"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["mysqld"]
+    min_matched: 1
+
+- name: "NFS Server"
+  desc: "Hosts identified as running NFS (Network File System) Servers"
+  vendor: "Multiple vendors"
+  category: "Storage management"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["nfsd", "rpc.nfsd"]
+    min_matched: 1
+
+- name: "Nginx"
+  desc: "Hosts identified as running Nginx Web Server"
+  vendor: "F5 (NGINX)"
+  category: "Application delivery / load balancing"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["nginx"]
+    min_matched: 1
+
+- name: "Objective Development Sharity"
+  desc: "Hosts identified as Objective Development Sharity Servers"
+  vendor: "Objective Development"
+  category: "Storage management"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["sharityd"]
+    min_matched: 1
+
+- name: "Opswise Universal Agent"
+  desc: "Hosts identified as Opswise Universal Agent Servers"
+  vendor: "Stonebranch"
+  category: "Workload automation"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["ubrokerd"]
+    min_matched: 1
+
+- name: "OptiFlowMgr"
+  desc: "Hosts identified as OptiFlowMgr Servers"
+  vendor: "Unknown"
+  category: "Unclassified"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["startOFM", "optiflomgr.jar"]
+    min_matched: 2
+
+- name: "Oracle Automatic Storage Management"
+  desc: "Hosts identified as Oracle Automatic Storage Management (ASM) Servers"
+  vendor: "Oracle"
+  category: "Storage management"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["asm_mmon_", "asm_pmon_", "asm_smon_"]
+    min_matched: 3
+
+- name: "Oracle Business Intelligence"
+  desc: "Hosts identified as Oracle Business Intelligence Servers"
+  vendor: "Oracle"
+  category: "Data analytics"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["nqsclustercontroller", "sawserver", "nqsserver"]
+    min_matched: 2
+
+- name: "Oracle Concurrent Manager"
+  desc: "Hosts identified as Oracle Concurrent Manager Servers"
+  vendor: "Oracle"
+  category: "Business operations"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["FNDSM", "FNDLIBR", "FNDIMON"]
+    min_matched: 2
+
+- name: "Oracle Configuration Manager"
+  desc: "Hosts identified as Oracle Configuration Manager Servers"
+  vendor: "Oracle"
+  category: "Infrastructure management"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["nmz"]
+    min_matched: 1
+
+- name: "Oracle Data Integrator Agent"
+  desc: "Hosts identified as Oracle Data Integrator Agent Servers"
+  vendor: "Oracle"
+  category: "Data management"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["agent.sh", "oracle.odi.Agent"]
+    min_matched: 1
+
+- name: "Oracle Database"
+  desc: "Hosts identified as Oracle Database Servers"
+  vendor: "Oracle"
+  category: "Database"
+  certified: "maybe"
+  certification_comment: "OpenShift Virtualization testing and guidance are documented, but the partner status says released and not on the catalog, so certification remains unconfirmed."
+  processes:
+    names: ["ora_mmon_", "ora_pmon_", "ora_smon_", "tnslsnr"]
+    min_matched: 3
+
+- name: "Oracle Enterprise Manager"
+  desc: "Hosts identified as Oracle Enterprise Manager Servers"
+  vendor: "Oracle"
+  category: "Infrastructure management"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["emwd.pl"]
+    min_matched: 1
+
+- name: "Oracle ESSBASE Server"
+  desc: "Hosts identified as Oracle ESSBASE Servers"
+  vendor: "Oracle"
+  category: "Data management"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["ESSBASE", "ESSSVR"]
+    min_matched: 2
+
+- name: "Oracle HTTP Server"
+  desc: "Hosts identified as Oracle HTTP Servers"
+  vendor: "Oracle"
+  category: "Web server"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["httpd.worker", "oracle"]
+    min_matched: 2
+
+- name: "Oracle Real Application Clusters"
+  desc: "Hosts identified as Oracle Real Application Clusters Servers"
+  vendor: "Oracle"
+  category: "Database"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["ocssd", "cssdmonitor", "cssdagent"]
+    min_matched: 2
+
+- name: "Oracle WebLogic Server"
+  desc: "Hosts identified as Oracle WebLogic Servers"
+  vendor: "Oracle"
+  category: "Middleware / integration"
+  certified: "yes"
+  certification_comment: "Oracle WebLogic Server is Partner Validated for OpenShift Container Platform, with OpenShift Virtualization listed as a supported infrastructure feature."
+  processes:
+    names: ["startWebLogic.sh", "startManagedWebLogic.sh", "weblogic.Server", "opmn"]
+    min_matched: 1
+
+- name: "PostgreSQL"
+  desc: "Hosts identified as running PostgreSQL Database Server"
+  vendor: "PostgreSQL project"
+  category: "Database"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["postgres"]
+    min_matched: 1
+
+- name: "Quest Authentication Services"
+  desc: "Hosts identified as Quest Authentication Services Servers"
+  vendor: "Quest Software"
+  category: "Identity / access"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["vasd"]
+    min_matched: 1
+
+- name: "RRD Tool"
+  desc: "Hosts identified as RRD Tool Servers"
+  vendor: "RRDtool project"
+  category: "Monitoring"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["rrdtool"]
+    min_matched: 1
+
+- name: "RabbitMQ"
+  desc: "Hosts identified as running RabbitMQ Server"
+  vendor: "Broadcom (VMware)"
+  category: "Middleware / integration"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["rabbitmq-server"]
+    min_matched: 1
+
+- name: "Redis"
+  desc: "Hosts identified as running Redis Server"
+  vendor: "Redis"
+  category: "Data management"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["redis-server"]
+    min_matched: 1
+
+- name: "SAS Intelligent Planning Suite"
+  desc: "Hosts identified as SAS Intelligent Planning Suite Servers"
+  vendor: "SAS"
+  category: "Planning / analytics"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["startSMPS.sh", "httpd.worker", "SASWebServer"]
+    min_matched: 2
+
+- name: "SAS Merchandise Planning Server"
+  desc: "Hosts identified as SAS Merchandise Planning Server Servers"
+  vendor: "SAS"
+  category: "Planning / analytics"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["BPServer", "MEServer"]
+    min_matched: 2
+
+- name: "SAS Scalable Performance Data Server"
+  desc: "Hosts identified as SAS Scalable Performance Data Servers"
+  vendor: "SAS"
+  category: "Data management"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["spdssnet", "spdsnsrv"]
+    min_matched: 2
+
+- name: "SAP Adaptive Server Enterprise"
+  desc: "Hosts identified as SAP ASE (Sybase) Database Servers"
+  vendor: "SAP"
+  category: "Database"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["dataserver", "backupserver"]
+    min_matched: 2
+
+- name: "SAP Application Server ABAP"
+  desc: "Hosts identified as SAP Application Server ABAP instances"
+  vendor: "SAP"
+  category: "Middleware / integration"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["disp+work", "sapstartsrv", "icman", "gwrd"]
+    min_matched: 2
+
+- name: "SAP Business Objects"
+  desc: "Hosts identified as SAP Business Objects Servers"
+  vendor: "SAP"
+  category: "Data analytics"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["SIA.sh", "boe_", "webiserver"]
+    min_matched: 1
+
+- name: "SAP Content Server"
+  desc: "Hosts identified as SAP Content Servers"
+  vendor: "SAP"
+  category: "Content management"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["sapcontentserver"]
+    min_matched: 1
+
+- name: "SAP HANA Database"
+  desc: "Hosts identified as SAP HANA Database Servers"
+  vendor: "SAP"
+  category: "Database"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["hdbdaemon", "hdbnameserver", "hdbindexserver", "hdbcompileserver", "hdbpreprocessor"]
+    min_matched: 2
+
+- name: "SAP Host Agent"
+  desc: "Hosts identified as SAP Host Agent Servers"
+  vendor: "SAP"
+  category: "Infrastructure management"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["saphostexec", "saposcol"]
+    min_matched: 2
+
+- name: "SAP NetWeaver Application Server Java"
+  desc: "Hosts identified as SAP NetWeaver Application Server Java instances"
+  vendor: "SAP"
+  category: "Middleware / integration"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["jstart", "jcontrol", "sapstartsrv"]
+    min_matched: 2
+
+- name: "SAP NetWeaver Gateway"
+  desc: "Hosts identified as SAP NetWeaver Gateway Servers"
+  vendor: "SAP"
+  category: "Middleware / integration"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["msg_server", "enserver", "enrepserver"]
+    min_matched: 2
+
+- name: "SAP Router"
+  desc: "Hosts identified as SAP Router Servers"
+  vendor: "SAP"
+  category: "Network management"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["saprouter"]
+    min_matched: 1
+
+- name: "SAP Solution Manager Diagnostic Agent"
+  desc: "Hosts identified as SAP Solution Manager Diagnostic Agent Servers"
+  vendor: "SAP"
+  category: "Monitoring"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["sapstartsrv", "daaadm"]
+    min_matched: 2
+
+- name: "SAP Web Dispatcher"
+  desc: "Hosts identified as SAP Web Dispatcher Servers"
+  vendor: "SAP"
+  category: "Application delivery / load balancing"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["sapwebdisp"]
+    min_matched: 1
+
+- name: "Samba"
+  desc: "Hosts identified as Samba Servers"
+  vendor: "Samba project"
+  category: "Storage management"
+  certified: "yes"
+  certification_comment: "The Red Hat Ecosystem Catalog lists Samba as certified for RHEL 7, which Red Hat considers compatible with OpenShift Virtualization."
+  processes:
+    names: ["smbd", "nmbd"]
+    min_matched: 2
+
+- name: "Squid Proxy"
+  desc: "Hosts identified as running Squid Proxy Server"
+  vendor: "Squid project"
+  category: "Proxy / SWG / visibility / NAC"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["squid"]
+    min_matched: 1
+
+- name: "Tripwire Agent"
+  desc: "Hosts identified as Tripwire Agent Servers"
+  vendor: "Tripwire"
+  category: "Security management"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["twagent", "tegesd", "tesvc"]
+    min_matched: 2
+
+- name: "WebMethods Integration Server"
+  desc: "Hosts identified as WebMethods Integration Servers"
+  vendor: "IBM"
+  category: "Middleware / integration"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["server.sh", "wm-isproxy.jar"]
+    min_matched: 2
+
+- name: "sshd"
+  desc: "Hosts identified as running the OpenSSH SSH daemon"
+  vendor: "OpenSSH project"
+  category: "Remote access"
+  certified: "maybe"
+  certification_comment: "Process detection identifies the software, but does not establish its OpenShift Virtualization certification or support."
+  processes:
+    names: ["sshd"]
+    min_matched: 1
+
+- name: "Palo Alto VM-Series NGFW"
+  desc: "VMs identified by Palo Alto Networks VM-Series vApp product metadata"
+  vendor: "Palo Alto Networks"
+  category: "Firewall / NGFW / routing / SD-WAN"
+  certified: "yes"
+  certification_comment: "Red Hat Ecosystem Catalog lists VM-Series as Partner Validated for OpenShift Virtualization."
+  confidence: 50
+  products:
+    - name_contains: ["PA-VM", "VM-Series"]
+      vendor_contains: ["Palo Alto Networks"]
+
+- name: "Palo Alto Panorama"
+  desc: "VMs identified by Panorama vApp product metadata"
+  vendor: "Palo Alto Networks"
+  category: "Firewall / NGFW / routing / SD-WAN"
+  certified: "yes"
+  certification_comment: "Palo Alto Networks Panorama is Partner Validated for OpenShift Virtualization in the Red Hat Ecosystem Catalog."
+  confidence: 50
+  products:
+    - name_contains: ["Panorama"]
+
+- name: "Cisco Secure Firewall Threat Defense Virtual"
+  desc: "VMs identified by Cisco Threat Defense vApp product metadata"
+  vendor: "Cisco"
+  category: "Firewall / NGFW / routing / SD-WAN"
+  certified: "maybe"
+  certification_comment: "A KVM or OS-installation path appears feasible, but product-specific OpenShift Virtualization validation is not established by this assessment."
+  confidence: 75
+  products:
+    - name_contains: ["Threat Defense Virtual", "Firepower Threat Defense Virtual"]
+      vendor_contains: ["Cisco Systems, Inc.", "Cisco"]
+
+- name: "Cisco ASAv"
+  desc: "VMs identified by Cisco ASAv vApp product metadata"
+  vendor: "Cisco"
+  category: "Firewall / NGFW / routing / SD-WAN"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_contains: ["Adaptive Security Virtual Appliance", "ASAv"]
+      vendor_contains: ["Cisco Systems, Inc.", "Cisco"]
+
+- name: "Cisco Catalyst 8000V Edge"
+  desc: "VMs identified by Cisco Catalyst 8000V or CSR 1000V vApp product metadata"
+  vendor: "Cisco"
+  category: "Firewall / NGFW / routing / SD-WAN"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_contains: ["Catalyst 8000V", "CSR 1000V"]
+      vendor_contains: ["Cisco Systems, Inc.", "Cisco"]
+
+- name: "Cisco Catalyst 9800-CL Wireless Controller"
+  desc: "VMs identified by Catalyst 9800-CL vApp product metadata"
+  vendor: "Cisco"
+  category: "Firewall / NGFW / routing / SD-WAN"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_contains: ["Catalyst 9800-CL"]
+
+- name: "Cisco Identity Services Engine"
+  desc: "VMs identified by Identity Services Engine vApp product metadata"
+  vendor: "Cisco"
+  category: "Firewall / NGFW / routing / SD-WAN"
+  certified: "maybe"
+  certification_comment: "A KVM or OS-installation path appears feasible, but product-specific OpenShift Virtualization validation is not established by this assessment."
+  confidence: 50
+  products:
+    - name_contains: ["Identity Services Engine"]
+
+- name: "Arista CloudEOS / vEOS Router"
+  desc: "VMs identified by Arista CloudEOS or vEOS vApp product metadata"
+  vendor: "Arista"
+  category: "Firewall / NGFW / routing / SD-WAN"
+  certified: "maybe"
+  certification_comment: "A KVM or OS-installation path appears feasible, but product-specific OpenShift Virtualization validation is not established by this assessment."
+  confidence: 50
+  products:
+    - name_contains: ["CloudEOS", "vEOS"]
+      vendor_contains: ["Arista Networks"]
+
+- name: "Fortinet FortiGate-VM"
+  desc: "VMs identified by FortiGate vApp product metadata"
+  vendor: "Fortinet"
+  category: "Firewall / NGFW / routing / SD-WAN"
+  certified: "yes"
+  certification_comment: "Red Hat Ecosystem Catalog lists FortiGate-VM as Partner Validated for OpenShift Virtualization."
+  confidence: 50
+  products:
+    - name_contains: ["FortiGate"]
+      vendor_contains: ["Fortinet"]
+
+- name: "Juniper vSRX Virtual Firewall"
+  desc: "VMs identified by Juniper vSRX vApp product metadata"
+  vendor: "Juniper Networks"
+  category: "Firewall / NGFW / routing / SD-WAN"
+  certified: "maybe"
+  certification_comment: "A KVM or OS-installation path appears feasible, but product-specific OpenShift Virtualization validation is not established by this assessment."
+  confidence: 50
+  products:
+    - name_contains: ["vSRX"]
+      vendor_contains: ["Juniper Networks"]
+
+- name: "Check Point CloudGuard Network Security Gateway"
+  desc: "VMs identified by Check Point CloudGuard vApp product metadata"
+  vendor: "Check Point"
+  category: "Firewall / NGFW / routing / SD-WAN"
+  certified: "no"
+  certification_comment: "The VMware appliance has an explicit NSX/vCenter coupling blocker or no identified KVM deployment path."
+  confidence: 50
+  products:
+    - name_contains: ["CloudGuard"]
+      vendor_contains: ["Check Point"]
+
+- name: "SonicWall NSv Series"
+  desc: "VMs identified by SonicWall NSv vApp product metadata"
+  vendor: "SonicWall"
+  category: "Firewall / NGFW / routing / SD-WAN"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_contains: ["NSv"]
+      vendor_contains: ["SonicWall"]
+
+- name: "Sophos Firewall"
+  desc: "VMs identified by Sophos Firewall vApp product metadata"
+  vendor: "Sophos"
+  category: "Firewall / NGFW / routing / SD-WAN"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_contains: ["Sophos Firewall"]
+      vendor_contains: ["Sophos"]
+
+- name: "HPE Aruba ClearPass"
+  desc: "VMs identified by ClearPass Policy Manager vApp product metadata"
+  vendor: "HPE Aruba Networking"
+  category: "Firewall / NGFW / routing / SD-WAN"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_contains: ["ClearPass Policy Manager"]
+
+- name: "HPE Aruba EdgeConnect Virtual"
+  desc: "VMs identified by EdgeConnect vApp product metadata"
+  vendor: "HPE Aruba Networking"
+  category: "Firewall / NGFW / routing / SD-WAN"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_contains: ["EdgeConnect"]
+      vendor_contains: ["Silver Peak", "HPE"]
+
+- name: "F5 BIG-IP Virtual Edition"
+  desc: "VMs identified by F5 BIG-IP vApp product metadata"
+  vendor: "F5"
+  category: "Application delivery / load balancing"
+  certified: "yes"
+  certification_comment: "The appliance assessment identifies this product as vendor-certified for OpenShift Virtualization."
+  confidence: 50
+  products:
+    - name_contains: ["BIG-IP"]
+      vendor_contains: ["F5 Networks", "F5"]
+
+- name: "NetScaler VPX"
+  desc: "VMs identified by NetScaler VPX or Citrix ADC VPX vApp product metadata"
+  vendor: "NetScaler (Cloud Software Group)"
+  category: "Application delivery / load balancing"
+  certified: "yes"
+  certification_comment: "The appliance assessment identifies this product as vendor-certified for OpenShift Virtualization."
+  confidence: 75
+  products:
+    - name_contains: ["NetScaler VPX", "Citrix ADC VPX"]
+
+- name: "A10 vThunder"
+  desc: "VMs identified by A10 vThunder vApp product metadata"
+  vendor: "A10 Networks"
+  category: "Application delivery / load balancing"
+  certified: "maybe"
+  certification_comment: "A KVM image exists, but product-specific OpenShift Virtualization validation is not recorded."
+  confidence: 50
+  products:
+    - name_contains: ["vThunder"]
+      vendor_contains: ["A10 Networks"]
+
+- name: "Avi Controller / NSX Advanced Load Balancer"
+  desc: "VMs identified by Avi Controller or NSX Advanced Load Balancer vApp product metadata"
+  vendor: "Broadcom / VMware"
+  category: "Application delivery / load balancing"
+  certified: "no"
+  certification_comment: "The VMware appliance has an explicit NSX/vCenter coupling blocker or no identified KVM deployment path."
+  confidence: 75
+  products:
+    - name_contains: ["Avi Controller", "NSX Advanced Load Balancer"]
+
+- name: "Broadcom Edge SWG (ProxySG) Virtual Appliance"
+  desc: "VMs identified by ProxySG or Edge SWG vApp product metadata"
+  vendor: "Broadcom (Symantec)"
+  category: "Proxy / SWG / visibility / NAC"
+  certified: "maybe"
+  certification_comment: "A KVM image exists, but product-specific OpenShift Virtualization validation is not recorded."
+  confidence: 50
+  products:
+    - name_contains: ["ProxySG-VA", "ProxySG-Enterprise-VA", "Edge SWG"]
+
+- name: "Zscaler Virtual Service Edge"
+  desc: "VMs identified by Zscaler Virtual Service Edge vApp product metadata"
+  vendor: "Zscaler"
+  category: "Proxy / SWG / visibility / NAC"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_contains: ["Virtual Service Edge", "Service Edge"]
+      vendor_contains: ["Zscaler"]
+
+- name: "Forescout eyeSight / CounterACT"
+  desc: "VMs identified by Forescout eyeSight or CounterACT vApp product metadata"
+  vendor: "Forescout"
+  category: "Proxy / SWG / visibility / NAC"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_contains: ["Forescout", "CounterACT"]
+
+- name: "Corelight Open NDR Sensor"
+  desc: "VMs identified by Corelight Open NDR vApp product metadata"
+  vendor: "Corelight"
+  category: "Proxy / SWG / visibility / NAC"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_contains: ["Open NDR"]
+      vendor_contains: ["Corelight"]
+
+- name: "Tenable Core"
+  desc: "VMs identified by Tenable Core vApp product and guest process metadata"
+  vendor: "Tenable"
+  category: "Vulnerability / SIEM / endpoint"
+  certified: "maybe"
+  certification_comment: "A KVM image exists, but product-specific OpenShift Virtualization validation is not recorded."
+  confidence: 75
+  match: all
+  processes:
+    names: ["nessusd", "cockpit-ws", "SecurityCenter"]
+    min_matched: 1
+  products:
+    - name_contains: ["Tenable Core"]
+
+- name: "Dell PowerProtect DD Virtual Edition"
+  desc: "VMs identified by Dell PowerProtect DD vApp product metadata"
+  vendor: "Dell Technologies"
+  category: "Storage / backup / data protection"
+  certified: "maybe"
+  certification_comment: "A KVM image exists, but product-specific OpenShift Virtualization validation is not recorded."
+  confidence: 75
+  products:
+    - name_contains: ["DD Virtual Edition"]
+      vendor_contains: ["Dell EMC", "Dell"]
+
+- name: "NetApp Active IQ Unified Manager"
+  desc: "VMs identified by Active IQ Unified Manager vApp product metadata"
+  vendor: "NetApp"
+  category: "Storage / backup / data protection"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_contains: ["Active IQ Unified Manager", "OnCommand Unified Manager"]
+
+- name: "Veeam Software Appliance"
+  desc: "VMs identified by Veeam Software Appliance vApp product metadata"
+  vendor: "Veeam"
+  category: "Storage / backup / data protection"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_contains: ["Veeam Software Appliance"]
+      vendor_contains: ["Veeam Software", "Veeam"]
+
+- name: "Nasuni Edge Appliance / Management Console"
+  desc: "VMs identified by Nasuni vApp product metadata"
+  vendor: "Nasuni"
+  category: "Storage / backup / data protection"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_contains: ["Nasuni Edge", "Nasuni Management Console"]
+      vendor_contains: ["Nasuni"]
+
+- name: "NAKIVO Backup & Replication Appliance"
+  desc: "VMs identified by NAKIVO Backup & Replication vApp product metadata"
+  vendor: "NAKIVO"
+  category: "Storage / backup / data protection"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_contains: ["NAKIVO Backup", "NAKIVO Backup & Replication"]
+
+- name: "Infoblox vNIOS"
+  desc: "VMs identified by Infoblox NIOS vApp product metadata"
+  vendor: "Infoblox"
+  category: "DNS / IPAM / identity / EUC"
+  certified: "maybe"
+  certification_comment: "A KVM image exists, but product-specific OpenShift Virtualization validation is not recorded."
+  confidence: 50
+  products:
+    - name_contains: ["Infoblox NIOS"]
+      vendor_contains: ["Infoblox"]
+
+- name: "Omnissa Unified Access Gateway"
+  desc: "VMs identified by Unified Access Gateway vApp product metadata"
+  vendor: "Omnissa"
+  category: "DNS / IPAM / identity / EUC"
+  certified: "no"
+  certification_comment: "The VMware appliance has an explicit NSX/vCenter coupling blocker or no identified KVM deployment path."
+  confidence: 75
+  products:
+    - name_contains: ["Unified Access Gateway", "VMware Unified Access Gateway"]
+
+- name: "VMware NSX Manager / NSX Edge"
+  desc: "VMs identified by NSX vApp product metadata"
+  vendor: "Broadcom / VMware"
+  category: "VMware control plane (replace, do not migrate)"
+  certified: "no"
+  certification_comment: "This is part of the VMware control plane and should be replaced rather than migrated to OpenShift Virtualization."
+  confidence: 75
+  products:
+    - name_contains: ["VMware NSX", "NSX Manager", "NSX Edge"]
+    - name_equals: ["NSX"]
+
+- name: "VMware VCF Operations"
+  desc: "VMs identified by VMware Aria Operations, vRealize Operations, or Log Insight vApp product metadata"
+  vendor: "Broadcom / VMware"
+  category: "VMware control plane (replace, do not migrate)"
+  certified: "no"
+  certification_comment: "This is part of the VMware control plane and should be replaced rather than migrated to OpenShift Virtualization."
+  confidence: 75
+  products:
+    - name_contains: ["VMware Aria Operations", "vRealize Operations", "Log Insight"]
+
+- name: "Cisco Firepower Management Center Virtual"
+  desc: "VMs identified by Cisco Firepower Management Center vApp product metadata"
+  vendor: "Cisco"
+  category: "Firewall / NGFW / routing / SD-WAN"
+  certified: "maybe"
+  certification_comment: "A KVM image exists, but product-specific OpenShift Virtualization validation is not recorded."
+  confidence: 75
+  products:
+    - name_contains: ["Firepower Management Center Virtual", "Secure Firewall Management Center Virtual"]
+      vendor_contains: ["Cisco Systems, Inc.", "Cisco"]
+
+- name: "Check Point Security Management Server"
+  desc: "VMs identified by Check Point Security Management Server vApp product metadata"
+  vendor: "Check Point"
+  category: "Firewall / NGFW / routing / SD-WAN"
+  certified: "yes"
+  certification_comment: "Check Point Security Management is Partner Validated for OpenShift Virtualization in the Red Hat Ecosystem Catalog."
+  confidence: 50
+  products:
+    - name_contains: ["Security Management Server", "Firewall Management Console"]
+      vendor_contains: ["Check Point"]
+
+- name: "NetScaler Console / ADM"
+  desc: "VMs identified by NetScaler Console, Citrix ADM, or MAS vApp product metadata"
+  vendor: "NetScaler (Cloud Software Group)"
+  category: "Application delivery / load balancing"
+  certified: "maybe"
+  certification_comment: "A KVM image exists, but product-specific OpenShift Virtualization validation is not recorded."
+  confidence: 50
+  products:
+    - name_contains: ["NetScaler Console", "Citrix ADM", "NetScaler MAS"]
+      name_equals: ["MAS"]
+      vendor_contains: ["NetScaler", "Citrix", "Cloud Software Group"]
+
+- name: "Dell OpenManage Enterprise"
+  desc: "VMs identified by Dell OpenManage Enterprise vApp product metadata"
+  vendor: "Dell Technologies"
+  category: "Infrastructure management"
+  certified: "maybe"
+  certification_comment: "A KVM image exists, but product-specific OpenShift Virtualization validation is not recorded."
+  confidence: 50
+  products:
+    - name_contains: ["OpenManage Enterprise"]
+      vendor_contains: ["Dell"]
+
+- name: "Dell PowerProtect Data Manager"
+  desc: "VMs identified by PowerProtect Data Manager vApp product metadata"
+  vendor: "Dell Technologies"
+  category: "Storage / backup / data protection"
+  certified: "no"
+  certification_comment: "The detected VMware appliance has no supported KVM path. Dell Partner Validated OpenShift support protects OpenShift VMs, but does not make this VMware appliance image migratable."
+  confidence: 50
+  products:
+    - name_contains: ["PowerProtect Data Manager"]
+
+- name: "IBM DataPower Gateway"
+  desc: "VMs identified by IBM DataPower Gateway vApp product metadata"
+  vendor: "IBM"
+  category: "Middleware / integration"
+  certified: "yes"
+  certification_comment: "IBM DataPower Gateway is Partner Validated for OpenShift Virtualization in the Red Hat Ecosystem Catalog."
+  confidence: 50
+  products:
+    - name_contains: ["IBM DataPower Gateway"]
+
+# Appliance family fallbacks with exact product-name matching.
+# These rows have no explicit vApp product alias; use an exact product-name match on the family label.
+
+- name: "CloudVision Portal (CVP)"
+  desc: "Hosts identified by an exact vApp product name for CloudVision Portal (CVP)"
+  vendor: "Arista"
+  category: "Firewall / NGFW / routing / SD-WAN"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["CloudVision Portal (CVP)"]
+
+- name: "FortiManager VM"
+  desc: "Hosts identified by an exact vApp product name for FortiManager VM"
+  vendor: "Fortinet"
+  category: "Firewall / NGFW / routing / SD-WAN"
+  certified: "yes"
+  certification_comment: "The Red Hat Ecosystem Catalog lists Fortinet FortiManager KVM as Partner Validated for OpenShift Virtualization."
+  confidence: 50
+  products:
+    - name_equals: ["FortiManager VM"]
+
+- name: "FortiAnalyzer VM"
+  desc: "Hosts identified by an exact vApp product name for FortiAnalyzer VM"
+  vendor: "Fortinet"
+  category: "Firewall / NGFW / routing / SD-WAN"
+  certified: "maybe"
+  certification_comment: "A KVM or OS-installation path appears feasible, but product-specific OpenShift Virtualization validation is not established by this assessment."
+  confidence: 50
+  products:
+    - name_equals: ["FortiAnalyzer VM"]
+
+- name: "vMX Virtual Router"
+  desc: "Hosts identified by an exact vApp product name for vMX Virtual Router"
+  vendor: "Juniper Networks"
+  category: "Firewall / NGFW / routing / SD-WAN"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["vMX Virtual Router"]
+
+- name: "GigaVUE V Series node (Cloud Suite for VMware)"
+  desc: "Hosts identified by an exact vApp product name for GigaVUE V Series node (Cloud Suite for VMware)"
+  vendor: "Gigamon"
+  category: "Proxy / SWG / visibility / NAC"
+  certified: "no"
+  certification_comment: "The VMware appliance has an explicit NSX/vCenter coupling blocker or no identified KVM deployment path."
+  confidence: 75
+  products:
+    - name_equals: ["GigaVUE V Series node (Cloud Suite for VMware)"]
+
+- name: "Rapid7 InsightVM / Nexpose Security Console virtual appliance"
+  desc: "Hosts identified by Rapid7 InsightVM guest processes and vApp product name"
+  vendor: "Rapid7"
+  category: "Vulnerability / SIEM / endpoint"
+  certified: "maybe"
+  certification_comment: "A KVM image exists, but product-specific OpenShift Virtualization validation is not recorded."
+  match: all
+  confidence: 50
+  processes:
+    names: ["nsc.sh", "nse.sh"]
+    min_matched: 1
+  products:
+    - name_equals: ["InsightVM / Nexpose Security Console virtual appliance"]
+
+- name: "Virtual Scanner Appliance (qVSA)"
+  desc: "Hosts identified by an exact vApp product name for Virtual Scanner Appliance (qVSA)"
+  vendor: "Qualys"
+  category: "Vulnerability / SIEM / endpoint"
+  certified: "yes"
+  certification_comment: "Qualys Virtual Scanner Appliance is Partner Validated for OpenShift Virtualization in the Red Hat Ecosystem Catalog."
+  confidence: 75
+  products:
+    - name_equals: ["Virtual Scanner Appliance (qVSA)"]
+
+- name: "QRadar SIEM virtual appliance"
+  desc: "Hosts identified by an exact vApp product name for QRadar SIEM virtual appliance"
+  vendor: "IBM"
+  category: "Vulnerability / SIEM / endpoint"
+  certified: "maybe"
+  certification_comment: "A KVM or OS-installation path appears feasible, but product-specific OpenShift Virtualization validation is not established by this assessment."
+  confidence: 50
+  products:
+    - name_equals: ["QRadar SIEM virtual appliance"]
+
+- name: "Deep Security"
+  desc: "Hosts identified by an exact vApp product name for Deep Security"
+  vendor: "Trend Micro"
+  category: "Vulnerability / SIEM / endpoint"
+  certified: "no"
+  certification_comment: "The VMware appliance has an explicit NSX/vCenter coupling blocker or no identified KVM deployment path."
+  confidence: 50
+  products:
+    - name_equals: ["Deep Security"]
+
+- name: "ONTAP Select"
+  desc: "Hosts identified by an exact vApp product name for ONTAP Select"
+  vendor: "NetApp"
+  category: "Storage / backup / data protection"
+  certified: "no"
+  certification_comment: "The appliance assessment flags VMware/NSX coupling or a missing KVM path. A separate completed OpenShift Virtualization reference architecture does not certify or make this VMware appliance image migratable."
+  confidence: 50
+  products:
+    - name_equals: ["ONTAP Select"]
+
+- name: "Zerto Virtual Manager Appliance (ZVMA)"
+  desc: "Hosts identified by an exact vApp product name for Zerto Virtual Manager Appliance (ZVMA)"
+  vendor: "Zerto (HPE)"
+  category: "Storage / backup / data protection"
+  certified: "no"
+  certification_comment: "The VMware appliance has an explicit NSX/vCenter coupling blocker or no identified KVM deployment path."
+  confidence: 75
+  products:
+    - name_equals: ["Zerto Virtual Manager Appliance (ZVMA)"]
+
+- name: "vCenter Server Appliance (VCSA)"
+  desc: "Hosts identified by an exact vApp product name for vCenter Server Appliance (VCSA)"
+  vendor: "Broadcom / VMware"
+  category: "VMware control plane (replace, do not migrate)"
+  certified: "no"
+  certification_comment: "This is part of the VMware control plane and should be replaced rather than migrated to OpenShift Virtualization."
+  confidence: 75
+  products:
+    - name_equals: ["vCenter Server Appliance (VCSA)"]
+
+- name: "Unified Communications Manager (CUCM)"
+  desc: "Hosts identified by an exact vApp product name for Unified Communications Manager (CUCM)"
+  vendor: "Cisco"
+  category: "Unified communications"
+  certified: "no"
+  certification_comment: "The vendor excludes KVM deployment for this product."
+  confidence: 75
+  products:
+    - name_equals: ["Unified Communications Manager (CUCM)"]
+
+- name: "Unity Connection"
+  desc: "Hosts identified by an exact vApp product name for Unity Connection"
+  vendor: "Cisco"
+  category: "Unified communications"
+  certified: "no"
+  certification_comment: "The vendor excludes KVM deployment for this product."
+  confidence: 75
+  products:
+    - name_equals: ["Unity Connection"]
+
+- name: "Emergency Responder (CER)"
+  desc: "Hosts identified by an exact vApp product name for Emergency Responder (CER)"
+  vendor: "Cisco"
+  category: "Unified communications"
+  certified: "no"
+  certification_comment: "The vendor excludes KVM deployment for this product."
+  confidence: 75
+  products:
+    - name_equals: ["Emergency Responder (CER)"]
+
+- name: "ACI Virtual APIC (vAPIC)"
+  desc: "Hosts identified by an exact vApp product name for ACI Virtual APIC (vAPIC)"
+  vendor: "Cisco"
+  category: "Firewall / NGFW / routing / SD-WAN"
+  certified: "no"
+  certification_comment: "The appliance is documented as VMware-only, with no supported KVM deployment path."
+  confidence: 50
+  products:
+    - name_equals: ["ACI Virtual APIC (vAPIC)"]
+
+- name: "NetScaler ADM Agent"
+  desc: "Hosts identified by an exact vApp product name for NetScaler ADM Agent"
+  vendor: "NetScaler (Cloud Software Group)"
+  category: "Application delivery / load balancing"
+  certified: "maybe"
+  certification_comment: "A KVM image exists, but product-specific OpenShift Virtualization validation is not recorded."
+  confidence: 50
+  products:
+    - name_equals: ["NetScaler ADM Agent"]
+
+- name: "Data Protection Central (DPC)"
+  desc: "Hosts identified by an exact vApp product name for Data Protection Central (DPC)"
+  vendor: "Dell Technologies"
+  category: "Storage / backup / data protection"
+  certified: "no"
+  certification_comment: "The appliance is documented as VMware-only, with no supported KVM deployment path."
+  confidence: 50
+  products:
+    - name_equals: ["Data Protection Central (DPC)"]
+
+- name: "Secure Remote Services (ESRS) / Secure Connect Gateway"
+  desc: "Hosts identified by an exact vApp product name for Secure Remote Services (ESRS) / Secure Connect Gateway"
+  vendor: "Dell Technologies"
+  category: "Storage / backup / data protection"
+  certified: "no"
+  certification_comment: "The appliance is documented as VMware-only, with no supported KVM deployment path."
+  confidence: 50
+  products:
+    - name_equals: ["Secure Remote Services (ESRS) / Secure Connect Gateway"]
+
+- name: "PowerMax vWitness"
+  desc: "Hosts identified by an exact vApp product name for PowerMax vWitness"
+  vendor: "Dell Technologies"
+  category: "Storage / backup / data protection"
+  certified: "no"
+  certification_comment: "The appliance is documented as VMware-only, with no supported KVM deployment path."
+  confidence: 50
+  products:
+    - name_equals: ["PowerMax vWitness"]
+
+- name: "DobiMiner"
+  desc: "Hosts identified by an exact vApp product name for DobiMiner"
+  vendor: "Dell Technologies"
+  category: "Storage / backup / data protection"
+  certified: "no"
+  certification_comment: "The appliance is documented as VMware-only, with no supported KVM deployment path."
+  confidence: 25
+  products:
+    - name_equals: ["DobiMiner"]
+
+- name: "Keystone collector"
+  desc: "Hosts identified by an exact vApp product name for Keystone collector"
+  vendor: "NetApp"
+  category: "Storage / backup / data protection"
+  certified: "no"
+  certification_comment: "The appliance is documented as VMware-only, with no supported KVM deployment path."
+  confidence: 25
+  products:
+    - name_equals: ["Keystone collector"]
+
+- name: "SANnav Management Portal"
+  desc: "Hosts identified by an exact vApp product name for SANnav Management Portal"
+  vendor: "Broadcom (Brocade)"
+  category: "Infrastructure management"
+  certified: "no"
+  certification_comment: "The appliance is documented as VMware-only, with no supported KVM deployment path."
+  confidence: 50
+  products:
+    - name_equals: ["SANnav Management Portal"]
+
+- name: "API Connect"
+  desc: "Hosts identified by an exact vApp product name for API Connect"
+  vendor: "IBM"
+  category: "Middleware / integration"
+  certified: "no"
+  certification_comment: "The appliance is documented as VMware-only, with no supported KVM deployment path."
+  confidence: 50
+  products:
+    - name_equals: ["API Connect"]
+
+- name: "StoredIQ"
+  desc: "Hosts identified by an exact vApp product name for StoredIQ"
+  vendor: "IBM"
+  category: "Data management"
+  certified: "no"
+  certification_comment: "The appliance is documented as VMware-only, with no supported KVM deployment path."
+  confidence: 25
+  products:
+    - name_equals: ["StoredIQ"]
+
+- name: "Media Gateway / Media Platform"
+  desc: "Hosts identified by an exact vApp product name for Media Gateway / Media Platform"
+  vendor: "Haivision"
+  category: "Media"
+  certified: "no"
+  certification_comment: "The appliance is documented as VMware-only, with no supported KVM deployment path."
+  confidence: 25
+  products:
+    - name_equals: ["Media Gateway / Media Platform"]
+
+- name: "Access Manager"
+  desc: "Hosts identified by an exact vApp product name for Access Manager"
+  vendor: "OpenText (NetIQ)"
+  category: "Identity / access"
+  certified: "no"
+  certification_comment: "The appliance is documented as VMware-only, with no supported KVM deployment path."
+  confidence: 50
+  products:
+    - name_equals: ["Access Manager"]
+
+- name: "Protection Server (PPS)"
+  desc: "Hosts identified by an exact vApp product name for Protection Server (PPS)"
+  vendor: "Proofpoint"
+  category: "Email security"
+  certified: "no"
+  certification_comment: "The appliance is documented as VMware-only, with no supported KVM deployment path."
+  confidence: 50
+  products:
+    - name_equals: ["Protection Server (PPS)"]
+
+- name: "SecurID Authentication Manager"
+  desc: "Hosts identified by an exact vApp product name for SecurID Authentication Manager"
+  vendor: "RSA"
+  category: "Identity / access"
+  certified: "no"
+  certification_comment: "The appliance is documented as VMware-only, with no supported KVM deployment path."
+  confidence: 50
+  products:
+    - name_equals: ["SecurID Authentication Manager"]
+
+- name: "Metasys ADS/ADX"
+  desc: "Hosts identified by an exact vApp product name for Metasys ADS/ADX"
+  vendor: "Johnson Controls"
+  category: "Building / OT systems"
+  certified: "no"
+  certification_comment: "The appliance is documented as VMware-only, with no supported KVM deployment path."
+  confidence: 50
+  products:
+    - name_equals: ["Metasys ADS/ADX"]
+
+- name: "Delphix Engine"
+  desc: "Hosts identified by an exact vApp product name for Delphix Engine"
+  vendor: "Perforce"
+  category: "Data management"
+  certified: "maybe"
+  certification_comment: "A KVM image exists, but product-specific OpenShift Virtualization validation is not recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Delphix Engine"]
+
+- name: "Network Monitoring System (NMS)"
+  desc: "Hosts identified by an exact vApp product name for Network Monitoring System (NMS)"
+  vendor: "SevOne (HPE)"
+  category: "Monitoring"
+  certified: "maybe"
+  certification_comment: "A KVM image exists, but product-specific OpenShift Virtualization validation is not recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Network Monitoring System (NMS)"]
+
+- name: "NetMRI"
+  desc: "Hosts identified by an exact vApp product name for NetMRI"
+  vendor: "Infoblox"
+  category: "DNS / IPAM / identity / EUC"
+  certified: "maybe"
+  certification_comment: "A KVM image exists, but product-specific OpenShift Virtualization validation is not recorded."
+  confidence: 50
+  products:
+    - name_equals: ["NetMRI"]
+
+- name: "Accops HyID"
+  desc: "Hosts identified by an exact vApp product name for Accops HyID"
+  vendor: "Accops"
+  category: "Identity / MFA"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 25
+  products:
+    - name_equals: ["Accops HyID"]
+
+- name: "ACCOPS VPN Prod"
+  desc: "Hosts identified by an exact vApp product name for ACCOPS VPN Prod"
+  vendor: "Accops"
+  category: "Remote access / VPN"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 25
+  products:
+    - name_equals: ["ACCOPS VPN Prod"]
+
+- name: "HySecure VDI"
+  desc: "Hosts identified by an exact vApp product name for HySecure VDI"
+  vendor: "Accops"
+  category: "VDI broker"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 25
+  products:
+    - name_equals: ["HySecure VDI"]
+
+- name: "Airlock Gateway"
+  desc: "Hosts identified by an exact vApp product name for Airlock Gateway"
+  vendor: "Airlock"
+  category: "WAF / reverse proxy"
+  certified: "yes"
+  certification_comment: "Airlock Gateway is Partner Validated for OpenShift Virtualization in the Red Hat Ecosystem Catalog."
+  confidence: 50
+  products:
+    - name_equals: ["Airlock Gateway"]
+
+- name: "Algo VPN appliance"
+  desc: "Hosts identified by an exact vApp product name for Algo VPN appliance"
+  vendor: "Algo"
+  category: "VPN"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 25
+  products:
+    - name_equals: ["Algo VPN appliance"]
+
+- name: "firewall Analyzer"
+  desc: "Hosts identified by an exact vApp product name for firewall Analyzer"
+  vendor: "Algosec"
+  category: "Security analytics"
+  certified: "maybe"
+  certification_comment: "Partner outreach has started, but no release or OpenShift Virtualization validation status is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["firewall Analyzer"]
+
+- name: "Allegro Network Multimeter appliance"
+  desc: "Hosts identified by an exact vApp product name for Allegro Network Multimeter appliance"
+  vendor: "Allegro Network Multimeter"
+  category: "Network monitoring"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 25
+  products:
+    - name_equals: ["Appliance"]
+      vendor_contains: ["Allegro Network Multimeter"]
+
+- name: "Packet Shaper"
+  desc: "Hosts identified by an exact vApp product name for Packet Shaper"
+  vendor: "Allot"
+  category: "Traffic shaping"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 25
+  products:
+    - name_equals: ["Packet Shaper"]
+
+- name: "StruxureWare Data Center Expert Virtual Appliance"
+  desc: "Hosts identified by an exact vApp product name for StruxureWare Data Center Expert Virtual Appliance"
+  vendor: "APC"
+  category: "DCIM"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["StruxureWare Data Center Expert Virtual Appliance"]
+
+- name: "Certificate Scanner (Corporate Managed)"
+  desc: "Hosts identified by an exact vApp product name for Certificate Scanner (Corporate Managed)"
+  vendor: "AppViewX"
+  category: "PKI / certificates"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 25
+  products:
+    - name_equals: ["Certificate Scanner (Corporate Managed)"]
+
+- name: "WIPS"
+  desc: "Hosts identified by an exact vApp product name for WIPS"
+  vendor: "Arista"
+  category: "Wireless security"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 25
+  products:
+    - name_equals: ["WIPS"]
+
+- name: "backup and recovery"
+  desc: "Hosts identified by an exact vApp product name for backup and recovery"
+  vendor: "Avamar"
+  category: "Backup"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["backup and recovery"]
+
+- name: "Avaya Aura Experience Portal - AAEP"
+  desc: "Hosts identified by an exact vApp product name for Avaya Aura Experience Portal - AAEP"
+  vendor: "Avaya"
+  category: "Unified communications"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Avaya Aura Experience Portal - AAEP"]
+
+- name: "Avaya Media Processing Platform - MPP"
+  desc: "Hosts identified by an exact vApp product name for Avaya Media Processing Platform - MPP"
+  vendor: "Avaya"
+  category: "Unified communications"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Avaya Media Processing Platform - MPP"]
+
+- name: "DataSync"
+  desc: "Hosts identified by an exact vApp product name for DataSync"
+  vendor: "AWS"
+  category: "Storage / data transfer"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["DataSync"]
+
+- name: "Bomgar Remote Access"
+  desc: "Hosts identified by an exact vApp product name for Bomgar Remote Access"
+  vendor: "BeyondTrust"
+  category: "Remote access"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Bomgar Remote Access"]
+
+- name: "Password Safe"
+  desc: "Hosts identified by an exact vApp product name for Password Safe"
+  vendor: "BeyondTrust"
+  category: "PAM"
+  certified: "yes"
+  certification_comment: "BeyondTrust Password Safe is Partner Validated for OpenShift Virtualization in the Red Hat Ecosystem Catalog."
+  confidence: 50
+  products:
+    - name_equals: ["Password Safe"]
+
+- name: "Privileged Remote Access"
+  desc: "Hosts identified by an exact vApp product name for Privileged Remote Access"
+  vendor: "BeyondTrust"
+  category: "PAM"
+  certified: "yes"
+  certification_comment: "BeyondTrust Privileged Remote Access is Partner Validated for OpenShift Virtualization in the Red Hat Ecosystem Catalog."
+  confidence: 50
+  products:
+    - name_equals: ["Privileged Remote Access"]
+
+- name: "DNS Men & Mice"
+  desc: "Hosts identified by an exact vApp product name for DNS Men & Mice"
+  vendor: "BlueCat Networks"
+  category: "DNS / IPAM"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["DNS Men & Mice"]
+
+- name: "CAS"
+  desc: "Hosts identified by an exact vApp product name for CAS"
+  vendor: "Bluecoat"
+  category: "Malware analysis"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["CAS"]
+
+- name: "Centreon Tool"
+  desc: "Hosts identified by an exact vApp product name for Centreon Tool"
+  vendor: "Centreon"
+  category: "Monitoring"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Centreon Tool"]
+
+- name: "CryptoFlow Net Creator"
+  desc: "Hosts identified by an exact vApp product name for CryptoFlow Net Creator"
+  vendor: "Certes"
+  category: "Network encryption"
+  certified: "yes"
+  certification_comment: "CryptoFlow Net Creator is Partner Validated for OpenShift Virtualization in the Red Hat Ecosystem Catalog."
+  confidence: 25
+  products:
+    - name_equals: ["CryptoFlow Net Creator"]
+
+- name: "DPRM"
+  desc: "Hosts identified by an exact vApp product name for DPRM"
+  vendor: "Certes"
+  category: "Network encryption"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 25
+  products:
+    - name_equals: ["DPRM"]
+
+- name: "Multi-Domain Security"
+  desc: "Hosts identified by an exact vApp product name for Multi-Domain Security"
+  vendor: "Check Point"
+  category: "Security management"
+  certified: "yes"
+  certification_comment: "Check Point Security Management/Multi-Domain Management is Partner Validated for OpenShift Virtualization in the Red Hat Ecosystem Catalog."
+  confidence: 50
+  products:
+    - name_equals: ["Multi-Domain Security"]
+
+- name: "Catalyst Center"
+  desc: "Hosts identified by an exact vApp product name for Catalyst Center"
+  vendor: "Cisco"
+  category: "Network management"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Catalyst Center"]
+
+- name: "Cisco Collectors"
+  desc: "Hosts identified by an exact vApp product name for Cisco Collectors"
+  vendor: "Cisco"
+  category: "Telemetry collection"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 25
+  products:
+    - name_equals: ["Cisco Collectors"]
+
+- name: "Cisco Modeling Labs (CML)"
+  desc: "Hosts identified by an exact vApp product name for Cisco Modeling Labs (CML)"
+  vendor: "Cisco"
+  category: "Network simulation"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Cisco Modeling Labs (CML)"]
+
+- name: "Cisco Spaces Connector"
+  desc: "Hosts identified by an exact vApp product name for Cisco Spaces Connector"
+  vendor: "Cisco"
+  category: "Wireless analytics"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Cisco Spaces Connector"]
+
+- name: "CSPC Collector"
+  desc: "Hosts identified by an exact vApp product name for CSPC Collector"
+  vendor: "Cisco"
+  category: "Telemetry collection"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["CSPC Collector"]
+
+- name: "Cyber Vision"
+  desc: "Hosts identified by an exact vApp product name for Cyber Vision"
+  vendor: "Cisco"
+  category: "OT / ICS security"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Cyber Vision"]
+
+- name: "Email and Web Manager"
+  desc: "Hosts identified by an exact vApp product name for Email and Web Manager"
+  vendor: "Cisco"
+  category: "Email / web security"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Email and Web Manager"]
+
+- name: "Expressway"
+  desc: "Hosts identified by an exact vApp product name for Expressway"
+  vendor: "Cisco"
+  category: "Unified communications"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Expressway"]
+
+- name: "IM & Presence (IM&P)"
+  desc: "Hosts identified by an exact vApp product name for IM & Presence (IM&P)"
+  vendor: "Cisco"
+  category: "Unified communications"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 75
+  products:
+    - name_equals: ["IM & Presence (IM&P)"]
+
+- name: "Intersight Virtual Appliance"
+  desc: "Hosts identified by an exact vApp product name for Intersight Virtual Appliance"
+  vendor: "Cisco"
+  category: "Infrastructure management"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Intersight Virtual Appliance"]
+
+- name: "Nexus Dashboard Fabric Controller"
+  desc: "Hosts identified by an exact vApp product name for Nexus Dashboard Fabric Controller"
+  vendor: "Cisco"
+  category: "Network management"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Nexus Dashboard Fabric Controller"]
+
+- name: "Prime Collaboration Deployment (PCD)"
+  desc: "Hosts identified by an exact vApp product name for Prime Collaboration Deployment (PCD)"
+  vendor: "Cisco"
+  category: "Unified communications"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Prime Collaboration Deployment (PCD)"]
+
+- name: "Prime Infrastructure"
+  desc: "Hosts identified by an exact vApp product name for Prime Infrastructure"
+  vendor: "Cisco"
+  category: "Network management"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Prime Infrastructure"]
+
+- name: "Secure Email Gateway (AsyncOS)"
+  desc: "Hosts identified by an exact vApp product name for Secure Email Gateway (AsyncOS)"
+  vendor: "Cisco"
+  category: "Email security"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Secure Email Gateway (AsyncOS)"]
+
+- name: "Smart Software Manager"
+  desc: "Hosts identified by an exact vApp product name for Smart Software Manager"
+  vendor: "Cisco"
+  category: "Licensing"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Smart Software Manager"]
+
+- name: "Stealthwatch"
+  desc: "Hosts identified by an exact vApp product name for Stealthwatch"
+  vendor: "Cisco"
+  category: "Network detection"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Stealthwatch"]
+
+- name: "ThousandEyes"
+  desc: "Hosts identified by an exact vApp product name for ThousandEyes"
+  vendor: "Cisco"
+  category: "Network monitoring"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["ThousandEyes"]
+
+- name: "UCS Director"
+  desc: "Hosts identified by an exact vApp product name for UCS Director"
+  vendor: "Cisco"
+  category: "Infrastructure management"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["UCS Director"]
+
+- name: "Unified Contact Centre Express (UCCX)"
+  desc: "Hosts identified by an exact vApp product name for Unified Contact Centre Express (UCCX)"
+  vendor: "Cisco"
+  category: "Contact centre"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 75
+  products:
+    - name_equals: ["Unified Contact Centre Express (UCCX)"]
+
+- name: "vND (Virtual Nexus Dashboard)"
+  desc: "Hosts identified by an exact vApp product name for vND (Virtual Nexus Dashboard)"
+  vendor: "Cisco"
+  category: "Network management"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["vND (Virtual Nexus Dashboard)"]
+
+- name: "Connector Appliance"
+  desc: "Hosts identified by an exact vApp product name for Connector Appliance"
+  vendor: "Citrix"
+  category: "Cloud connector"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Connector Appliance"]
+
+- name: "Cleondris ONE"
+  desc: "Hosts identified by an exact vApp product name for Cleondris ONE"
+  vendor: "Cleondris"
+  category: "Storage management"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 25
+  products:
+    - name_equals: ["Cleondris ONE"]
+
+- name: "Data Protect"
+  desc: "Hosts identified by an exact vApp product name for Data Protect"
+  vendor: "Cohesity"
+  category: "Backup"
+  certified: "yes"
+  certification_comment: "Cohesity DataProtect is Partner Validated for OpenShift Virtualization data protection; this covers protecting OpenShift VMs, not moving a VMware OVA unchanged."
+  confidence: 50
+  products:
+    - name_equals: ["Data Protect"]
+
+- name: "ControlUp"
+  desc: "Hosts identified by an exact vApp product name for ControlUp"
+  vendor: "ControlUp"
+  category: "Monitoring"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["ControlUp"]
+
+- name: "EMC SRM"
+  desc: "Hosts identified by an exact vApp product name for EMC SRM"
+  vendor: "Dell"
+  category: "Storage management"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["EMC SRM"]
+
+- name: "XMS"
+  desc: "Hosts identified by an exact vApp product name for XMS"
+  vendor: "Dell"
+  category: "Storage management"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["XMS"]
+
+- name: "EasyRedmine appliance"
+  desc: "Hosts identified by an exact vApp product name for EasyRedmine appliance"
+  vendor: "EasyRedmine"
+  category: "DevOps tooling"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 25
+  products:
+    - name_equals: ["Appliance"]
+      vendor_contains: ["EasyRedmine"]
+
+- name: "Discovery , command ,Explore manager nodes"
+  desc: "Hosts identified by an exact vApp product name for Discovery , command ,Explore manager nodes"
+  vendor: "ExtraHop"
+  category: "Network detection"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Discovery , command ,Explore manager nodes"]
+
+- name: "Big-IQ"
+  desc: "Hosts identified by an exact vApp product name for Big-IQ"
+  vendor: "F5"
+  category: "Load balancing management"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Big-IQ"]
+
+- name: "All VM appliances"
+  desc: "Hosts identified by an exact vApp product name for All VM appliances"
+  vendor: "FireEye"
+  category: "Network / email security"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 25
+  products:
+    - name_equals: ["All VM appliances"]
+
+- name: "Email security"
+  desc: "Hosts identified by an exact vApp product name for Email security"
+  vendor: "Forcepoint"
+  category: "Email security"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Email security"]
+
+- name: "Web security (Proxy)"
+  desc: "Hosts identified by an exact vApp product name for Web security (Proxy)"
+  vendor: "Forcepoint"
+  category: "Proxy / SWG"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Web security (Proxy)"]
+
+- name: "Data Security Manager"
+  desc: "Hosts identified by an exact vApp product name for Data Security Manager"
+  vendor: "Fortanix"
+  category: "KMS / HSM"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Data Security Manager"]
+
+- name: "FortiNAC"
+  desc: "Hosts identified by an exact vApp product name for FortiNAC"
+  vendor: "Fortinet"
+  category: "NAC"
+  certified: "maybe"
+  certification_comment: "Partner work is committed, but no released or validated OpenShift Virtualization listing is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["FortiNAC"]
+
+- name: "FortiSandbox"
+  desc: "Hosts identified by an exact vApp product name for FortiSandbox"
+  vendor: "Fortinet"
+  category: "Malware analysis"
+  certified: "maybe"
+  certification_comment: "Partner discussions are ongoing, but no released or validated OpenShift Virtualization listing is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["FortiSandbox"]
+
+- name: "FortiSOAR"
+  desc: "Hosts identified by an exact vApp product name for FortiSOAR"
+  vendor: "Fortinet"
+  category: "SOAR"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["FortiSOAR"]
+
+- name: "GigaVUE-FM"
+  desc: "Hosts identified by an exact vApp product name for GigaVUE-FM"
+  vendor: "Gigamon"
+  category: "Network visibility"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["GigaVUE-FM"]
+
+- name: "Mandiant Security Validation"
+  desc: "Hosts identified by an exact vApp product name for Mandiant Security Validation"
+  vendor: "Google"
+  category: "Security validation"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 25
+  products:
+    - name_equals: ["Mandiant Security Validation"]
+
+- name: "HNAS Virtual SMU"
+  desc: "Hosts identified by an exact vApp product name for HNAS Virtual SMU"
+  vendor: "Hitachi"
+  category: "Storage management"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["HNAS Virtual SMU"]
+
+- name: "OpsCenter"
+  desc: "Hosts identified by an exact vApp product name for OpsCenter"
+  vendor: "Hitachi"
+  category: "Storage management"
+  certified: "maybe"
+  certification_comment: "Partner outreach has started, but no release or OpenShift Virtualization validation status is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["OpsCenter"]
+
+- name: "OneView"
+  desc: "Hosts identified by an exact vApp product name for OneView"
+  vendor: "HPE"
+  category: "Infrastructure management"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["OneView"]
+
+- name: "Hycu"
+  desc: "Hosts identified by an exact vApp product name for Hycu"
+  vendor: "Hycu"
+  category: "Backup"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Hycu"]
+
+- name: "Acura"
+  desc: "Hosts identified by an exact vApp product name for Acura"
+  vendor: "Hystax"
+  category: "Migration / DR"
+  certified: "yes"
+  certification_comment: "Hystax Acura is Partner Validated for OpenShift Virtualization in the Red Hat Ecosystem Catalog."
+  confidence: 25
+  products:
+    - name_equals: ["Acura"]
+
+- name: "Guardium"
+  desc: "Hosts identified by an exact vApp product name for Guardium"
+  vendor: "IBM"
+  category: "Database security"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Guardium"]
+
+- name: "Security Qradar SOAR"
+  desc: "Hosts identified by an exact vApp product name for Security Qradar SOAR"
+  vendor: "IBM"
+  category: "SOAR"
+  certified: "yes"
+  certification_comment: "IBM Security QRadar SOAR is Partner Validated for OpenShift Virtualization in the Red Hat Ecosystem Catalog."
+  confidence: 50
+  products:
+    - name_equals: ["Security Qradar SOAR"]
+
+- name: "Turbonomic"
+  desc: "Hosts identified by an exact vApp product name for Turbonomic"
+  vendor: "IBM"
+  category: "Optimisation"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Turbonomic"]
+
+- name: "Data Activity Monitoring (DAM)"
+  desc: "Hosts identified by an exact vApp product name for Data Activity Monitoring (DAM)"
+  vendor: "Imperva"
+  category: "Database security"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Data Activity Monitoring (DAM)"]
+
+- name: "WAF KVM"
+  desc: "Hosts identified by an exact vApp product name for WAF KVM"
+  vendor: "Imperva"
+  category: "WAF"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["WAF KVM"]
+
+- name: "OneSign"
+  desc: "Hosts identified by an exact vApp product name for OneSign"
+  vendor: "Imprivata"
+  category: "Identity / SSO"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["OneSign"]
+
+- name: "IsarFlow"
+  desc: "Hosts identified by an exact vApp product name for IsarFlow"
+  vendor: "IsarNet AG"
+  category: "Network monitoring"
+  certified: "yes"
+  certification_comment: "IsarFlow is Partner Validated for OpenShift Virtualization in the Red Hat Ecosystem Catalog."
+  confidence: 25
+  products:
+    - name_equals: ["IsarFlow"]
+
+- name: "Pulse Connect Secure"
+  desc: "Hosts identified by an exact vApp product name for Pulse Connect Secure"
+  vendor: "Ivanti"
+  category: "Remote access / VPN"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Pulse Connect Secure"]
+
+- name: "Virtual Traffic Manager (VTM)"
+  desc: "Hosts identified by an exact vApp product name for Virtual Traffic Manager (VTM)"
+  vendor: "Ivanti"
+  category: "Load balancing"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Virtual Traffic Manager (VTM)"]
+
+- name: "Apstra"
+  desc: "Hosts identified by an exact vApp product name for Apstra"
+  vendor: "Juniper Networks"
+  category: "Network automation"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Apstra"]
+
+- name: "Content Hub"
+  desc: "Hosts identified by an exact vApp product name for Content Hub"
+  vendor: "Kiteworks"
+  category: "Secure file transfer"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Content Hub"]
+
+- name: "Observer"
+  desc: "Hosts identified by an exact vApp product name for Observer"
+  vendor: "Komprise"
+  category: "Data management"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Observer"]
+
+- name: "XClarity Administrator"
+  desc: "Hosts identified by an exact vApp product name for XClarity Administrator"
+  vendor: "Lenovo"
+  category: "Infrastructure management"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["XClarity Administrator"]
+
+- name: "Leostream platform"
+  desc: "Hosts identified by an exact vApp product name for Leostream platform"
+  vendor: "Leostream"
+  category: "VDI broker"
+  certified: "yes"
+  certification_comment: "Leostream Remote Desktop Access Platform is Partner Validated for OpenShift Virtualization in the Red Hat Ecosystem Catalog."
+  confidence: 50
+  products:
+    - name_equals: ["Leostream platform"]
+
+- name: "LiquidFiles appliance"
+  desc: "Hosts identified by an exact vApp product name for LiquidFiles appliance"
+  vendor: "LiquidFiles"
+  category: "Secure file transfer"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Appliance"]
+      vendor_contains: ["LiquidFiles"]
+
+- name: "LiveNX"
+  desc: "Hosts identified by an exact vApp product name for LiveNX"
+  vendor: "LiveAction"
+  category: "Network monitoring"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["LiveNX"]
+
+- name: "GitHub Server Enterprise"
+  desc: "Hosts identified by an exact vApp product name for GitHub Server Enterprise"
+  vendor: "Microsoft"
+  category: "DevOps tooling"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["GitHub Server Enterprise"]
+
+- name: "Morpheus Data"
+  desc: "Hosts identified by an exact vApp product name for Morpheus Data"
+  vendor: "Morpheus"
+  category: "Cloud management"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Morpheus Data"]
+
+- name: "Cloud Compliance"
+  desc: "Hosts identified by an exact vApp product name for Cloud Compliance"
+  vendor: "NetApp"
+  category: "Data governance"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Cloud Compliance"]
+
+- name: "Data Infrastructure Insights (DII)"
+  desc: "Hosts identified by an exact vApp product name for Data Infrastructure Insights (DII)"
+  vendor: "NetApp"
+  category: "Monitoring"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Data Infrastructure Insights (DII)"]
+
+- name: "StorageGrid Gateway Node"
+  desc: "Hosts identified by an exact vApp product name for StorageGrid Gateway Node"
+  vendor: "NetApp"
+  category: "Object storage"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["StorageGrid Gateway Node"]
+
+- name: "5G Converter"
+  desc: "Hosts identified by an exact vApp product name for 5G Converter"
+  vendor: "NetScout"
+  category: "Telco monitoring"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 25
+  products:
+    - name_equals: ["5G Converter"]
+
+- name: "nG1"
+  desc: "Hosts identified by an exact vApp product name for nG1"
+  vendor: "NetScout"
+  category: "Network monitoring"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["nG1"]
+
+- name: "vStream"
+  desc: "Hosts identified by an exact vApp product name for vStream"
+  vendor: "NetScout"
+  category: "Network monitoring"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["vStream"]
+
+- name: "Engine"
+  desc: "Hosts identified by an exact vApp product name for Engine"
+  vendor: "Nexthink"
+  category: "Digital experience monitoring"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Engine"]
+
+- name: "Portal"
+  desc: "Hosts identified by an exact vApp product name for Portal"
+  vendor: "Nexthink"
+  category: "Digital experience monitoring"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Portal"]
+
+- name: "Lighthouse Enterprise"
+  desc: "Hosts identified by an exact vApp product name for Lighthouse Enterprise"
+  vendor: "Opengear"
+  category: "Out-of-band management"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Lighthouse Enterprise"]
+
+- name: "Cortex XDR Broker VM"
+  desc: "Hosts identified by an exact vApp product name for Cortex XDR Broker VM"
+  vendor: "Palo Alto Networks"
+  category: "XDR"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Cortex XDR Broker VM"]
+
+- name: "Expedition"
+  desc: "Hosts identified by an exact vApp product name for Expedition"
+  vendor: "Palo Alto Networks"
+  category: "Migration tooling"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Expedition"]
+
+- name: "CloudFS"
+  desc: "Hosts identified by an exact vApp product name for CloudFS"
+  vendor: "Panzura"
+  category: "Cloud NAS gateway"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["CloudFS"]
+
+- name: "Poly Clariti Platform appliance"
+  desc: "Hosts identified by an exact vApp product name for Poly Clariti Platform appliance"
+  vendor: "Poly"
+  category: "Unified communications"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Poly Clariti Platform appliance"]
+
+- name: "Pure Storage Collector"
+  desc: "Hosts identified by an exact vApp product name for Pure Storage Collector"
+  vendor: "Portworx"
+  category: "Monitoring"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 25
+  products:
+    - name_equals: ["Pure Storage Collector"]
+
+- name: "LoadMaster"
+  desc: "Hosts identified by an exact vApp product name for LoadMaster"
+  vendor: "Progress Kemp"
+  category: "Load balancing"
+  certified: "yes"
+  certification_comment: "The Red Hat Ecosystem Catalog lists KEMP Virtual LoadMaster as certified for RHEL 7, which Red Hat considers compatible with OpenShift Virtualization."
+  confidence: 50
+  products:
+    - name_equals: ["LoadMaster"]
+
+- name: "Threat Response Auto-Pull (TRAP)"
+  desc: "Hosts identified by an exact vApp product name for Threat Response Auto-Pull (TRAP)"
+  vendor: "Proofpoint"
+  category: "Email security"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Threat Response Auto-Pull (TRAP)"]
+
+- name: "Gateway Service"
+  desc: "Hosts identified by an exact vApp product name for Gateway Service"
+  vendor: "Qualys"
+  category: "Vulnerability management"
+  certified: "yes"
+  certification_comment: "Qualys Gateway Service Appliance is Partner Validated for OpenShift Virtualization in the Red Hat Ecosystem Catalog."
+  confidence: 50
+  products:
+    - name_equals: ["Gateway Service"]
+
+- name: "AntiDDOSSolution"
+  desc: "Hosts identified by an exact vApp product name for AntiDDOSSolution"
+  vendor: "Radware"
+  category: "DDoS protection"
+  certified: "maybe"
+  certification_comment: "Partner discussions are ongoing, but no released or validated OpenShift Virtualization listing is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["AntiDDOSSolution"]
+
+- name: "Ribbon EMS"
+  desc: "Hosts identified by an exact vApp product name for Ribbon EMS"
+  vendor: "Ribbon"
+  category: "Unified communications"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Ribbon EMS"]
+
+- name: "Session Border Controller (SBC)"
+  desc: "Hosts identified by an exact vApp product name for Session Border Controller (SBC)"
+  vendor: "Ribbon"
+  category: "Unified communications"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Session Border Controller (SBC)"]
+
+- name: "NetIM"
+  desc: "Hosts identified by an exact vApp product name for NetIM"
+  vendor: "Riverbed"
+  category: "Network monitoring"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["NetIM"]
+
+- name: "SteelCentral"
+  desc: "Hosts identified by an exact vApp product name for SteelCentral"
+  vendor: "Riverbed"
+  category: "Network monitoring"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["SteelCentral"]
+
+- name: "Identity Router"
+  desc: "Hosts identified by an exact vApp product name for Identity Router"
+  vendor: "RSA"
+  category: "Identity / access"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Identity Router"]
+
+- name: "NAS Cloud Direct"
+  desc: "Hosts identified by an exact vApp product name for NAS Cloud Direct"
+  vendor: "Rubrik"
+  category: "Backup"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["NAS Cloud Direct"]
+
+- name: "Identity Security Cloud, Cluster CCG"
+  desc: "Hosts identified by an exact vApp product name for Identity Security Cloud, Cluster CCG"
+  vendor: "SailPoint"
+  category: "Identity governance"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Identity Security Cloud, Cluster CCG"]
+
+- name: "Policy Guru"
+  desc: "Hosts identified by an exact vApp product name for Policy Guru"
+  vendor: "SecureLogix"
+  category: "Voice security"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 25
+  products:
+    - name_equals: ["Policy Guru"]
+
+- name: "SeppMail appliance"
+  desc: "Hosts identified by an exact vApp product name for SeppMail appliance"
+  vendor: "SeppMail"
+  category: "Email security"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Appliance"]
+      vendor_contains: ["SeppMail"]
+
+- name: "Orchestrator"
+  desc: "Hosts identified by an exact vApp product name for Orchestrator"
+  vendor: "Silver Peak"
+  category: "SD-WAN"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Orchestrator"]
+
+- name: "Informacast"
+  desc: "Hosts identified by an exact vApp product name for Informacast"
+  vendor: "Singlewire Software"
+  category: "Mass notification"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Informacast"]
+
+- name: "Secure Web Gateway"
+  desc: "Hosts identified by an exact vApp product name for Secure Web Gateway"
+  vendor: "Skyhigh Security"
+  category: "Proxy / SWG"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Secure Web Gateway"]
+
+- name: "PowerIQ/DCTrack"
+  desc: "Hosts identified by an exact vApp product name for PowerIQ/DCTrack"
+  vendor: "Sunbird"
+  category: "DCIM"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["PowerIQ/DCTrack"]
+
+- name: "Advanced Threat Protection"
+  desc: "Hosts identified by an exact vApp product name for Advanced Threat Protection"
+  vendor: "Symantec"
+  category: "Threat detection"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 25
+  products:
+    - name_equals: ["Advanced Threat Protection"]
+
+- name: "Encryption Management Server"
+  desc: "Hosts identified by an exact vApp product name for Encryption Management Server"
+  vendor: "Symantec"
+  category: "Encryption"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Encryption Management Server"]
+
+- name: "Tanium Appliance"
+  desc: "Hosts identified by an exact vApp product name for Tanium Appliance"
+  vendor: "Tanium"
+  category: "Endpoint management"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Tanium Appliance"]
+
+- name: "Packet Ranger"
+  desc: "Hosts identified by an exact vApp product name for Packet Ranger"
+  vendor: "Tavve"
+  category: "Network tooling"
+  certified: "yes"
+  certification_comment: "PacketRanger is Partner Validated for OpenShift Virtualization in the Red Hat Ecosystem Catalog."
+  confidence: 25
+  products:
+    - name_equals: ["Packet Ranger"]
+
+- name: "TCPWave"
+  desc: "Hosts identified by an exact vApp product name for TCPWave"
+  vendor: "TCPWave"
+  category: "DNS / IPAM"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["TCPWave"]
+
+- name: "Teramind Appliance"
+  desc: "Hosts identified by an exact vApp product name for Teramind Appliance"
+  vendor: "Terramind"
+  category: "Insider threat / UAM"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Teramind Appliance"]
+
+- name: "CipherTrust Manager - KMS"
+  desc: "Hosts identified by an exact vApp product name for CipherTrust Manager - KMS"
+  vendor: "Thales"
+  category: "KMS / HSM"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["CipherTrust Manager - KMS"]
+
+- name: "Vormetric"
+  desc: "Hosts identified by an exact vApp product name for Vormetric"
+  vendor: "Thales"
+  category: "Encryption"
+  certified: "yes"
+  certification_comment: "The Red Hat Ecosystem Catalog lists Vormetric Transparent Encryption as certified for RHEL 8, which Red Hat considers compatible with OpenShift Virtualization."
+  confidence: 50
+  products:
+    - name_equals: ["Vormetric"]
+
+- name: "Central Management System"
+  desc: "Hosts identified by an exact vApp product name for Central Management System"
+  vendor: "Trellix"
+  category: "Security management"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Central Management System"]
+
+- name: "DDEI"
+  desc: "Hosts identified by an exact vApp product name for DDEI"
+  vendor: "TrendMicro"
+  category: "Email security"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["DDEI"]
+
+- name: "TOS / TufinOS 24.2"
+  desc: "Hosts identified by an exact vApp product name for TOS / TufinOS 24.2"
+  vendor: "Tufin"
+  category: "Security policy management"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["TOS / TufinOS 24.2"]
+
+- name: "Backup"
+  desc: "Hosts identified by an exact vApp product name for Backup"
+  vendor: "Unitrends"
+  category: "Backup"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Backup"]
+
+- name: "Enterprise Video"
+  desc: "Hosts identified by an exact vApp product name for Enterprise Video"
+  vendor: "vbrick"
+  category: "Media"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 25
+  products:
+    - name_equals: ["Enterprise Video"]
+
+- name: "Vectra AI NDR"
+  desc: "Hosts identified by an exact vApp product name for Vectra AI NDR"
+  vendor: "Vectra AI"
+  category: "Network detection"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Vectra AI NDR"]
+
+- name: "Versa SDWAN VM"
+  desc: "Hosts identified by an exact vApp product name for Versa SDWAN VM"
+  vendor: "Versa Networks"
+  category: "SD-WAN"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Versa SDWAN VM"]
+
+- name: "Infrastructure Monitoring"
+  desc: "Hosts identified by an exact vApp product name for Infrastructure Monitoring"
+  vendor: "Virtana"
+  category: "Monitoring"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Infrastructure Monitoring"]
+
+- name: "VyOS"
+  desc: "Hosts identified by an exact vApp product name for VyOS"
+  vendor: "VyOS Networks"
+  category: "Routing"
+  certified: "yes"
+  certification_comment: "VyOS Universal Router is Partner Validated for OpenShift Virtualization in the Red Hat Ecosystem Catalog."
+  confidence: 50
+  products:
+    - name_equals: ["VyOS"]
+
+- name: "Load Balancer"
+  desc: "Hosts identified by an exact vApp product name for Load Balancer"
+  vendor: "Zen Load Balancer"
+  category: "Load balancing"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Load Balancer"]
+
+- name: "Zenoss Collector"
+  desc: "Hosts identified by an exact vApp product name for Zenoss Collector"
+  vendor: "Zenoss"
+  category: "Monitoring"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Zenoss Collector"]
+
+- name: "Airgap"
+  desc: "Hosts identified by an exact vApp product name for Airgap"
+  vendor: "Zscaler"
+  category: "Microsegmentation"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 25
+  products:
+    - name_equals: ["Airgap"]
+
+- name: "App Connector"
+  desc: "Hosts identified by an exact vApp product name for App Connector"
+  vendor: "Zscaler"
+  category: "ZTNA"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["App Connector"]
+
+- name: "Deception"
+  desc: "Hosts identified by an exact vApp product name for Deception"
+  vendor: "Zscaler"
+  category: "Deception"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 25
+  products:
+    - name_equals: ["Deception"]
+
+- name: "DLP Connector"
+  desc: "Hosts identified by an exact vApp product name for DLP Connector"
+  vendor: "Zscaler"
+  category: "DLP"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 25
+  products:
+    - name_equals: ["DLP Connector"]
+
+- name: "Nanolog Streaming Service (NSS)"
+  desc: "Hosts identified by an exact vApp product name for Nanolog Streaming Service (NSS)"
+  vendor: "Zscaler"
+  category: "Log streaming"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Nanolog Streaming Service (NSS)"]
+
+- name: "Dell PowerStore VSA"
+  desc: "VMs identified by Dell PowerStore vApp product metadata"
+  vendor: "Dell Technologies"
+  category: "Storage / backup / data protection"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["PowerStore VSA"]
+
+- name: "Microsoft Azure Migrate Appliance"
+  desc: "VMs identified by Azure Migrate appliance vApp product metadata"
+  vendor: "Microsoft"
+  category: "Migration tooling"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["Microsoft Azure Migrate Appliance"]
+
+- name: "NAbox"
+  desc: "VMs identified by NAbox NetApp monitoring appliance product metadata"
+  vendor: "NAbox project"
+  category: "Monitoring"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["NAbox"]
+
+- name: "ManageIQ"
+  desc: "VMs identified by ManageIQ hybrid IT management platform product metadata"
+  vendor: "ManageIQ"
+  category: "Cloud management"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_equals: ["ManageIQ"]
+
+- name: "ONTAP tools for VMware vSphere"
+  desc: "VMs identified by NetApp ONTAP tools for VMware vSphere product metadata"
+  vendor: "NetApp"
+  category: "Storage management"
+  certified: "maybe"
+  certification_comment: "No product-specific OpenShift Virtualization certification or compatibility result is recorded."
+  confidence: 50
+  products:
+    - name_contains: ["ONTAP tools for VMware vSphere"]
+      vendor_contains: ["NetApp"]
