@@ -1,0 +1,2 @@
+ALTER TABLE vm_applications
+ADD COLUMN IF NOT EXISTS confidence INTEGER;

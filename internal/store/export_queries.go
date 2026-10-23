@@ -393,6 +393,8 @@ const applicationsQuery = `
 			SELECT
 				COALESCE(app_name, '') AS application_name,
 				COALESCE(MAX(app_desc), '') AS application_description,
+				COALESCE(MAX(app_vendor), 'Unknown') AS application_vendor,
+				COALESCE(MAX(app_category), 'Unclassified') AS application_category,
 				COUNT(*) AS vm_count,
 				COALESCE(string_agg(vm_id, '; ' ORDER BY vm_name), '') AS vm_ids
 

@@ -173,6 +173,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 		uMemAvg, uMemP95, uMemMax, uMemLatest               sql.NullFloat64
 		uDisk, uConfidence                                  sql.NullFloat64
 		inspectionState, inspectionDetails, inspectionError string
+		vAppProductsJSON                                    sql.NullString
 	)
 
 	if err := rows.Scan(
@@ -191,7 +192,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 		&uMoid, &uVmName, &uProvCpus, &uProvMemMb, &uProvDiskKb,
 		&uCpuAvg, &uCpuP95, &uCpuMax, &uCpuLatest,
 		&uMemAvg, &uMemP95, &uMemMax, &uMemLatest,
-		&uDisk, &uConfidence, &pvm.GuestApps,
+		&uDisk, &uConfidence, &pvm.GuestApps, &vAppProductsJSON,
 		&inspectionState, &inspectionDetails, &inspectionError,
 	); err != nil {
 		return nil, fmt.Errorf("scanning VM %s: %w", id, err)
@@ -202,6 +203,11 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 	}
 
 	result := fromDB(pvm)
+	if vAppProductsJSON.Valid && vAppProductsJSON.String != "" {
+		if err := json.Unmarshal([]byte(vAppProductsJSON.String), &result.VAppProducts); err != nil {
+			return nil, fmt.Errorf("parsing vApp products for VM %s: %w", id, err)
+		}
+	}
 	result.Groups = groups
 	result.InspectionStatus.State = models.InspectionState(inspectionState)
 	result.InspectionStatus.Details = inspectionDetails
@@ -250,13 +256,14 @@ func (s *VMStore) GetFilterOptions(ctx context.Context) (models.VMFilterOptions,
 	}, nil
 }
 
-// GetGuestApps returns all VMs with their guest application names.
+// GetGuestApps returns VM guest application names and vApp product metadata.
 func (s *VMStore) GetGuestApps(ctx context.Context) ([]models.VMGuestApps, error) {
 	query, args, err := sq.Select(
 		`v."VM ID"`,
 		`v."VM"`,
 		`COALESCE(v."guest_apps", '[]')`,
-	).From("vinfo v").ToSql()
+		`COALESCE(NULLIF(p.products_json, ''), '[]')`,
+	).From("vinfo v").LeftJoin(`vm_vapp_products p ON p.vm_id = v."VM ID"`).ToSql()
 	if err != nil {
 		return nil, err
 	}
@@ -269,8 +276,8 @@ func (s *VMStore) GetGuestApps(ctx context.Context) ([]models.VMGuestApps, error
 
 	var result []models.VMGuestApps
 	for rows.Next() {
-		var id, name, guestAppsJSON string
-		if err := rows.Scan(&id, &name, &guestAppsJSON); err != nil {
+		var id, name, guestAppsJSON, productsJSON string
+		if err := rows.Scan(&id, &name, &guestAppsJSON, &productsJSON); err != nil {
 			return nil, err
 		}
 
@@ -288,10 +295,16 @@ func (s *VMStore) GetGuestApps(ctx context.Context) ([]models.VMGuestApps, error
 			}
 		}
 
+		var products []models.VAppProduct
+		if err := json.Unmarshal([]byte(productsJSON), &products); err != nil {
+			return nil, fmt.Errorf("parsing vApp products for VM %s: %w", id, err)
+		}
+
 		result = append(result, models.VMGuestApps{
 			ID:       id,
 			Name:     name,
 			AppNames: appNames,
+			Products: products,
 		})
 	}
 

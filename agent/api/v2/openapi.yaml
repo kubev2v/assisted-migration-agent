@@ -2063,6 +2063,11 @@ components:
           items:
             $ref: '#/components/schemas/Process'
           description: List of processes detected on this VM
+        products:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+          description: Products configured in the VM's vApp settings
 
     Process:
       type: object
@@ -2075,6 +2080,43 @@ components:
         version:
           type: string
           description: Version of the process
+
+    Product:
+      type: object
+      required:
+        - key
+      properties:
+        key:
+          type: integer
+          format: int32
+          description: Product key
+        classId:
+          type: string
+          description: Product class identifier
+        instanceId:
+          type: string
+          description: Product instance identifier
+        name:
+          type: string
+          description: Product name
+        vendor:
+          type: string
+          description: Product vendor
+        version:
+          type: string
+          description: Product version
+        fullVersion:
+          type: string
+          description: Full product version
+        vendorUrl:
+          type: string
+          description: Product vendor URL
+        productUrl:
+          type: string
+          description: Product URL
+        appUrl:
+          type: string
+          description: Application URL
 
     VirtualMachineListResponse:
       type: object
@@ -2380,6 +2422,8 @@ components:
       required:
         - name
         - description
+        - vendor
+        - category
         - vmCount
         - vms
       properties:
@@ -2389,6 +2433,20 @@ components:
         description:
           type: string
           description: Application description
+        vendor:
+          type: string
+          description: Application vendor
+        category:
+          type: string
+          description: Application category
+        confidence:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Detection confidence percentage; defaults to 75 for process-only application definitions and 50 otherwise when omitted
+        containerizationCandidate:
+          type: boolean
+          description: Whether the application has a known container deployment option
         vmCount:
           type: integer
           description: Number of VMs running this application

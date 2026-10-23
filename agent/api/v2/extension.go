@@ -263,7 +263,33 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 		details.Processes = &apps
 	}
 
+	if len(vm.VAppProducts) > 0 {
+		products := make([]Product, 0, len(vm.VAppProducts))
+		for _, p := range vm.VAppProducts {
+			products = append(products, Product{
+				Key:         p.Key,
+				ClassId:     optionalString(p.ClassId),
+				InstanceId:  optionalString(p.InstanceId),
+				Name:        optionalString(p.Name),
+				Vendor:      optionalString(p.Vendor),
+				Version:     optionalString(p.Version),
+				FullVersion: optionalString(p.FullVersion),
+				VendorUrl:   optionalString(p.VendorUrl),
+				ProductUrl:  optionalString(p.ProductUrl),
+				AppUrl:      optionalString(p.AppUrl),
+			})
+		}
+		details.Products = &products
+	}
+
 	return details
+}
+
+func optionalString(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
 }
 
 func NewCollectionFromDatabase(db *store.Database) Collection {
@@ -633,12 +659,20 @@ func NewApplicationList(apps []models.ApplicationOverview) []ApplicationOverview
 		for _, vm := range app.VMs {
 			vms = append(vms, ApplicationVM{Id: vm.ID, Name: vm.Name})
 		}
-		apiApps = append(apiApps, ApplicationOverview{
+		apiApp := ApplicationOverview{
 			Name:        app.Name,
 			Description: app.Description,
+			Vendor:      app.Vendor,
+			Category:    app.Category,
+			Confidence:  app.Confidence,
 			VmCount:     app.VMCount,
 			Vms:         vms,
-		})
+		}
+		if app.ContainerizationCandidate {
+			candidate := true
+			apiApp.ContainerizationCandidate = &candidate
+		}
+		apiApps = append(apiApps, apiApp)
 	}
 
 	return apiApps
