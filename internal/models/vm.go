@@ -28,6 +28,7 @@ type VirtualMachineSummary struct {
 }
 
 type VM struct {
+	NICCount        int32
 	ID              string
 	Name            string
 	VCenterID       string
@@ -104,6 +105,7 @@ type Disk struct {
 }
 
 type NIC struct {
+	Adapter     string
 	MAC         string
 	Network     string
 	Index       int

@@ -782,8 +782,11 @@ type VirtualMachineDetail struct {
 	Name string `json:"name"`
 
 	// NestedHVEnabled Whether nested virtualization is enabled
-	NestedHVEnabled *bool               `json:"nestedHVEnabled,omitempty"`
-	Nics            []VirtualMachineNIC `json:"nics"`
+	NestedHVEnabled *bool `json:"nestedHVEnabled,omitempty"`
+
+	// NicCount Adapter count reported by the source; 0 when unavailable
+	NicCount int32               `json:"nicCount"`
+	Nics     []VirtualMachineNIC `json:"nics"`
 
 	// PowerState Current power state (poweredOn, poweredOff, suspended)
 	PowerState string `json:"powerState"`
@@ -884,6 +887,9 @@ type VirtualMachineListResponse struct {
 
 // VirtualMachineNIC defines model for VirtualMachineNIC.
 type VirtualMachineNIC struct {
+	// Adapter Virtual adapter model, such as Vmxnet3 or E1000
+	Adapter *string `json:"adapter,omitempty"`
+
 	// Index NIC index within the VirtualMachine
 	Index *int `json:"index,omitempty"`
 
