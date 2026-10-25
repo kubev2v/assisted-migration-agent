@@ -218,7 +218,7 @@ spec:
       - name: ociArtifactExpiresAfter
         value: $(params.image-expires-after)
       - name: SCRIPT_RUNNER_IMAGE
-        value: "registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:c4c285d42941ebb2bd4da878479008e1e4536bb599aad1dbe568f89de9053661"
+        value: "registry.access.redhat.com/ubi9/ubi-minimal:latest"
       - name: SCRIPT
         value: |
           #!/bin/bash
@@ -298,13 +298,13 @@ spec:
         value: $(tasks.run-script.results.SCRIPT_ARTIFACT)
       - name: PREFETCH_ARTIFACT
         value: $(tasks.prefetch-dependencies.results.PREFETCH_ARTIFACT)
+      - name: ADDITIONAL_BASE_IMAGES
+        value:
+        - $(tasks.run-script.results.SCRIPT_RUNNER_IMAGE_REFERENCE)
       - name: IMAGE_APPEND_PLATFORM
         value: "true"
       - name: ALLOW_CROSS_PLATFORM_IMAGES
         value: "true"
-      - name: ADDITIONAL_BASE_IMAGES
-        value:
-        - $(tasks.run-script.results.SCRIPT_RUNNER_IMAGE_REFERENCE)
       runAfter:
       - run-script
       taskRef:
