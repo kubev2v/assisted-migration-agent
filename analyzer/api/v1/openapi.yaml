@@ -1004,7 +1004,7 @@ components:
         - vcenters
       properties:
         data:
-          $ref: https://raw.githubusercontent.com/kubev2v/migration-planner/a9ac212f476f426fb0aa0437afff4e3f96cfd21b/api/v1alpha1/openapi.yaml#/components/schemas/Inventory
+          $ref: https://raw.githubusercontent.com/kubev2v/migration-planner/9353b1842c03c2cd36f7445299c7500ed5d08fae/api/v1alpha1/openapi.yaml#/components/schemas/Inventory
         vcenters:
           type: array
           items:
@@ -1079,7 +1079,7 @@ components:
       - inventory
       properties:
         inventory:
-          $ref: https://raw.githubusercontent.com/kubev2v/migration-planner/a9ac212f476f426fb0aa0437afff4e3f96cfd21b/api/v1alpha1/openapi.yaml#/components/schemas/Inventory
+          $ref: https://raw.githubusercontent.com/kubev2v/migration-planner/9353b1842c03c2cd36f7445299c7500ed5d08fae/api/v1alpha1/openapi.yaml#/components/schemas/Inventory
 
     VirtualMachine:
       type: object
@@ -1191,6 +1191,7 @@ components:
       - coresPerSocket
       - memoryMB
       - disks
+      - nicCount
       - nics
       properties:
         id:
@@ -1299,6 +1300,11 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/VirtualMachineDisk'
+        nicCount:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Adapter count reported by the source; 0 when unavailable
         nics:
           type: array
           items:
@@ -1389,6 +1395,9 @@ components:
     VirtualMachineNIC:
       type: object
       properties:
+        adapter:
+          type: string
+          description: Virtual adapter model, such as Vmxnet3 or E1000
         mac:
           type: string
           description: MAC address
@@ -1568,7 +1577,7 @@ components:
         group:
           $ref: '#/components/schemas/Group'
         inventory:
-          $ref: https://raw.githubusercontent.com/kubev2v/migration-planner/a9ac212f476f426fb0aa0437afff4e3f96cfd21b/api/v1alpha1/openapi.yaml#/components/schemas/Inventory
+          $ref: https://raw.githubusercontent.com/kubev2v/migration-planner/9353b1842c03c2cd36f7445299c7500ed5d08fae/api/v1alpha1/openapi.yaml#/components/schemas/Inventory
         vms:
           type: array
           items:

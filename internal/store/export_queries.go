@@ -194,6 +194,7 @@ var vmsQuery = `
 				v."VI SDK UUID" AS vi_sdk_uuid,
 
 				-- Networks
+				COALESCE(v."NICs", 0) AS nic_count,
 				COALESCE(v."Network #1", '') AS network_1,
 				COALESCE(v."Network #2", '') AS network_2,
 				COALESCE(v."Network #3", '') AS network_3,
@@ -335,6 +336,7 @@ const networkQuery = `
 						TRY_CAST(regexp_extract(n."NIC label", '\d+$', 0) AS INTEGER),
 						n."NIC label"
 				) - 1 AS nic_index,
+				COALESCE(v."NICs", 0) AS nic_count,
 				COALESCE(n."Network", '') AS network,
 				COALESCE(n."Switch", '') AS switch,
 				COALESCE(n."Type", '') AS type,
