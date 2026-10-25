@@ -302,9 +302,6 @@ spec:
         value: "true"
       - name: ALLOW_CROSS_PLATFORM_IMAGES
         value: "true"
-      - name: ADDITIONAL_BASE_IMAGES
-        value:
-        - $(tasks.run-script.results.SCRIPT_RUNNER_IMAGE_REFERENCE)
       runAfter:
       - run-script
       taskRef:
