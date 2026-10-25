@@ -187,9 +187,12 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 
 	for _, n := range vm.NICs {
 		nic := VirtualMachineNIC{
-			Mac:     &n.MAC,
-			Network: &n.Network,
-			Index:   &n.Index,
+			Mac:         &n.MAC,
+			Network:     &n.Network,
+			Index:       &n.Index,
+			VlanId:      &n.VlanID,
+			Ipv4Address: &n.IPv4Address,
+			Ipv6Address: &n.IPv6Address,
 		}
 		details.Nics = append(details.Nics, nic)
 	}

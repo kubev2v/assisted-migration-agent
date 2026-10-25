@@ -2137,6 +2137,15 @@ components:
     VirtualMachineNIC:
       type: object
       properties:
+        vlanId:
+          type: string
+          description: Reported port-group VLAN configuration, including zero or trunk ranges when supplied; empty when unknown. Per-port overrides are not resolved.
+        ipv4Address:
+          type: string
+          description: IPv4 addresses reported for this adapter. For vCenter collections, multiple addresses are separated by commas; RVTools values retain their source formatting. Empty when unknown.
+        ipv6Address:
+          type: string
+          description: IPv6 addresses reported for this adapter. For vCenter collections, multiple addresses are separated by commas; RVTools values retain their source formatting. Empty when unknown.
         mac:
           type: string
           description: MAC address

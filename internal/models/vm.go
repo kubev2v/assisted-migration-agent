@@ -109,6 +109,7 @@ type NIC struct {
 	Index       int
 	IPv4Address string
 	IPv6Address string
+	VlanID      string
 }
 
 type Device struct {

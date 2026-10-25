@@ -3,6 +3,7 @@ package store_test
 import (
 	"context"
 	"database/sql"
+	"encoding/csv"
 	"os"
 	"path/filepath"
 	"time"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
 
+	v2 "github.com/kubev2v/assisted-migration-agent/agent/api/v2"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
@@ -1427,6 +1429,53 @@ var _ = Describe("VMStore", func() {
 				Expect(vm.InspectionConcernCount).To(Equal(1))
 			})
 		})
+	})
+
+	It("should expose VLAN and all adapter addresses consistently in the API and CSV", func() {
+		insertVM("vm-network", "Network Test", "poweredOn", "cluster1", 4096)
+		_, err := s.Querier().ExecContext(ctx, `
+				INSERT INTO vnetwork ("VM ID", "Network", "Mac Address", "NIC label", "Switch", "VLAN", "IPv4 Address", "IPv6 Address")
+				VALUES ('vm-network', 'standard', '00:01', 'Network adapter 1', 'vSwitch0', '0', '10.0.0.1,10.0.0.2', '2001:db8::1,fe80::1'),
+				       ('vm-network', 'distributed', '00:02', 'Network adapter 2', 'dvs-1', '10-20,30-40', NULL, NULL),
+				       ('vm-network', 'unknown', '00:03', 'Network adapter 3', NULL, NULL, NULL, NULL)
+			`)
+		Expect(err).NotTo(HaveOccurred())
+		vm, err := s.VM().Get(ctx, "vm-network")
+		Expect(err).NotTo(HaveOccurred())
+		detail := v2.NewVirtualMachineDetailFromModel(*vm)
+		Expect(detail.Nics).To(HaveLen(3))
+		byMAC := make(map[string]v2.VirtualMachineNIC)
+		for _, nic := range detail.Nics {
+			byMAC[*nic.Mac] = nic
+		}
+		Expect(*byMAC["00:01"].VlanId).To(Equal("0"))
+		Expect(*byMAC["00:01"].Ipv4Address).To(Equal("10.0.0.1,10.0.0.2"))
+		Expect(*byMAC["00:01"].Ipv6Address).To(Equal("2001:db8::1,fe80::1"))
+		Expect(*byMAC["00:02"].VlanId).To(Equal("10-20,30-40"))
+		Expect(*byMAC["00:03"].VlanId).To(BeEmpty())
+
+		path := filepath.Join(tmpDir, "networks.csv")
+		Expect(s.Export().CopyScope(ctx, "network", path)).To(Succeed())
+		file, err := os.Open(path)
+		Expect(err).NotTo(HaveOccurred())
+		defer func() { _ = file.Close() }()
+		records, err := csv.NewReader(file).ReadAll()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(records).To(HaveLen(4))
+		columns := make(map[string]int)
+		for i, name := range records[0] {
+			columns[name] = i
+		}
+		Expect(columns).To(HaveKey("vlan_id"))
+		Expect(columns).To(HaveKey("ipv4_address"))
+		Expect(columns).To(HaveKey("ipv6_address"))
+		for i, record := range records[1:] {
+			nic := byMAC[record[columns["mac_address"]]]
+			Expect(record[columns["nic_index"]]).To(Equal([]string{"0", "1", "2"}[i]))
+			Expect(record[columns["vlan_id"]]).To(Equal(*nic.VlanId))
+			Expect(record[columns["ipv4_address"]]).To(Equal(*nic.Ipv4Address))
+			Expect(record[columns["ipv6_address"]]).To(Equal(*nic.Ipv6Address))
+		}
 	})
 
 	Context("NIC IP addresses", func() {
