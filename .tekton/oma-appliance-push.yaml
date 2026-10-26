@@ -287,6 +287,9 @@ spec:
         value: $(tasks.run-script.results.SCRIPT_ARTIFACT)
       - name: PREFETCH_ARTIFACT
         value: $(tasks.prefetch-dependencies.results.PREFETCH_ARTIFACT)
+      - name: ADDITIONAL_BASE_IMAGES
+        value:
+        - $(tasks.run-script.results.SCRIPT_RUNNER_IMAGE_REFERENCE)
       runAfter:
       - run-script
       taskRef:
