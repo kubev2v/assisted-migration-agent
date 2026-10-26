@@ -169,6 +169,9 @@ LABEL konflux.additional-tags="${RELEASE_TAGS}"
 ARG IMAGE_VERSION=""
 LABEL org.opencontainers.image.version="${IMAGE_VERSION}"
 
+ARG BRANCH_TAG=""
+LABEL konflux.release.branch-tag="${BRANCH_TAG}"
+
 USER 1001
 
 # Expose HTTP port (configurable via --server-http-port, default: 8000)

@@ -217,6 +217,7 @@ spec:
         - $(params.build-args[*])
         - "RELEASE_TAGS=prod {{git_tag}}"
         - "IMAGE_VERSION={{git_tag}}"
+        - "BRANCH_TAG=prod"
       - name: PRIVILEGED_NESTED
         value: $(params.privileged-nested)
       - name: SOURCE_URL

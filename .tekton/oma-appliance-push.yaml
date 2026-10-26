@@ -231,6 +231,7 @@ spec:
           echo "Computed IMAGE_VERSION: $VERSION"
           sed -i "s|ARG RELEASE_TAGS=\"\"|ARG RELEASE_TAGS=\"$TAGS\"|" agent/Containerfile
           sed -i "s|ARG IMAGE_VERSION=\"\"|ARG IMAGE_VERSION=\"$VERSION\"|" agent/Containerfile
+          sed -i "s|ARG BRANCH_TAG=\"\"|ARG BRANCH_TAG=\"$BRANCH\"|" agent/Containerfile
           echo "Modified Containerfile ARG defaults successfully"
       - name: HERMETIC
         value: $(params.hermetic)
