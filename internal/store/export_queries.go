@@ -343,6 +343,8 @@ const networkQuery = `
 				COALESCE(n."Mac Address", '') AS mac_address,
 				COALESCE(n."IPv4 Address", '') AS ipv4_address,
 				COALESCE(n."IPv6 Address", '') AS ipv6_address,
+				COALESCE(n."IPv4 CIDR", '') AS ipv4_cidr,
+				COALESCE(n."IPv6 CIDR", '') AS ipv6_cidr,
 				COALESCE(n."VLAN", '') AS vlan_id,
 				COALESCE(n."Connected", false) AS connected,
 				COALESCE(n."Starts Connected", false) AS starts_connected

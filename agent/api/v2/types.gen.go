@@ -890,8 +890,14 @@ type VirtualMachineNIC struct {
 	// Ipv4Address IPv4 addresses reported for this adapter. For vCenter collections, multiple addresses are separated by commas; RVTools values retain their source formatting. Empty when unknown.
 	Ipv4Address *string `json:"ipv4Address,omitempty"`
 
+	// Ipv4Cidr Comma-separated IPv4 address/prefix pairs reported for this adapter. Empty when prefix information is unavailable, including RVTools imports.
+	Ipv4Cidr *string `json:"ipv4Cidr,omitempty"`
+
 	// Ipv6Address IPv6 addresses reported for this adapter. For vCenter collections, multiple addresses are separated by commas; RVTools values retain their source formatting. Empty when unknown.
 	Ipv6Address *string `json:"ipv6Address,omitempty"`
+
+	// Ipv6Cidr Comma-separated IPv6 address/prefix pairs reported for this adapter. Empty when prefix information is unavailable, including RVTools imports.
+	Ipv6Cidr *string `json:"ipv6Cidr,omitempty"`
 
 	// Mac MAC address
 	Mac *string `json:"mac,omitempty"`

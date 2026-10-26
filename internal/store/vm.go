@@ -369,6 +369,8 @@ func fromDB(pvm duckdb_models.VM) models.VM {
 			Index:       i,
 			IPv4Address: n.IPv4Address,
 			IPv6Address: n.IPv6Address,
+			IPv4CIDR:    n.IPv4CIDR,
+			IPv6CIDR:    n.IPv6CIDR,
 			VlanID:      n.VlanID,
 		})
 	}

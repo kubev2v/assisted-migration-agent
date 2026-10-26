@@ -53,7 +53,7 @@ func NewVirtualMachineFromSummary(vm models.VirtualMachineSummary) VirtualMachin
 	return result
 }
 
-// NewVirtualMachineDetailFromModel converts a models.VM to a v2 VirtualMachineDetail.
+// NewVirtualMachineDetailFromModel converts a models.VM to a v1 VirtualMachineDetail.
 func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 	details := VirtualMachineDetail{
 		Id:              vm.ID,
@@ -143,9 +143,14 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 
 	for _, n := range vm.NICs {
 		nic := VirtualMachineNIC{
-			Mac:     &n.MAC,
-			Network: &n.Network,
-			Index:   &n.Index,
+			Mac:         &n.MAC,
+			Network:     &n.Network,
+			Index:       &n.Index,
+			VlanId:      &n.VlanID,
+			Ipv4Address: &n.IPv4Address,
+			Ipv6Address: &n.IPv6Address,
+			Ipv4Cidr:    &n.IPv4CIDR,
+			Ipv6Cidr:    &n.IPv6CIDR,
 		}
 		details.Nics = append(details.Nics, nic)
 	}

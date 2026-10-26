@@ -193,6 +193,8 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 			VlanId:      &n.VlanID,
 			Ipv4Address: &n.IPv4Address,
 			Ipv6Address: &n.IPv6Address,
+			Ipv4Cidr:    &n.IPv4CIDR,
+			Ipv6Cidr:    &n.IPv6CIDR,
 		}
 		details.Nics = append(details.Nics, nic)
 	}

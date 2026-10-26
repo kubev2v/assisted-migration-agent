@@ -109,6 +109,8 @@ type NIC struct {
 	Index       int
 	IPv4Address string
 	IPv6Address string
+	IPv4CIDR    string
+	IPv6CIDR    string
 	VlanID      string
 }
 

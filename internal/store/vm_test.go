@@ -13,7 +13,6 @@ import (
 
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
 
-	v2 "github.com/kubev2v/assisted-migration-agent/agent/api/v2"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
@@ -1431,28 +1430,33 @@ var _ = Describe("VMStore", func() {
 		})
 	})
 
-	It("should expose VLAN and all adapter addresses consistently in the API and CSV", func() {
+	It("should retain VLAN, addresses and CIDRs consistently in the store and CSV", func() {
 		insertVM("vm-network", "Network Test", "poweredOn", "cluster1", 4096)
 		_, err := s.Querier().ExecContext(ctx, `
-				INSERT INTO vnetwork ("VM ID", "Network", "Mac Address", "NIC label", "Switch", "VLAN", "IPv4 Address", "IPv6 Address")
-				VALUES ('vm-network', 'standard', '00:01', 'Network adapter 1', 'vSwitch0', '0', '10.0.0.1,10.0.0.2', '2001:db8::1,fe80::1'),
-				       ('vm-network', 'distributed', '00:02', 'Network adapter 2', 'dvs-1', '10-20,30-40', NULL, NULL),
-				       ('vm-network', 'unknown', '00:03', 'Network adapter 3', NULL, NULL, NULL, NULL)
+				INSERT INTO vnetwork ("VM ID", "Network", "Mac Address", "NIC label", "Switch", "VLAN", "IPv4 Address", "IPv6 Address", "IPv4 CIDR", "IPv6 CIDR")
+				VALUES ('vm-network', 'standard', '00:01', 'Network adapter 1', 'vSwitch0', '0', '10.0.0.1,10.0.0.2', '2001:db8::1,fe80::1', '10.0.0.1/24,10.0.0.2/25', '2001:db8::1/64,fe80::1/64'),
+				       ('vm-network', 'distributed', '00:02', 'Network adapter 2', 'dvs-1', '10-20,30-40', NULL, NULL, NULL, NULL),
+				       ('vm-network', 'unknown', '00:03', 'Network adapter 3', NULL, NULL, '192.0.2.3', '2001:db8::3', NULL, NULL)
 			`)
 		Expect(err).NotTo(HaveOccurred())
 		vm, err := s.VM().Get(ctx, "vm-network")
 		Expect(err).NotTo(HaveOccurred())
-		detail := v2.NewVirtualMachineDetailFromModel(*vm)
-		Expect(detail.Nics).To(HaveLen(3))
-		byMAC := make(map[string]v2.VirtualMachineNIC)
-		for _, nic := range detail.Nics {
-			byMAC[*nic.Mac] = nic
+		Expect(vm.NICs).To(HaveLen(3))
+		byMAC := make(map[string]models.NIC)
+		for _, nic := range vm.NICs {
+			byMAC[nic.MAC] = nic
 		}
-		Expect(*byMAC["00:01"].VlanId).To(Equal("0"))
-		Expect(*byMAC["00:01"].Ipv4Address).To(Equal("10.0.0.1,10.0.0.2"))
-		Expect(*byMAC["00:01"].Ipv6Address).To(Equal("2001:db8::1,fe80::1"))
-		Expect(*byMAC["00:02"].VlanId).To(Equal("10-20,30-40"))
-		Expect(*byMAC["00:03"].VlanId).To(BeEmpty())
+		Expect(byMAC["00:01"].VlanID).To(Equal("0"))
+		Expect(byMAC["00:01"].IPv4Address).To(Equal("10.0.0.1,10.0.0.2"))
+		Expect(byMAC["00:01"].IPv6Address).To(Equal("2001:db8::1,fe80::1"))
+		Expect(byMAC["00:01"].IPv4CIDR).To(Equal("10.0.0.1/24,10.0.0.2/25"))
+		Expect(byMAC["00:01"].IPv6CIDR).To(Equal("2001:db8::1/64,fe80::1/64"))
+		Expect(byMAC["00:02"].VlanID).To(Equal("10-20,30-40"))
+		Expect(byMAC["00:03"].VlanID).To(BeEmpty())
+		Expect(byMAC["00:03"].IPv4Address).To(Equal("192.0.2.3"))
+		Expect(byMAC["00:03"].IPv6Address).To(Equal("2001:db8::3"))
+		Expect(byMAC["00:03"].IPv4CIDR).To(BeEmpty())
+		Expect(byMAC["00:03"].IPv6CIDR).To(BeEmpty())
 
 		path := filepath.Join(tmpDir, "networks.csv")
 		Expect(s.Export().CopyScope(ctx, "network", path)).To(Succeed())
@@ -1469,12 +1473,16 @@ var _ = Describe("VMStore", func() {
 		Expect(columns).To(HaveKey("vlan_id"))
 		Expect(columns).To(HaveKey("ipv4_address"))
 		Expect(columns).To(HaveKey("ipv6_address"))
+		Expect(columns).To(HaveKey("ipv4_cidr"))
+		Expect(columns).To(HaveKey("ipv6_cidr"))
 		for i, record := range records[1:] {
 			nic := byMAC[record[columns["mac_address"]]]
 			Expect(record[columns["nic_index"]]).To(Equal([]string{"0", "1", "2"}[i]))
-			Expect(record[columns["vlan_id"]]).To(Equal(*nic.VlanId))
-			Expect(record[columns["ipv4_address"]]).To(Equal(*nic.Ipv4Address))
-			Expect(record[columns["ipv6_address"]]).To(Equal(*nic.Ipv6Address))
+			Expect(record[columns["vlan_id"]]).To(Equal(nic.VlanID))
+			Expect(record[columns["ipv4_address"]]).To(Equal(nic.IPv4Address))
+			Expect(record[columns["ipv6_address"]]).To(Equal(nic.IPv6Address))
+			Expect(record[columns["ipv4_cidr"]]).To(Equal(nic.IPv4CIDR))
+			Expect(record[columns["ipv6_cidr"]]).To(Equal(nic.IPv6CIDR))
 		}
 	})
 
