@@ -1896,7 +1896,7 @@ func PathToRawSpec(pathToFile string) map[string]func() ([]byte, error) {
 
 	pathPrefix := path.Dir(pathToFile)
 
-	for rawPath, rawFunc := range externalRef0.PathToRawSpec(path.Join(pathPrefix, "https://raw.githubusercontent.com/kubev2v/migration-planner/5692d9489e56c4c2563494ff019fd132d0d54c62/api/v1alpha1/openapi.yaml")) {
+	for rawPath, rawFunc := range externalRef0.PathToRawSpec(path.Join(pathPrefix, "https://raw.githubusercontent.com/kubev2v/migration-planner/0c066510008cdb566e4efabaa4d85929a8bffeb4/api/v1alpha1/openapi.yaml")) {
 		if _, ok := res[rawPath]; ok {
 			// it is not possible to compare functions in golang, so always overwrite the old value
 		}
