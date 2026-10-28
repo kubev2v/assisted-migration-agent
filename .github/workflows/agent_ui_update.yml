@@ -1,0 +1,38 @@
+name: React to Agent-UI Repository Changes
+
+on:
+  repository_dispatch:
+    types: [agent_ui_updated]
+
+permissions:
+  contents: read
+
+jobs:
+  update:
+    if: github.event.client_payload.repo == 'kubev2v/migration-planner-agent-ui'
+    uses: kubev2v/migration-planner-workflows/.github/workflows/repo-dispatch-update.yml@b5de744cc45e4daaf9e28dcd6b179ab4a8ad7c7c # main
+    with:
+      sha: ${{ github.event.client_payload.sha }}
+      target-branch: ${{ github.event.client_payload.target_branch }}
+      source-repo: ${{ github.event.client_payload.repo }}
+      component-name: Agent-UI image tag
+      pr-branch-prefix: update-agent-ui
+      update-command: |
+        [[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "ERROR: invalid UI commit SHA"; exit 1; }
+        SOURCE_BRANCH=$(git branch --show-current)
+        case "$SOURCE_BRANCH" in
+          main|stable) ;;
+          *) echo "ERROR: unsupported UI source branch: $SOURCE_BRANCH"; exit 1 ;;
+        esac
+        SOURCE_HEAD=$(git ls-remote --exit-code https://github.com/kubev2v/migration-planner-agent-ui.git "refs/heads/$SOURCE_BRANCH" | cut -f1)
+        if [[ "$SHA" != "$SOURCE_HEAD" ]]; then
+          echo "ERROR: rejecting stale UI notification $SHA; $SOURCE_BRANCH is at $SOURCE_HEAD"
+          # Fail the update step so the reusable workflow cannot create or modify a PR.
+          exit 1
+        fi
+        CONFIG_FILE="ui-config"
+        sed -i "s/^AGENT_UI_IMAGE_TAG=.*/AGENT_UI_IMAGE_TAG=$SHA/" "$CONFIG_FILE"
+        grep -q "^AGENT_UI_IMAGE_TAG=$SHA" "$CONFIG_FILE" || { echo "ERROR: sed substitution failed"; exit 1; }
+    secrets:
+      APP_ID: ${{ secrets.MIGRATION_PLANNER_SYNC_APP_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.MIGRATION_PLANNER_SYNC_APP_PRIVATE_KEY }}

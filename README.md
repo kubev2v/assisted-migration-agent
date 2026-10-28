@@ -16,6 +16,37 @@ defines the HTTP contract, and `handlers/v2/` implements it. Shared
 implementation remains in `internal/` and `pkg/`. The RVTools proof of
 concept remains available as an Agent mode and uses `agent/Containerfile.rvtools`.
 
+## Container images
+
+`ui-config` pins `AGENT_UI_IMAGE_TAG` to a UI commit SHA for both
+`agent/Containerfile` and `agent/Containerfile.rvtools`. Local Make targets and
+all Agent/RVTools Konflux pipelines use this config:
+
+```bash
+make image
+```
+
+For a direct Podman/Buildah build, pass the config explicitly:
+
+```bash
+podman build --build-arg-file ui-config -f agent/Containerfile .
+podman build --build-arg-file ui-config -f agent/Containerfile.rvtools .
+```
+
+For local testing, override the pin with `make image AGENT_UI_IMAGE_TAG=<sha>`
+or `AGENT_UI_IMAGE_TAG=<sha> make image`.
+
+On pushes to the UI repository's `main` or `stable` branch, its notification
+workflow waits for the SHA-tagged image, then dispatches `agent_ui_updated` to
+this repository. The receiver checks the SHA against the UI source branch head
+and rejects stale notifications before updating `ui-config` or creating a PR
+on the matching branch. These PRs are automatically approved and set to merge by rebase
+after required checks pass. Merging updates the UI used by subsequent container
+builds.
+The `MIGRATION_PLANNER_SYNC_APP_ID` and `MIGRATION_PLANNER_SYNC_APP_PRIVATE_KEY`
+secrets must be available in both repositories. The sync GitHub App must be
+installed on this repository with contents and pull request write access.
+
 ## RVTools Analyzer
 
 The Analyzer runs independently of Agent IDs and the Migration Planner console. It has its own API under `/api/v1`; the Agent's `--rvtools-mode` and `/api/v2/collector/rvtools` remain available.

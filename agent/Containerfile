@@ -1,8 +1,9 @@
+# Supply the pinned UI tag with --build-arg-file ui-config.
 # =============================================================================
 # Stage 1: Fetch the UI
 # =============================================================================
 ARG AGENT_UI_IMAGE=quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent-ui
-ARG AGENT_UI_IMAGE_TAG=latest
+ARG AGENT_UI_IMAGE_TAG
 FROM --platform=linux/amd64 ${AGENT_UI_IMAGE}:${AGENT_UI_IMAGE_TAG} AS ui-builder
 
 
@@ -12,7 +13,7 @@ FROM --platform=linux/amd64 ${AGENT_UI_IMAGE}:${AGENT_UI_IMAGE_TAG} AS ui-builde
 FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/ubi-minimal AS ui-metadata-extractor
 
 ARG AGENT_UI_IMAGE=quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent-ui
-ARG AGENT_UI_IMAGE_TAG=latest
+ARG AGENT_UI_IMAGE_TAG
 
 # Install skopeo to inspect the UI image
 RUN microdnf install -y skopeo && microdnf clean all

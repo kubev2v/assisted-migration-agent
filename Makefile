@@ -21,7 +21,9 @@ ANALYZER_IMAGE_TAG ?= latest
 IMAGE_NAME ?= assisted-migration-agent
 IMAGE_TAG ?= latest
 AGENT_UI_IMAGE ?= quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent-ui
-AGENT_UI_IMAGE_TAG ?= latest
+ifeq ($(origin AGENT_UI_IMAGE_TAG),undefined)
+include ui-config
+endif
 ANALYZER_UI_IMAGE ?= $(AGENT_UI_IMAGE)
 ANALYZER_UI_IMAGE_TAG ?= $(AGENT_UI_IMAGE_TAG)
 

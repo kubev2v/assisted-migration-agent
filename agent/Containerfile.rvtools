@@ -1,11 +1,12 @@
+# Supply the pinned UI tag with --build-arg-file ui-config.
 # The UI image supplies architecture-independent static files.
 ARG AGENT_UI_IMAGE=quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent-ui
-ARG AGENT_UI_IMAGE_TAG=latest
+ARG AGENT_UI_IMAGE_TAG
 FROM --platform=linux/amd64 ${AGENT_UI_IMAGE}:${AGENT_UI_IMAGE_TAG} AS ui-builder
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal AS ui-metadata-extractor
 ARG AGENT_UI_IMAGE=quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent-ui
-ARG AGENT_UI_IMAGE_TAG=latest
+ARG AGENT_UI_IMAGE_TAG
 RUN microdnf install -y skopeo && microdnf clean all
 RUN UI_GIT_COMMIT=$(skopeo inspect --format '{{index .Labels "vcs-ref"}}' docker://${AGENT_UI_IMAGE}:${AGENT_UI_IMAGE_TAG} || echo "unknown") && \
     echo -n "${UI_GIT_COMMIT}" > /tmp/ui-git-commit.txt

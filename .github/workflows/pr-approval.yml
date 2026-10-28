@@ -9,6 +9,8 @@ jobs:
     uses: kubev2v/migration-planner-workflows/.github/workflows/pr-approval.yml@main
     with:
       user_path_permissions: |
+        migration-planner-sync[bot]:
+          - 'ui-config'
         '*':
           - '.github/release-config.txt'
     secrets:
