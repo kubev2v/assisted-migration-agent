@@ -122,20 +122,7 @@ func (f *rvtoolsWorkFactory) Build() work.WorkBuilder[models.CollectorStatus, mo
 				result, err := parser.IngestRvTools(ctx, file)
 				if err != nil {
 					log.Errorw("failed to ingest rvtools file", "file", file, "error", err)
-					r.Err = fmt.Errorf("ingesting rvtools file %s: %w", file, err)
-					return r, r.Err
-				}
-
-				if result.HasErrors() {
-					log.Errorw("rvtools validation failed", "file", file, "errors", result.Errors)
-					issue := result.Errors[0]
-					switch issue.Code {
-					case duckdb_parser.CodeNoVMs, duckdb_parser.CodeMissingVMID, duckdb_parser.CodeMissingVMName,
-						duckdb_parser.CodeMissingCluster, duckdb_parser.CodeMissingVISDKUUID:
-						r.Err = fmt.Errorf("RVTools validation failed: %s", issue.Message)
-					default:
-						r.Err = fmt.Errorf("RVTools file could not be validated")
-					}
+					r.Err = err
 					return r, r.Err
 				}
 
