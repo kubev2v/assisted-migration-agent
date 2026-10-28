@@ -149,7 +149,8 @@ SELECT
     COALESCE(metadata.entries, map()) AS "Metadata",
     COALESCE(ins.status, 'not_started') AS "InspectionState",
     COALESCE(ins.details, '') AS "InspectionDetails",
-    COALESCE(ins.error, '') AS "InspectionError"
+    COALESCE(ins.error, '') AS "InspectionError",
+    COALESCE(i."NICs", 0) AS "NICCount"
 FROM filtered_vm i
 CROSS JOIN metadata_agg metadata
 LEFT JOIN vcpu c ON i."VM ID" = c."VM ID"

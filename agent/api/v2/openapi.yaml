@@ -1930,6 +1930,7 @@ components:
         - coresPerSocket
         - memoryMB
         - disks
+        - nicCount
         - nics
       properties:
         id:
@@ -2046,6 +2047,11 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/VirtualMachineDisk'
+        nicCount:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Adapter count reported by the source; 0 when unavailable
         nics:
           type: array
           items:
@@ -2137,6 +2143,9 @@ components:
     VirtualMachineNIC:
       type: object
       properties:
+        adapter:
+          type: string
+          description: Virtual adapter model, such as Vmxnet3 or E1000
         mac:
           type: string
           description: MAC address

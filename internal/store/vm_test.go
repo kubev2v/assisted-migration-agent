@@ -3,8 +3,11 @@ package store_test
 import (
 	"context"
 	"database/sql"
+	"encoding/csv"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -12,6 +15,7 @@ import (
 
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
 
+	v2 "github.com/kubev2v/assisted-migration-agent/agent/api/v2"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
@@ -1427,6 +1431,105 @@ var _ = Describe("VMStore", func() {
 				Expect(vm.InspectionConcernCount).To(Equal(1))
 			})
 		})
+	})
+
+	It("keeps adapter inventory consistent in VM details and CSV exports", func() {
+		insertVM("vm-network", "network-vm", "poweredOn", "cluster-a", 4096)
+		_, err := s.Querier().ExecContext(ctx, `UPDATE vinfo SET "NICs"=2 WHERE "VM ID"='vm-network'`)
+		Expect(err).NotTo(HaveOccurred())
+		_, err = s.Querier().ExecContext(ctx, `INSERT INTO vnetwork
+			("VM ID", "Mac Address", "Network", "Adapter", "Switch", "IPv4 Address", "IPv6 Address") VALUES
+			('vm-network', 'aa:00:00:00:00:01', 'Production', 'Vmxnet3', 'vSwitch0', '10.0.0.5', '2001:db8::5'),
+			('vm-network', 'aa:00:00:00:00:02', 'Backup', 'E1000', '', '', '')`)
+		Expect(err).NotTo(HaveOccurred())
+		vm, err := s.VM().Get(ctx, "vm-network")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(vm.NICCount).To(Equal(int32(2)))
+		detail := v2.NewVirtualMachineDetailFromModel(*vm)
+		Expect(detail.NicCount).To(Equal(vm.NICCount))
+		Expect(detail.Nics).To(HaveLen(2))
+		Expect(*detail.Nics[0].Adapter).To(Equal("Vmxnet3"))
+		Expect(*detail.Nics[0].Network).To(Equal("Production"))
+		Expect(*detail.Nics[0].Mac).To(Equal("aa:00:00:00:00:01"))
+		Expect(*detail.Nics[1].Adapter).To(Equal("E1000"))
+		Expect(*detail.Nics[1].Network).To(Equal("Backup"))
+		Expect(vm.NICs[0].IPv4Address).To(Equal("10.0.0.5"))
+		Expect(vm.NICs[0].IPv6Address).To(Equal("2001:db8::5"))
+
+		exportPath := filepath.Join(tmpDir, "network.csv")
+		Expect(s.Export().CopyScope(ctx, "network", exportPath)).To(Succeed())
+		data, err := os.ReadFile(exportPath)
+		Expect(err).NotTo(HaveOccurred())
+		records, err := csv.NewReader(strings.NewReader(string(data))).ReadAll()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(records).To(HaveLen(3))
+		row := map[string]string{}
+		for i, column := range records[0] {
+			row[column] = records[1][i]
+		}
+		Expect(row["nic_count"]).To(Equal("2"))
+		Expect(row["adapter"]).To(Equal(*detail.Nics[0].Adapter))
+		Expect(row["network"]).To(Equal(*detail.Nics[0].Network))
+		Expect(row["mac_address"]).To(Equal(*detail.Nics[0].Mac))
+		Expect(row["switch"]).To(Equal("vSwitch0"))
+		Expect(row["ipv4_address"]).To(Equal("10.0.0.5"))
+		Expect(row["ipv6_address"]).To(Equal("2001:db8::5"))
+		vmsPath := filepath.Join(tmpDir, "vms.csv")
+		Expect(s.Export().CopyScope(ctx, "vms", vmsPath)).To(Succeed())
+		data, err = os.ReadFile(vmsPath)
+		Expect(err).NotTo(HaveOccurred())
+		records, err = csv.NewReader(strings.NewReader(string(data))).ReadAll()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(records).To(HaveLen(2))
+		row = map[string]string{}
+		for i, column := range records[0] {
+			row[column] = records[1][i]
+		}
+		Expect(row["nic_count"]).To(Equal("2"))
+	})
+
+	It("preserves a source NIC count without adapter details", func() {
+		insertVM("vm-count", "count-vm", "poweredOn", "cluster-a", 4096)
+		for _, count := range []int32{3, 0} {
+			_, err := s.Querier().ExecContext(ctx, `UPDATE vinfo SET "NICs"=? WHERE "VM ID"='vm-count'`, count)
+			Expect(err).NotTo(HaveOccurred())
+			vm, err := s.VM().Get(ctx, "vm-count")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vm.NICCount).To(Equal(count))
+			Expect(vm.NICs).To(BeEmpty())
+		}
+	})
+
+	It("returns zero for missing NIC counts in VM details and exports", func() {
+		insertVM("vm-unknown", "unknown-vm", "poweredOn", "cluster-a", 4096)
+		_, err := s.Querier().ExecContext(ctx, `UPDATE vinfo SET "NICs"=NULL WHERE "VM ID"='vm-unknown'`)
+		Expect(err).NotTo(HaveOccurred())
+		_, err = s.Querier().ExecContext(ctx, `INSERT INTO vnetwork ("VM ID", "Network") VALUES ('vm-unknown', 'Production')`)
+		Expect(err).NotTo(HaveOccurred())
+		vm, err := s.VM().Get(ctx, "vm-unknown")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(vm.NICCount).To(BeZero())
+		data, err := json.Marshal(v2.NewVirtualMachineDetailFromModel(*vm))
+		Expect(err).NotTo(HaveOccurred())
+		var detail map[string]json.RawMessage
+		Expect(json.Unmarshal(data, &detail)).To(Succeed())
+		Expect(string(detail["nicCount"])).To(Equal("0"))
+
+		for _, scope := range []string{"vms", "network"} {
+			exportPath := filepath.Join(tmpDir, scope+".csv")
+			Expect(s.Export().CopyScope(ctx, scope, exportPath)).To(Succeed())
+			data, err := os.ReadFile(exportPath)
+			Expect(err).NotTo(HaveOccurred())
+			records, err := csv.NewReader(strings.NewReader(string(data))).ReadAll()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(records).To(HaveLen(2))
+			Expect(records[0]).To(ContainElement("nic_count"))
+			for i, column := range records[0] {
+				if column == "nic_count" {
+					Expect(records[1][i]).To(Equal("0"))
+				}
+			}
+		}
 	})
 
 	Context("NIC IP addresses", func() {
