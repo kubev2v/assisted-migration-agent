@@ -9,7 +9,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
+	"uuid"
 
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
 	"github.com/kubev2v/migration-planner/pkg/inventory/converters"
@@ -42,7 +44,6 @@ func (f *rvtoolsWorkFactory) Build() work.WorkBuilder[models.CollectorStatus, mo
 	log := zap.S().Named("collector_service")
 
 	var collectionDb *store.Database
-	var parser *duckdb_parser.Parser
 	database := fmt.Sprintf("collection_%d", time.Now().Unix())
 
 	units := []work.WorkUnit[models.CollectorStatus, models.CollectorResult]{
@@ -68,9 +69,7 @@ func (f *rvtoolsWorkFactory) Build() work.WorkBuilder[models.CollectorStatus, mo
 					return r, r.Err
 				}
 
-				log.Infow("creating collection database", "name", database)
 				dbPath := filepath.Join(f.dataDir, database+".duckdb")
-
 				hash := sha256.Sum256([]byte(dbPath))
 				id := hex.EncodeToString(hash[:])[:6]
 
@@ -87,7 +86,7 @@ func (f *rvtoolsWorkFactory) Build() work.WorkBuilder[models.CollectorStatus, mo
 						return err
 					}
 
-					parser = duckdb_parser.New(st.Querier(), f.validator)
+					parser := duckdb_parser.New(st.Querier(), f.validator)
 					if err := parser.Init(); err != nil {
 						return err
 					}
@@ -99,24 +98,64 @@ func (f *rvtoolsWorkFactory) Build() work.WorkBuilder[models.CollectorStatus, mo
 					return r, r.Err
 				}
 
-				log.Infow("collection database ready", "name", database)
+				log.Infow("collection database created", "path", collectionDb.Path)
+
 				return r, nil
 			},
 		},
 	}
 
-	// 2. Ingest: parse each RVTools Excel file into the collection DB.
+	// 2. Ingest: parse each RVTools Excel file in the temporary DB, then append
+	// its tables to the collection DB before cleaning up for the next file.
 	for _, file := range f.rvToolsFiles {
 		units = append(units, work.WorkUnit[models.CollectorStatus, models.CollectorResult]{
 			Status: func() models.CollectorStatus {
 				return models.CollectorStatus{State: models.CollectorStateCollecting}
 			},
 			Work: func(ctx context.Context, r models.CollectorResult) (models.CollectorResult, error) {
-				st, err := collectionDb.Store()
+				// create temporay db which is used to parse rvtools
+				// the result of this db will be appended into the final one
+				dbID := fmt.Sprintf("temporary_db_%s", strings.ReplaceAll(uuid.New().String(), "-", "")[:6])
+				tempDBPath := filepath.Join(f.dataDir, fmt.Sprintf("%s.duckdb", dbID))
+
+				collectionTemporaryDB, err := f.pool.NewDatabase(uuid.New().String(), tempDBPath, time.Now(), store.EagerConnectionInitilization, 1024, store.ReadWriteDatabase)
 				if err != nil {
-					r.Err = fmt.Errorf("getting collection store: %w", err)
+					r.Err = fmt.Errorf("opening collection database %s: %w", tempDBPath, err)
 					return r, r.Err
 				}
+				defer func() {
+					_ = collectionTemporaryDB.Close()
+					_ = f.pool.Delete(dbID)
+					_ = os.Remove(tempDBPath)
+				}()
+
+				if err := collectionTemporaryDB.Migrate(ctx, func(ctx context.Context, sqlDb *sql.DB) error {
+					st, err := collectionTemporaryDB.Store()
+					if err != nil {
+						return err
+					}
+
+					parser := duckdb_parser.New(st.Querier(), f.validator)
+					if err := parser.Init(); err != nil {
+						return err
+					}
+
+					err = migrations.RunCollection(ctx, sqlDb, dbID)
+					return err
+				}); err != nil {
+					_ = collectionTemporaryDB.Close()
+					r.Err = fmt.Errorf("migrating collection database %s: %w", database, err)
+					return r, r.Err
+				}
+
+				log.Infow("temporary collection database created", "path", collectionTemporaryDB.Path)
+				tempStore, err := collectionTemporaryDB.Store()
+				if err != nil {
+					r.Err = fmt.Errorf("getting temporary collection store: %w", err)
+					return r, r.Err
+				}
+
+				parser := duckdb_parser.New(tempStore.Querier(), f.validator)
 
 				log.Infow("ingesting rvtools file", "file", file)
 				result, err := parser.IngestRvTools(ctx, file)
@@ -143,17 +182,41 @@ func (f *rvtoolsWorkFactory) Build() work.WorkBuilder[models.CollectorStatus, mo
 					log.Warnw("rvtools validation warning", "file", file, "code", w.Code, "message", w.Message)
 				}
 
-				if err := st.Checkpoint(ctx); err != nil {
+				inv, err := parser.BuildInventory(ctx, nil)
+				if err != nil {
+					r.Err = fmt.Errorf("error building inventory for %s: %w", file, err)
+					return r, r.Err
+				}
+
+				invBytes, err := json.Marshal(converters.ToAPI(inv))
+				if err != nil {
+					r.Err = fmt.Errorf("failed to marshal inventory for %s: %w", file, err)
+					return r, r.Err
+				}
+
+				if err := tempStore.Inventory().SaveSubset(ctx, invBytes); err != nil {
+					r.Err = fmt.Errorf("saving inventory subset for %s: %w", file, err)
+					return r, r.Err
+				}
+
+				if err := tempStore.Checkpoint(ctx); err != nil {
 					log.Errorw("checkpoint failed after ingesting", "file", file, "error", err)
 					r.Err = fmt.Errorf("checkpoint after ingesting %s: %w", file, err)
 					return r, r.Err
 				}
 
-				if err := os.Remove(file); err != nil {
-					log.Warnw("failed to remove rvtools file", "file", file, "error", err)
+				if err := collectionTemporaryDB.Close(); err != nil {
+					r.Err = fmt.Errorf("closing temporary collection database after ingesting %s: %w", file, err)
+					return r, r.Err
+				}
+
+				if err := collectionDb.Append(ctx, collectionTemporaryDB); err != nil {
+					r.Err = fmt.Errorf("appending temporary collection database after ingesting %s: %w", file, err)
+					return r, r.Err
 				}
 
 				log.Infow("rvtools file ingested", "file", file)
+
 				return r, nil
 			},
 		})
@@ -172,11 +235,17 @@ func (f *rvtoolsWorkFactory) Build() work.WorkBuilder[models.CollectorStatus, mo
 			}
 
 			log.Info("building inventory from rvtools data")
+			parser := duckdb_parser.New(st.Querier(), f.validator)
 			inv, err := parser.BuildInventory(ctx, nil)
 			if err != nil {
 				r.Err = fmt.Errorf("error building inventory: %w", err)
 				return r, r.Err
 			}
+
+			// generate a random UUID for this inventory since is the aggregated
+			inv.VCenterID = "aggregated"
+			// set version to aggregated since this inventory is the aggregated one
+			inv.VCenterVersion = "aggregated"
 
 			invBytes, err := json.Marshal(converters.ToAPI(inv))
 			if err != nil {
@@ -208,6 +277,9 @@ func (f *rvtoolsWorkFactory) Build() work.WorkBuilder[models.CollectorStatus, mo
 
 	finalize := func(ctx context.Context, result models.CollectorResult) error {
 		for _, file := range f.rvToolsFiles {
+			if _, err := os.Stat(file); err != nil {
+				continue // it could ErrNotExist or any other err so continue
+			}
 			if err := os.Remove(file); err != nil {
 				zap.S().Warnw("failed to remove rvtools file", "file", file, "error", err)
 			}

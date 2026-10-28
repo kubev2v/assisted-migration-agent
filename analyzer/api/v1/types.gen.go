@@ -221,6 +221,12 @@ type Inventory struct {
 	Inventory externalRef0.Inventory `json:"inventory"`
 }
 
+// InventoryResponse defines model for InventoryResponse.
+type InventoryResponse struct {
+	Data     externalRef0.Inventory `json:"data"`
+	Vcenters []SubResource          `json:"vcenters"`
+}
+
 // Process defines model for Process.
 type Process struct {
 	// Name Name of the process
@@ -228,6 +234,11 @@ type Process struct {
 
 	// Version Version of the process
 	Version *string `json:"version,omitempty"`
+}
+
+// SubResource defines model for SubResource.
+type SubResource struct {
+	Id string `json:"id"`
 }
 
 // UpdateGroupRequest defines model for UpdateGroupRequest.

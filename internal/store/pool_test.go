@@ -228,6 +228,115 @@ var _ = Describe("Pool", func() {
 		})
 	})
 
+	Context("Append", func() {
+		It("copies rows from shared main tables by column name", func() {
+			destination, err := pool.NewDatabase("destination", filepath.Join(tmpDir, "destination.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			Expect(err).NotTo(HaveOccurred())
+			source, err := pool.NewDatabase("source", filepath.Join(tmpDir, "source.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			Expect(err).NotTo(HaveOccurred())
+
+			destinationStore, err := destination.Store()
+			Expect(err).NotTo(HaveOccurred())
+			sourceStore, err := source.Store()
+			Expect(err).NotTo(HaveOccurred())
+
+			_, err = destinationStore.Querier().ExecContext(ctx, `CREATE TABLE first (id INTEGER PRIMARY KEY, name VARCHAR)`)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = destinationStore.Querier().ExecContext(ctx, `CREATE TABLE "second table" (id INTEGER PRIMARY KEY, value VARCHAR)`)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = destinationStore.Querier().ExecContext(ctx, `CREATE TABLE about (product VARCHAR)`)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = sourceStore.Querier().ExecContext(ctx, `CREATE TABLE first (name VARCHAR, id INTEGER PRIMARY KEY)`)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = sourceStore.Querier().ExecContext(ctx, `CREATE TABLE "second table" (value VARCHAR, id INTEGER PRIMARY KEY)`)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = sourceStore.Querier().ExecContext(ctx, `CREATE TABLE about (product VARCHAR)`)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = sourceStore.Querier().ExecContext(ctx, `INSERT INTO first VALUES ('source', 7)`)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = sourceStore.Querier().ExecContext(ctx, `INSERT INTO "second table" VALUES ('copied', 8)`)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = sourceStore.Querier().ExecContext(ctx, `INSERT INTO about VALUES ('vCenter')`)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(source.Close()).To(Succeed())
+
+			Expect(destination.Append(ctx, source)).To(Succeed())
+
+			var id int
+			var value string
+			Expect(destinationStore.Querier().QueryRowContext(ctx, `SELECT id, name FROM first`).Scan(&id, &value)).To(Succeed())
+			Expect(id).To(Equal(7))
+			Expect(value).To(Equal("source"))
+			Expect(destinationStore.Querier().QueryRowContext(ctx, `SELECT id, value FROM "second table"`).Scan(&id, &value)).To(Succeed())
+			Expect(id).To(Equal(8))
+			Expect(value).To(Equal("copied"))
+			Expect(destinationStore.Querier().QueryRowContext(ctx, `SELECT product FROM about`).Scan(&value)).To(Succeed())
+			Expect(value).To(Equal("vCenter"))
+		})
+
+		It("skips source tables missing from the destination", func() {
+			destination, err := pool.NewDatabase("destination", filepath.Join(tmpDir, "destination.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			Expect(err).NotTo(HaveOccurred())
+			source, err := pool.NewDatabase("source", filepath.Join(tmpDir, "source.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			Expect(err).NotTo(HaveOccurred())
+			sourceStore, err := source.Store()
+			Expect(err).NotTo(HaveOccurred())
+			_, err = sourceStore.Querier().ExecContext(ctx, `CREATE TABLE source_only (id INTEGER)`)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(source.Close()).To(Succeed())
+
+			Expect(destination.Append(ctx, source)).To(Succeed())
+
+			destinationStore, err := destination.Store()
+			Expect(err).NotTo(HaveOccurred())
+			var count int
+			Expect(destinationStore.Querier().QueryRowContext(ctx,
+				`SELECT count(*) FROM duckdb_tables() WHERE database_name = current_database() AND table_name = 'source_only'`,
+			).Scan(&count)).To(Succeed())
+			Expect(count).To(BeZero())
+		})
+
+		It("skips conflicting rows and copies the remaining rows", func() {
+			destination, err := pool.NewDatabase("destination", filepath.Join(tmpDir, "destination.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			Expect(err).NotTo(HaveOccurred())
+			source, err := pool.NewDatabase("source", filepath.Join(tmpDir, "source.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			Expect(err).NotTo(HaveOccurred())
+
+			destinationStore, err := destination.Store()
+			Expect(err).NotTo(HaveOccurred())
+			sourceStore, err := source.Store()
+			Expect(err).NotTo(HaveOccurred())
+			for _, st := range []*store.Store{destinationStore, sourceStore} {
+				_, err = st.Querier().ExecContext(ctx, `CREATE TABLE first (id INTEGER PRIMARY KEY)`)
+				Expect(err).NotTo(HaveOccurred())
+				_, err = st.Querier().ExecContext(ctx, `CREATE TABLE second (id INTEGER PRIMARY KEY, value VARCHAR)`)
+				Expect(err).NotTo(HaveOccurred())
+			}
+			_, err = sourceStore.Querier().ExecContext(ctx, `INSERT INTO first VALUES (1)`)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = sourceStore.Querier().ExecContext(ctx, `INSERT INTO second VALUES (2, 'source')`)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = sourceStore.Querier().ExecContext(ctx, `INSERT INTO second VALUES (3, 'new')`)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = destinationStore.Querier().ExecContext(ctx, `INSERT INTO second VALUES (2, 'existing')`)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(source.Close()).To(Succeed())
+
+			Expect(destination.Append(ctx, source)).To(Succeed())
+
+			var count int
+			Expect(destinationStore.Querier().QueryRowContext(ctx, `SELECT count(*) FROM first WHERE id = 1`).Scan(&count)).To(Succeed())
+			Expect(count).To(Equal(1))
+			Expect(destinationStore.Querier().QueryRowContext(ctx, `SELECT count(*) FROM second`).Scan(&count)).To(Succeed())
+			Expect(count).To(Equal(2))
+			var value string
+			Expect(destinationStore.Querier().QueryRowContext(ctx, `SELECT value FROM second WHERE id = 2`).Scan(&value)).To(Succeed())
+			Expect(value).To(Equal("existing"))
+			Expect(destinationStore.Querier().QueryRowContext(ctx, `SELECT value FROM second WHERE id = 3`).Scan(&value)).To(Succeed())
+			Expect(value).To(Equal("new"))
+		})
+	})
+
 	Context("LatestCollection", func() {
 		It("returns false when pool has only the main database", func() {
 			mainDB, err := pool.NewDatabase(store.MainDatabaseID, filepath.Join(tmpDir, "main.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)

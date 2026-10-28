@@ -1,27 +1,39 @@
 openapi: 3.0.3
+
 info:
   title: Standalone RVTools Analyzer API
   version: 1.0.0
+
 servers:
 - url: /api/v1
+
 tags:
 - name: Collections
   description: Collection database management
+
 - name: Collector
   description: Inventory collection operations
+
 - name: Inventories
   description: Collected inventory resources
+
 - name: VirtualMachines
   description: Virtual machine queries across all vCenters
+
 - name: Groups
   description: VirtualMachine group management
+
 - name: Rightsizing
   description: Rightsizing reports and cluster/VM utilization
+
 - name: Version
   description: Analyzer version information
+
 - name: Analyzer
   description: Analyzer status
+
 paths:
+
   /virtualmachines:
     get:
       tags:
@@ -73,6 +85,7 @@ paths:
           description: No collections found
         '500':
           description: Internal server error
+
   /virtualmachines/batch-update-exclusion:
     post:
       tags:
@@ -94,6 +107,7 @@ paths:
           description: No collections found
         '500':
           description: Internal server error
+
   /virtualmachines/filter-options:
     get:
       tags:
@@ -111,6 +125,7 @@ paths:
           description: No collections found
         '500':
           description: Internal server error
+
   /virtualmachines/labels:
     get:
       tags:
@@ -128,6 +143,7 @@ paths:
           description: No collections found
         '500':
           description: Internal server error
+
   /virtualmachines/labels/{label}:
     patch:
       tags:
@@ -179,6 +195,7 @@ paths:
           description: Invalid request
         '500':
           description: Internal server error
+
   /virtualmachines/{vmId}:
     get:
       tags:
@@ -230,6 +247,7 @@ paths:
           description: No collections or VirtualMachine not found
         '500':
           description: Internal server error
+
   /virtualmachines/{vmId}/utilization:
     get:
       tags:
@@ -254,6 +272,7 @@ paths:
           description: No collections or no utilization data for this VM
         '500':
           description: Internal server error
+
   /groups:
     get:
       tags:
@@ -321,6 +340,7 @@ paths:
           description: No collections found
         '500':
           description: Internal server error
+
   /groups/{groupId}:
     get:
       tags:
@@ -421,6 +441,7 @@ paths:
           description: No collections or group not found
         '500':
           description: Internal server error
+
   /groups/{groupId}/applications:
     get:
       tags:
@@ -445,6 +466,7 @@ paths:
           description: No collections or group not found
         '500':
           description: Internal server error
+
   /inventory:
     get:
       tags:
@@ -470,7 +492,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Inventory'
+                $ref: '#/components/schemas/InventoryResponse'
             application/zip:
               schema:
                 type: string
@@ -479,6 +501,34 @@ paths:
           description: No collections or inventory not found
         '500':
           description: Internal server error
+
+  /inventory/vcenters/{vid}:
+    get:
+      tags:
+        - Inventories
+      summary: Get a vCenter inventory from the latest collection
+      operationId: getLatestVcenterInventory
+      parameters:
+        - name: vid
+          in: path
+          required: true
+          description: ID of the vCenter
+          schema:
+            type: string
+      responses:
+        '200':
+          description: vCenter inventory and cluster IDs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Inventory'
+        '400':
+          description: bad request if vcenter id is not a valid UUID
+        '404':
+          description: No collections, inventory, or matching vCenter found
+        '500':
+          description: Internal server error
+
   /collections:
     get:
       tags:
@@ -504,6 +554,7 @@ paths:
           description: Delete all collections
         '500':
           description: Internal server error
+
   /collector:
     get:
       tags:
@@ -529,6 +580,7 @@ paths:
           description: Collector stopped
         '500':
           description: Internal server error
+
   /collector/rvtools:
     post:
       tags:
@@ -562,6 +614,7 @@ paths:
           description: Collection already in progress
         '500':
           description: Internal server error
+
   /collections/{id}/inventory:
     get:
       tags:
@@ -586,6 +639,7 @@ paths:
           description: Collection or inventory not found
         '500':
           description: Internal server error
+
   /collections/{id}/virtualmachines:
     get:
       tags:
@@ -643,6 +697,7 @@ paths:
           description: Collection not found
         '500':
           description: Internal server error
+
   /collections/{id}/virtualmachines/filter-options:
     get:
       tags:
@@ -667,6 +722,7 @@ paths:
           description: Collection not found
         '500':
           description: Internal server error
+
   /collections/{id}/virtualmachines/labels:
     get:
       tags:
@@ -691,6 +747,7 @@ paths:
           description: Collection not found
         '500':
           description: Internal server error
+
   /collections/{id}/virtualmachines/{vmId}:
     get:
       tags:
@@ -721,6 +778,7 @@ paths:
           description: Collection or VirtualMachine not found
         '500':
           description: Internal server error
+
   /collections/{id}/virtualmachines/{vmId}/utilization:
     get:
       tags:
@@ -751,6 +809,7 @@ paths:
           description: Collection not found or no utilization data for this VM
         '500':
           description: Internal server error
+
   /collections/{id}/export:
     get:
       tags:
@@ -799,6 +858,7 @@ paths:
           description: Collection not found
         '500':
           description: Internal server error
+
   /collections/{id}/groups:
     get:
       tags:
@@ -848,6 +908,7 @@ paths:
           description: Collection not found
         '500':
           description: Internal server error
+
   /collections/{id}/groups/{groupId}:
     get:
       tags:
@@ -904,6 +965,7 @@ paths:
           description: Collection or group not found
         '500':
           description: Internal server error
+
   /version:
     get:
       tags:
@@ -917,6 +979,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VersionInfo'
+
   /status:
     get:
       tags:
@@ -930,8 +993,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AnalyzerStatus'
+
 components:
   schemas:
+
+    InventoryResponse:
+      type: object
+      required:
+        - data
+        - vcenters
+      properties:
+        data:
+          $ref: https://raw.githubusercontent.com/kubev2v/migration-planner/a9ac212f476f426fb0aa0437afff4e3f96cfd21b/api/v1alpha1/openapi.yaml#/components/schemas/Inventory
+        vcenters:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubResource'
+
+    SubResource:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+
     Collection:
       type: object
       required:
@@ -949,6 +1035,7 @@ components:
           type: string
           format: date-time
           description: When the collection was created
+
     CollectionListResponse:
       type: object
       required:
@@ -958,6 +1045,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Collection'
+
     CollectorStatus:
       type: object
       required:
@@ -984,6 +1072,7 @@ components:
         error:
           type: string
           description: Error message when status is error
+
     Inventory:
       type: object
       required:
@@ -991,6 +1080,7 @@ components:
       properties:
         inventory:
           $ref: https://raw.githubusercontent.com/kubev2v/migration-planner/a9ac212f476f426fb0aa0437afff4e3f96cfd21b/api/v1alpha1/openapi.yaml#/components/schemas/Inventory
+
     VirtualMachine:
       type: object
       required:
@@ -1088,6 +1178,7 @@ components:
           type: number
           format: double
           description: Data confidence -- sample_count / expected_sample_count x 100
+
     VirtualMachineDetail:
       type: object
       required:
@@ -1233,6 +1324,7 @@ components:
           items:
             $ref: '#/components/schemas/Process'
           description: List of processes detected on this VM
+
     Process:
       type: object
       required:
@@ -1244,6 +1336,7 @@ components:
         version:
           type: string
           description: Version of the process
+
     VirtualMachineListResponse:
       type: object
       required:
@@ -1265,6 +1358,7 @@ components:
         pageCount:
           type: integer
           description: Total number of pages
+
     VirtualMachineDisk:
       type: object
       properties:
@@ -1291,6 +1385,7 @@ components:
         mode:
           type: string
           description: Disk mode (persistent, independent_persistent, independent_nonpersistent)
+
     VirtualMachineNIC:
       type: object
       properties:
@@ -1303,12 +1398,14 @@ components:
         index:
           type: integer
           description: NIC index within the VirtualMachine
+
     VirtualMachineDevice:
       type: object
       properties:
         kind:
           type: string
           description: Device type (cdrom, floppy, usb, serial, parallel)
+
     GuestNetwork:
       type: object
       properties:
@@ -1328,6 +1425,7 @@ components:
         network:
           type: string
           description: Network name from the guest
+
     VirtualMachineIssue:
       type: object
       required:
@@ -1357,6 +1455,7 @@ components:
           - VirtualMachineIssueCategoryAdvisory
           - VirtualMachineIssueCategoryError
           - VirtualMachineIssueCategoryOther
+
     InspectionStatus:
       type: object
       required:
@@ -1383,6 +1482,7 @@ components:
         error:
           type: string
           description: Error message when state is error
+
     VirtualMachineInspectionResults:
       type: object
       description: VirtualMachines Inspection results
@@ -1391,6 +1491,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/VirtualMachineInspectionConcern'
+
     VirtualMachineInspectionConcern:
       type: object
       required:
@@ -1405,6 +1506,7 @@ components:
           type: string
         category:
           type: string
+
     Group:
       type: object
       required:
@@ -1434,6 +1536,7 @@ components:
         updatedAt:
           type: string
           format: date-time
+
     GroupListResponse:
       type: object
       required:
@@ -1452,6 +1555,7 @@ components:
           type: integer
         pageCount:
           type: integer
+
     GroupResponse:
       type: object
       required:
@@ -1475,6 +1579,7 @@ components:
           type: integer
         pageCount:
           type: integer
+
     CreateGroupRequest:
       type: object
       required:
@@ -1497,6 +1602,7 @@ components:
           minLength: 1
           x-oapi-codegen-extra-tags:
             binding: required,min=1
+
     UpdateGroupRequest:
       type: object
       minProperties: 1
@@ -1517,6 +1623,7 @@ components:
           minLength: 1
           x-oapi-codegen-extra-tags:
             binding: omitempty,min=1
+
     ApplicationListResponse:
       type: object
       required:
@@ -1526,6 +1633,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ApplicationOverview'
+
     ApplicationOverview:
       type: object
       required:
@@ -1547,6 +1655,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ApplicationVM'
+
     ApplicationVM:
       type: object
       required:
@@ -1559,6 +1668,7 @@ components:
         name:
           type: string
           description: VM name
+
     VirtualMachineUpdateRequest:
       type: object
       properties:
@@ -1574,6 +1684,7 @@ components:
           description: User-defined labels (replaces existing labels)
           x-oapi-codegen-extra-tags:
             binding: omitempty,dive,notblank,min=1,max=100
+
     BatchUpdateExclusionRequest:
       type: object
       required:
@@ -1590,6 +1701,7 @@ components:
         migrationExcluded:
           type: boolean
           description: Exclusion state to set for all VMs
+
     VMFilterOptionsResponse:
       type: object
       required:
@@ -1624,6 +1736,7 @@ components:
           items:
             type: string
           description: Distinct detected application names
+
     VMLabelsResponse:
       type: object
       required:
@@ -1640,6 +1753,7 @@ components:
           items:
             type: integer
           description: Number of VMs with each label (same order as labels array)
+
     UpdateLabelVMsRequest:
       type: object
       properties:
@@ -1657,6 +1771,7 @@ components:
           description: VMs to remove the label from
           x-oapi-codegen-extra-tags:
             binding: omitempty,dive,required
+
     DeleteLabelGloballyResponse:
       type: object
       required:
@@ -1669,6 +1784,7 @@ components:
         affected:
           type: integer
           description: Number of VMs that had the label removed
+
     VmUtilizationDetails:
       type: object
       required:
@@ -1729,6 +1845,7 @@ components:
         confidence:
           type: number
           format: double
+
     VersionInfo:
       type: object
       required:
@@ -1741,6 +1858,7 @@ components:
         gitCommit:
           type: string
           description: Git commit SHA
+
     AnalyzerStatus:
       type: object
       required:

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/kubev2v/assisted-migration-agent/pkg/errors"
 
+	sq "github.com/Masterminds/squirrel"
 	pkgstore "github.com/kubev2v/migration-planner/pkg/store"
 	"go.uber.org/zap"
 )
@@ -88,6 +90,47 @@ const (
 	ReadWriteDatabase
 )
 
+// holds the constraint at db level
+// used in append db to look for constraint before copy paste values
+type constraint struct {
+	// Kind is either PK, UNIQUE or FK.
+	// These are the only constraints that are important in copy paste op
+	Kind string
+	// If Kind is FK ReferencedTable holds the name of the referenced table
+	ReferencedTable string
+}
+
+// key is the table
+type constraintsType map[string][]constraint
+
+func (c constraintsType) getReferencedTables(tableName string) []string {
+	refTables := []string{}
+	for table, constraints := range c {
+		if table != tableName {
+			continue
+		}
+		for _, constraint := range constraints {
+			if constraint.Kind == "FOREIGN KEY" {
+				refTables = append(refTables, constraint.ReferencedTable)
+			}
+		}
+	}
+	return refTables
+}
+
+func (c constraintsType) HasConstraint(tableName string, constraintName string) bool {
+	constraints, found := c[tableName]
+	if !found {
+		return false
+	}
+	for _, constraint := range constraints {
+		if strings.EqualFold(constraint.Kind, constraintName) {
+			return true
+		}
+	}
+	return false
+}
+
 type Database struct {
 	ID          string
 	Path        string
@@ -146,6 +189,169 @@ func (d *Database) LastAccess() int64 {
 	}
 
 	return s.LastAccess()
+}
+
+// Append copies all source tables into this database. The source must be closed.
+// This method tries to be agnostic of the db schema but, it assummes the source and dest schemas matches.
+func (d *Database) Append(ctx context.Context, source *Database) error {
+	if source == nil || source == d {
+		return fmt.Errorf("source must be a different database")
+	}
+
+	if d.accessMode != ReadWriteDatabase {
+		return fmt.Errorf("destination database is read-only")
+	}
+
+	st, err := d.Store()
+	if err != nil {
+		return fmt.Errorf("opening destination database: %w", err)
+	}
+
+	const sourceName = "source_db"
+	if err := st.AttachDatabase(ctx, source, sourceName, ReadOnlyDatabase); err != nil {
+		return err
+	}
+	defer func() {
+		_ = st.DetachDatabase(context.WithoutCancel(ctx), sourceName)
+	}()
+
+	tablesQuery, args, err := sq.Select("database_name", "table_name").
+		From("duckdb_tables()").
+		Where(sq.Eq{"schema_name": "main"}).
+		OrderBy("database_name", "table_oid").ToSql()
+	if err != nil {
+		return err
+	}
+
+	rows, err := st.Querier().QueryContext(ctx, tablesQuery, args...)
+	if err != nil {
+		return fmt.Errorf("listing tables: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	destinationTables := make(map[string]bool)
+	sourceTables := make([]string, 0)
+
+	for rows.Next() {
+		var databaseName string
+		var table string
+		if err := rows.Scan(&databaseName, &table); err != nil {
+			return fmt.Errorf("reading table list: %w", err)
+		}
+
+		if databaseName == sourceName {
+			sourceTables = append(sourceTables, table)
+		} else {
+			destinationTables[table] = true
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("listing tables: %w", err)
+	}
+
+	// for conflict cause to work, the table should have an unique constraint
+	// so, list all the PK, UNIQUE and FK constraints for each table.
+	// if table has the constraint, we should add ON CONFLICT clause
+	// if table references another table, copy the referenced table first
+	constraints := make(constraintsType)
+	q, args, err := sq.Select("table_name,constraint_type,referenced_table").
+		From("duckdb_constraints()").
+		Where(sq.Eq{"constraint_type": []string{"PRIMARY KEY", "UNIQUE", "FOREIGN KEY"}}).
+		Where(sq.Eq{"schema_name": "main"}).
+		Where(sq.Expr("database_name = current_database()")).
+		ToSql()
+	if err != nil {
+		return fmt.Errorf("building constraints query: %w", err)
+	}
+
+	qRows, qErr := st.Querier().QueryContext(ctx, q, args...)
+	if qErr != nil {
+		return fmt.Errorf("listing constraints: %w", qErr)
+	}
+	defer func() { _ = qRows.Close() }()
+
+	for qRows.Next() {
+		var (
+			table           string
+			constraintType  string
+			referencedTable *string
+		)
+		if err := qRows.Scan(&table, &constraintType, &referencedTable); err != nil {
+			return fmt.Errorf("reading constraints list: %w", err)
+		}
+
+		refTable := ""
+		if referencedTable != nil {
+			refTable = *referencedTable
+		}
+
+		items, found := constraints[table]
+		if !found {
+			constraints[table] = []constraint{{Kind: constraintType, ReferencedTable: refTable}}
+			continue
+		}
+
+		items = append(items, constraint{Kind: constraintType, ReferencedTable: refTable})
+		constraints[table] = items
+	}
+
+	if err := qRows.Err(); err != nil {
+		return fmt.Errorf("listing constraints: %w", err)
+	}
+
+	// order the sourceTables by referenced table.
+	// The idea is to put referenced tables in front of the corresponding referee table.
+	// like bubble sort: the referenced table is swap in place with the referee one.
+	// Ex: if the sourceTables = [a,b] and a has a FK to b, the resulting list is [b,a]
+	// It does not handle FK cycles. a -> b and b->a
+	changed := true
+	for changed {
+		changed = false
+		for i := 0; i < len(sourceTables); i++ {
+			t := sourceTables[i]
+			refTables := constraints.getReferencedTables(t)
+			if len(refTables) == 0 {
+				continue
+			}
+
+			// find the first "referee" after the current position swap it
+			for j := i + 1; j < len(sourceTables); j++ {
+				if slices.Index(refTables, sourceTables[j]) >= 0 {
+					temp := sourceTables[i]
+					sourceTables[i] = sourceTables[j]
+					sourceTables[j] = temp
+					changed = true
+					break
+				}
+			}
+		}
+	}
+
+	for _, table := range sourceTables {
+		if !destinationTables[table] {
+			continue
+		}
+
+		quotedTable := `"` + strings.ReplaceAll(table, `"`, `""`) + `"`
+		copyQuery := sq.Insert("main." + quotedTable + " BY NAME").
+			Select(sq.Select("*").From(sourceName + ".main." + quotedTable))
+
+		if constraints.HasConstraint(table, "PRIMARY KEY") || constraints.HasConstraint(table, "UNIQUE") {
+			copyQuery = copyQuery.Suffix("ON CONFLICT DO NOTHING")
+		}
+
+		q, args, err := copyQuery.ToSql()
+		if err != nil {
+			return fmt.Errorf("building copy query for table %q: %w", table, err)
+		}
+
+		if _, err := st.Querier().ExecContext(ctx, q, args...); err != nil {
+			return fmt.Errorf("copying table %q: %w", table, err)
+		}
+	}
+
+	return nil
 }
 
 // Clone exports this database and imports it into a new database at dstPath.

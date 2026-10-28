@@ -6,13 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"uuid"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kubev2v/migration-planner/pkg/inventory/converters"
 	"go.uber.org/zap"
 
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
-
 	agentAPI "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 
 	v1api "github.com/kubev2v/assisted-migration-agent/analyzer/api/v1"
@@ -61,29 +61,62 @@ func (h *Handler) GetLatestInventory(c *gin.Context, params v1api.GetLatestInven
 	h.getInventory(c, invSvc)
 }
 
-// ── Private shared logic ───────────────────────────────────────────────
-
-func (h *Handler) getInventory(c *gin.Context, invSvc *services.InventoryService) {
-	inv, err := invSvc.GetInventory(c.Request.Context())
+func (h *Handler) GetLatestVcenterInventory(c *gin.Context, vid string) {
+	invSvc, err := h.svc.LatestInventoryService()
 	if err != nil {
 		if srvErrors.IsResourceNotFoundError(err) {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			c.JSON(http.StatusNotFound, gin.H{"error": "no collections found"})
 			return
 		}
-		zap.S().Named("inventory_handler").Errorw("failed to get inventory", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if _, err := uuid.Parse(vid); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "vcenter id should be a valid UUID"})
+		return
+	}
+
+	inv, err := invSvc.GetVCenterInventory(c.Request.Context(), vid)
+	if err != nil {
+		if srvErrors.IsResourceNotFoundError(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "no inventory found"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	var inventory v1alpha1.Inventory
 	if err := json.Unmarshal(inv.Data, &inventory); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("error unmarshalling inventory: %v", err)})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, v1api.Inventory{
-		Inventory: inventory,
-	})
+	c.JSON(http.StatusOK, v1api.Inventory{Inventory: inventory})
+}
+
+// ── Private shared logic ───────────────────────────────────────────────
+
+func (h *Handler) getInventory(c *gin.Context, invSvc *services.InventoryService) {
+	inventory, err := invSvc.GetAggregatedInventory(c.Request.Context())
+	if err != nil {
+		if srvErrors.IsResourceNotFoundError(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "no inventory found"})
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	resp, err := v1api.NewVCenterInventory(inventory)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
 }
 
 // getInventoryBundle writes a ZIP archive containing the main inventory

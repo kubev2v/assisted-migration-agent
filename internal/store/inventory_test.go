@@ -58,7 +58,33 @@ var _ = Describe("InventoryStore", func() {
 		}
 	})
 
-	Describe("Save", func() {
+	Context("Save", func() {
+		// Given inventory data with a vCenter ID
+		// When we save the main inventory
+		// Then its database ID should be the vCenter ID
+		It("should store the vCenter ID as the main inventory ID", func() {
+			// Arrange
+			data := []byte(`{
+				"vcenter_id": "vc-main",
+				"vcenter_version": "8.0.3",
+				"vcenter": {
+					"vms": {"total": 2},
+					"infra": {"totalHosts": 1}
+				},
+				"clusters": {}
+			}`)
+
+			// Act
+			err := s.Inventory().Save(ctx, data)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Assert
+			var id string
+			err = s.Querier().QueryRowContext(ctx, `SELECT id FROM inventory WHERE is_subset = false`).Scan(&id)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(id).To(Equal("vc-main"))
+		})
+
 		// Given valid inventory data
 		// When we save the inventory
 		// Then it should save successfully without error
@@ -94,7 +120,35 @@ var _ = Describe("InventoryStore", func() {
 		})
 	})
 
-	Describe("Get", func() {
+	Context("SaveSubset", func() {
+		// Given inventory data with a vCenter ID
+		// When we save a subset inventory
+		// Then its database ID should be the vCenter ID
+		It("should store the vCenter ID as the subset inventory ID", func() {
+			// Arrange
+			data := []byte(`{
+				"vcenter_id": "vc-subset",
+				"vcenter_version": "8.0.2",
+				"vcenter": {
+					"vms": {"total": 3},
+					"infra": {"totalHosts": 2}
+				},
+				"clusters": {}
+			}`)
+
+			// Act
+			err := s.Inventory().SaveSubset(ctx, data)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Assert
+			var id string
+			err = s.Querier().QueryRowContext(ctx, `SELECT id FROM inventory WHERE is_subset = true`).Scan(&id)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(id).To(Equal("vc-subset"))
+		})
+	})
+
+	Context("Get", func() {
 		// Given an empty inventory store
 		// When we try to get the inventory
 		// Then it should return ResourceNotFoundError

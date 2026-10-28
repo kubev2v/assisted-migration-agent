@@ -10,3 +10,10 @@ type Inventory struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
+
+type VCenterInventory struct {
+	Data       []byte
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	VcenterIDs []string
+}

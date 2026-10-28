@@ -1,9 +1,12 @@
 package v1
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/kubev2v/migration-planner/api/v1alpha1"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
@@ -354,4 +357,22 @@ func NewApplicationList(apps []models.ApplicationOverview) []ApplicationOverview
 	}
 
 	return apiApps
+}
+
+func NewVCenterInventory(m models.VCenterInventory) (InventoryResponse, error) {
+	var inventory v1alpha1.Inventory
+	if err := json.Unmarshal(m.Data, &inventory); err != nil {
+		return InventoryResponse{}, err
+	}
+
+	resp := InventoryResponse{
+		Data:     inventory,
+		Vcenters: make([]SubResource, 0, len(m.VcenterIDs)),
+	}
+
+	for _, id := range m.VcenterIDs {
+		resp.Vcenters = append(resp.Vcenters, SubResource{Id: id})
+	}
+
+	return resp, nil
 }
