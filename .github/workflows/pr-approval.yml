@@ -10,7 +10,7 @@ jobs:
     with:
       user_path_permissions: |
         migration-planner-sync[bot]:
-          - 'ui-config'
+          - 'build-config/ui-image'
         '*':
           - '.github/release-config.txt'
     secrets:

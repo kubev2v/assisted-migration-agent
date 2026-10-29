@@ -1,9 +1,11 @@
-# Supply the pinned UI tag with --build-arg-file ui-config.
+# Supply the UI pin and upgrade defaults with --build-arg-file build-config/ui-image
+# and --build-arg-file build-config/min-upgrade-version.
 # =============================================================================
 # Stage 1: Fetch the UI
 # =============================================================================
 ARG AGENT_UI_IMAGE=quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent-ui
 ARG AGENT_UI_IMAGE_TAG
+ARG IMAGE_ENV=dev
 FROM --platform=linux/amd64 ${AGENT_UI_IMAGE}:${AGENT_UI_IMAGE_TAG} AS ui-builder
 
 
@@ -110,7 +112,7 @@ RUN wget -q "https://extensions.duckdb.org/${DUCKDB_VERSION}/linux_amd64/sqlite_
 # =============================================================================
 # Stage 7: Final runtime image
 # =============================================================================
-FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/ubi
+FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/ubi AS appliance-runtime
 
 # Add CentOS Stream 9 repos for virt-v2v and dependencies
 # Fetch the CentOS Stream signing key and verify it against a pinned SHA-256 before trusting it
@@ -180,3 +182,33 @@ EXPOSE 8000
 
 ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["run"]
+
+# Validate the selected environment's upgrade metadata before labeling the image.
+FROM appliance-runtime AS upgrade-dev
+ARG MIN_UPGRADE_VERSION_DEV
+ARG MIN_UPGRADE_VERSION=${MIN_UPGRADE_VERSION_DEV}
+RUN /bin/bash -c '[[ "$MIN_UPGRADE_VERSION" =~ ^main-release-(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-[0-9a-f]{7,40}$ ]] || { \
+    printf "Invalid min-upgrade-version for dev: [%s]. Expected main-release-<major>.<minor>-<short-sha> (7-40 lowercase hex digits).\n" "$MIN_UPGRADE_VERSION" >&2; \
+    exit 1; \
+}'
+LABEL min-upgrade-version="${MIN_UPGRADE_VERSION}"
+
+FROM appliance-runtime AS upgrade-stage
+ARG MIN_UPGRADE_VERSION_STAGE
+ARG MIN_UPGRADE_VERSION=${MIN_UPGRADE_VERSION_STAGE}
+RUN /bin/bash -c '[[ "$MIN_UPGRADE_VERSION" =~ ^stable-release-(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-[0-9a-f]{7,40}$ ]] || { \
+    printf "Invalid min-upgrade-version for stage: [%s]. Expected stable-release-<major>.<minor>-<short-sha> (7-40 lowercase hex digits).\n" "$MIN_UPGRADE_VERSION" >&2; \
+    exit 1; \
+}'
+LABEL min-upgrade-version="${MIN_UPGRADE_VERSION}"
+
+FROM appliance-runtime AS upgrade-production
+ARG MIN_UPGRADE_VERSION_PRODUCTION
+ARG MIN_UPGRADE_VERSION=${MIN_UPGRADE_VERSION_PRODUCTION}
+RUN /bin/bash -c '[[ "$MIN_UPGRADE_VERSION" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || { \
+    printf "Invalid min-upgrade-version for production: [%s]. Expected v<major>.<minor>.<patch>.\n" "$MIN_UPGRADE_VERSION" >&2; \
+    exit 1; \
+}'
+LABEL min-upgrade-version="${MIN_UPGRADE_VERSION}"
+
+FROM upgrade-${IMAGE_ENV} AS final

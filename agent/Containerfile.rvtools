@@ -1,4 +1,4 @@
-# Supply the pinned UI tag with --build-arg-file ui-config.
+# Supply the pinned UI tag with --build-arg-file build-config/ui-image.
 # The UI image supplies architecture-independent static files.
 ARG AGENT_UI_IMAGE=quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent-ui
 ARG AGENT_UI_IMAGE_TAG

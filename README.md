@@ -18,7 +18,7 @@ concept remains available as an Agent mode and uses `agent/Containerfile.rvtools
 
 ## Container images
 
-`ui-config` pins `AGENT_UI_IMAGE_TAG` to a UI commit SHA for both
+`build-config/ui-image` pins `AGENT_UI_IMAGE_TAG` to a UI commit SHA for both
 `agent/Containerfile` and `agent/Containerfile.rvtools`. Local Make targets and
 all Agent/RVTools Konflux pipelines use this config:
 
@@ -29,20 +29,64 @@ make image
 For a direct Podman/Buildah build, pass the config explicitly:
 
 ```bash
-podman build --build-arg-file ui-config -f agent/Containerfile .
-podman build --build-arg-file ui-config -f agent/Containerfile.rvtools .
+podman build --build-arg-file build-config/ui-image --build-arg-file build-config/min-upgrade-version -f agent/Containerfile .
+podman build --build-arg-file build-config/ui-image -f agent/Containerfile.rvtools .
 ```
 
 For local testing, override the pin with `make image AGENT_UI_IMAGE_TAG=<sha>`
 or `AGENT_UI_IMAGE_TAG=<sha> make image`.
 
+### Upgrade compatibility metadata
+
+The appliance image's `min-upgrade-version` label identifies the oldest installed
+image version supported as the starting point for an upgrade to that image.
+It is separate from `org.opencontainers.image.version`, which identifies the
+candidate image itself.
+
+`build-config/min-upgrade-version` maintains one minimum supported version per
+environment. Appliance builds select the default with `IMAGE_ENV` (`dev`, `stage`,
+or `production`):
+
+```bash
+make image                      # dev
+make image IMAGE_ENV=stage
+make image IMAGE_ENV=production
+```
+
+Konflux selects `dev` for pushes to `main`, `stage` for pushes to `stable`, and
+`production` for Git tag builds. Pull request builds use `dev`. All appliance
+pipelines read `build-config/min-upgrade-version`; the RVTools image is unaffected.
+
+Direct Podman/Buildah builds load both files under `build-config/` and use
+`--build-arg IMAGE_ENV=stage` (default: `dev`). An explicit
+`MIN_UPGRADE_VERSION=<version>` build argument overrides the selected default,
+also available through `make image MIN_UPGRADE_VERSION=<version>`.
+
+Preserve the complete version string for the environment:
+
+| Environment | Version format |
+|-------------|----------------|
+| Dev | `main-release-<major>.<minor>-<short-sha>` |
+| Stage | `stable-release-<major>.<minor>-<short-sha>` |
+| Production | `v<major>.<minor>.<patch>` |
+
+The Containerfile validates the effective minimum version, including overrides,
+before setting the label. Empty values, wrong environment prefixes, malformed
+versions, and numeric components with leading zeros fail the build. Dev and stage
+commit SHAs must contain 7-40 lowercase hexadecimal digits.
+
+The minimum is an explicitly maintained compatibility boundary. Do not derive it
+from the candidate image's version or order commit SHAs lexically. Update
+`build-config/min-upgrade-version` when the supported upgrade starting point changes.
+
 On pushes to the UI repository's `main` or `stable` branch, its notification
 workflow waits for the SHA-tagged image, then dispatches `agent_ui_updated` to
 this repository. The receiver checks the SHA against the UI source branch head
-and rejects stale notifications before updating `ui-config` or creating a PR
-on the matching branch. These PRs are automatically approved and set to merge by rebase
-after required checks pass. Merging updates the UI used by subsequent container
-builds.
+and rejects stale notifications before updating `build-config/ui-image` or
+creating a PR on the matching branch. These PRs are automatically approved and
+set to merge by rebase after required checks pass. Within `build-config/`,
+auto-approval covers only `ui-image`; changes to `min-upgrade-version` require
+review. Merging updates the UI used by subsequent container builds.
 The `MIGRATION_PLANNER_SYNC_APP_ID` and `MIGRATION_PLANNER_SYNC_APP_PRIVATE_KEY`
 secrets must be available in both repositories. The sync GitHub App must be
 installed on this repository with contents and pull request write access.
