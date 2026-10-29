@@ -108,7 +108,7 @@ var _ = Describe("Inventory handler", func() {
 	}
 
 	saveMainInventory := func(collSt *store.Store) {
-		inventoryJSON := `{"vcenter_id":"vc-test","clusters":{"cluster-1":{"vms":{"total":5},"infra":{}}}}`
+		inventoryJSON := `{"vcenter_id":"vc-test","clusters":{"cluster-1":{"vms":{"total":5,"osInfo":{"RHEL":{"count":3,"supported":true,"supportTier":"certified","mtvStatus":"green"},"Windows":{"count":2,"supported":true,"supportTier":"certified","mtvStatus":"blue"}}},"infra":{}}}}`
 		Expect(collSt.Inventory().Save(context.Background(), []byte(inventoryJSON))).To(Succeed())
 	}
 
@@ -174,6 +174,10 @@ var _ = Describe("Inventory handler", func() {
 			Expect(resp.Inventory.AgentId.String()).To(Equal(agentID))
 			Expect(resp.Inventory.Inventory.VcenterId).To(Equal("vc-test"))
 			Expect(resp.Inventory.Inventory.Clusters).To(HaveKey("cluster-1"))
+			osInfo := resp.Inventory.Inventory.Clusters["cluster-1"].Vms.OsInfo
+			Expect(osInfo).NotTo(BeNil())
+			Expect((*osInfo)["RHEL"].MtvStatus).To(HaveValue(Equal(v1.Green)))
+			Expect((*osInfo)["Windows"].MtvStatus).To(HaveValue(Equal(v1.Blue)))
 		})
 
 		It("returns JSON when scope is explicitly main", func() {
