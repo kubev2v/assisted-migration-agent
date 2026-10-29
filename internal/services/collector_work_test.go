@@ -18,7 +18,7 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/pkg/crypto"
 )
 
-func TestCollectorWork_CollectionTime(t *testing.T) {
+func TestCollectorWork_CollectionTimeAndStorage(t *testing.T) {
 	g := NewWithT(t)
 	ctx := context.Background()
 	dataDir := t.TempDir()
@@ -47,6 +47,12 @@ func TestCollectorWork_CollectionTime(t *testing.T) {
 		`INSERT INTO fixture.Cluster VALUES ('cluster-1', 'cluster1', '{}', 'ClusterComputeResource', false, false, '')`,
 		`CREATE TABLE fixture.Host (ID VARCHAR, Cluster VARCHAR, CpuCores INTEGER, CpuSockets INTEGER, MemoryBytes BIGINT, Model VARCHAR, Vendor VARCHAR, Datastores VARCHAR, VMotionSupported BOOLEAN, StorageVMotionSupported BOOLEAN)`,
 		`INSERT INTO fixture.Host VALUES ('host-1', 'cluster-1', 8, 2, 34359738368, 'ESXi', 'VMware', '[]', true, true)`,
+		`ALTER TABLE fixture.Host ADD COLUMN HbaDiskInfo VARCHAR`,
+		`ALTER TABLE fixture.Host ADD COLUMN HostScsiDisks VARCHAR`,
+		`ALTER TABLE fixture.Host ADD COLUMN HostScsiTopology VARCHAR`,
+		`UPDATE fixture.Host SET HbaDiskInfo = '[{"key":"hba-1","hbaDevice":"vmhba1","protocol":"FibreChannel","nodeWorldWideName":"000123","portWorldWideName":"000456"}]',
+            HostScsiDisks = '[{"key":"lun-1","canonicalName":"naa.001","vendor":"NETAPP","model":"LUN"}]',
+            HostScsiTopology = '[{"key":"hba-1","scsiDiskKeys":["lun-1"]}]'`,
 		`CREATE TABLE fixture.VM (
                     ID VARCHAR, Name VARCHAR, Folder VARCHAR, Host VARCHAR, UUID VARCHAR, Firmware VARCHAR,
                     PowerState VARCHAR, ConnectionState VARCHAR, FaultToleranceEnabled INTEGER,
@@ -114,4 +120,26 @@ func TestCollectorWork_CollectionTime(t *testing.T) {
 	var stored []byte
 	g.Expect(db.QueryRowContext(ctx, "SELECT data FROM inventory LIMIT 1").Scan(&stored)).To(Succeed())
 	g.Expect(stored).To(Equal(result.Inventory))
+	assertCollectedStorage(t, stored,
+		`[{"device":"vmhba1","key":"hba-1","protocol":"FibreChannel","nodeWwn":"000123","portWwn":"000456"}]`,
+		`[{"canonicalName":"naa.001","key":"lun-1","vendor":"NETAPP","model":"LUN","adapterDevices":["vmhba1"]}]`)
+}
+
+func assertCollectedStorage(t *testing.T, raw []byte, adapters, luns string) {
+	t.Helper()
+	g := NewWithT(t)
+	var inventory struct {
+		VCenter struct {
+			Infra struct {
+				Hosts []map[string]json.RawMessage `json:"hosts"`
+			} `json:"infra"`
+		} `json:"vcenter"`
+	}
+	g.Expect(json.Unmarshal(raw, &inventory)).To(Succeed())
+	g.Expect(inventory.VCenter.Infra.Hosts).To(HaveLen(1))
+	host := inventory.VCenter.Infra.Hosts[0]
+	g.Expect(host).To(HaveKey("storageAdapters"))
+	g.Expect(host).To(HaveKey("storageLuns"))
+	g.Expect(string(host["storageAdapters"])).To(MatchJSON(adapters))
+	g.Expect(string(host["storageLuns"])).To(MatchJSON(luns))
 }

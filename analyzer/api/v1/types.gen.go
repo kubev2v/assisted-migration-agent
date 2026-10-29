@@ -101,6 +101,11 @@ type BatchUpdateExclusionRequest struct {
 	VmIds []string `binding:"required,min=1,dive,required" json:"vmIds"`
 }
 
+// Inventory defines model for CollectedInventory.
+type Inventory struct {
+	Inventory externalRef0.Inventory `json:"inventory"`
+}
+
 // Collection defines model for Collection.
 type Collection struct {
 	// CreatedAt When the collection was created
@@ -215,11 +220,6 @@ type InspectionStatus struct {
 
 // InspectionStatusState Current inspection state
 type InspectionStatusState string
-
-// Inventory defines model for Inventory.
-type Inventory struct {
-	Inventory externalRef0.Inventory `json:"inventory"`
-}
 
 // InventoryResponse defines model for InventoryResponse.
 type InventoryResponse struct {
