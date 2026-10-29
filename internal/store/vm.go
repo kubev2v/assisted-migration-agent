@@ -11,7 +11,9 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 	duckdb "github.com/duckdb/duckdb-go/v2"
+	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
 	duckdb_models "github.com/kubev2v/migration-planner/pkg/duckdb_parser/models"
+	plannerInventory "github.com/kubev2v/migration-planner/pkg/inventory"
 	"go.uber.org/zap"
 
 	vmfilter "github.com/kubev2v/assisted-migration-agent/internal/filter"
@@ -146,7 +148,13 @@ func (s *VMStore) Count(ctx context.Context, filter sq.Sqlizer) (int, error) {
 
 // Get returns full VM details by ID, including utilization data from the latest rightsizing report.
 func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
-	rows, err := s.db.QueryContext(ctx, vmGetQuery, id)
+	topology, err := duckdb_parser.VMStorageTopologyQuery(ctx, s.db)
+	if err != nil {
+		return nil, err
+	}
+	// Both positional parameters bind to the same VM ID:
+	// the first is used by the topology CTE, the second by filtered_vm.
+	rows, err := s.db.QueryContext(ctx, "WITH "+topology+", "+vmGetQuery, id, id)
 	if err != nil {
 		return nil, fmt.Errorf("querying VM %s: %w", id, err)
 	}
@@ -350,13 +358,44 @@ func fromDB(pvm duckdb_models.VM) models.VM {
 	disks := make([]models.Disk, 0, len(pvm.Disks))
 	var totalDiskCapacityMiB int64
 	for _, d := range pvm.Disks {
+		var datastore *models.DiskDatastore
+		if d.Datastore.ID != "" ||
+			d.DatastoreName != "" ||
+			d.DatastoreType != "" ||
+			d.DatastoreFilesystemType != "" ||
+			d.DatastoreFilesystemMajorVersion > 0 ||
+			d.DatastoreStorageProtocol != "" ||
+			d.DatastoreVendor != "" ||
+			d.DatastoreModel != "" ||
+			len(d.DatastoreBackingDeviceIDs) > 0 {
+			datastore = &models.DiskDatastore{
+				ID:                     d.Datastore.ID,
+				Name:                   d.DatastoreName,
+				Type:                   d.DatastoreType,
+				FilesystemType:         d.DatastoreFilesystemType,
+				FilesystemMajorVersion: d.DatastoreFilesystemMajorVersion,
+				// ProtocolType is the reported transport (e.g. FibreChannel, iSCSI, or NFS).
+				ProtocolType: d.DatastoreStorageProtocol,
+				// StorageProtocol classifies datastore types as Block (VMFS), File (NFS), or Object (vSAN).
+				StorageProtocol:  plannerInventory.StorageProtocolFromDatastoreType(d.DatastoreType),
+				BackingDeviceIDs: append([]string(nil), d.DatastoreBackingDeviceIDs...),
+				Vendor:           d.DatastoreVendor,
+				Model:            d.DatastoreModel,
+			}
+		}
+		var rdmBacking *models.RDMBacking
+		if d.RDM && d.RDMBacking != nil {
+			rdmBacking = &models.RDMBacking{LunUUID: d.RDMBacking.LunUUID}
+		}
 		disks = append(disks, models.Disk{
-			File:     d.File,
-			Capacity: d.Capacity,
-			Shared:   d.Shared,
-			RDM:      d.RDM,
-			Bus:      d.Bus,
-			Mode:     d.Mode,
+			File:       d.File,
+			Capacity:   d.Capacity,
+			Shared:     d.Shared,
+			RDM:        d.RDM,
+			RDMBacking: rdmBacking,
+			Bus:        d.Bus,
+			Mode:       d.Mode,
+			Datastore:  datastore,
 		})
 		totalDiskCapacityMiB += d.Capacity
 	}

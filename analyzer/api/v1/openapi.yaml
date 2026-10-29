@@ -1004,7 +1004,7 @@ components:
         - vcenters
       properties:
         data:
-          $ref: https://raw.githubusercontent.com/kubev2v/migration-planner/a9ac212f476f426fb0aa0437afff4e3f96cfd21b/api/v1alpha1/openapi.yaml#/components/schemas/Inventory
+          $ref: https://raw.githubusercontent.com/kubev2v/migration-planner/a9136aeb41ecdab5cd13a062716f3d8a5979c395/api/v1alpha1/openapi.yaml#/components/schemas/Inventory
         vcenters:
           type: array
           items:
@@ -1079,7 +1079,7 @@ components:
       - inventory
       properties:
         inventory:
-          $ref: https://raw.githubusercontent.com/kubev2v/migration-planner/a9ac212f476f426fb0aa0437afff4e3f96cfd21b/api/v1alpha1/openapi.yaml#/components/schemas/Inventory
+          $ref: https://raw.githubusercontent.com/kubev2v/migration-planner/a9136aeb41ecdab5cd13a062716f3d8a5979c395/api/v1alpha1/openapi.yaml#/components/schemas/Inventory
 
     VirtualMachine:
       type: object
@@ -1379,12 +1379,62 @@ components:
         rdm:
           type: boolean
           description: Whether this is a Raw Device Mapping
+        rdmBacking:
+          $ref: '#/components/schemas/RDMBacking'
         bus:
           type: string
           description: Bus type (scsi, ide, sata, nvme)
         mode:
           type: string
           description: Disk mode (persistent, independent_persistent, independent_nonpersistent)
+        datastore:
+          $ref: '#/components/schemas/VirtualMachineDatastore'
+
+    RDMBacking:
+      type: object
+      description: Source-provided backing identity for an RDM disk; omitted when unavailable
+      properties:
+        lunUuid:
+          type: string
+          description: LUN UUID reported directly by the RDM disk backing, when available
+
+    VirtualMachineDatastore:
+      type: object
+      description: Datastore backing this virtual disk
+      properties:
+        id:
+          type: string
+          description: Datastore object ID
+        name:
+          type: string
+          description: Datastore name
+        type:
+          type: string
+          description: Datastore type (VMFS, NFS, vSAN, vVol)
+        filesystemType:
+          type: string
+          description: Datastore filesystem type
+        filesystemMajorVersion:
+          type: integer
+          format: int32
+          description: Datastore filesystem major version when available
+        protocolType:
+          type: string
+          description: Backing storage transport protocol when available (for example FC, iSCSI, or NFS)
+        storageProtocol:
+          type: string
+          description: Datastore storage access category when available (Block, File, or Object)
+        backingDeviceIds:
+          type: array
+          description: Canonical identifiers for devices backing the datastore (for example, an NAA identifier for a SCSI LUN); may be unavailable for some datastore types
+          items:
+            type: string
+        vendor:
+          type: string
+          description: Vendor reported by matching backing devices when available
+        model:
+          type: string
+          description: Model reported by matching backing devices when available
 
     VirtualMachineNIC:
       type: object
@@ -1568,7 +1618,7 @@ components:
         group:
           $ref: '#/components/schemas/Group'
         inventory:
-          $ref: https://raw.githubusercontent.com/kubev2v/migration-planner/a9ac212f476f426fb0aa0437afff4e3f96cfd21b/api/v1alpha1/openapi.yaml#/components/schemas/Inventory
+          $ref: https://raw.githubusercontent.com/kubev2v/migration-planner/a9136aeb41ecdab5cd13a062716f3d8a5979c395/api/v1alpha1/openapi.yaml#/components/schemas/Inventory
         vms:
           type: array
           items:

@@ -10,6 +10,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/require"
 
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
 
@@ -179,3 +180,66 @@ var _ = Describe("Migrations", func() {
 		})
 	})
 })
+
+func TestRDMLunUUIDCollectionMigration(t *testing.T) {
+	ctx := context.Background()
+	db, err := sql.Open("duckdb", "")
+	require.NoError(t, err)
+	defer func() { _ = db.Close() }()
+	require.NoError(t, duckdb_parser.New(db, nil).Init())
+	require.NoError(t, migrations.RunCollection(ctx, db, "memory"))
+	_, err = db.Exec(`DELETE FROM collection_schema_migrations WHERE version=2;
+ ALTER TABLE vdisk DROP COLUMN "RDM LUN UUID";
+ INSERT INTO vinfo ("VM ID","VM") VALUES ('vm-1','legacy-vm');
+ INSERT INTO vdisk ("VM ID","Raw","Capacity MiB","Disk UUID") VALUES ('vm-1',true,100,'not-a-lun-uuid');`)
+	require.NoError(t, err)
+	require.NoError(t, migrations.RunCollection(ctx, db, "memory"))
+	require.NoError(t, migrations.RunCollection(ctx, db, "memory"))
+	var capacity int64
+	var uuid sql.NullString
+	require.NoError(t, db.QueryRow(`SELECT "Capacity MiB","RDM LUN UUID" FROM vdisk`).Scan(&capacity, &uuid))
+	require.Equal(t, int64(100), capacity)
+	require.False(t, uuid.Valid)
+	_, err = db.Exec(`UPDATE vdisk SET "RDM LUN UUID"='collected-lun-uuid'; DELETE FROM collection_schema_migrations WHERE version=2;`)
+	require.NoError(t, err)
+	require.NoError(t, migrations.RunCollection(ctx, db, "memory"))
+	require.NoError(t, db.QueryRow(`SELECT "RDM LUN UUID" FROM vdisk`).Scan(&uuid))
+	require.Equal(t, "collected-lun-uuid", uuid.String, "idempotent column addition must preserve supplied UUIDs")
+}
+
+func TestPreStorageCollectionMigration(t *testing.T) {
+	db, err := sql.Open("duckdb", "")
+	require.NoError(t, err)
+	defer func() { _ = db.Close() }()
+	schema, err := os.ReadFile("../testdata/pre_storage_schema.sql")
+	require.NoError(t, err)
+	_, err = db.Exec(string(schema))
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO vdatastore ("Object ID", "Name", "Type", "Capacity MiB") VALUES ('ds-1', 'legacy-ds', 'VMFS', 2048);
+INSERT INTO vhba ("Device", "Type") VALUES ('vmhba64', 'ISCSI');`)
+	require.NoError(t, err)
+	ctx := context.Background()
+	require.NoError(t, migrations.RunCollection(ctx, db, "memory"))
+	require.NoError(t, migrations.RunCollection(ctx, db, "memory"))
+	var appliedVersions string
+	require.NoError(t, db.QueryRow(`SELECT string_agg(version::VARCHAR, ',' ORDER BY version) FROM collection_schema_migrations`).Scan(&appliedVersions))
+	require.Equal(t, "1,2", appliedVersions)
+	var fsType, protocol, hbaType sql.NullString
+	var version sql.NullInt32
+	var capacity float64
+	require.NoError(t, db.QueryRow(`SELECT "Filesystem Type", "Filesystem Major Version", "Storage Protocol", "Capacity MiB" FROM vdatastore`).Scan(&fsType, &version, &protocol, &capacity))
+	require.False(t, fsType.Valid)
+	require.False(t, version.Valid)
+	require.False(t, protocol.Valid)
+	require.Equal(t, float64(2048), capacity)
+	require.NoError(t, db.QueryRow(`SELECT "Type" FROM vhba WHERE "Device"='vmhba64'`).Scan(&hbaType))
+	require.Equal(t, "ISCSI", hbaType.String)
+	_, err = db.Exec(`UPDATE vdatastore SET "Filesystem Type"='VMFS', "Filesystem Major Version"=6, "Storage Protocol"='iSCSI';
+DELETE FROM collection_schema_migrations WHERE version=2;`)
+	require.NoError(t, err)
+	require.NoError(t, migrations.RunCollection(ctx, db, "memory"))
+	require.NoError(t, db.QueryRow(`SELECT "Filesystem Type", "Filesystem Major Version", "Storage Protocol" FROM vdatastore`).Scan(&fsType, &version, &protocol))
+	require.Equal(t, "VMFS", fsType.String)
+	require.Equal(t, int32(6), version.Int32)
+	require.Equal(t, "iSCSI", protocol.String)
+}
