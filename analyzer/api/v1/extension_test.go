@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/getkin/kin-openapi/openapi3"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -100,3 +102,19 @@ var _ = DescribeTable("VM disk storage metadata", func(disk models.Disk, want st
 		RDM: true, RDMBacking: &models.RDMBacking{},
 	}, `{"file":"","capacity":0,"shared":false,"rdm":true,"bus":"","mode":""}`),
 )
+
+var _ = Describe("Inventory schema", func() {
+	It("exposes host storage in aggregate and group inventories", func() {
+		spec, err := v1.GetSwagger()
+		Expect(err).NotTo(HaveOccurred())
+		for _, ref := range []*openapi3.SchemaRef{
+			spec.Components.Schemas["InventoryResponse"].Value.Properties["data"],
+			spec.Components.Schemas["GroupResponse"].Value.Properties["inventory"],
+		} {
+			Expect(ref.Value.Properties).To(HaveKey("vcenter"))
+			host := ref.Value.Properties["vcenter"].Value.Properties["infra"].Value.Properties["hosts"].Value.Items.Value
+			Expect(host.Properties).To(HaveKey("storageAdapters"))
+			Expect(host.Properties).To(HaveKey("storageLuns"))
+		}
+	})
+})

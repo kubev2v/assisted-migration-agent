@@ -135,3 +135,18 @@ var _ = Describe("NewVirtualMachineDetailFromModel", func() {
 		Expect(detail.InspectionStatus).To(BeNil())
 	})
 })
+
+var _ = Describe("Inventory schema", func() {
+	It("exposes host storage adapters and LUNs on inventory and group responses", func() {
+		spec, err := v2.GetSwagger()
+		Expect(err).NotTo(HaveOccurred())
+		hosts := spec.Paths.Value("/inventory").Get.Responses.Value("200").Value.Content["application/json"].Schema.Value.Properties["inventory"].Value.Properties["inventory"].Value.Properties["vcenter"].Value.Properties["infra"].Value.Properties["hosts"].Value.Items.Value
+		Expect(hosts.Properties).To(HaveKey("storageAdapters"))
+		Expect(hosts.Properties).To(HaveKey("storageLuns"))
+		Expect(hosts.Properties["storageAdapters"].Value.Items.Value.Properties).To(HaveKey("nodeWwn"))
+		Expect(hosts.Properties["storageLuns"].Value.Items.Value.Properties).To(HaveKey("adapterDevices"))
+		groupHosts := spec.Components.Schemas["GroupResponse"].Value.Properties["inventory"].Value.Properties["vcenter"].Value.Properties["infra"].Value.Properties["hosts"].Value.Items.Value
+		Expect(groupHosts.Properties).To(HaveKey("storageAdapters"))
+		Expect(groupHosts.Properties).To(HaveKey("storageLuns"))
+	})
+})

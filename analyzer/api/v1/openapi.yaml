@@ -521,7 +521,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Inventory'
+                $ref: '#/components/schemas/CollectedInventory'
         '400':
           description: bad request if vcenter id is not a valid UUID
         '404':
@@ -654,7 +654,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Inventory'
+                $ref: '#/components/schemas/CollectedInventory'
         '404':
           description: Collection or inventory not found
         '500':
@@ -1024,7 +1024,7 @@ components:
         - vcenters
       properties:
         data:
-          $ref: https://raw.githubusercontent.com/kubev2v/migration-planner/3fc3570c5d9820a9879c53dcf80bb73be9a6e912/api/v1alpha1/openapi.yaml#/components/schemas/Inventory
+          $ref: https://raw.githubusercontent.com/kubev2v/migration-planner/3530a4e580e161a80a5cd474028a309b148be291/api/v1alpha1/openapi.yaml#/components/schemas/Inventory
         vcenters:
           type: array
           items:
@@ -1093,13 +1093,15 @@ components:
           type: string
           description: Error message when status is error
 
-    Inventory:
+    # Distinct from Planner Inventory so code generation can inline both schemas.
+    CollectedInventory:
+      x-go-name: Inventory
       type: object
       required:
       - inventory
       properties:
         inventory:
-          $ref: https://raw.githubusercontent.com/kubev2v/migration-planner/3fc3570c5d9820a9879c53dcf80bb73be9a6e912/api/v1alpha1/openapi.yaml#/components/schemas/Inventory
+          $ref: https://raw.githubusercontent.com/kubev2v/migration-planner/3530a4e580e161a80a5cd474028a309b148be291/api/v1alpha1/openapi.yaml#/components/schemas/Inventory
 
     VirtualMachine:
       type: object
@@ -1660,7 +1662,7 @@ components:
         group:
           $ref: '#/components/schemas/Group'
         inventory:
-          $ref: https://raw.githubusercontent.com/kubev2v/migration-planner/3fc3570c5d9820a9879c53dcf80bb73be9a6e912/api/v1alpha1/openapi.yaml#/components/schemas/Inventory
+          $ref: https://raw.githubusercontent.com/kubev2v/migration-planner/3530a4e580e161a80a5cd474028a309b148be291/api/v1alpha1/openapi.yaml#/components/schemas/Inventory
         vms:
           type: array
           items:

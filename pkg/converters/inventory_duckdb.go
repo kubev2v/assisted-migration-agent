@@ -247,6 +247,41 @@ func infraFromDuckDB(i *inventory.InfraData) api.Infra {
 		}
 		host.VmotionSupported = h.VMotionSupported
 		host.StorageVmotionSupported = h.StorageVMotionSupported
+		if len(h.StorageAdapters) > 0 {
+			adapters := make([]api.HostStorageAdapter, 0, len(h.StorageAdapters))
+			for _, storageAdapter := range h.StorageAdapters {
+				adapter := api.HostStorageAdapter{
+					Device:   optionalString(storageAdapter.Device),
+					Key:      optionalString(storageAdapter.Key),
+					Type:     optionalString(storageAdapter.Type),
+					Protocol: optionalString(storageAdapter.Protocol),
+					Model:    optionalString(storageAdapter.Model),
+					Driver:   optionalString(storageAdapter.Driver),
+					NodeWwn:  optionalString(storageAdapter.NodeWWN),
+					PortWwn:  optionalString(storageAdapter.PortWWN),
+				}
+				adapters = append(adapters, adapter)
+			}
+			host.StorageAdapters = &adapters
+		}
+		if len(h.StorageLuns) > 0 {
+			luns := make([]api.HostStorageLun, 0, len(h.StorageLuns))
+			for _, storageLun := range h.StorageLuns {
+				lun := api.HostStorageLun{
+					CanonicalName: optionalString(storageLun.CanonicalName),
+					Key:           optionalString(storageLun.Key),
+					LunUuid:       optionalString(storageLun.LunUUID),
+					Vendor:        optionalString(storageLun.Vendor),
+					Model:         optionalString(storageLun.Model),
+				}
+				if len(storageLun.AdapterDevices) > 0 {
+					adapterDevices := append([]string(nil), storageLun.AdapterDevices...)
+					lun.AdapterDevices = &adapterDevices
+				}
+				luns = append(luns, lun)
+			}
+			host.StorageLuns = &luns
+		}
 		hosts = append(hosts, host)
 	}
 
@@ -378,4 +413,11 @@ func vmsPerHostAverage(totalVMs, totalHosts int) *float64 {
 	}
 	avg := math.Round(float64(totalVMs*100)/float64(totalHosts)) / 100
 	return &avg
+}
+
+func optionalString(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
 }
