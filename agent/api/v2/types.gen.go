@@ -459,6 +459,15 @@ type GuestNetwork struct {
 	PrefixLength *int32 `json:"prefixLength,omitempty"`
 }
 
+// HostPhysicalNIC defines model for HostPhysicalNIC.
+type HostPhysicalNIC struct {
+	// Id Source physical NIC identity, scoped to the VM's host and collection.
+	Id string `json:"id"`
+
+	// LinkSpeedMbps Reported link speed in Mbps; omitted when unknown. This is not measured throughput.
+	LinkSpeedMbps *int32 `json:"linkSpeedMbps,omitempty"`
+}
+
 // InspectionStatus defines model for InspectionStatus.
 type InspectionStatus struct {
 	// Details Human-readable details about the current inspection state
@@ -751,6 +760,9 @@ type VirtualMachineDetail struct {
 
 	// HostName Guest hostname
 	HostName *string `json:"hostName,omitempty"`
+
+	// HostPhysicalNics Physical NICs reported on the VM's host. An empty array means no records were retained.
+	HostPhysicalNics *[]HostPhysicalNIC `json:"hostPhysicalNics,omitempty"`
 
 	// Id Unique identifier for the VirtualMachine in vCenter
 	Id string `json:"id"`

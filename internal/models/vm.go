@@ -62,10 +62,11 @@ type VM struct {
 	ToolsStatus        string
 	ToolsRunningStatus string
 
-	Disks         []Disk
-	NICs          []NIC
-	Devices       []Device
-	GuestNetworks []GuestNetwork
+	Disks            []Disk
+	HostPhysicalNICs []HostPhysicalNIC
+	NICs             []NIC
+	Devices          []Device
+	GuestNetworks    []GuestNetwork
 
 	Issues []Issue
 
@@ -101,6 +102,11 @@ type Disk struct {
 	RDM      bool
 	Bus      string
 	Mode     string
+}
+
+type HostPhysicalNIC struct {
+	ID            string
+	LinkSpeedMbps *int32
 }
 
 type NIC struct {
