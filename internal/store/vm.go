@@ -162,6 +162,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 	var pvm duckdb_models.VM
 	var groups StringArray
 	var metadata duckdb.Composite[map[string][]string]
+	var hostNICs duckdb.Composite[[]models.HostPhysicalNIC]
 	var (
 		uMoid                                               sql.NullString
 		uVmName                                             sql.NullString
@@ -193,6 +194,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 		&uDisk, &uConfidence, &pvm.GuestApps,
 		&metadata,
 		&inspectionState, &inspectionDetails, &inspectionError,
+		&hostNICs,
 	); err != nil {
 		return nil, fmt.Errorf("scanning VM %s: %w", id, err)
 	}
@@ -202,6 +204,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 	}
 
 	result := fromDB(pvm)
+	result.HostPhysicalNICs = hostNICs.Get()
 	result.Metadata = metadata.Get()
 	if result.Metadata == nil {
 		result.Metadata = make(map[string][]string)

@@ -205,9 +205,19 @@ var vmsQuery = `
 
 				-- Migration Assessment
 				v."migration_excluded" AS migration_excluded,
-` + vmAssessmentSelectCols + `
+` + vmAssessmentSelectCols + `,
+				COALESCE(hn.nics, '[]') AS host_physical_nics
 
 			FROM vinfo v
+			LEFT JOIN (
+				SELECT "Host", to_json(LIST(
+					CASE WHEN "Speed" IS NULL THEN json_object('id', "Network Device")
+						ELSE json_object('id', "Network Device", 'linkSpeedMbps', "Speed") END
+					ORDER BY "Network Device")) AS nics
+				FROM vnic
+				WHERE "Host" != ''
+				GROUP BY "Host"
+			) hn ON hn."Host" = v."Host"
 ` + vmDiskTotalsJoin + `
 ` + vmAssessmentJoins + `
 

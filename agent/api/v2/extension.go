@@ -107,6 +107,12 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 		Nics:            make([]VirtualMachineNIC, 0, len(vm.NICs)),
 	}
 
+	hostNICs := make([]HostPhysicalNIC, 0, len(vm.HostPhysicalNICs))
+	for _, nic := range vm.HostPhysicalNICs {
+		hostNICs = append(hostNICs, HostPhysicalNIC{Id: nic.ID, LinkSpeedMbps: nic.LinkSpeedMbps})
+	}
+	details.HostPhysicalNics = &hostNICs
+
 	if vm.UUID != "" {
 		details.Uuid = &vm.UUID
 	}

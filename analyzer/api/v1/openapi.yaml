@@ -1299,6 +1299,11 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/VirtualMachineDisk'
+        hostPhysicalNics:
+          type: array
+          description: Physical NICs reported on the VM's host. An empty array means no records were retained.
+          items:
+            $ref: '#/components/schemas/HostPhysicalNIC'
         nics:
           type: array
           items:
@@ -1385,6 +1390,19 @@ components:
         mode:
           type: string
           description: Disk mode (persistent, independent_persistent, independent_nonpersistent)
+
+    HostPhysicalNIC:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+          description: Source physical NIC identity, scoped to the VM's host and collection.
+        linkSpeedMbps:
+          type: integer
+          format: int32
+          description: Reported link speed in Mbps; omitted when unknown. This is not measured throughput.
 
     VirtualMachineNIC:
       type: object
