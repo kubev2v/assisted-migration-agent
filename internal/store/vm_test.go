@@ -1430,13 +1430,13 @@ var _ = Describe("VMStore", func() {
 		})
 	})
 
-	It("should retain VLAN, addresses and CIDRs consistently in the store and CSV", func() {
+	It("should retain VLAN and address prefixes consistently in the store and CSV", func() {
 		insertVM("vm-network", "Network Test", "poweredOn", "cluster1", 4096)
 		_, err := s.Querier().ExecContext(ctx, `
-				INSERT INTO vnetwork ("VM ID", "Network", "Mac Address", "NIC label", "Switch", "VLAN", "IPv4 Address", "IPv6 Address", "IPv4 CIDR", "IPv6 CIDR")
-				VALUES ('vm-network', 'standard', '00:01', 'Network adapter 1', 'vSwitch0', '0', '10.0.0.1,10.0.0.2', '2001:db8::1,fe80::1', '10.0.0.1/24,10.0.0.2/25', '2001:db8::1/64,fe80::1/64'),
-				       ('vm-network', 'distributed', '00:02', 'Network adapter 2', 'dvs-1', '10-20,30-40', NULL, NULL, NULL, NULL),
-				       ('vm-network', 'unknown', '00:03', 'Network adapter 3', NULL, NULL, '192.0.2.3', '2001:db8::3', NULL, NULL)
+				INSERT INTO vnetwork ("VM ID", "Network", "Mac Address", "NIC label", "Switch", "VLAN", "IPv4 Address", "IPv6 Address")
+				VALUES ('vm-network', 'standard', '00:01', 'Network adapter 1', 'vSwitch0', '0', ['10.0.0.1/0', '10.0.0.2/25'], ['2001:db8::1/64', 'fe80::1/64']),
+				       ('vm-network', 'distributed', '00:02', 'Network adapter 2', 'dvs-1', '10-20,30-40', NULL, NULL),
+				       ('vm-network', 'unknown', '00:03', 'Network adapter 3', NULL, NULL, ['192.0.2.3'], ['2001:db8::3'])
 			`)
 		Expect(err).NotTo(HaveOccurred())
 		vm, err := s.VM().Get(ctx, "vm-network")
@@ -1447,16 +1447,34 @@ var _ = Describe("VMStore", func() {
 			byMAC[nic.MAC] = nic
 		}
 		Expect(byMAC["00:01"].VlanID).To(Equal("0"))
-		Expect(byMAC["00:01"].IPv4Address).To(Equal("10.0.0.1,10.0.0.2"))
-		Expect(byMAC["00:01"].IPv6Address).To(Equal("2001:db8::1,fe80::1"))
-		Expect(byMAC["00:01"].IPv4CIDR).To(Equal("10.0.0.1/24,10.0.0.2/25"))
-		Expect(byMAC["00:01"].IPv6CIDR).To(Equal("2001:db8::1/64,fe80::1/64"))
+		Expect(byMAC["00:01"].IPv4Address).To(Equal([]string{"10.0.0.1/0", "10.0.0.2/25"}))
+		Expect(byMAC["00:01"].IPv6Address).To(Equal([]string{"2001:db8::1/64", "fe80::1/64"}))
 		Expect(byMAC["00:02"].VlanID).To(Equal("10-20,30-40"))
 		Expect(byMAC["00:03"].VlanID).To(BeEmpty())
-		Expect(byMAC["00:03"].IPv4Address).To(Equal("192.0.2.3"))
-		Expect(byMAC["00:03"].IPv6Address).To(Equal("2001:db8::3"))
-		Expect(byMAC["00:03"].IPv4CIDR).To(BeEmpty())
-		Expect(byMAC["00:03"].IPv6CIDR).To(BeEmpty())
+		Expect(byMAC["00:03"].IPv4Address).To(Equal([]string{"192.0.2.3"}))
+		Expect(byMAC["00:03"].IPv6Address).To(Equal([]string{"2001:db8::3"}))
+
+		for _, expression := range []string{
+			"net.ipv4 contains '10.0.0.2'", "net.ipv4 contains '10.0.0.2/25'",
+			"net.ipv4 contains '192.0.2.3'", "net.ipv6 contains '2001:db8::1'",
+			"net.ipv6 contains '2001:db8::1/64'", "net.ipv6 contains '2001:db8::3'",
+		} {
+			filter := store.ByFilter(expression)
+			Expect(filter).NotTo(BeNil())
+			count, err := s.VM().Count(ctx, filter)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(count).To(Equal(1))
+		}
+		for _, expression := range []string{
+			"net.ipv4 contains '10.0.0.20'",
+			"net.ipv4 contains '10.0.0.2/99'",
+		} {
+			filter := store.ByFilter(expression)
+			Expect(filter).NotTo(BeNil())
+			count, err := s.VM().Count(ctx, filter)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(count).To(BeZero())
+		}
 
 		path := filepath.Join(tmpDir, "networks.csv")
 		Expect(s.Export().CopyScope(ctx, "network", path)).To(Succeed())
@@ -1473,16 +1491,14 @@ var _ = Describe("VMStore", func() {
 		Expect(columns).To(HaveKey("vlan_id"))
 		Expect(columns).To(HaveKey("ipv4_address"))
 		Expect(columns).To(HaveKey("ipv6_address"))
-		Expect(columns).To(HaveKey("ipv4_cidr"))
-		Expect(columns).To(HaveKey("ipv6_cidr"))
+		Expect(columns).NotTo(HaveKey("ipv4_cidr"))
+		Expect(columns).NotTo(HaveKey("ipv6_cidr"))
 		for i, record := range records[1:] {
 			nic := byMAC[record[columns["mac_address"]]]
 			Expect(record[columns["nic_index"]]).To(Equal([]string{"0", "1", "2"}[i]))
 			Expect(record[columns["vlan_id"]]).To(Equal(nic.VlanID))
-			Expect(record[columns["ipv4_address"]]).To(Equal(nic.IPv4Address))
-			Expect(record[columns["ipv6_address"]]).To(Equal(nic.IPv6Address))
-			Expect(record[columns["ipv4_cidr"]]).To(Equal(nic.IPv4CIDR))
-			Expect(record[columns["ipv6_cidr"]]).To(Equal(nic.IPv6CIDR))
+			Expect(record[columns["ipv4_address"]]).To(Equal(map[string]string{"00:01": "10.0.0.1/0,10.0.0.2/25", "00:03": "192.0.2.3"}[nic.MAC]))
+			Expect(record[columns["ipv6_address"]]).To(Equal(map[string]string{"00:01": "2001:db8::1/64,fe80::1/64", "00:03": "2001:db8::3"}[nic.MAC]))
 		}
 	})
 
@@ -1496,7 +1512,7 @@ var _ = Describe("VMStore", func() {
 
 			_, err = s.Querier().ExecContext(ctx, `
 				INSERT INTO vnetwork ("VM ID", "Network", "Mac Address", "IPv4 Address", "IPv6 Address")
-				VALUES ('vm-ips', 'VM Network', '00:50:56:aa:bb:cc', '10.0.0.5', 'fe80::1')
+				VALUES ('vm-ips', 'VM Network', '00:50:56:aa:bb:cc', ['10.0.0.5'], ['fe80::1'])
 			`)
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -1506,11 +1522,11 @@ var _ = Describe("VMStore", func() {
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vm.NICs).To(HaveLen(1))
-			Expect(vm.NICs[0].IPv4Address).To(Equal("10.0.0.5"))
-			Expect(vm.NICs[0].IPv6Address).To(Equal("fe80::1"))
+			Expect(vm.NICs[0].IPv4Address).To(Equal([]string{"10.0.0.5"}))
+			Expect(vm.NICs[0].IPv6Address).To(Equal([]string{"fe80::1"}))
 		})
 
-		It("should return empty string for NICs with no IP", func() {
+		It("should return empty arrays for NICs with no IP", func() {
 			_, err := s.Querier().ExecContext(ctx, `
 				INSERT INTO vnetwork ("VM ID", "Network", "Mac Address")
 				VALUES ('vm-ips', 'Management', '00:50:56:ff:ff:ff')
@@ -1522,8 +1538,8 @@ var _ = Describe("VMStore", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(vm.NICs).To(HaveLen(2))
 			noIpNic := vm.NICs[1]
-			Expect(noIpNic.IPv4Address).To(Equal(""))
-			Expect(noIpNic.IPv6Address).To(Equal(""))
+			Expect(noIpNic.IPv4Address).To(Equal([]string{}))
+			Expect(noIpNic.IPv6Address).To(Equal([]string{}))
 		})
 	})
 

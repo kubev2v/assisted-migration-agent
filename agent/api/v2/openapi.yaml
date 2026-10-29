@@ -2141,17 +2141,15 @@ components:
           type: string
           description: Reported port-group VLAN configuration, including zero or trunk ranges when supplied; empty when unknown. Per-port overrides are not resolved.
         ipv4Address:
-          type: string
-          description: IPv4 addresses reported for this adapter. For vCenter collections, multiple addresses are separated by commas; RVTools values retain their source formatting. Empty when unknown.
+          type: array
+          items:
+            type: string
+          description: IPv4 addresses, each followed by /prefix when reported. Empty array when unknown.
         ipv6Address:
-          type: string
-          description: IPv6 addresses reported for this adapter. For vCenter collections, multiple addresses are separated by commas; RVTools values retain their source formatting. Empty when unknown.
-        ipv4Cidr:
-          type: string
-          description: Comma-separated IPv4 address/prefix pairs reported for this adapter. Empty when prefix information is unavailable, including RVTools imports.
-        ipv6Cidr:
-          type: string
-          description: Comma-separated IPv6 address/prefix pairs reported for this adapter. Empty when prefix information is unavailable, including RVTools imports.
+          type: array
+          items:
+            type: string
+          description: IPv6 addresses, each followed by /prefix when reported. Empty array when unknown.
         mac:
           type: string
           description: MAC address
