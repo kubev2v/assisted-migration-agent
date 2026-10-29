@@ -89,6 +89,7 @@ groups_agg AS (
 SELECT
     COALESCE(i."VM ID", '') AS "ID",
     COALESCE(i."VM", '') AS "Name",
+    COALESCE(i."Annotation", '') AS "Annotation",
     COALESCE(i."Folder ID", i."Folder", '') AS "Folder",
     COALESCE(i."Host", '') AS "Host",
     COALESCE(i."SMBIOS UUID", i."VM UUID", '') AS "UUID",

@@ -107,6 +107,9 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 		Nics:            make([]VirtualMachineNIC, 0, len(vm.NICs)),
 	}
 
+	if vm.Annotation != "" {
+		details.Annotation = &vm.Annotation
+	}
 	if vm.UUID != "" {
 		details.Uuid = &vm.UUID
 	}
