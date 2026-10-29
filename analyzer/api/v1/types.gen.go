@@ -536,11 +536,20 @@ type VirtualMachineNIC struct {
 	// Index NIC index within the VirtualMachine
 	Index *int `json:"index,omitempty"`
 
+	// Ipv4Address IPv4 addresses, each followed by /prefix when reported. Empty array when unknown.
+	Ipv4Address *[]string `json:"ipv4Address,omitempty"`
+
+	// Ipv6Address IPv6 addresses, each followed by /prefix when reported. Empty array when unknown.
+	Ipv6Address *[]string `json:"ipv6Address,omitempty"`
+
 	// Mac MAC address
 	Mac *string `json:"mac,omitempty"`
 
 	// Network Network reference
 	Network *string `json:"network,omitempty"`
+
+	// VlanId Reported port-group VLAN configuration, including zero or trunk ranges when supplied; empty when unknown. Per-port overrides are not resolved.
+	VlanId *string `json:"vlanId,omitempty"`
 }
 
 // VirtualMachineUpdateRequest defines model for VirtualMachineUpdateRequest.

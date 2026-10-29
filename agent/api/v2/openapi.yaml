@@ -2137,6 +2137,19 @@ components:
     VirtualMachineNIC:
       type: object
       properties:
+        vlanId:
+          type: string
+          description: Reported port-group VLAN configuration, including zero or trunk ranges when supplied; empty when unknown. Per-port overrides are not resolved.
+        ipv4Address:
+          type: array
+          items:
+            type: string
+          description: IPv4 addresses, each followed by /prefix when reported. Empty array when unknown.
+        ipv6Address:
+          type: array
+          items:
+            type: string
+          description: IPv6 addresses, each followed by /prefix when reported. Empty array when unknown.
         mac:
           type: string
           description: MAC address

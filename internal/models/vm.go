@@ -107,8 +107,9 @@ type NIC struct {
 	MAC         string
 	Network     string
 	Index       int
-	IPv4Address string
-	IPv6Address string
+	IPv4Address []string
+	IPv6Address []string
+	VlanID      string
 }
 
 type Device struct {

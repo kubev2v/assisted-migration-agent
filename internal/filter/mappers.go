@@ -234,10 +234,11 @@ var DefaultMapper filter.MapFunc = func(name string) (string, filter.FieldType, 
 		return `net."Switch"`, filter.StringField, nil
 	case "net.type":
 		return `net."Type"`, filter.StringField, nil
+	// Allow contains to match either the reported IP/prefix or its bare IP.
 	case "net.ipv4":
-		return `net."IPv4 Address"`, filter.StringField, nil
+		return `list_concat(net."IPv4 Address", [split_part(ip, '/', 1) FOR ip IN net."IPv4 Address"])`, filter.ArrayField, nil
 	case "net.ipv6":
-		return `net."IPv6 Address"`, filter.StringField, nil
+		return `list_concat(net."IPv6 Address", [split_part(ip, '/', 1) FOR ip IN net."IPv6 Address"])`, filter.ArrayField, nil
 	case "net.cluster":
 		return `net."Cluster"`, filter.StringField, nil
 	case "net.connected":
