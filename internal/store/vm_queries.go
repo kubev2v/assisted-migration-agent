@@ -140,6 +140,13 @@ nics AS (
     JOIN filtered_vm fv ON vnetwork."VM ID" = fv."VM ID"
     GROUP BY vnetwork."VM ID"
 ),
+host_nics AS (
+    SELECT LIST({'ID': n."Network Device", 'LinkSpeedMbps': n."Speed"}
+        ORDER BY n."Network Device") AS nics
+    FROM vnic n
+    JOIN filtered_vm fv ON n."Host" = fv."Host"
+    WHERE n."Host" != ''
+),
 concerns_agg AS (
     SELECT
         "VM_ID",
@@ -228,9 +235,11 @@ SELECT
     COALESCE(ins.status, 'not_started') AS "InspectionState",
     COALESCE(ins.details, '') AS "InspectionDetails",
     COALESCE(ins.error, '') AS "InspectionError",
-    COALESCE(i."NICs", 0) AS "NICCount"
+    COALESCE(i."NICs", 0) AS "NICCount",
+    COALESCE(hn.nics, []) AS "HostPhysicalNICs"
 FROM filtered_vm i
 CROSS JOIN metadata_agg metadata
+CROSS JOIN host_nics hn
 LEFT JOIN vcpu c ON i."VM ID" = c."VM ID"
 LEFT JOIN vmemory m ON i."VM ID" = m."VM ID"
 LEFT JOIN disks d ON i."VM ID" = d."VM ID"
