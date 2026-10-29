@@ -28,7 +28,7 @@ spec:
   - name: path-context
     value: .
   - name: build-args-file
-    value: ui-config
+    value: build-config/ui-image
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
@@ -221,6 +221,11 @@ spec:
           set -euo pipefail
           VERSION_BRANCH=$(cat .github/release-config.txt | tr -d '\n\r ' || echo '')
           BRANCH="{{target_branch}}"
+          case "$BRANCH" in
+            main) IMAGE_ENV=dev ;;
+            stable) IMAGE_ENV=stage ;;
+            *) echo "Unsupported appliance branch: $BRANCH" >&2; exit 1 ;;
+          esac
           SHORT_SHA=$(echo "{{revision}}" | cut -c1-7)
           if [ -n "$VERSION_BRANCH" ]; then
             TAGS="$BRANCH $BRANCH-$VERSION_BRANCH-$SHORT_SHA"
@@ -234,6 +239,7 @@ spec:
           sed -i "s|ARG RELEASE_TAGS=\"\"|ARG RELEASE_TAGS=\"$TAGS\"|" agent/Containerfile
           sed -i "s|ARG IMAGE_VERSION=\"\"|ARG IMAGE_VERSION=\"$VERSION\"|" agent/Containerfile
           sed -i "s|ARG BRANCH_TAG=\"\"|ARG BRANCH_TAG=\"$BRANCH\"|" agent/Containerfile
+          sed -i "s|ARG IMAGE_ENV=dev|ARG IMAGE_ENV=$IMAGE_ENV|" agent/Containerfile
           echo "Modified Containerfile ARG defaults successfully"
       - name: HERMETIC
         value: $(params.hermetic)
@@ -270,6 +276,7 @@ spec:
       - name: BUILD_ARGS_FILES
         value:
         - $(params.build-args-file)
+        - build-config/min-upgrade-version
       - name: PRIVILEGED_NESTED
         value: $(params.privileged-nested)
       - name: SOURCE_URL

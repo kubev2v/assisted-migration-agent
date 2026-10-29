@@ -20,9 +20,11 @@ ANALYZER_IMAGE_TAG ?= latest
 
 IMAGE_NAME ?= assisted-migration-agent
 IMAGE_TAG ?= latest
+IMAGE_ENV ?= dev
+MIN_UPGRADE_VERSION ?=
 AGENT_UI_IMAGE ?= quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent-ui
 ifeq ($(origin AGENT_UI_IMAGE_TAG),undefined)
-include ui-config
+include build-config/ui-image
 endif
 ANALYZER_UI_IMAGE ?= $(AGENT_UI_IMAGE)
 ANALYZER_UI_IMAGE_TAG ?= $(AGENT_UI_IMAGE_TAG)
@@ -109,11 +111,16 @@ e2e.container.clean:
 
 # Build container image
 image:
+	@case "$(IMAGE_ENV)" in dev|stage|production) ;; *) echo "IMAGE_ENV must be dev, stage, or production" >&2; exit 1 ;; esac
 	@echo "📦 Building container image $(IMAGE_NAME):$(IMAGE_TAG)..."
 	@echo "   Using UI image: $(AGENT_UI_IMAGE):$(AGENT_UI_IMAGE_TAG)"
 	$(PODMAN) build \
+		--build-arg-file build-config/ui-image \
+		--build-arg-file build-config/min-upgrade-version \
+		--build-arg IMAGE_ENV=$(IMAGE_ENV) \
 		--build-arg PLANNER_AGENT_GIT_COMMIT=$(PLANNER_AGENT_GIT_COMMIT) \
 		--build-arg PLANNER_AGENT_VERSION=$(PLANNER_AGENT_VERSION) \
+		$(if $(MIN_UPGRADE_VERSION),--build-arg MIN_UPGRADE_VERSION=$(MIN_UPGRADE_VERSION)) \
 		--build-arg AGENT_UI_IMAGE=$(AGENT_UI_IMAGE) \
 		--build-arg AGENT_UI_IMAGE_TAG=$(AGENT_UI_IMAGE_TAG) \
 		-t $(IMAGE_NAME):$(IMAGE_TAG) \

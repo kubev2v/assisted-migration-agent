@@ -1,0 +1,4 @@
+# Oldest installed image supported as an upgrade starting point in each environment.
+MIN_UPGRADE_VERSION_DEV=main-release-0.31-212e974
+MIN_UPGRADE_VERSION_STAGE=stable-release-0.30-722023a
+MIN_UPGRADE_VERSION_PRODUCTION=v0.29.0
