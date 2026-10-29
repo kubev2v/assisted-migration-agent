@@ -530,7 +530,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Inventory'
+                $ref: '#/components/schemas/CollectedInventory'
             application/zip:
               schema:
                 type: string
@@ -660,7 +660,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Inventory'
+                $ref: '#/components/schemas/CollectedInventory'
         '404':
           description: Collection or inventory not found
         '500':
@@ -1721,13 +1721,15 @@ components:
           description: Error message when status is error
 
     # ── Inventories ──────────────────────────────────────────────────────
-    Inventory:
+    # Distinct from Planner Inventory so code generation can inline both schemas.
+    CollectedInventory:
+      x-go-name: Inventory
       type: object
       required:
         - inventory
       properties:
         inventory:
-          $ref: 'https://raw.githubusercontent.com/kubev2v/migration-planner/3fc3570c5d9820a9879c53dcf80bb73be9a6e912/api/v1alpha1/openapi.yaml#/components/schemas/UpdateInventory'
+          $ref: 'https://raw.githubusercontent.com/ronenav/migration-planner/848334cc834b81224b91420262873a35a269c1c2/api/v1alpha1/openapi.yaml#/components/schemas/UpdateInventory'
 
     # ── VCenter Credentials ──────────────────────────────────────────────
     VcenterCredentials:
@@ -2393,7 +2395,7 @@ components:
         group:
           $ref: '#/components/schemas/Group'
         inventory:
-          $ref: 'https://raw.githubusercontent.com/kubev2v/migration-planner/3fc3570c5d9820a9879c53dcf80bb73be9a6e912/api/v1alpha1/openapi.yaml#/components/schemas/Inventory'
+          $ref: 'https://raw.githubusercontent.com/ronenav/migration-planner/848334cc834b81224b91420262873a35a269c1c2/api/v1alpha1/openapi.yaml#/components/schemas/Inventory'
         vms:
           type: array
           items:

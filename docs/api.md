@@ -157,6 +157,15 @@ curl -X DELETE http://localhost:8000/api/v1/collector
 
 Returns the collected inventory data.
 
+Host records under `vcenter.infra.hosts` and `clusters[*].infra.hosts` can include:
+
+- `storageAdapters`: device name, source key/type/protocol, model, driver, and node/port WWNs. WWNs are strings and retain leading zeros.
+- `storageLuns`: canonical name, source SCSI key, source-provided LUN UUID, vendor/model, and distinct sorted `adapterDevices` associations. LUNs can appear without adapter metadata.
+
+These optional fields also apply to v2 latest/collection inventory and group inventory responses. Missing or conflicting facts are omitted. An absent array does not establish that collection was complete or that the host has no storage. Existing cached inventories remain unchanged until rebuilt. Group host membership follows the existing inventory behavior.
+
+LUN records describe storage visible to the host. They do not provide per-path health, array UUIDs, or ordinary VMDK-to-LUN placement. Host LUN UUIDs are exposed only when retained by the source; datastore backing IDs and VM disk RDM LUN UUIDs remain separate fields.
+
 ```bash
 curl http://localhost:8000/api/v1/inventory
 ```

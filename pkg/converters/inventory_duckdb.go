@@ -247,6 +247,78 @@ func infraFromDuckDB(i *inventory.InfraData) api.Infra {
 		}
 		host.VmotionSupported = h.VMotionSupported
 		host.StorageVmotionSupported = h.StorageVMotionSupported
+		if len(h.StorageAdapters) > 0 {
+			adapters := make([]api.HostStorageAdapter, 0, len(h.StorageAdapters))
+			for _, storageAdapter := range h.StorageAdapters {
+				adapter := api.HostStorageAdapter{}
+				if storageAdapter.Device != "" {
+					device := storageAdapter.Device
+					adapter.Device = &device
+				}
+				if storageAdapter.Key != "" {
+					key := storageAdapter.Key
+					adapter.Key = &key
+				}
+				if storageAdapter.Type != "" {
+					typeValue := storageAdapter.Type
+					adapter.Type = &typeValue
+				}
+				if storageAdapter.Protocol != "" {
+					protocol := storageAdapter.Protocol
+					adapter.Protocol = &protocol
+				}
+				if storageAdapter.Model != "" {
+					model := storageAdapter.Model
+					adapter.Model = &model
+				}
+				if storageAdapter.Driver != "" {
+					driver := storageAdapter.Driver
+					adapter.Driver = &driver
+				}
+				if storageAdapter.NodeWWN != "" {
+					nodeWWN := storageAdapter.NodeWWN
+					adapter.NodeWwn = &nodeWWN
+				}
+				if storageAdapter.PortWWN != "" {
+					portWWN := storageAdapter.PortWWN
+					adapter.PortWwn = &portWWN
+				}
+				adapters = append(adapters, adapter)
+			}
+			host.StorageAdapters = &adapters
+		}
+		if len(h.StorageLuns) > 0 {
+			luns := make([]api.HostStorageLun, 0, len(h.StorageLuns))
+			for _, storageLun := range h.StorageLuns {
+				lun := api.HostStorageLun{}
+				if storageLun.CanonicalName != "" {
+					canonicalName := storageLun.CanonicalName
+					lun.CanonicalName = &canonicalName
+				}
+				if storageLun.Key != "" {
+					key := storageLun.Key
+					lun.Key = &key
+				}
+				if storageLun.LunUUID != "" {
+					lunUuid := storageLun.LunUUID
+					lun.LunUuid = &lunUuid
+				}
+				if storageLun.Vendor != "" {
+					vendor := storageLun.Vendor
+					lun.Vendor = &vendor
+				}
+				if storageLun.Model != "" {
+					model := storageLun.Model
+					lun.Model = &model
+				}
+				if len(storageLun.AdapterDevices) > 0 {
+					adapterDevices := append([]string(nil), storageLun.AdapterDevices...)
+					lun.AdapterDevices = &adapterDevices
+				}
+				luns = append(luns, lun)
+			}
+			host.StorageLuns = &luns
+		}
 		hosts = append(hosts, host)
 	}
 
