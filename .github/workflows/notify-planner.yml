@@ -1,0 +1,74 @@
+name: Notify planner of released appliance image
+
+on:
+  push:
+    branches: [main, stable]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: notify-appliance-${{ github.ref_name }}-${{ github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  wait-for-image:
+    if: github.repository == 'kubev2v/assisted-migration-agent'
+    runs-on: ubuntu-latest
+    timeout-minutes: 125
+    outputs:
+      image-tag: ${{ steps.image.outputs.image-tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Wait for released Quay.io image
+        id: image
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE="quay.io/redhat-services-prod/assisted-migration-tenant/assisted-migration/oma-appliance"
+          RELEASE=$(tr -d '\n\r ' < .github/release-config.txt)
+          [[ "$RELEASE" =~ ^release-[0-9]+\.[0-9]+$ ]] || { echo "ERROR: invalid release configuration"; exit 1; }
+          TAG="${GITHUB_REF_NAME}-${RELEASE}-${GITHUB_SHA:0:7}"
+          DEADLINE=$((SECONDS + 7200))
+
+          require_current_head() {
+            local head
+            if ! head=$(timeout 30s git ls-remote --exit-code https://github.com/kubev2v/assisted-migration-agent.git "refs/heads/$GITHUB_REF_NAME" | cut -f1); then
+              echo "ERROR: failed to resolve $GITHUB_REF_NAME branch head"
+              exit 1
+            fi
+            if [[ "$head" != "$GITHUB_SHA" ]]; then
+              echo "Skipping superseded commit $GITHUB_SHA; $GITHUB_REF_NAME is at $head"
+              exit 0
+            fi
+          }
+
+          echo "Waiting for $IMAGE:$TAG to be released..."
+          while (( SECONDS < DEADLINE )); do
+            require_current_head
+            if timeout 30s podman manifest inspect "$IMAGE:$TAG" > /dev/null 2>&1; then
+              require_current_head
+              echo "Image $IMAGE:$TAG is available"
+              echo "image-tag=$TAG" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            sleep 30
+          done
+
+          echo "ERROR: timed out waiting for $IMAGE:$TAG"
+          exit 1
+
+  notify-planner:
+    needs: wait-for-image
+    if: needs.wait-for-image.outputs.image-tag != ''
+    uses: kubev2v/migration-planner-workflows/.github/workflows/repo-dispatch-notify.yml@main
+    with:
+      event-type: appliance_image_updated
+      target-repo: kubev2v/migration-planner
+      image-tag: ${{ needs.wait-for-image.outputs.image-tag }}
+    secrets:
+      APP_ID: ${{ secrets.MIGRATION_PLANNER_SYNC_APP_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.MIGRATION_PLANNER_SYNC_APP_PRIVATE_KEY }}
