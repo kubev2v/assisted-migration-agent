@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 
@@ -172,6 +173,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 		uMemAvg, uMemP95, uMemMax, uMemLatest               sql.NullFloat64
 		uDisk, uConfidence                                  sql.NullFloat64
 		inspectionState, inspectionDetails, inspectionError string
+		vAppProducts                                        AppProducts
 	)
 
 	if err := rows.Scan(
@@ -193,6 +195,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 		&uDisk, &uConfidence, &pvm.GuestApps,
 		&metadata,
 		&inspectionState, &inspectionDetails, &inspectionError,
+		&vAppProducts,
 	); err != nil {
 		return nil, fmt.Errorf("scanning VM %s: %w", id, err)
 	}
@@ -206,6 +209,9 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 	if result.Metadata == nil {
 		result.Metadata = make(map[string][]string)
 	}
+
+	result.AppProducts = vAppProducts
+
 	result.Groups = groups
 	result.InspectionStatus.State = models.InspectionState(inspectionState)
 	result.InspectionStatus.Details = inspectionDetails
@@ -260,13 +266,14 @@ func (s *VMStore) GetFilterOptions(ctx context.Context) (models.VMFilterOptions,
 	}, nil
 }
 
-// GetGuestApps returns all VMs with their guest application names.
+// GetGuestApps returns VM guest application names and vApp product metadata.
 func (s *VMStore) GetGuestApps(ctx context.Context) ([]models.VMGuestApps, error) {
 	query, args, err := sq.Select(
 		`v."VM ID"`,
 		`v."VM"`,
 		`COALESCE(v."guest_apps", '[]')`,
-	).From("vinfo v").ToSql()
+		"p.*",
+	).From("vinfo v").LeftJoin(`vm_vapp_products p ON p.vm_id = v."VM ID"`).ToSql()
 	if err != nil {
 		return nil, err
 	}
@@ -277,10 +284,20 @@ func (s *VMStore) GetGuestApps(ctx context.Context) ([]models.VMGuestApps, error
 	}
 	defer func() { _ = rows.Close() }()
 
-	var result []models.VMGuestApps
+	result := make(map[string]models.VMGuestApps)
 	for rows.Next() {
 		var id, name, guestAppsJSON string
-		if err := rows.Scan(&id, &name, &guestAppsJSON); err != nil {
+		var (
+			pKey                                                                 sql.NullInt32
+			pVmID, pClassID, pInstanceID, pName, pVendor, pVersion, pFullVersion sql.NullString
+			pVendorUrl, pProductUrl, pAppUrl                                     sql.NullString
+		)
+
+		if err := rows.Scan(
+			&id, &name, &guestAppsJSON, &pVmID, &pKey, &pInstanceID,
+			&pClassID, &pName, &pVendor, &pVersion, &pFullVersion,
+			&pVendorUrl, &pProductUrl, &pAppUrl,
+		); err != nil {
 			return nil, err
 		}
 
@@ -298,14 +315,60 @@ func (s *VMStore) GetGuestApps(ctx context.Context) ([]models.VMGuestApps, error
 			}
 		}
 
-		result = append(result, models.VMGuestApps{
+		guestApp := models.VMGuestApps{
 			ID:       id,
 			Name:     name,
 			AppNames: appNames,
-		})
+			Products: make([]models.AppProduct, 0),
+		}
+
+		var product models.AppProduct
+		if pVmID.Valid {
+			if pClassID.Valid {
+				product.ClassId = pClassID.String
+			}
+			if pInstanceID.Valid {
+				product.InstanceId = pInstanceID.String
+			}
+			if pName.Valid {
+				product.Name = pName.String
+			}
+			if pVendor.Valid {
+				product.Vendor = pVendor.String
+			}
+			if pVersion.Valid {
+				product.Version = pVendor.String
+			}
+			if pFullVersion.Valid {
+				product.FullVersion = pFullVersion.String
+			}
+			if pVendorUrl.Valid {
+				product.VendorUrl = pVendorUrl.String
+			}
+			if pProductUrl.Valid {
+				product.ProductUrl = pProductUrl.String
+			}
+			if pAppUrl.Valid {
+				product.AppUrl = pAppUrl.String
+			}
+			guestApp.Products = []models.AppProduct{product}
+		}
+
+		existingResult, found := result[id]
+		if !found {
+			result[id] = guestApp
+		} else {
+			existingResult.Products = append(existingResult.Products, guestApp.Products...)
+			result[id] = existingResult
+		}
 	}
 
-	return result, rows.Err()
+	r := make([]models.VMGuestApps, 0, len(result))
+	for rr := range maps.Values(result) {
+		r = append(r, rr)
+	}
+
+	return r, rows.Err()
 }
 
 // normalizeCategory validates and normalizes an issue category (case-insensitive).

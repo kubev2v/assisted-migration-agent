@@ -77,13 +77,27 @@ type VM struct {
 	Labels []string
 	Groups []string
 
-	GuestApps []GuestApp
-	Metadata  map[string][]string
+	Metadata    map[string][]string
+	GuestApps   []GuestApp
+	AppProducts []AppProduct
 }
 
 type GuestApp struct {
 	Name    string
 	Version string
+}
+
+type AppProduct struct {
+	Key         int32
+	ClassId     string
+	InstanceId  string
+	Name        string
+	Vendor      string
+	Version     string
+	FullVersion string
+	VendorUrl   string
+	ProductUrl  string
+	AppUrl      string
 }
 
 type Issue struct {

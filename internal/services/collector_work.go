@@ -329,6 +329,23 @@ func (f *vCenterCollectorWorkFactory) Build() work.WorkBuilder[models.CollectorS
 					}
 				}
 
+				appSrv, err := NewApplicationService(st)
+				if err != nil {
+					r.Err = fmt.Errorf("failed to ingest vm products: %w", err)
+					return r, err
+				}
+
+				if err := appSrv.InsertProducts(ctx, r.SQLitePath); err != nil {
+					r.Err = err
+					return r, err
+				}
+
+				if err := st.Checkpoint(ctx); err != nil {
+					log.Warnw("checkpoint after ingest failed", "error", err)
+					r.Err = fmt.Errorf("checkpoint failed: %w", err)
+					return r, err
+				}
+
 				log.Info("sqlite data successfully ingested into duckdb")
 
 				if err := os.Remove(r.SQLitePath); err != nil {
