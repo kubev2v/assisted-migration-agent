@@ -122,6 +122,17 @@ var _ = Describe("Pool", func() {
 			Expect(collections).To(BeEmpty())
 		})
 
+		It("should fail startup when a collection database cannot be migrated", func() {
+			seedPool.Close()
+			broken := filepath.Join(tmpDir, "collection_1234.duckdb")
+			Expect(os.WriteFile(broken, []byte("not a duckdb file"), 0644)).To(Succeed())
+
+			_, err := bootstrap.InitPool(tmpDir)
+
+			Expect(err).To(MatchError(ContainSubstring("collection_1234")))
+			Expect(os.ReadFile(broken)).To(Equal([]byte("not a duckdb file")))
+		})
+
 		It("should be a no-op when no stale collections exist", func() {
 			seedPool.Close()
 
