@@ -10,7 +10,7 @@ permissions:
 jobs:
   update:
     if: github.event.client_payload.repo == 'kubev2v/migration-planner-agent-ui'
-    uses: kubev2v/migration-planner-workflows/.github/workflows/repo-dispatch-update.yml@b5de744cc45e4daaf9e28dcd6b179ab4a8ad7c7c # main
+    uses: kubev2v/migration-planner-workflows/.github/workflows/repo-dispatch-update.yml@c272ae15bf54065d0f798c865735946c648dfd05 # main
     with:
       sha: ${{ github.event.client_payload.sha }}
       target-branch: ${{ github.event.client_payload.target_branch }}
