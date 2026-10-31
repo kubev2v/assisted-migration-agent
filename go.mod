@@ -255,7 +255,8 @@ require (
 	github.com/ugorji/go/codec v1.3.1 // indirect
 	github.com/ulikunitz/xz v0.5.17 // indirect
 	github.com/vbatts/tar-split v0.12.3 // indirect
-	github.com/vbauerster/mpb/v8 v8.12.1 // indirect
+	github.com/vbauerster/cupwriter v0.0.5 // indirect
+	github.com/vbauerster/mpb/v8 v8.16.3 // indirect
 	github.com/vektah/gqlparser/v2 v2.5.63 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
