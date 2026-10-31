@@ -8,7 +8,7 @@ require (
 	github.com/duckdb/duckdb-go/v2 v2.5.4
 	github.com/ecordell/optgen v0.1.1
 	github.com/fatih/color v1.18.0
-	github.com/getkin/kin-openapi v0.145.0
+	github.com/getkin/kin-openapi v0.152.0
 	github.com/gin-contrib/zap v1.1.9
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-extras/cobraflags v0.0.0-20260116100222-f76efc9500d4
@@ -20,7 +20,7 @@ require (
 	github.com/kubev2v/forklift v0.0.0-20260812070321-b33d2e55b079
 	github.com/kubev2v/migration-planner v0.28.1-0.20261026142817-6be8b373fa84
 	github.com/kubev2v/vm-migration-detective v0.0.0-20261006023354-140bc9526c2c
-	github.com/oapi-codegen/gin-middleware v1.0.2
+	github.com/oapi-codegen/gin-middleware v1.2.1
 	github.com/oapi-codegen/runtime v1.1.2
 	github.com/onsi/ginkgo/v2 v2.29.0
 	github.com/onsi/gomega v1.41.0
