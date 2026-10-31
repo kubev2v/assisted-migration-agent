@@ -230,15 +230,15 @@ spec:
           SHORT_SHA=$(echo "{{revision}}" | cut -c1-7)
           if [ -n "$VERSION_BRANCH" ]; then
             TAGS="$BRANCH $BRANCH-$VERSION_BRANCH-$SHORT_SHA"
-            VERSION="$BRANCH-$VERSION_BRANCH-$SHORT_SHA"
+            APPLIANCE_VERSION="$BRANCH-$VERSION_BRANCH-$SHORT_SHA"
           else
             TAGS="$BRANCH $BRANCH-$SHORT_SHA"
-            VERSION="$BRANCH-$SHORT_SHA"
+            APPLIANCE_VERSION="$BRANCH-$SHORT_SHA"
           fi
           echo "Computed RELEASE_TAGS: $TAGS"
-          echo "Computed IMAGE_VERSION: $VERSION"
+          echo "Computed APPLIANCE_VERSION: $APPLIANCE_VERSION"
           sed -i "s|ARG RELEASE_TAGS=\"\"|ARG RELEASE_TAGS=\"$TAGS\"|" agent/Containerfile.rvtools
-          sed -i "s|ARG IMAGE_VERSION=\"\"|ARG IMAGE_VERSION=\"$VERSION\"|" agent/Containerfile.rvtools
+          sed -i "s|ARG APPLIANCE_VERSION=\"\"|ARG APPLIANCE_VERSION=\"$APPLIANCE_VERSION\"|" agent/Containerfile.rvtools
           sed -i "s|ARG BRANCH_TAG=\"\"|ARG BRANCH_TAG=\"$BRANCH\"|" agent/Containerfile.rvtools
           echo "Modified Containerfile ARG defaults successfully"
       - name: HERMETIC
