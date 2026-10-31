@@ -6,6 +6,7 @@
 ARG AGENT_UI_IMAGE=quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent-ui
 ARG AGENT_UI_IMAGE_TAG
 ARG IMAGE_ENV=dev
+ARG APPLIANCE_VERSION=""
 FROM --platform=linux/amd64 ${AGENT_UI_IMAGE}:${AGENT_UI_IMAGE_TAG} AS ui-builder
 
 
@@ -43,12 +44,12 @@ COPY . .
 COPY --from=ui-metadata-extractor /tmp/ui-git-commit.txt /tmp/ui-git-commit.txt
 
 ARG PLANNER_AGENT_GIT_COMMIT=unknown
-ARG PLANNER_AGENT_VERSION=v0.0.0
+ARG APPLIANCE_VERSION
 
 # Build the agent with UI git commit
 RUN UI_GIT_COMMIT=$(cat /tmp/ui-git-commit.txt) && \
     echo "Building with UI_GIT_COMMIT=${UI_GIT_COMMIT}" && \
-    make build PLANNER_AGENT_GIT_COMMIT=${PLANNER_AGENT_GIT_COMMIT} PLANNER_AGENT_VERSION=${PLANNER_AGENT_VERSION} UI_GIT_COMMIT=${UI_GIT_COMMIT} BINARY_PATH=/tmp/agent
+    make build PLANNER_AGENT_GIT_COMMIT=${PLANNER_AGENT_GIT_COMMIT} APPLIANCE_VERSION="${APPLIANCE_VERSION}" UI_GIT_COMMIT=${UI_GIT_COMMIT} BINARY_PATH=/tmp/agent
 
 
 # =============================================================================
@@ -169,8 +170,8 @@ exec /app/agent "$@"\n' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 ARG RELEASE_TAGS=""
 LABEL konflux.additional-tags="${RELEASE_TAGS}"
 
-ARG IMAGE_VERSION=""
-LABEL org.opencontainers.image.version="${IMAGE_VERSION}"
+ARG APPLIANCE_VERSION
+LABEL org.opencontainers.image.version="${APPLIANCE_VERSION}"
 
 ARG BRANCH_TAG=""
 LABEL konflux.release.branch-tag="${BRANCH_TAG}"

@@ -29,12 +29,20 @@ make image
 For a direct Podman/Buildah build, pass the config explicitly:
 
 ```bash
-podman build --build-arg-file build-config/ui-image --build-arg-file build-config/min-upgrade-version -f agent/Containerfile .
-podman build --build-arg-file build-config/ui-image -f agent/Containerfile.rvtools .
+podman build --build-arg-file build-config/ui-image --build-arg-file build-config/min-upgrade-version --build-arg APPLIANCE_VERSION=main-release-0.31-383f77d -f agent/Containerfile .
+podman build --build-arg-file build-config/ui-image --build-arg APPLIANCE_VERSION=main-release-0.31-383f77d -f agent/Containerfile.rvtools .
 ```
 
 For local testing, override the pin with `make image AGENT_UI_IMAGE_TAG=<sha>`
 or `AGENT_UI_IMAGE_TAG=<sha> make image`.
+
+For appliance and Agent RVTools images, `APPLIANCE_VERSION` is shared by the binary
+and the `org.opencontainers.image.version` label. The version API and UI therefore report
+the full appliance version, such as `main-release-0.31-383f77d`,
+`stable-release-0.31-383f77d`, or `v0.31.0`. Use
+`make image APPLIANCE_VERSION=<version>` to set it locally; the default is `DEV`.
+For direct Podman/Buildah builds, pass
+`--build-arg APPLIANCE_VERSION=<version>` explicitly.
 
 ### Upgrade compatibility metadata
 
