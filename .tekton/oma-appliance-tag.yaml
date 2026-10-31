@@ -228,7 +228,7 @@ spec:
         value:
         - $(params.build-args[*])
         - "RELEASE_TAGS=prod {{git_tag}}"
-        - "IMAGE_VERSION={{git_tag}}"
+        - "APPLIANCE_VERSION={{git_tag}}"
         - "BRANCH_TAG=prod"
         - "IMAGE_ENV=production"
       - name: PRIVILEGED_NESTED

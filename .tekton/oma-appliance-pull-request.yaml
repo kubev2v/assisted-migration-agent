@@ -231,6 +231,7 @@ spec:
       - name: BUILD_ARGS
         value:
         - $(params.build-args[*])
+        - "APPLIANCE_VERSION=on-pr-{{revision}}"
       - name: PRIVILEGED_NESTED
         value: $(params.privileged-nested)
       - name: SOURCE_URL
