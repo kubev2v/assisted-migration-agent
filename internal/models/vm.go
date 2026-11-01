@@ -124,12 +124,13 @@ type DiskDatastore struct {
 }
 
 type NIC struct {
-	Adapter     string
-	MAC         string
-	Network     string
-	Index       int
-	IPv4Address string
-	IPv6Address string
+	Adapter       string
+	MAC           string
+	Network       string
+	Index         int
+	IPv4Addresses []string
+	IPv6Addresses []string
+	VlanID        string
 }
 
 type Device struct {

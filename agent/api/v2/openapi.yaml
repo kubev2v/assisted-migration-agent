@@ -1727,7 +1727,7 @@ components:
         - inventory
       properties:
         inventory:
-          $ref: 'https://raw.githubusercontent.com/kubev2v/migration-planner/9353b1842c03c2cd36f7445299c7500ed5d08fae/api/v1alpha1/openapi.yaml#/components/schemas/UpdateInventory'
+          $ref: 'https://raw.githubusercontent.com/kubev2v/migration-planner/3fc3570c5d9820a9879c53dcf80bb73be9a6e912/api/v1alpha1/openapi.yaml#/components/schemas/UpdateInventory'
 
     # ── VCenter Credentials ──────────────────────────────────────────────
     VcenterCredentials:
@@ -2196,6 +2196,19 @@ components:
         adapter:
           type: string
           description: Virtual adapter model, such as Vmxnet3 or E1000
+        vlanId:
+          type: string
+          description: Port-group VLAN configuration when supplied; empty when unknown.
+        ipv4Addresses:
+          type: array
+          items:
+            type: string
+          description: IPv4 addresses reported for this adapter. An IP address may also contain a CIDR suffix. Empty array when unknown.
+        ipv6Addresses:
+          type: array
+          items:
+            type: string
+          description: IPv6 addresses reported for this adapter. An IP address may also contain a CIDR suffix. Empty array when unknown.
         mac:
           type: string
           description: MAC address
@@ -2377,7 +2390,7 @@ components:
         group:
           $ref: '#/components/schemas/Group'
         inventory:
-          $ref: 'https://raw.githubusercontent.com/kubev2v/migration-planner/9353b1842c03c2cd36f7445299c7500ed5d08fae/api/v1alpha1/openapi.yaml#/components/schemas/Inventory'
+          $ref: 'https://raw.githubusercontent.com/kubev2v/migration-planner/3fc3570c5d9820a9879c53dcf80bb73be9a6e912/api/v1alpha1/openapi.yaml#/components/schemas/Inventory'
         vms:
           type: array
           items:
