@@ -587,11 +587,20 @@ type VirtualMachineNIC struct {
 	// Index NIC index within the VirtualMachine
 	Index *int `json:"index,omitempty"`
 
+	// Ipv4Addresses IPv4 addresses reported for this adapter. An IP address may also contain a CIDR suffix. Empty array when unknown.
+	Ipv4Addresses *[]string `json:"ipv4Addresses,omitempty"`
+
+	// Ipv6Addresses IPv6 addresses reported for this adapter. An IP address may also contain a CIDR suffix. Empty array when unknown.
+	Ipv6Addresses *[]string `json:"ipv6Addresses,omitempty"`
+
 	// Mac MAC address
 	Mac *string `json:"mac,omitempty"`
 
 	// Network Network reference
 	Network *string `json:"network,omitempty"`
+
+	// VlanId Port-group VLAN configuration when supplied; empty when unknown.
+	VlanId *string `json:"vlanId,omitempty"`
 }
 
 // VirtualMachineUpdateRequest defines model for VirtualMachineUpdateRequest.

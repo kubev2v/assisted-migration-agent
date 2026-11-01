@@ -132,8 +132,9 @@ nics AS (
             'Connected': "Connected",
             'StartsConnected': "Starts Connected",
             'Type': "Type",
-            'IPv4Address': CASE WHEN "IPv4 Address" = 'VM' OR "IPv4 Address" IS NULL THEN '' ELSE "IPv4 Address" END,
-            'IPv6Address': CASE WHEN "IPv6 Address" = 'VM' OR "IPv6 Address" IS NULL THEN '' ELSE "IPv6 Address" END
+            'VlanID': "VLAN",
+            'IPv4Addresses': "IPv4 Addresses",
+            'IPv6Addresses': "IPv6 Addresses"
         } ORDER BY "Mac Address" ASC) AS nics
     FROM vnetwork
     JOIN filtered_vm fv ON vnetwork."VM ID" = fv."VM ID"
