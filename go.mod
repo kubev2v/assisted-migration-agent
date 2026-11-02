@@ -328,4 +328,4 @@ require (
 	tags.cncf.io/container-device-interface v1.1.1 // indirect
 )
 
-replace github.com/go-ini/ini => gopkg.in/ini.v1 v1.67.1
+replace github.com/go-ini/ini => gopkg.in/ini.v1 v1.67.3
