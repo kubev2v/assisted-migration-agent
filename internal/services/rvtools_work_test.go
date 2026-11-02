@@ -4,9 +4,9 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"testing"
 	"time"
 
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/xuri/excelize/v2"
 
@@ -15,7 +15,7 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 )
 
-func TestRVToolsValidationErrors(t *testing.T) {
+var _ = Describe("RVTools Validation Errors", func() {
 	for _, tc := range []struct {
 		name    string
 		headers []string
@@ -53,55 +53,54 @@ func TestRVToolsValidationErrors(t *testing.T) {
 			want:    "RVTools file could not be validated",
 		},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
-			g := NewWithT(t)
+		It(tc.name, func() {
 			ctx := context.Background()
-			dir := t.TempDir()
+			dir := GinkgoT().TempDir()
 			path := filepath.Join(dir, "rvtools.xlsx")
 			book := excelize.NewFile()
-			defer func() { g.Expect(book.Close()).To(Succeed()) }()
-			g.Expect(book.SetSheetName("Sheet1", "vInfo")).To(Succeed())
+			defer func() { Expect(book.Close()).To(Succeed()) }()
+			Expect(book.SetSheetName("Sheet1", "vInfo")).To(Succeed())
 			headers := tc.headers
 			if headers == nil {
 				headers = []string{"VM ID", "VM", "Cluster", "VI SDK UUID"}
 			}
-			g.Expect(book.SetSheetRow("vInfo", "A1", &headers)).To(Succeed())
+			Expect(book.SetSheetRow("vInfo", "A1", &headers)).To(Succeed())
 			if tc.row != nil {
-				g.Expect(book.SetSheetRow("vInfo", "A2", &tc.row)).To(Succeed())
+				Expect(book.SetSheetRow("vInfo", "A2", &tc.row)).To(Succeed())
 			}
-			g.Expect(book.SaveAs(path)).To(Succeed())
+			Expect(book.SaveAs(path)).To(Succeed())
 
 			pool := store.NewPool(5 * time.Minute)
 			defer pool.Close()
 			mainDB, err := pool.NewDatabase(store.MainDatabaseID, filepath.Join(dir, "agent.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
-			g.Expect(err).NotTo(HaveOccurred())
-			g.Expect(mainDB.Migrate(ctx, migrations.RunMain)).To(Succeed())
+			Expect(err).NotTo(HaveOccurred())
+			Expect(mainDB.Migrate(ctx, migrations.RunMain)).To(Succeed())
 			pool.Add(mainDB)
 
 			factory, err := newRvtoolWorkFactory(pool, []string{path}, dir, nil)
-			g.Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 			collector := NewCollectorService(factory)
 			defer collector.Stop()
-			g.Expect(collector.Start(ctx)).To(Succeed())
+			Expect(collector.Start(ctx)).To(Succeed())
 			select {
 			case <-collector.done:
 			case <-time.After(30 * time.Second):
-				t.Fatal("RVTools collection did not finish")
+				Fail("RVTools collection did not finish")
 			}
 
 			status := collector.GetStatus()
-			g.Expect(status.State).To(Equal(models.CollectorStateError))
-			g.Expect(status.Error).To(MatchError(tc.want))
+			Expect(status.State).To(Equal(models.CollectorStateError))
+			Expect(status.Error).To(MatchError(tc.want))
 			st, err := mainDB.Store()
-			g.Expect(err).NotTo(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
 			collections, err := st.Collection().List(ctx)
-			g.Expect(err).NotTo(HaveOccurred())
-			g.Expect(collections).To(HaveLen(1))
-			g.Expect(collections[0].State).To(Equal(models.CollectionStateFailed))
-			g.Expect(collections[0].Error).To(Equal(tc.want))
-			g.Expect(pool.List()).To(HaveLen(1))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(collections).To(HaveLen(1))
+			Expect(collections[0].State).To(Equal(models.CollectionStateFailed))
+			Expect(collections[0].Error).To(Equal(tc.want))
+			Expect(pool.List()).To(HaveLen(1))
 			_, err = os.Stat(path)
-			g.Expect(os.IsNotExist(err)).To(BeTrue(), "uploaded workbook should be removed")
+			Expect(os.IsNotExist(err)).To(BeTrue(), "uploaded workbook should be removed")
 		})
 	}
-}
+})
