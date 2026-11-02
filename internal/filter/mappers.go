@@ -72,11 +72,11 @@ import (
 //
 // vm_applications (va) — application.* prefix:
 //
-//	application, application.name, application.description
-//
 // metadata — key/value entries:
 //
 //	metadata.key, metadata.value
+//
+//	application, application.name, application.description, application.vendor, application.category
 var DefaultMapper filter.MapFunc = func(name string) (string, filter.FieldType, error) {
 	switch strings.ToLower(name) {
 	// vinfo (v) — string fields
@@ -292,6 +292,24 @@ var DefaultMapper filter.MapFunc = func(name string) (string, filter.FieldType, 
 		return `va.app_name`, filter.StringField, nil
 	case "application.description":
 		return `va.app_desc`, filter.StringField, nil
+	case "application.vendor":
+		return `va.app_vendor`, filter.StringField, nil
+	case "application.category":
+		return `va.app_category`, filter.StringField, nil
+
+		// products
+	case "product", "product.name":
+		return "vm_vapp_products.name", filter.StringField, nil
+	case "product.vendor":
+		return "vm_vapp_products.vendor", filter.StringField, nil
+	case "product.version":
+		return "vm_vapp_products.version", filter.StringField, nil
+	case "product.full_version":
+		return "vm_vapp_products.full_version", filter.StringField, nil
+	case "product.vendor_url":
+		return "vm_vapp_products.vendor_url", filter.StringField, nil
+	case "product.app_url":
+		return "vm_vapp_products.app_url", filter.StringField, nil
 
 	default:
 		return "", 0, fmt.Errorf("unknown filter field: %s", name)
@@ -375,6 +393,10 @@ var ApplicationMapper filter.MapFunc = func(name string) (string, filter.FieldTy
 		return "app_name", filter.StringField, nil
 	case "description":
 		return "app_desc", filter.StringField, nil
+	case "vendor":
+		return "app_vendor", filter.StringField, nil
+	case "category":
+		return "app_category", filter.StringField, nil
 	case "vm_id":
 		return "vm_id", filter.StringField, nil
 	case "vm_name":

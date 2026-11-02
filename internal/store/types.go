@@ -1,6 +1,11 @@
 package store
 
-import "fmt"
+import (
+	"database/sql/driver"
+	"fmt"
+
+	"github.com/kubev2v/assisted-migration-agent/internal/models"
+)
 
 // rowScanner is satisfied by both *sql.Row and *sql.Rows, allowing scanXxx
 // functions to work with both single-row and multi-row query results.
@@ -39,4 +44,53 @@ func (s *StringArray) Scan(src any) error {
 	default:
 		return fmt.Errorf("unsupported type for StringArray: %T", src)
 	}
+}
+
+type AppProducts []models.AppProduct
+
+func (n *AppProducts) Scan(value interface{}) error {
+	if value == nil {
+		*n = nil
+		return nil
+	}
+	slice, ok := value.([]interface{})
+	if !ok {
+		return fmt.Errorf("NICs.Scan: expected []interface{}, got %T", value)
+	}
+	result := make([]models.AppProduct, 0, len(slice))
+	for _, item := range slice {
+		m, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		p := models.AppProduct{
+			Key:         m["key"].(int32),
+			ClassId:     toString(m["classId"]),
+			InstanceId:  toString(m["instanceId"]),
+			Name:        toString(m["name"]),
+			Vendor:      toString(m["vendor"]),
+			Version:     toString(m["version"]),
+			FullVersion: toString(m["fullVersion"]),
+			VendorUrl:   toString(m["vendorUrl"]),
+			ProductUrl:  toString(m["productUrl"]),
+			AppUrl:      toString(m["appUrl"]),
+		}
+		result = append(result, p)
+	}
+	*n = result
+	return nil
+}
+
+func (n AppProducts) Value() (driver.Value, error) {
+	return n, nil
+}
+
+func toString(v interface{}) string {
+	if v == nil {
+		return ""
+	}
+	if s, ok := v.(string); ok {
+		return s
+	}
+	return fmt.Sprintf("%v", v)
 }

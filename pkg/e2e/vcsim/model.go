@@ -16,13 +16,27 @@ type AppInfo struct {
 	Version string `json:"version"`
 }
 
+type VAppProduct struct {
+	Key         int32  `json:"key"`
+	ClassID     string `json:"classId,omitempty"`
+	InstanceID  string `json:"instanceId,omitempty"`
+	Name        string `json:"name,omitempty"`
+	Vendor      string `json:"vendor,omitempty"`
+	Version     string `json:"version,omitempty"`
+	FullVersion string `json:"fullVersion,omitempty"`
+	VendorURL   string `json:"vendorUrl,omitempty"`
+	ProductURL  string `json:"productUrl,omitempty"`
+	AppURL      string `json:"appUrl,omitempty"`
+}
+
 type VM struct {
-	Name      string     `json:"name"`
-	CPU       int        `json:"cpu"`
-	MemoryMB  int64      `json:"memoryMB"`
-	Disks     []DiskSpec `json:"disks"`
-	Folder    string     `json:"folder"`
-	GuestApps []AppInfo  `json:"guestApps,omitempty"`
+	Name         string        `json:"name"`
+	CPU          int           `json:"cpu"`
+	MemoryMB     int64         `json:"memoryMB"`
+	Disks        []DiskSpec    `json:"disks"`
+	Folder       string        `json:"folder"`
+	GuestApps    []AppInfo     `json:"guestApps,omitempty"`
+	VAppProducts []VAppProduct `json:"vAppProducts,omitempty"`
 
 	vmID        int
 	createTask  int
@@ -48,6 +62,7 @@ type vmTemplateData struct {
 	NumDisks     int
 	Disks        []diskTemplateData
 	GuestApps    string
+	VAppProducts []VAppProduct
 }
 
 type diskTemplateData struct {

@@ -337,6 +337,7 @@ func (d *Dataset) toVMTemplateData(vm VM, index int) vmTemplateData {
 		NumDisks:     len(vm.Disks),
 		Disks:        disks,
 		GuestApps:    guestApps,
+		VAppProducts: vm.VAppProducts,
 	}
 }
 
