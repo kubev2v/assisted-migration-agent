@@ -14,13 +14,13 @@ import (
 	"uuid"
 
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
-	"github.com/kubev2v/migration-planner/pkg/inventory/converters"
 	"github.com/kubev2v/migration-planner/pkg/opa"
 	"go.uber.org/zap"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
+	"github.com/kubev2v/assisted-migration-agent/pkg/converters"
 	"github.com/kubev2v/assisted-migration-agent/pkg/work"
 )
 

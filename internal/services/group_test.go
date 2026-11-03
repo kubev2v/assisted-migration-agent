@@ -10,7 +10,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/pkg/inventory"
-	"github.com/kubev2v/migration-planner/pkg/inventory/converters"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -22,6 +21,7 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/services"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
+	"github.com/kubev2v/assisted-migration-agent/pkg/converters"
 	"github.com/kubev2v/assisted-migration-agent/test"
 )
 

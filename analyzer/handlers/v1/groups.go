@@ -7,12 +7,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/kubev2v/migration-planner/pkg/inventory/converters"
 
 	v1 "github.com/kubev2v/assisted-migration-agent/analyzer/api/v1"
 	vmfilter "github.com/kubev2v/assisted-migration-agent/internal/filter"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	services "github.com/kubev2v/assisted-migration-agent/internal/services"
+	"github.com/kubev2v/assisted-migration-agent/pkg/converters"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 

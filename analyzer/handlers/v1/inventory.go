@@ -9,8 +9,9 @@ import (
 	"uuid"
 
 	"github.com/gin-gonic/gin"
-	"github.com/kubev2v/migration-planner/pkg/inventory/converters"
 	"go.uber.org/zap"
+
+	"github.com/kubev2v/assisted-migration-agent/pkg/converters"
 
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	agentAPI "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
