@@ -199,6 +199,11 @@ type CapabilityStatus struct {
 	} `json:"capabilities"`
 }
 
+// Inventory defines model for CollectedInventory.
+type Inventory struct {
+	Inventory externalRef0.UpdateInventory `json:"inventory"`
+}
+
 // Collection defines model for Collection.
 type Collection struct {
 	// CreatedAt When the collection was created
@@ -483,11 +488,6 @@ type InspectorStatus struct {
 
 // InspectorStatusState Inspector state
 type InspectorStatusState string
-
-// Inventory defines model for Inventory.
-type Inventory struct {
-	Inventory externalRef0.UpdateInventory `json:"inventory"`
-}
 
 // OperationCapability defines model for OperationCapability.
 type OperationCapability struct {
