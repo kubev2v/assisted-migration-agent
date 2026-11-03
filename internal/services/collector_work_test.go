@@ -112,6 +112,6 @@ func TestCollectorWork_CollectionTime(t *testing.T) {
 	g.Expect(err).NotTo(HaveOccurred())
 	defer func() { _ = db.Close() }()
 	var stored []byte
-	g.Expect(db.QueryRowContext(ctx, "SELECT data FROM inventory WHERE id = 1").Scan(&stored)).To(Succeed())
+	g.Expect(db.QueryRowContext(ctx, "SELECT data FROM inventory LIMIT 1").Scan(&stored)).To(Succeed())
 	g.Expect(stored).To(Equal(result.Inventory))
 }

@@ -1,5 +1,7 @@
 package store
 
+import "github.com/kubev2v/migration-planner/pkg/duckdb_parser"
+
 // Export COPY queries build migration-planning CSV views, not raw table dumps.
 // They join inventory with concerns, inspection, utilization, and groups and
 // compute migration_status (Ready/Review/Blocked/Excluded) aligned with the VM API.
@@ -194,6 +196,7 @@ var vmsQuery = `
 				v."VI SDK UUID" AS vi_sdk_uuid,
 
 				-- Networks
+				COALESCE(v."NICs", 0) AS nic_count,
 				COALESCE(v."Network #1", '') AS network_1,
 				COALESCE(v."Network #2", '') AS network_2,
 				COALESCE(v."Network #3", '') AS network_3,
@@ -292,10 +295,10 @@ const clustersQuery = `
 `
 
 // datastoresQuery — scope "datastores": capacity, free space, used_percent, and VM count per datastore.
-// VM count is derived by parsing datastore names from vdisk paths.
-const datastoresQuery = `
+var datastoresQuery = `
 
 		COPY (
+			WITH ` + duckdb_parser.DatastoreResolutionQuery() + `
 			SELECT
 				COALESCE(ds."Name", '') AS name,
 				COALESCE(ds."Object ID", '') AS id,
@@ -314,16 +317,15 @@ const datastoresQuery = `
 				COALESCE(ds."Hosts", '') AS hosts,
 				COALESCE(vm_counts.vm_count, 0) AS vm_count
 
-			FROM vdatastore ds
+			FROM storage_datastores ds
 
-			-- VM count per datastore (extract datastore name from disk path)
 			LEFT JOIN (
 				SELECT
-					regexp_extract(COALESCE("Path", "Disk Path"), '\[([^\]]+)\]', 1) AS datastore_name,
+					datastore_row_id,
 					COUNT(DISTINCT "VM ID") AS vm_count
-				FROM vdisk
-				GROUP BY datastore_name
-			) vm_counts ON ds."Name" = vm_counts.datastore_name
+				FROM storage_disk_datastores
+				GROUP BY datastore_row_id
+			) vm_counts ON ds.datastore_row_id = vm_counts.datastore_row_id
 
 			ORDER BY ds."Name"
 		) TO ? (FORMAT CSV, HEADER TRUE)
@@ -345,6 +347,7 @@ const networkQuery = `
 						TRY_CAST(regexp_extract(n."NIC label", '\d+$', 0) AS INTEGER),
 						n."NIC label"
 				) - 1 AS nic_index,
+				COALESCE(v."NICs", 0) AS nic_count,
 				COALESCE(n."Network", '') AS network,
 				COALESCE(n."Switch", '') AS switch,
 				COALESCE(n."Type", '') AS type,

@@ -10,6 +10,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/require"
 
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
 
@@ -179,3 +180,29 @@ var _ = Describe("Migrations", func() {
 		})
 	})
 })
+
+func TestRDMLunUUIDCollectionMigration(t *testing.T) {
+	ctx := context.Background()
+	db, err := sql.Open("duckdb", "")
+	require.NoError(t, err)
+	defer func() { _ = db.Close() }()
+	require.NoError(t, duckdb_parser.New(db, nil).Init())
+	require.NoError(t, migrations.RunCollection(ctx, db, "memory"))
+	_, err = db.Exec(`DELETE FROM collection_schema_migrations WHERE version=2;
+ ALTER TABLE vdisk DROP COLUMN "RDM LUN UUID";
+ INSERT INTO vinfo ("VM ID","VM") VALUES ('vm-1','legacy-vm');
+ INSERT INTO vdisk ("VM ID","Raw","Capacity MiB","Disk UUID") VALUES ('vm-1',true,100,'not-a-lun-uuid');`)
+	require.NoError(t, err)
+	require.NoError(t, migrations.RunCollection(ctx, db, "memory"))
+	require.NoError(t, migrations.RunCollection(ctx, db, "memory"))
+	var capacity int64
+	var uuid sql.NullString
+	require.NoError(t, db.QueryRow(`SELECT "Capacity MiB","RDM LUN UUID" FROM vdisk`).Scan(&capacity, &uuid))
+	require.Equal(t, int64(100), capacity)
+	require.False(t, uuid.Valid)
+	_, err = db.Exec(`UPDATE vdisk SET "RDM LUN UUID"='collected-lun-uuid'; DELETE FROM collection_schema_migrations WHERE version=2;`)
+	require.NoError(t, err)
+	require.NoError(t, migrations.RunCollection(ctx, db, "memory"))
+	require.NoError(t, db.QueryRow(`SELECT "RDM LUN UUID" FROM vdisk`).Scan(&uuid))
+	require.Equal(t, "collected-lun-uuid", uuid.String, "idempotent column addition must preserve supplied UUIDs")
+}

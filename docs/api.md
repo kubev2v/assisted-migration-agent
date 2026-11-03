@@ -421,8 +421,29 @@ curl http://localhost:8000/api/v1/vms/vm-001
 | `capacity` | integer | Disk capacity in bytes |
 | `shared` | boolean | Whether disk is shared between multiple VMs |
 | `rdm` | boolean | Whether this is a Raw Device Mapping |
+| `rdmBacking` | object | Optional RDM backing identity (see RDM Backing Object) |
 | `bus` | string | Bus type (`scsi`, `ide`, `sata`, `nvme`) |
 | `mode` | string | Disk mode (`persistent`, `independent_persistent`, `independent_nonpersistent`) |
+| `datastore` | object | Datastore backing this disk (see Virtual Machine Datastore Object) |
+
+#### RDM Backing Object
+
+`rdmBacking.lunUuid` is the LUN UUID supplied directly by an RDM disk backing. It is populated from Forklift `lunUuid` or RVTools `vDisk.Raw LUN ID` when available. The object is omitted for ordinary disks and when the source supplies no LUN UUID. Existing collections are not backfilled. Datastore backing-device IDs and generic disk UUIDs are separate identities.
+
+#### Virtual Machine Datastore Object
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Datastore object ID |
+| `name` | string | Datastore name |
+| `type` | string | Datastore type (VMFS, NFS, vSAN, vVol) |
+| `filesystemType` | string | Datastore filesystem type |
+| `filesystemMajorVersion` | integer | Filesystem major version, when reported |
+| `protocolType` | string | Backing storage transport protocol, when reported |
+| `storageProtocol` | string | Datastore access category (Block, File, or Object) |
+| `backingDeviceIds` | array of strings | Canonical identifiers for devices backing the datastore, such as an NAA identifier for a SCSI LUN; may be unavailable for some datastore types |
+| `vendor` | string | Vendor reported by matching backing devices, when available |
+| `model` | string | Model reported by matching backing devices, when available |
 
 #### NIC Object
 

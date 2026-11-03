@@ -2,7 +2,7 @@
 
 PODMAN ?= podman
 PLANNER_AGENT_GIT_COMMIT ?= $(shell git rev-list -1 HEAD --abbrev-commit)
-PLANNER_AGENT_VERSION ?= "DEV"
+APPLIANCE_VERSION ?= DEV
 
 # OPA Policies
 OPA_POLICIES_FOLDER ?= $(CURDIR)/policies
@@ -14,15 +14,17 @@ MAIN_PATH=./agent/main.go
 ANALYZER_BINARY_PATH ?= bin/rvtools-analyzer
 ANALYZER_DATA_FOLDER ?= $(CURDIR)/analyzer/data
 ANALYZER_GIT_COMMIT ?= $(PLANNER_AGENT_GIT_COMMIT)
-ANALYZER_VERSION ?= $(PLANNER_AGENT_VERSION)
+ANALYZER_VERSION ?= $(APPLIANCE_VERSION)
 ANALYZER_IMAGE_NAME ?= rvtools-analyzer
 ANALYZER_IMAGE_TAG ?= latest
 
 IMAGE_NAME ?= assisted-migration-agent
 IMAGE_TAG ?= latest
+IMAGE_ENV ?= dev
+MIN_UPGRADE_VERSION ?=
 AGENT_UI_IMAGE ?= quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent-ui
 ifeq ($(origin AGENT_UI_IMAGE_TAG),undefined)
-include ui-config
+include build-config/ui-image
 endif
 ANALYZER_UI_IMAGE ?= $(AGENT_UI_IMAGE)
 ANALYZER_UI_IMAGE_TAG ?= $(AGENT_UI_IMAGE_TAG)
@@ -69,7 +71,7 @@ help:
 UI_GIT_COMMIT ?= unknown
 build:
 	@echo "Building $(BINARY_NAME)..."
-	go build -ldflags="-X main.gitCommit=${PLANNER_AGENT_GIT_COMMIT} -X main.version=${PLANNER_AGENT_VERSION} -X main.uiGitCommit=${UI_GIT_COMMIT}" -o $(BINARY_PATH) $(MAIN_PATH)
+	go build -ldflags="-X main.gitCommit=${PLANNER_AGENT_GIT_COMMIT} -X main.version=${APPLIANCE_VERSION} -X main.uiGitCommit=${UI_GIT_COMMIT}" -o $(BINARY_PATH) $(MAIN_PATH)
 	@echo "Build complete: $(BINARY_PATH)"
 
 build.analyzer:
@@ -109,11 +111,16 @@ e2e.container.clean:
 
 # Build container image
 image:
+	@case "$(IMAGE_ENV)" in dev|stage|production) ;; *) echo "IMAGE_ENV must be dev, stage, or production" >&2; exit 1 ;; esac
 	@echo "📦 Building container image $(IMAGE_NAME):$(IMAGE_TAG)..."
 	@echo "   Using UI image: $(AGENT_UI_IMAGE):$(AGENT_UI_IMAGE_TAG)"
 	$(PODMAN) build \
+		--build-arg-file build-config/ui-image \
+		--build-arg-file build-config/min-upgrade-version \
+		--build-arg IMAGE_ENV=$(IMAGE_ENV) \
 		--build-arg PLANNER_AGENT_GIT_COMMIT=$(PLANNER_AGENT_GIT_COMMIT) \
-		--build-arg PLANNER_AGENT_VERSION=$(PLANNER_AGENT_VERSION) \
+		--build-arg APPLIANCE_VERSION=$(APPLIANCE_VERSION) \
+		$(if $(MIN_UPGRADE_VERSION),--build-arg MIN_UPGRADE_VERSION=$(MIN_UPGRADE_VERSION)) \
 		--build-arg AGENT_UI_IMAGE=$(AGENT_UI_IMAGE) \
 		--build-arg AGENT_UI_IMAGE_TAG=$(AGENT_UI_IMAGE_TAG) \
 		-t $(IMAGE_NAME):$(IMAGE_TAG) \

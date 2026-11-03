@@ -30,7 +30,7 @@ jobs:
           # Fail the update step so the reusable workflow cannot create or modify a PR.
           exit 1
         fi
-        CONFIG_FILE="ui-config"
+        CONFIG_FILE="build-config/ui-image"
         sed -i "s/^AGENT_UI_IMAGE_TAG=.*/AGENT_UI_IMAGE_TAG=$SHA/" "$CONFIG_FILE"
         grep -q "^AGENT_UI_IMAGE_TAG=$SHA" "$CONFIG_FILE" || { echo "ERROR: sed substitution failed"; exit 1; }
     secrets:

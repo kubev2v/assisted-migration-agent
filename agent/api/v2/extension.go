@@ -95,6 +95,7 @@ func NewVirtualMachineFromSummary(vm models.VirtualMachineSummary) VirtualMachin
 // NewVirtualMachineDetailFromModel converts a models.VM to a v2 VirtualMachineDetail.
 func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 	details := VirtualMachineDetail{
+		NicCount:        vm.NICCount,
 		Id:              vm.ID,
 		Name:            vm.Name,
 		VCenterID:       vm.VCenterID,
@@ -184,15 +185,55 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 			Bus:      &d.Bus,
 			Mode:     &d.Mode,
 		}
+		if d.RDM && d.RDMBacking != nil && d.RDMBacking.LunUUID != "" {
+			lunUUID := d.RDMBacking.LunUUID
+			disk.RdmBacking = &RDMBacking{LunUuid: &lunUUID}
+		}
 		if d.Key != 0 {
 			key := d.Key
 			disk.Key = &key
+		}
+		if d.Datastore != nil {
+			datastore := VirtualMachineDatastore{}
+			if d.Datastore.ID != "" {
+				datastore.Id = &d.Datastore.ID
+			}
+			if d.Datastore.Name != "" {
+				datastore.Name = &d.Datastore.Name
+			}
+			if d.Datastore.Type != "" {
+				datastore.Type = &d.Datastore.Type
+			}
+			if d.Datastore.FilesystemType != "" {
+				datastore.FilesystemType = &d.Datastore.FilesystemType
+			}
+			if d.Datastore.FilesystemMajorVersion > 0 {
+				datastore.FilesystemMajorVersion = &d.Datastore.FilesystemMajorVersion
+			}
+			if d.Datastore.ProtocolType != "" {
+				datastore.ProtocolType = &d.Datastore.ProtocolType
+			}
+			if d.Datastore.StorageProtocol != "" {
+				datastore.StorageProtocol = &d.Datastore.StorageProtocol
+			}
+			if len(d.Datastore.BackingDeviceIDs) > 0 {
+				backingDeviceIDs := append([]string(nil), d.Datastore.BackingDeviceIDs...)
+				datastore.BackingDeviceIds = &backingDeviceIDs
+			}
+			if d.Datastore.Vendor != "" {
+				datastore.Vendor = &d.Datastore.Vendor
+			}
+			if d.Datastore.Model != "" {
+				datastore.Model = &d.Datastore.Model
+			}
+			disk.Datastore = &datastore
 		}
 		details.Disks = append(details.Disks, disk)
 	}
 
 	for _, n := range vm.NICs {
 		nic := VirtualMachineNIC{
+			Adapter: &n.Adapter,
 			Mac:     &n.MAC,
 			Network: &n.Network,
 			Index:   &n.Index,
