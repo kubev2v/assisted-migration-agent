@@ -48,6 +48,25 @@ func (a *AgentStatus) FromModel(m models.AgentStatus) {
 	}
 	a.Mode = AgentStatusMode(m.Console.Target)
 	a.RvtoolsModeEnabled = &m.RVToolsMode
+	s := m.UpdateStatus
+	a.UpdateStatus = UpdateStatus{
+		CurrentVersion: s.CurrentVersion,
+		State:          UpdateStatusState(s.State), LastError: s.LastError,
+	}
+	if s.LastResult != nil {
+		r := s.LastResult
+		a.UpdateStatus.LastResult = &UpdateResult{
+			File: r.File, Result: UpdateResultResult(r.Result), Time: r.Time,
+			Error: &r.Error, ErrorStage: &r.ErrorStage,
+		}
+		if r.RunningImage != nil {
+			a.UpdateStatus.LastResult.RunningImage = &UpdateImage{Version: r.RunningImage.Version, Digest: r.RunningImage.Digest}
+		}
+		if r.LastSuccessfulUpdate != nil {
+			u := r.LastSuccessfulUpdate
+			a.UpdateStatus.LastResult.LastSuccessfulUpdate = &SuccessfulUpdate{Version: u.Version, Digest: u.Digest, Time: u.Time}
+		}
+	}
 }
 
 // NewVirtualMachineFromSummary converts a models.VirtualMachineSummary to a v2 VirtualMachine.

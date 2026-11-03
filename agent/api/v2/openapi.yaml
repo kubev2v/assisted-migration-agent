@@ -27,6 +27,8 @@ tags:
     description: vCenter credential management
   - name: Version
     description: Agent version information
+  - name: Update
+    description: Appliance image uploads and host update results
 paths:
   # ── Agent ──────────────────────────────────────────────────────────────
   /agent:
@@ -1527,6 +1529,40 @@ paths:
           description: Internal server error
 
   # ── Version ────────────────────────────────────────────────────────────
+  /update/image:
+    put:
+      tags: [Update]
+      summary: Upload an OCI image for a disconnected appliance update
+      description: Validate the complete upload and atomically place the archive in the watched directory. The host owns upgrade execution. Read updateStatus in GET /agent for upload activity and the last host result.
+      operationId: putUpdateImage
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: OCI archive; maximum file payload is 3 GiB
+      responses:
+        '202':
+          description: Validated image handed to the host; installation is asynchronous and may restart the agent
+        '400':
+          description: Invalid multipart input, OCI image, platform, or upgrade version
+        '409':
+          description: Connected mode or another image upload in progress
+        '413':
+          description: File exceeds 3 GiB or multipart framing exceeds 1 MiB
+        '507':
+          description: Insufficient storage; preparation requires three times the archive size
+        '500':
+          description: Internal error
+        '503':
+          description: Update service unavailable
   /version:
     get:
       tags: [Version]
@@ -2702,6 +2738,7 @@ components:
       required:
         - mode
         - consoleConnection
+        - updateStatus
       properties:
         mode:
           type: string
@@ -2732,6 +2769,10 @@ components:
         rvtoolsModeEnabled:
           type: boolean
           description: RVTool mode enabled
+        updateStatus:
+          description: Always present in both connected and disconnected modes, including while the console is unreachable. Includes upload activity and the last host update result. Update-status errors do not fail the agent-status response.
+          allOf:
+            - $ref: '#/components/schemas/UpdateStatus'
 
     AgentModeRequest:
       type: object
@@ -3183,6 +3224,66 @@ components:
             type: string
 
     # ── Version ──────────────────────────────────────────────────────────
+    UpdateStatus:
+      type: object
+      required: [currentVersion, state, lastResult, lastError]
+      properties:
+        currentVersion:
+          type: string
+        state:
+          type: string
+          enum: [idle, uploading, validating, unknown]
+          description: Agent upload activity only; idle does not indicate whether the host is running an upgrade. Unknown means status could not be read.
+        lastResult:
+          allOf:
+            - $ref: '#/components/schemas/UpdateResult'
+          nullable: true
+        lastError:
+          type: string
+          nullable: true
+    UpdateResult:
+      type: object
+      required: [file, result, time]
+      properties:
+        file:
+          type: string
+        result:
+          type: string
+          enum: [applied, rolled-back, failed, unchanged]
+        time:
+          type: string
+          format: date-time
+        error:
+          type: string
+        error_stage:
+          type: string
+        running_image:
+          allOf:
+            - $ref: '#/components/schemas/UpdateImage'
+          nullable: true
+        last_successful_update:
+          allOf:
+            - $ref: '#/components/schemas/SuccessfulUpdate'
+          nullable: true
+    UpdateImage:
+      type: object
+      required: [version, digest]
+      properties:
+        version:
+          type: string
+        digest:
+          type: string
+    SuccessfulUpdate:
+      type: object
+      required: [version, digest, time]
+      properties:
+        version:
+          type: string
+        digest:
+          type: string
+        time:
+          type: string
+          format: date-time
     VersionInfo:
       type: object
       required:

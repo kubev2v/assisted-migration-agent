@@ -22,6 +22,7 @@ type ServiceManager struct {
 	mu          sync.Mutex
 	inspector   *InspectorService
 	vddk        *VddkService
+	update      *UpdateService
 	forecaster  *ForecasterService
 	validator   *opa.Validator
 	collector   *CollectorService
@@ -58,6 +59,10 @@ func WithCredentialsService(s *CredentialsService) ServiceManagerOption {
 
 func WithVddkService(s *VddkService) ServiceManagerOption {
 	return func(m *ServiceManager) { m.vddk = s }
+}
+
+func WithUpdateService(s *UpdateService) ServiceManagerOption {
+	return func(m *ServiceManager) { m.update = s }
 }
 
 func WithForecasterService(s *ForecasterService) ServiceManagerOption {
@@ -201,6 +206,8 @@ func (m *ServiceManager) InspectorService() (*InspectorService, error) {
 func (m *ServiceManager) VddkService() *VddkService {
 	return m.vddk
 }
+
+func (m *ServiceManager) UpdateService() *UpdateService { return m.update }
 
 func (m *ServiceManager) ForecasterService() *ForecasterService {
 	return m.forecaster

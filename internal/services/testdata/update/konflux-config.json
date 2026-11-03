@@ -1,0 +1,14 @@
+{
+  "architecture": "amd64",
+  "os": "linux",
+  "config": {
+    "Labels": {
+      "konflux.release.branch-tag": "main",
+      "min-upgrade-version": "main-release-0.31-212e974",
+      "org.opencontainers.image.created": "2026-11-03T01:47:54Z",
+      "org.opencontainers.image.revision": "1e771353c06b3b5a8596a3dbd309b626d0213b6b",
+      "org.opencontainers.image.source": "https://github.com/kubev2v/assisted-migration-agent",
+      "org.opencontainers.image.version": "main-release-0.32-1e77135"
+    }
+  }
+}

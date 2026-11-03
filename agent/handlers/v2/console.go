@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 
 	v2 "github.com/kubev2v/assisted-migration-agent/agent/api/v2"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
@@ -13,10 +14,21 @@ import (
 // GetAgentStatus returns the current agent status.
 // (GET /agent)
 func (h *Handler) GetAgentStatus(c *gin.Context) {
-	status := h.svc.ConsoleService().Status()
+	status := models.AgentStatus{Console: h.svc.ConsoleService().Status(), RVToolsMode: h.cfg.Agent.RVToolsMode}
+	// Agent status gates UI startup; an update error must not block it.
+	message := "update status is unavailable"
+	status.UpdateStatus = models.UpdateStatus{CurrentVersion: h.cfg.Agent.Version, State: "unknown", LastError: &message}
+	update := h.svc.UpdateService()
+	if update != nil {
+		updateStatus, err := update.Status(c.Request.Context())
+		if err != nil {
+			zap.S().Errorw("reading update status", "error", err)
+		} else {
+			status.UpdateStatus = updateStatus
+		}
+	}
 	var resp v2.AgentStatus
-	resp.FromModel(models.AgentStatus{Console: status, RVToolsMode: h.cfg.Agent.RVToolsMode})
-
+	resp.FromModel(status)
 	c.JSON(http.StatusOK, resp)
 }
 
