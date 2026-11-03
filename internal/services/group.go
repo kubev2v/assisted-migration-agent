@@ -9,7 +9,8 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/kubev2v/migration-planner/pkg/inventory"
-	"github.com/kubev2v/migration-planner/pkg/inventory/converters"
+
+	"github.com/kubev2v/assisted-migration-agent/pkg/converters"
 
 	vmfilter "github.com/kubev2v/assisted-migration-agent/internal/filter"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"

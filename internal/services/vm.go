@@ -8,7 +8,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
 	"github.com/kubev2v/migration-planner/pkg/inventory"
-	"github.com/kubev2v/migration-planner/pkg/inventory/converters"
+
+	"github.com/kubev2v/assisted-migration-agent/pkg/converters"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"

@@ -1,0 +1,381 @@
+package converters
+
+import (
+	"math"
+	"regexp"
+	"strings"
+
+	api "github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/kubev2v/migration-planner/pkg/inventory"
+)
+
+// ToAPI converts a parsed DuckDB inventory to the api model.
+func ToAPI(inv *inventory.Inventory) *api.Inventory {
+	clusters := make(map[string]api.InventoryData)
+	for clusterID, data := range inv.Clusters {
+		clusters[clusterID] = inventoryDataFromDuckDB(&data)
+	}
+
+	result := &api.Inventory{
+		VcenterId:      inv.VCenterID,
+		Clusters:       clusters,
+		VcenterVersion: &inv.VCenterVersion,
+		CreatedAt:      inv.CreatedAt,
+		CollectionTime: inv.CollectionTime,
+	}
+	if inv.VCenter != nil {
+		vcenter := inventoryDataFromDuckDB(inv.VCenter)
+		result.Vcenter = &vcenter
+	}
+
+	return result
+}
+
+func inventoryDataFromDuckDB(d *inventory.InventoryData) api.InventoryData {
+	result := api.InventoryData{
+		Vms:   vmsFromDuckDB(&d.VMs),
+		Infra: infraFromDuckDB(&d.Infra),
+	}
+	result.Infra.VmsPerHostAverage = vmsPerHostAverage(d.VMs.Total, d.Infra.TotalHosts)
+
+	if d.ClusterFeatures != nil {
+		clusterFeatures := api.ClusterFeatures{
+			DrsEnabled: d.ClusterFeatures.DrsEnabled,
+			HaEnabled:  d.ClusterFeatures.HaEnabled,
+		}
+
+		// Map DrsMode string to enum type
+		if d.ClusterFeatures.DrsMode != nil {
+			normalized := strings.ToLower(strings.TrimSpace(*d.ClusterFeatures.DrsMode))
+			switch normalized {
+			case "fullyautomated", "fully automated":
+				mode := api.ClusterFeaturesDrsModeFullyAutomated
+				clusterFeatures.DrsMode = &mode
+			case "partiallyautomated", "partially automated":
+				mode := api.ClusterFeaturesDrsModePartiallyAutomated
+				clusterFeatures.DrsMode = &mode
+			case "manual":
+				mode := api.ClusterFeaturesDrsModeManual
+				clusterFeatures.DrsMode = &mode
+			default:
+				mode := api.ClusterFeaturesDrsModeNone
+				clusterFeatures.DrsMode = &mode
+			}
+		}
+
+		result.ClusterFeatures = &clusterFeatures
+	}
+
+	if d.ClusterUtilization != nil {
+		util := api.ClusterUtilization{
+			CpuAvg:     d.ClusterUtilization.CpuAvg,
+			CpuP95:     d.ClusterUtilization.CpuP95,
+			CpuMax:     d.ClusterUtilization.CpuMax,
+			MemAvg:     d.ClusterUtilization.MemAvg,
+			MemP95:     d.ClusterUtilization.MemP95,
+			MemMax:     d.ClusterUtilization.MemMax,
+			Confidence: d.ClusterUtilization.Confidence,
+		}
+		result.ClusterUtilization = &util
+	}
+
+	return result
+}
+
+func vmsFromDuckDB(v *inventory.VMsData) api.VMs {
+	osInfo := make(map[string]api.OsInfo)
+	for name, os := range v.OSInfo {
+		tier := api.OsInfoSupportTier(os.SupportTier)
+		info := api.OsInfo{
+			Count:       os.Count,
+			Supported:   os.IsSupported,
+			SupportTier: &tier,
+		}
+		if os.UpgradeRecommendation != "" {
+			rec := os.UpgradeRecommendation
+			info.UpgradeRecommendation = &rec
+		}
+		osInfo[name] = info
+	}
+
+	diskSizeTiers := make(map[string]api.DiskSizeTierSummary)
+	for tier, summary := range v.DiskSizeTiers {
+		diskSizeTiers[tier] = api.DiskSizeTierSummary{
+			VmCount:     summary.VMCount,
+			TotalSizeTB: summary.TotalSizeTB,
+		}
+	}
+
+	var diskComplexityTierPtr *map[string]api.DiskSizeTierSummary
+	if len(v.DiskComplexityTiers) > 0 {
+		m := make(map[string]api.DiskSizeTierSummary, len(v.DiskComplexityTiers))
+		for tier, summary := range v.DiskComplexityTiers {
+			m[tier] = api.DiskSizeTierSummary{
+				VmCount:     summary.VMCount,
+				TotalSizeTB: summary.TotalSizeTB,
+			}
+		}
+		diskComplexityTierPtr = &m
+	}
+
+	diskTypes := make(map[string]api.DiskTypeSummary)
+	for diskType, summary := range v.DiskTypes {
+		diskTypes[diskType] = api.DiskTypeSummary{
+			VmCount:     summary.VMCount,
+			TotalSizeTB: summary.TotalSizeTB,
+		}
+	}
+
+	complexityDist := make(map[string]api.DiskSizeTierSummary, len(v.ComplexityDistribution))
+	for level, summary := range v.ComplexityDistribution {
+		complexityDist[level] = api.DiskSizeTierSummary{
+			VmCount:     summary.VMCount,
+			TotalSizeTB: summary.TotalSizeTB,
+		}
+	}
+
+	migrationWarnings := make([]api.MigrationIssue, 0, len(v.MigrationWarnings))
+	for _, w := range v.MigrationWarnings {
+		id := w.ID
+		migrationWarnings = append(migrationWarnings, api.MigrationIssue{
+			Id:         &id,
+			Label:      w.Label,
+			Assessment: w.Assessment,
+			Count:      w.Count,
+		})
+	}
+
+	notMigratableReasons := make([]api.MigrationIssue, 0, len(v.NotMigratableReasons))
+	for _, c := range v.NotMigratableReasons {
+		id := c.ID
+		notMigratableReasons = append(notMigratableReasons, api.MigrationIssue{
+			Id:         &id,
+			Label:      c.Label,
+			Assessment: c.Assessment,
+			Count:      c.Count,
+		})
+	}
+
+	nicCount := api.VMResourceBreakdown{
+		Total:                          v.NicCount.Total,
+		TotalForMigratable:             v.NicCount.TotalForMigratable,
+		TotalForMigratableWithWarnings: v.NicCount.TotalForMigratableWithWarnings,
+		TotalForNotMigratable:          v.NicCount.TotalForNotMigratable,
+	}
+
+	migratableWithWarnings := v.TotalMigratableWithWarnings
+	totalWithSharedDisks := v.TotalWithSharedDisks
+	totalWithRDM := v.TotalWithRDM
+	totalWithFaultTolerance := v.TotalWithFaultTolerance
+
+	return api.VMs{
+		Total:                       v.Total,
+		TotalMigratable:             v.TotalMigratable,
+		TotalMigratableWithWarnings: &migratableWithWarnings,
+		TotalWithSharedDisks:        &totalWithSharedDisks,
+		TotalWithRDM:                &totalWithRDM,
+		TotalWithFaultTolerance:     &totalWithFaultTolerance,
+		PowerStates:                 v.PowerStates,
+		OsInfo:                      &osInfo,
+		CpuCores: api.VMResourceBreakdown{
+			Total:                          v.CPUCores.Total,
+			TotalForMigratable:             v.CPUCores.TotalForMigratable,
+			TotalForMigratableWithWarnings: v.CPUCores.TotalForMigratableWithWarnings,
+			TotalForNotMigratable:          v.CPUCores.TotalForNotMigratable,
+		},
+		RamGB: api.VMResourceBreakdown{
+			Total:                          v.RamGB.Total,
+			TotalForMigratable:             v.RamGB.TotalForMigratable,
+			TotalForMigratableWithWarnings: v.RamGB.TotalForMigratableWithWarnings,
+			TotalForNotMigratable:          v.RamGB.TotalForNotMigratable,
+		},
+		DiskCount: api.VMResourceBreakdown{
+			Total:                          v.DiskCount.Total,
+			TotalForMigratable:             v.DiskCount.TotalForMigratable,
+			TotalForMigratableWithWarnings: v.DiskCount.TotalForMigratableWithWarnings,
+			TotalForNotMigratable:          v.DiskCount.TotalForNotMigratable,
+		},
+		DiskGB: api.VMResourceBreakdown{
+			Total:                          v.DiskGB.Total,
+			TotalForMigratable:             v.DiskGB.TotalForMigratable,
+			TotalForMigratableWithWarnings: v.DiskGB.TotalForMigratableWithWarnings,
+			TotalForNotMigratable:          v.DiskGB.TotalForNotMigratable,
+		},
+		NicCount:                 &nicCount,
+		DistributionByCpuTier:    &v.DistributionByCPUTier,
+		DistributionByMemoryTier: &v.DistributionByMemoryTier,
+		DistributionByNicCount:   &v.DistributionByNICCount,
+		DistributionByComplexity: &v.DistributionByComplexity,
+		ComplexityDistribution:   &complexityDist,
+		DiskSizeTier:             &diskSizeTiers,
+		DiskComplexityTier:       diskComplexityTierPtr,
+		DiskTypes:                &diskTypes,
+		MigrationWarnings:        migrationWarnings,
+		NotMigratableReasons:     notMigratableReasons,
+		IssuesBreakdown: &api.IssuesBreakdown{
+			Critical:    v.IssuesBreakdown.Critical,
+			Warning:     v.IssuesBreakdown.Warning,
+			Information: v.IssuesBreakdown.Information,
+			Advisory:    v.IssuesBreakdown.Advisory,
+			Error:       v.IssuesBreakdown.Error,
+		},
+	}
+}
+
+func infraFromDuckDB(i *inventory.InfraData) api.Infra {
+	hosts := make([]api.Host, 0, len(i.Hosts))
+	for _, h := range i.Hosts {
+		host := api.Host{
+			Vendor: h.Vendor,
+			Model:  h.Model,
+		}
+		if h.ID != "" {
+			id := h.ID
+			host.Id = &id
+		}
+		if h.CpuCores > 0 {
+			cores := h.CpuCores
+			host.CpuCores = &cores
+		}
+		if h.CpuSockets > 0 {
+			cpus := h.CpuSockets
+			host.CpuSockets = &cpus
+		}
+		if h.MemoryMB > 0 {
+			mem := int64(h.MemoryMB)
+			host.MemoryMB = &mem
+		}
+		host.VmotionSupported = h.VMotionSupported
+		host.StorageVmotionSupported = h.StorageVMotionSupported
+		hosts = append(hosts, host)
+	}
+
+	datastores := make([]api.Datastore, 0, len(i.Datastores))
+	for _, d := range i.Datastores {
+		vsanSnapshotSupport := d.VsanSnapshotSupport
+		ds := api.Datastore{
+			DiskId:                  d.DiskId,
+			FreeCapacityGB:          int(d.FreeCapacityGB),
+			TotalCapacityGB:         int(d.TotalCapacityGB),
+			Type:                    d.Type,
+			VsanSnapshotSupport:     &vsanSnapshotSupport,
+			HardwareAcceleratedMove: false, // Always false to match old behavior
+			Model:                   d.Model,
+			ProtocolType:            d.ProtocolType,
+			Vendor:                  d.Vendor,
+		}
+		if d.FilesystemType != "" {
+			filesystemType := d.FilesystemType
+			ds.FilesystemType = &filesystemType
+		}
+		if d.FilesystemMajorVersion > 0 {
+			filesystemMajorVersion := d.FilesystemMajorVersion
+			ds.FilesystemMajorVersion = &filesystemMajorVersion
+		}
+		if len(d.BackingDeviceIDs) > 0 {
+			backingDeviceIDs := append([]string(nil), d.BackingDeviceIDs...)
+			ds.BackingDeviceIds = &backingDeviceIDs
+		}
+		if d.StorageProtocol != "" {
+			storageProtocol := api.DatastoreStorageProtocol(d.StorageProtocol)
+			ds.StorageProtocol = &storageProtocol
+		}
+		if d.HostId != "" {
+			hostId := d.HostId
+			ds.HostId = &hostId
+		}
+		if d.StorageIoConfiguration != nil {
+			enabled := d.StorageIoConfiguration.Enabled
+			congestion := d.StorageIoConfiguration.CongestionThreshold
+			mode := api.StorageIoConfigurationCongestionThresholdMode(d.StorageIoConfiguration.CongestionThresholdMode)
+			percent := d.StorageIoConfiguration.PercentOfPeakThroughput
+			ds.StorageIoConfiguration = &api.StorageIoConfiguration{
+				Enabled:                 &enabled,
+				CongestionThreshold:     &congestion,
+				CongestionThresholdMode: &mode,
+				PercentOfPeakThroughput: &percent,
+			}
+		}
+		anonymizeNFSDatastore(&ds)
+		datastores = append(datastores, ds)
+	}
+
+	networks := make([]api.Network, 0, len(i.Networks))
+	for _, n := range i.Networks {
+		net := api.Network{
+			Name: n.Name,
+			Type: api.NetworkType(n.Type),
+		}
+		if n.Dvswitch != "" {
+			dvs := n.Dvswitch
+			net.Dvswitch = &dvs
+		}
+		if n.VlanId != "" {
+			vlan := n.VlanId
+			net.VlanId = &vlan
+		}
+		if n.VmsCount > 0 {
+			count := n.VmsCount
+			net.VmsCount = &count
+		}
+		networks = append(networks, net)
+	}
+
+	infra := api.Infra{
+		Hosts:                &hosts,
+		HostPowerStates:      i.HostPowerStates,
+		Datastores:           datastores,
+		Networks:             networks,
+		TotalHosts:           i.TotalHosts,
+		CpuOverCommitment:    i.CPUOverCommitment,
+		MemoryOverCommitment: i.MemoryOverCommitment,
+	}
+
+	standaloneHostsDetected := i.StandaloneHostsDetected
+	infra.StandaloneHostsDetected = &standaloneHostsDetected
+
+	if i.TotalDatacenters > 0 {
+		dc := i.TotalDatacenters
+		infra.TotalDatacenters = &dc
+	}
+	if len(i.ClustersPerDatacenter) > 0 {
+		infra.ClustersPerDatacenter = &i.ClustersPerDatacenter
+	}
+
+	return infra
+}
+
+// anonymizeNFSDatastore redacts NFS datastore identifiers that carry a server
+// address or export path (for example "10.46.29.166 /nfs-data/exports" or
+// "server:/export"), which may contain sensitive information. Plain datastore
+// names are kept. The protocol label ("NFS"/"NFS41") is not sensitive and is
+// never redacted.
+func anonymizeNFSDatastore(ds *api.Datastore) {
+	if strings.EqualFold(ds.Type, "NFS") && nfsDiskIdIsAddressLike(ds.DiskId) {
+		ds.DiskId = "N/A"
+	}
+}
+
+// ipv4Pattern matches a bare IPv4 address, which RVTools reports as the NFS
+// datastore address when no export path is included.
+var ipv4Pattern = regexp.MustCompile(`^(\d{1,3}\.){3}\d{1,3}$`)
+
+// nfsDiskIdIsAddressLike reports whether a datastore identifier looks like a
+// server address or export path rather than a datastore name. vSphere datastore
+// names cannot contain ":" or "/", so those characters identify an address.
+func nfsDiskIdIsAddressLike(diskId string) bool {
+	if strings.ContainsAny(diskId, ":/") {
+		return true
+	}
+	return ipv4Pattern.MatchString(strings.TrimSpace(diskId))
+}
+
+// vmsPerHostAverage returns the average VM density per host, rounded to 2
+// decimals. Returns nil when there are no hosts (division undefined).
+func vmsPerHostAverage(totalVMs, totalHosts int) *float64 {
+	if totalHosts <= 0 {
+		return nil
+	}
+	avg := math.Round(float64(totalVMs*100)/float64(totalHosts)) / 100
+	return &avg
+}

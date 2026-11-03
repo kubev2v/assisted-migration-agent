@@ -9,7 +9,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/kubev2v/migration-planner/pkg/inventory/converters"
 	"go.uber.org/zap"
 
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -18,6 +17,7 @@ import (
 
 	v2api "github.com/kubev2v/assisted-migration-agent/agent/api/v2"
 	services "github.com/kubev2v/assisted-migration-agent/internal/services"
+	"github.com/kubev2v/assisted-migration-agent/pkg/converters"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
