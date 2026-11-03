@@ -77,6 +77,24 @@ const (
 	InspectorStatusStateRunning InspectorStatusState = "running"
 )
 
+// Defines values for UpdateResultResult.
+const (
+	Applied    UpdateResultResult = "applied"
+	Failed     UpdateResultResult = "failed"
+	RolledBack UpdateResultResult = "rolled-back"
+	Unchanged  UpdateResultResult = "unchanged"
+)
+
+// Defines values for UpdateStatusState.
+const (
+	Applying    UpdateStatusState = "applying"
+	Downloading UpdateStatusState = "downloading"
+	Idle        UpdateStatusState = "idle"
+	Ready       UpdateStatusState = "ready"
+	Uploading   UpdateStatusState = "uploading"
+	Validating  UpdateStatusState = "validating"
+)
+
 // Defines values for VirtualMachineIssueCategory.
 const (
 	VirtualMachineIssueCategoryAdvisory    VirtualMachineIssueCategory = "Advisory"
@@ -511,6 +529,12 @@ type PairCapabilityRequest struct {
 	Pairs []DatastorePairRequest `json:"pairs"`
 }
 
+// PreparedUpdateImage defines model for PreparedUpdateImage.
+type PreparedUpdateImage struct {
+	Digest  string `json:"digest"`
+	Version string `json:"version"`
+}
+
 // Process defines model for Process.
 type Process struct {
 	// Name Name of the process
@@ -564,11 +588,24 @@ type StartInspectionRequest struct {
 	VmIds []string `binding:"required,min=1,dive,required" json:"vmIds"`
 }
 
+// SuccessfulUpdate defines model for SuccessfulUpdate.
+type SuccessfulUpdate struct {
+	Digest  string    `json:"digest"`
+	Time    time.Time `json:"time"`
+	Version string    `json:"version"`
+}
+
 // UpdateGroupRequest defines model for UpdateGroupRequest.
 type UpdateGroupRequest struct {
 	Description *string `binding:"omitempty,max=500" json:"description,omitempty"`
 	Filter      *string `binding:"omitempty,min=1" json:"filter,omitempty"`
 	Name        *string `binding:"omitempty,min=1,max=100" json:"name,omitempty"`
+}
+
+// UpdateImage defines model for UpdateImage.
+type UpdateImage struct {
+	Digest  string `json:"digest"`
+	Version string `json:"version"`
 }
 
 // UpdateLabelVMsRequest defines model for UpdateLabelVMsRequest.
@@ -579,6 +616,41 @@ type UpdateLabelVMsRequest struct {
 	// Remove VMs to remove the label from
 	Remove *[]string `binding:"omitempty,dive,required" json:"remove,omitempty"`
 }
+
+// UpdateResult defines model for UpdateResult.
+type UpdateResult struct {
+	Error                *string            `json:"error,omitempty"`
+	ErrorStage           *string            `json:"error_stage,omitempty"`
+	File                 string             `json:"file"`
+	LastSuccessfulUpdate *SuccessfulUpdate  `json:"last_successful_update"`
+	Result               UpdateResultResult `json:"result"`
+	RunningImage         *UpdateImage       `json:"running_image"`
+	Time                 time.Time          `json:"time"`
+}
+
+// UpdateResultResult defines model for UpdateResult.Result.
+type UpdateResultResult string
+
+// UpdateStatus defines model for UpdateStatus.
+type UpdateStatus struct {
+	// AutoUpdate Null when disconnected; false until OMA-3031 adds the persisted preference
+	AutoUpdate *bool `json:"autoUpdate"`
+
+	// Connected Configured operating mode, independent of current SaaS connectivity
+	Connected      bool                 `json:"connected"`
+	CurrentVersion string               `json:"currentVersion"`
+	LastError      *string              `json:"lastError"`
+	LastResult     *UpdateResult        `json:"lastResult"`
+	LatestVersion  *string              `json:"latestVersion"`
+	PreparedImage  *PreparedUpdateImage `json:"preparedImage"`
+	State          UpdateStatusState    `json:"state"`
+
+	// UpdateAvailable Null until OMA-3031 supplies SaaS availability; also null when disconnected or unknown
+	UpdateAvailable *bool `json:"updateAvailable"`
+}
+
+// UpdateStatusState defines model for UpdateStatus.State.
+type UpdateStatusState string
 
 // VMFilterOptionsResponse defines model for VMFilterOptionsResponse.
 type VMFilterOptionsResponse struct {
@@ -1097,6 +1169,12 @@ type GetLatestInventoryParams struct {
 // GetLatestInventoryParamsScope defines parameters for GetLatestInventory.
 type GetLatestInventoryParamsScope string
 
+// PutUpdateImageMultipartBody defines parameters for PutUpdateImage.
+type PutUpdateImageMultipartBody struct {
+	// File OCI archive; maximum file payload is 3 GiB
+	File openapi_types.File `json:"file"`
+}
+
 // ListLatestVirtualMachinesParams defines parameters for ListLatestVirtualMachines.
 type ListLatestVirtualMachinesParams struct {
 	// ByExpression Filter by expression
@@ -1138,6 +1216,9 @@ type StartInspectionJSONRequestBody = StartInspectionRequest
 
 // PutInspectorVddkMultipartRequestBody defines body for PutInspectorVddk for multipart/form-data ContentType.
 type PutInspectorVddkMultipartRequestBody PutInspectorVddkMultipartBody
+
+// PutUpdateImageMultipartRequestBody defines body for PutUpdateImage for multipart/form-data ContentType.
+type PutUpdateImageMultipartRequestBody PutUpdateImageMultipartBody
 
 // BatchUpdateLatestVMExclusionJSONRequestBody defines body for BatchUpdateLatestVMExclusion for application/json ContentType.
 type BatchUpdateLatestVMExclusionJSONRequestBody = BatchUpdateExclusionRequest

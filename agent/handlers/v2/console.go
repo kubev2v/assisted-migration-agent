@@ -41,7 +41,7 @@ func (h *Handler) SetAgentMode(c *gin.Context) {
 	}
 
 	if err := h.svc.ConsoleService().SetMode(c.Request.Context(), mode); err != nil {
-		if srvErrors.IsModeConflictError(err) {
+		if srvErrors.IsModeConflictError(err) || srvErrors.IsUpdateInProgressError(err) {
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 			return
 		}

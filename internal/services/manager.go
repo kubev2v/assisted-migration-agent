@@ -22,6 +22,7 @@ type ServiceManager struct {
 	mu          sync.Mutex
 	inspector   *InspectorService
 	vddk        *VddkService
+	update      *UpdateService
 	forecaster  *ForecasterService
 	validator   *opa.Validator
 	collector   *CollectorService
@@ -58,6 +59,10 @@ func WithCredentialsService(s *CredentialsService) ServiceManagerOption {
 
 func WithVddkService(s *VddkService) ServiceManagerOption {
 	return func(m *ServiceManager) { m.vddk = s }
+}
+
+func WithUpdateService(s *UpdateService) ServiceManagerOption {
+	return func(m *ServiceManager) { m.update = s }
 }
 
 func WithForecasterService(s *ForecasterService) ServiceManagerOption {
@@ -200,6 +205,15 @@ func (m *ServiceManager) InspectorService() (*InspectorService, error) {
 
 func (m *ServiceManager) VddkService() *VddkService {
 	return m.vddk
+}
+
+func (m *ServiceManager) UpdateService() *UpdateService { return m.update }
+
+func (m *ServiceManager) IsBusy() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return (m.collector != nil && m.collector.GetStatus().State.IsRunning()) ||
+		(m.inspector != nil && m.inspector.IsBusy())
 }
 
 func (m *ServiceManager) ForecasterService() *ForecasterService {
@@ -349,6 +363,12 @@ func (m *ServiceManager) Stop(ctx context.Context) {
 
 // DeleteData deletes all the collections.
 func (m *ServiceManager) DeleteData(ctx context.Context) error {
+	if m.update != nil {
+		if err := m.update.reserve(); err != nil {
+			return err
+		}
+		defer m.update.release()
+	}
 	// stop service manager
 	m.Stop(ctx)
 
@@ -358,7 +378,7 @@ func (m *ServiceManager) DeleteData(ctx context.Context) error {
 	}
 
 	// switch agent in disconnected mode
-	if err := m.console.SetMode(ctx, models.AgentModeDisconnected); err != nil {
+	if err := m.console.setMode(ctx, models.AgentModeDisconnected); err != nil {
 		return err
 	}
 
@@ -367,6 +387,12 @@ func (m *ServiceManager) DeleteData(ctx context.Context) error {
 
 // DeleteCollections stops local work and removes all collection databases.
 func (m *ServiceManager) DeleteCollections(ctx context.Context) error {
+	if m.update != nil {
+		if err := m.update.reserve(); err != nil {
+			return err
+		}
+		defer m.update.release()
+	}
 	m.Stop(ctx)
 	return m.collection.DeleteAll(ctx)
 }

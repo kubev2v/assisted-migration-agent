@@ -1,0 +1,5 @@
+package services
+
+var InspectUpdateArchiveForTest = inspectUpdateArchive
+
+var InspectUpdateArchiveForPlatformForTest = inspectUpdateArchiveForPlatform

@@ -223,6 +223,7 @@ func (a *Agent) ToOption() AgentOption {
 		to.LegacyStatusEnabled = a.LegacyStatusEnabled
 		to.RetainCollections = a.RetainCollections
 		to.RVToolsMode = a.RVToolsMode
+		to.UpdateEnabled = a.UpdateEnabled
 	}
 }
 
@@ -241,6 +242,7 @@ func (a *Agent) DebugMap() map[string]any {
 	debugMap["LegacyStatusEnabled"] = helpers.DebugValue(a.LegacyStatusEnabled, false)
 	debugMap["RetainCollections"] = helpers.DebugValue(a.RetainCollections, false)
 	debugMap["RVToolsMode"] = helpers.DebugValue(a.RVToolsMode, false)
+	debugMap["UpdateEnabled"] = helpers.DebugValue(a.UpdateEnabled, false)
 	return debugMap
 }
 
@@ -341,6 +343,13 @@ func WithRetainCollections(retainCollections int) AgentOption {
 func WithRVToolsMode(rVToolsMode bool) AgentOption {
 	return func(a *Agent) {
 		a.RVToolsMode = rVToolsMode
+	}
+}
+
+// WithUpdateEnabled returns an option that can set UpdateEnabled on a Agent
+func WithUpdateEnabled(updateEnabled bool) AgentOption {
+	return func(a *Agent) {
+		a.UpdateEnabled = updateEnabled
 	}
 }
 
