@@ -1,6 +1,6 @@
-ARG ANALYZER_UI_IMAGE=quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent-ui
-ARG ANALYZER_UI_IMAGE_TAG=latest
-FROM --platform=linux/amd64 ${ANALYZER_UI_IMAGE}:${ANALYZER_UI_IMAGE_TAG} AS ui-builder
+ARG OFFLINE_ANALYZER_UI_IMAGE=quay.io/redhat-user-workloads/assisted-migration-tenant/oma-rvtool-offline-analyzer-ui
+ARG OFFLINE_ANALYZER_UI_IMAGE_TAG
+FROM --platform=linux/amd64 ${OFFLINE_ANALYZER_UI_IMAGE}:${OFFLINE_ANALYZER_UI_IMAGE_TAG} AS ui-builder
 
 FROM registry.access.redhat.com/ubi9/go-toolset AS backend-builder
 WORKDIR /src
@@ -50,7 +50,7 @@ FROM registry.access.redhat.com/ubi9/ubi
 RUN dnf install -y ca-certificates tzdata && dnf clean all
 WORKDIR /app
 COPY --from=backend-builder /tmp/rvtools-analyzer /app/rvtools-analyzer
-COPY --from=ui-builder /apps/agent-ui/dist /app/static
+COPY --from=ui-builder /apps/offline-analyzer/dist /app/static
 COPY --from=opa-builder /app/policies /app/policies
 COPY --from=duckdb-extensions /extensions /app/extensions
 RUN mkdir -p /var/lib/analyzer && \

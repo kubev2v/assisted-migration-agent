@@ -18,9 +18,10 @@ concept remains available as an Agent mode and uses `agent/Containerfile.rvtools
 
 ## Container images
 
-`build-config/ui-image` pins `AGENT_UI_IMAGE_TAG` to a UI commit SHA for both
-`agent/Containerfile` and `agent/Containerfile.rvtools`. Local Make targets and
-all Agent/RVTools Konflux pipelines use this config:
+`build-config/ui-image` pins UI commit SHAs: `AGENT_UI_IMAGE_TAG` for
+`agent/Containerfile` and `agent/Containerfile.rvtools`, and
+`OFFLINE_ANALYZER_UI_IMAGE_TAG` for `analyzer/Containerfile`. Local Make targets
+and all Agent/RVTools Konflux pipelines use this config:
 
 ```bash
 make image
@@ -31,10 +32,12 @@ For a direct Podman/Buildah build, pass the config explicitly:
 ```bash
 podman build --build-arg-file build-config/ui-image --build-arg-file build-config/min-upgrade-version --build-arg APPLIANCE_VERSION=main-release-0.31-383f77d -f agent/Containerfile .
 podman build --build-arg-file build-config/ui-image --build-arg APPLIANCE_VERSION=main-release-0.31-383f77d -f agent/Containerfile.rvtools .
+podman build --build-arg-file build-config/ui-image -f analyzer/Containerfile .
 ```
 
 For local testing, override the pin with `make image AGENT_UI_IMAGE_TAG=<sha>`
-or `AGENT_UI_IMAGE_TAG=<sha> make image`.
+or `AGENT_UI_IMAGE_TAG=<sha> make image`, and
+`make image.analyzer OFFLINE_ANALYZER_UI_IMAGE_TAG=<sha>` for the analyzer.
 
 For appliance and Agent RVTools images, `APPLIANCE_VERSION` is shared by the binary
 and the `org.opencontainers.image.version` label. The version API and UI therefore report
@@ -89,9 +92,10 @@ from the candidate image's version or order commit SHAs lexically. Update
 `build-config/min-upgrade-version` when the supported upgrade starting point changes.
 
 On pushes to the UI repository's `main` or `stable` branch, its notification
-workflow waits for the SHA-tagged image, then dispatches `agent_ui_updated` to
-this repository. The receiver checks the SHA against the UI source branch head
-and rejects stale notifications before updating `build-config/ui-image` or
+workflow waits for the SHA-tagged images, then dispatches `agent_ui_updated` and
+`offline_analyzer_ui_updated` to this repository. Each receiver checks the SHA
+against the UI source branch head and rejects stale notifications before
+updating its tag in `build-config/ui-image` or
 creating a PR on the matching branch. These PRs are automatically approved and
 set to merge by rebase after required checks pass. Within `build-config/`,
 auto-approval covers only `ui-image`; changes to `min-upgrade-version` require
