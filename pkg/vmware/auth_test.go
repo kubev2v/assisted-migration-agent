@@ -1,8 +1,11 @@
 package vmware
 
-import "testing"
+import (
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+)
 
-func TestNormalizeAndValidateURL(t *testing.T) {
+var _ = Describe("Normalize And Validate URL", func() {
 	tests := []struct {
 		name    string
 		in      string
@@ -28,14 +31,14 @@ func TestNormalizeAndValidateURL(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		It(tt.name, func() {
 			got, err := NormalizeAndValidateURL(tt.in)
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("err = %v, wantErr = %v", err, tt.wantErr)
+			if tt.wantErr {
+				Expect(err).To(HaveOccurred())
+				return
 			}
-			if !tt.wantErr && got != tt.want {
-				t.Fatalf("got %q, want %q", got, tt.want)
-			}
+			Expect(err).To(Succeed())
+			Expect(got).To(Equal(tt.want))
 		})
 	}
-}
+})
