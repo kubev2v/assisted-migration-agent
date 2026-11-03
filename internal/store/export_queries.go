@@ -212,11 +212,17 @@ var vmsQuery = `
 				COALESCE(hn.nics, '[]') AS host_physical_nics
 
 			FROM vinfo v
+			-- Aggregate NICs per host to keep one export row per VM.
 			LEFT JOIN (
-				SELECT "Host", to_json(LIST(
-					CASE WHEN "Speed" IS NULL THEN json_object('id', "Network Device")
-						ELSE json_object('id', "Network Device", 'linkSpeedMbps', "Speed") END
-					ORDER BY "Network Device")) AS nics
+				SELECT
+					"Host",
+					to_json(LIST(
+						CASE
+							WHEN "Speed" IS NULL THEN json_object('id', "Network Device")
+							ELSE json_object('id', "Network Device", 'linkSpeedMbps', "Speed")
+						END
+						ORDER BY "Network Device"
+					)) AS nics
 				FROM vnic
 				WHERE "Host" != ''
 				GROUP BY "Host"
