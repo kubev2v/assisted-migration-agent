@@ -158,6 +158,7 @@ func registerAgentFlags(flagSet *pflag.FlagSet, config *config.Configuration) {
 	flagSet.StringVar(&config.Agent.Version, "version", config.Agent.Version, "Agent version to report to console")
 	flagSet.StringVar(&config.Agent.DataFolder, "data-folder", config.Agent.DataFolder, "Path to the persistent data folder")
 	flagSet.BoolVar(&config.Agent.RVToolsMode, "rvtools-mode", config.Agent.RVToolsMode, "RVTool mode: enabled or disabled (default: disable)")
+	flagSet.BoolVar(&config.Agent.UpdateEnabled, "update-enabled", config.Agent.UpdateEnabled, "Enable experimental update status and image upload (disabled pending OMA-2934)")
 }
 
 func registerConsoleFlags(flagSet *pflag.FlagSet, config *config.Configuration) {

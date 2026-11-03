@@ -24,6 +24,7 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/bootstrap"
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
 	"github.com/kubev2v/assisted-migration-agent/internal/handlers"
+	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/server"
 	service "github.com/kubev2v/assisted-migration-agent/internal/services"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
@@ -122,7 +123,8 @@ func initV2(cfg *config.Configuration) (*server.Server, func(), error) {
 
 	srv, err := server.NewServer(cfg.Server, map[string]server.APIGroup{
 		apiV2: {
-			Swagger: swagger,
+			Swagger:              swagger,
+			StreamingUploadPaths: []string{"/update/image"},
 			RegisterFn: func(router *gin.RouterGroup) {
 				v2.RegisterHandlers(router, v2H)
 			},
@@ -133,6 +135,9 @@ func initV2(cfg *config.Configuration) (*server.Server, func(), error) {
 	}
 
 	cleanup := func() {
+		if update := v2SvcMgr.UpdateService(); update != nil {
+			update.Stop()
+		}
 		v2SvcMgr.Stop(context.Background())
 		pool.Close()
 		zap.S().Info("v2 service and pool closed")
@@ -172,11 +177,29 @@ func NewAgentServiceManager(cfg *config.Configuration, pool *store.Pool, console
 		service.WithVddkService(service.NewVddkService(cfg.Agent.DataFolder, pool)),
 		service.WithForecasterService(service.NewForecasterService(pool, credentials)),
 	)
-	manager := service.NewServiceManager(cfg.Agent.DataFolder, managerOpts...)
+	var manager *service.ServiceManager
+	if cfg.Agent.UpdateEnabled {
+		update, err := service.NewUpdateService(cfg.Agent.DataFolder, cfg.Agent.Version,
+			func(ctx context.Context) (models.AgentMode, error) {
+				configuration, err := mainStore.Configuration().Get(ctx)
+				if err != nil {
+					return "", err
+				}
+				return configuration.AgentMode, nil
+			}, func() bool { return manager.IsBusy() })
+		if err != nil {
+			return nil, fmt.Errorf("initializing update service: %w", err)
+		}
+		managerOpts = append(managerOpts, service.WithUpdateService(update))
+	}
+	manager = service.NewServiceManager(cfg.Agent.DataFolder, managerOpts...)
 
 	// The console needs the manager for status reporting, so it is attached last.
 	consoleService, err := service.NewConsoleService(cfg.Agent, consoleClient, manager, mainStore)
 	if err != nil {
+		if update := manager.UpdateService(); update != nil {
+			update.Stop()
+		}
 		return nil, err
 	}
 	manager.SetConsoleService(consoleService)

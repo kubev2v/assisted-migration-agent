@@ -101,6 +101,17 @@ func (c *Console) GetMode(ctx context.Context) (models.AgentMode, error) {
 }
 
 func (c *Console) SetMode(ctx context.Context, mode models.AgentMode) error {
+	if c.mgr != nil && c.mgr.update != nil {
+		if err := c.mgr.update.reserve(); err != nil {
+			return err
+		}
+		defer c.mgr.update.release()
+	}
+	return c.setMode(ctx, mode)
+}
+
+// setMode is also used when DeleteData already holds the update reservation.
+func (c *Console) setMode(ctx context.Context, mode models.AgentMode) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 

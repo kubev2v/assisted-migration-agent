@@ -27,6 +27,8 @@ tags:
     description: vCenter credential management
   - name: Version
     description: Agent version information
+  - name: Update
+    description: Appliance update status and image preparation
 paths:
   # ── Agent ──────────────────────────────────────────────────────────────
   /agent:
@@ -1527,6 +1529,59 @@ paths:
           description: Internal server error
 
   # ── Version ────────────────────────────────────────────────────────────
+  /update:
+    get:
+      tags: [Update]
+      summary: Get appliance update status
+      operationId: getUpdateStatus
+      responses:
+        '200':
+          description: Current status; this request does not contact the SaaS or validate archives
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateStatus'
+        '500':
+          description: Internal error or unreadable host result
+        '503':
+          description: Updates are disabled pending OMA-2934
+  /update/image:
+    put:
+      tags: [Update]
+      summary: Prepare an OCI image for a disconnected appliance without activating it
+      operationId: putUpdateImage
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: OCI archive; maximum file payload is 3 GiB
+      responses:
+        '200':
+          description: Validated image prepared; no installation or restart occurred
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateStatus'
+        '400':
+          description: Invalid multipart input, OCI image, platform, or upgrade version
+        '409':
+          description: Connected mode, collection or inspection running, or update operation in progress
+        '413':
+          description: File exceeds 3 GiB or multipart framing exceeds 1 MiB
+        '507':
+          description: Insufficient storage; preparation requires three times the archive size
+        '500':
+          description: Internal error
+        '503':
+          description: Updates are disabled pending OMA-2934
   /version:
     get:
       tags: [Version]
@@ -3089,6 +3144,91 @@ components:
             type: string
 
     # ── Version ──────────────────────────────────────────────────────────
+    UpdateStatus:
+      type: object
+      required: [currentVersion, connected, autoUpdate, updateAvailable, latestVersion, state, preparedImage, lastResult, lastError]
+      properties:
+        currentVersion:
+          type: string
+        connected:
+          type: boolean
+          description: Configured operating mode, independent of current SaaS connectivity
+        autoUpdate:
+          type: boolean
+          nullable: true
+          description: Null when disconnected; false until OMA-3031 adds the persisted preference
+        updateAvailable:
+          type: boolean
+          nullable: true
+          description: Null until OMA-3031 supplies SaaS availability; also null when disconnected or unknown
+        latestVersion:
+          type: string
+          nullable: true
+        state:
+          type: string
+          enum: [idle, uploading, downloading, validating, ready, applying]
+        preparedImage:
+          allOf:
+            - $ref: '#/components/schemas/PreparedUpdateImage'
+          nullable: true
+        lastResult:
+          allOf:
+            - $ref: '#/components/schemas/UpdateResult'
+          nullable: true
+        lastError:
+          type: string
+          nullable: true
+    PreparedUpdateImage:
+      type: object
+      required: [version, digest]
+      properties:
+        version:
+          type: string
+        digest:
+          type: string
+    UpdateResult:
+      type: object
+      required: [file, result, time]
+      properties:
+        file:
+          type: string
+        result:
+          type: string
+          enum: [applied, rolled-back, failed, unchanged]
+        time:
+          type: string
+          format: date-time
+        error:
+          type: string
+        error_stage:
+          type: string
+        running_image:
+          allOf:
+            - $ref: '#/components/schemas/UpdateImage'
+          nullable: true
+        last_successful_update:
+          allOf:
+            - $ref: '#/components/schemas/SuccessfulUpdate'
+          nullable: true
+    UpdateImage:
+      type: object
+      required: [version, digest]
+      properties:
+        version:
+          type: string
+        digest:
+          type: string
+    SuccessfulUpdate:
+      type: object
+      required: [version, digest, time]
+      properties:
+        version:
+          type: string
+        digest:
+          type: string
+        time:
+          type: string
+          format: date-time
     VersionInfo:
       type: object
       required:
