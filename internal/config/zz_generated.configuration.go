@@ -218,6 +218,7 @@ func (a *Agent) ToOption() AgentOption {
 		to.GitCommit = a.GitCommit
 		to.UIGitCommit = a.UIGitCommit
 		to.DataFolder = a.DataFolder
+		to.AutoMigrate = a.AutoMigrate
 		to.OpaPoliciesFolder = a.OpaPoliciesFolder
 		to.UpdateInterval = a.UpdateInterval
 		to.LegacyStatusEnabled = a.LegacyStatusEnabled
@@ -236,6 +237,7 @@ func (a *Agent) DebugMap() map[string]any {
 	debugMap["GitCommit"] = helpers.DebugValue(a.GitCommit, false)
 	debugMap["UIGitCommit"] = helpers.DebugValue(a.UIGitCommit, false)
 	debugMap["DataFolder"] = helpers.DebugValue(a.DataFolder, false)
+	debugMap["AutoMigrate"] = helpers.DebugValue(a.AutoMigrate, false)
 	debugMap["OpaPoliciesFolder"] = helpers.DebugValue(a.OpaPoliciesFolder, false)
 	debugMap["UpdateInterval"] = helpers.DebugValue(a.UpdateInterval, false)
 	debugMap["LegacyStatusEnabled"] = helpers.DebugValue(a.LegacyStatusEnabled, false)
@@ -306,6 +308,13 @@ func WithUIGitCommit(uIGitCommit string) AgentOption {
 func WithDataFolder(dataFolder string) AgentOption {
 	return func(a *Agent) {
 		a.DataFolder = dataFolder
+	}
+}
+
+// WithAutoMigrate returns an option that can set AutoMigrate on a Agent
+func WithAutoMigrate(autoMigrate bool) AgentOption {
+	return func(a *Agent) {
+		a.AutoMigrate = autoMigrate
 	}
 }
 

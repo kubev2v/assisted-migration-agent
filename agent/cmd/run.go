@@ -157,6 +157,7 @@ func registerAgentFlags(flagSet *pflag.FlagSet, config *config.Configuration) {
 	flagSet.StringVar(&config.Agent.SourceID, "source-id", config.Agent.SourceID, "Source identifier (UUID) for this agent")
 	flagSet.StringVar(&config.Agent.Version, "version", config.Agent.Version, "Agent version to report to console")
 	flagSet.StringVar(&config.Agent.DataFolder, "data-folder", config.Agent.DataFolder, "Path to the persistent data folder")
+	flagSet.BoolVar(&config.Agent.AutoMigrate, "auto-migrate", config.Agent.AutoMigrate, "Apply database migrations on startup; disable after offline migration")
 	flagSet.BoolVar(&config.Agent.RVToolsMode, "rvtools-mode", config.Agent.RVToolsMode, "RVTool mode: enabled or disabled (default: disable)")
 }
 

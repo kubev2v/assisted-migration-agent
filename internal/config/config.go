@@ -35,6 +35,7 @@ type Agent struct {
 	GitCommit           string        `debugmap:"visible" default:"unknown"`
 	UIGitCommit         string        `debugmap:"visible" default:"unknown"`
 	DataFolder          string        `debugmap:"visible"`
+	AutoMigrate         bool          `debugmap:"visible" default:"true"`
 	OpaPoliciesFolder   string        `debugmap:"visible"`
 	UpdateInterval      time.Duration `debugmap:"visible" default:"5s"`
 	LegacyStatusEnabled bool          `debugmap:"visible" default:"true"`

@@ -58,7 +58,7 @@ func bootstrapAnalyzer(cfg *config.Configuration) (*server.Server, func(), error
 	if err != nil {
 		return nil, nil, fmt.Errorf("initialize OPA validator: %w", err)
 	}
-	pool, err := bootstrap.InitPool(cfg.Agent.DataFolder)
+	pool, err := bootstrap.InitPool(cfg.Agent.DataFolder, true)
 	if err != nil {
 		return nil, nil, err
 	}
