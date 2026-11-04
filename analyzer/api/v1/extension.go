@@ -2,11 +2,13 @@ package v1
 
 import (
 	"encoding/json"
+	"errors"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
@@ -307,8 +309,21 @@ func NewCollectorStatus(status models.CollectorStatus) CollectorStatus {
 	}
 
 	if status.Error != nil {
-		e := status.Error.Error()
-		c.Error = &e
+		message := duckdb_parser.RVToolsFailureMessage
+		var processing *duckdb_parser.RVToolsProcessingError
+		var validation *duckdb_parser.SchemaValidationError
+		var workbook *duckdb_parser.XLSXError
+		if !errors.As(status.Error, &processing) || processing.Stage == duckdb_parser.RVToolsStageParsing {
+			switch {
+			case errors.As(status.Error, &validation):
+				if text := validation.Error(); text != "" {
+					message = text
+				}
+			case errors.As(status.Error, &workbook):
+				message = workbook.Error()
+			}
+		}
+		c.Error = &message
 	}
 
 	return c

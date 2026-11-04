@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -76,7 +77,10 @@ func (f *rvtoolsWorkFactory) Build() work.WorkBuilder[models.CollectorStatus, mo
 				var dbError error
 				collectionDb, dbError = f.pool.NewDatabase(id, dbPath, time.Now(), store.EagerConnectionInitilization, 1024, store.ReadWriteDatabase)
 				if dbError != nil {
-					r.Err = fmt.Errorf("opening collection database %s: %w", database, dbError)
+					r.Err = &duckdb_parser.RVToolsProcessingError{
+						Stage: duckdb_parser.RVToolsStageInitialization,
+						Cause: fmt.Errorf("opening collection database %s: %w", database, dbError),
+					}
 					return r, r.Err
 				}
 
@@ -94,7 +98,10 @@ func (f *rvtoolsWorkFactory) Build() work.WorkBuilder[models.CollectorStatus, mo
 					return migrations.RunCollection(ctx, sqlDb, database)
 				}); err != nil {
 					_ = collectionDb.Close()
-					r.Err = fmt.Errorf("migrating collection database %s: %w", database, err)
+					r.Err = &duckdb_parser.RVToolsProcessingError{
+						Stage: duckdb_parser.RVToolsStageInitialization,
+						Cause: fmt.Errorf("migrating collection database %s: %w", database, err),
+					}
 					return r, r.Err
 				}
 
@@ -120,7 +127,11 @@ func (f *rvtoolsWorkFactory) Build() work.WorkBuilder[models.CollectorStatus, mo
 
 				collectionTemporaryDB, err := f.pool.NewDatabase(uuid.New().String(), tempDBPath, time.Now(), store.EagerConnectionInitilization, 1024, store.ReadWriteDatabase)
 				if err != nil {
-					r.Err = fmt.Errorf("opening collection database %s: %w", tempDBPath, err)
+					r.Err = &duckdb_parser.RVToolsProcessingError{
+						Stage:    duckdb_parser.RVToolsStageInitialization,
+						Filename: file,
+						Cause:    fmt.Errorf("opening collection database %s: %w", tempDBPath, err),
+					}
 					return r, r.Err
 				}
 				defer func() {
@@ -144,7 +155,10 @@ func (f *rvtoolsWorkFactory) Build() work.WorkBuilder[models.CollectorStatus, mo
 					return err
 				}); err != nil {
 					_ = collectionTemporaryDB.Close()
-					r.Err = fmt.Errorf("migrating collection database %s: %w", database, err)
+					r.Err = &duckdb_parser.RVToolsProcessingError{
+						Stage: duckdb_parser.RVToolsStageInitialization,
+						Cause: fmt.Errorf("migrating collection database %s: %w", database, err),
+					}
 					return r, r.Err
 				}
 
@@ -161,19 +175,10 @@ func (f *rvtoolsWorkFactory) Build() work.WorkBuilder[models.CollectorStatus, mo
 				result, err := parser.IngestRvTools(ctx, file)
 				if err != nil {
 					log.Errorw("failed to ingest rvtools file", "file", file, "error", err)
-					r.Err = fmt.Errorf("ingesting rvtools file %s: %w", file, err)
-					return r, r.Err
-				}
-
-				if result.HasErrors() {
-					log.Errorw("rvtools validation failed", "file", file, "errors", result.Errors)
-					issue := result.Errors[0]
-					switch issue.Code {
-					case duckdb_parser.CodeNoVMs, duckdb_parser.CodeMissingVMID, duckdb_parser.CodeMissingVMName,
-						duckdb_parser.CodeMissingCluster, duckdb_parser.CodeMissingVISDKUUID:
-						r.Err = fmt.Errorf("RVTools validation failed: %s", issue.Message)
-					default:
-						r.Err = fmt.Errorf("RVTools file could not be validated")
+					r.Err = &duckdb_parser.RVToolsProcessingError{
+						Stage:    duckdb_parser.RVToolsStageParsing,
+						Filename: file,
+						Cause:    fmt.Errorf("ingesting rvtools file %s: %w", file, err),
 					}
 					return r, r.Err
 				}
@@ -184,7 +189,11 @@ func (f *rvtoolsWorkFactory) Build() work.WorkBuilder[models.CollectorStatus, mo
 
 				inv, err := parser.BuildInventory(ctx, nil)
 				if err != nil {
-					r.Err = fmt.Errorf("error building inventory for %s: %w", file, err)
+					r.Err = &duckdb_parser.RVToolsProcessingError{
+						Stage:    duckdb_parser.RVToolsStageParsing,
+						Filename: file,
+						Cause:    fmt.Errorf("error building inventory for %s: %w", file, err),
+					}
 					return r, r.Err
 				}
 
@@ -206,7 +215,11 @@ func (f *rvtoolsWorkFactory) Build() work.WorkBuilder[models.CollectorStatus, mo
 				}
 
 				if err := collectionTemporaryDB.Close(); err != nil {
-					r.Err = fmt.Errorf("closing temporary collection database after ingesting %s: %w", file, err)
+					r.Err = &duckdb_parser.RVToolsProcessingError{
+						Stage:    duckdb_parser.RVToolsStageCleanup,
+						Filename: file,
+						Cause:    fmt.Errorf("closing temporary collection database after ingesting %s: %w", file, err),
+					}
 					return r, r.Err
 				}
 
@@ -304,10 +317,12 @@ func (f *rvtoolsWorkFactory) Build() work.WorkBuilder[models.CollectorStatus, mo
 
 		mainDB, err := f.pool.Get(store.MainDatabaseID)
 		if err != nil {
+			zap.S().Errorw("failed to get main database during RVTools finalization", "error", err)
 			return fmt.Errorf("failed to get main database: %w", err)
 		}
 		mainSt, err := mainDB.Store()
 		if err != nil {
+			zap.S().Errorw("failed to get main store during RVTools finalization", "error", err)
 			return fmt.Errorf("failed to get main store: %w", err)
 		}
 
@@ -319,7 +334,23 @@ func (f *rvtoolsWorkFactory) Build() work.WorkBuilder[models.CollectorStatus, mo
 			}
 			zap.S().Infow("collection database added to pool", "id", collectionDb.ID, "path", collectionDb.Path)
 		case result.Err != nil:
-			if err := mainSt.Collection().MarkFailed(ctx, database, result.Err.Error()); err != nil {
+			message := duckdb_parser.RVToolsFailureMessage
+			var processing *duckdb_parser.RVToolsProcessingError
+			var validation *duckdb_parser.SchemaValidationError
+			var workbook *duckdb_parser.XLSXError
+			if !errors.As(result.Err, &processing) || processing.Stage == duckdb_parser.RVToolsStageParsing {
+				switch {
+				case errors.As(result.Err, &validation):
+					if text := validation.Error(); text != "" {
+						message = text
+					}
+					zap.S().Errorw("RVTools schema validation failed", "issues", validation.Result.Errors)
+				case errors.As(result.Err, &workbook):
+					message = workbook.Error()
+					zap.S().Errorw("failed to read RVTools workbook", "error", workbook.Cause)
+				}
+			}
+			if err := mainSt.Collection().MarkFailed(ctx, database, message); err != nil {
 				zap.S().Warnw("failed to mark collection as failed", "error", err)
 			}
 			if collectionDb != nil {
