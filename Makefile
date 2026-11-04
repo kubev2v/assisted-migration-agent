@@ -26,8 +26,10 @@ AGENT_UI_IMAGE ?= quay.io/redhat-user-workloads/assisted-migration-tenant/migrat
 ifeq ($(origin AGENT_UI_IMAGE_TAG),undefined)
 include build-config/ui-image
 endif
-ANALYZER_UI_IMAGE ?= $(AGENT_UI_IMAGE)
-ANALYZER_UI_IMAGE_TAG ?= $(AGENT_UI_IMAGE_TAG)
+OFFLINE_ANALYZER_UI_IMAGE ?= quay.io/redhat-user-workloads/assisted-migration-tenant/oma-rvtool-offline-analyzer-ui
+ifeq ($(origin OFFLINE_ANALYZER_UI_IMAGE_TAG),undefined)
+OFFLINE_ANALYZER_UI_IMAGE_TAG := $(shell sed -n 's/^OFFLINE_ANALYZER_UI_IMAGE_TAG=//p' build-config/ui-image)
+endif
 
 GOBASE=$(shell pwd)
 GOBIN=$(GOBASE)/bin
@@ -129,12 +131,13 @@ image:
 
 image.analyzer:
 	@echo "Building RVTools Analyzer image $(ANALYZER_IMAGE_NAME):$(ANALYZER_IMAGE_TAG)..."
-	@echo "   Using UI image: $(ANALYZER_UI_IMAGE):$(ANALYZER_UI_IMAGE_TAG)"
+	@echo "   Using UI image: $(OFFLINE_ANALYZER_UI_IMAGE):$(OFFLINE_ANALYZER_UI_IMAGE_TAG)"
 	$(PODMAN) build \
+		--build-arg-file build-config/ui-image \
 		--build-arg ANALYZER_GIT_COMMIT=$(ANALYZER_GIT_COMMIT) \
 		--build-arg ANALYZER_VERSION=$(ANALYZER_VERSION) \
-		--build-arg ANALYZER_UI_IMAGE=$(ANALYZER_UI_IMAGE) \
-		--build-arg ANALYZER_UI_IMAGE_TAG=$(ANALYZER_UI_IMAGE_TAG) \
+		--build-arg OFFLINE_ANALYZER_UI_IMAGE=$(OFFLINE_ANALYZER_UI_IMAGE) \
+		--build-arg OFFLINE_ANALYZER_UI_IMAGE_TAG=$(OFFLINE_ANALYZER_UI_IMAGE_TAG) \
 		-t $(ANALYZER_IMAGE_NAME):$(ANALYZER_IMAGE_TAG) \
 		-f analyzer/Containerfile .
 
