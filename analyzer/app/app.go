@@ -64,6 +64,14 @@ func bootstrapAnalyzer(cfg *config.Configuration) (*server.Server, func(), error
 	}
 	cleanupPool := func() { pool.Close() }
 
+	if err := pool.Migrate(context.Background()); err != nil {
+		cleanupPool()
+		return nil, nil, err
+	}
+	if err := bootstrap.CleanupStaleCollections(context.Background(), pool, cfg.Agent.DataFolder); err != nil {
+		zap.S().Errorw("failed to cleanup stale collections", "error", err)
+	}
+
 	svc, err := newAnalyzerServiceManager(cfg, pool, opaValidator)
 	if err != nil {
 		cleanupPool()

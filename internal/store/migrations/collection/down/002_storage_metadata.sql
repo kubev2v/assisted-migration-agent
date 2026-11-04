@@ -1,0 +1,3 @@
+-- No rollback SQL: this migration is part of the minimum supported baseline (collection 002).
+-- Rollback never reverses this migration.
+-- Future collection migrations (003 onward) must provide executable down SQL.

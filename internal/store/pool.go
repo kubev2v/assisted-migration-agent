@@ -524,7 +524,8 @@ func (p *Pool) All() iter.Seq[*Database] {
 	}
 }
 
-func (p *Pool) Delete(id string) error {
+// Unregister closes a database and removes it from the pool without deleting its file.
+func (p *Pool) Unregister(id string) error {
 	db, err := p.Get(id)
 	if err != nil {
 		if errors.IsResourceNotFoundError(err) {
@@ -560,6 +561,21 @@ func (p *Pool) Delete(id string) error {
 		}
 	}
 
+	return nil
+}
+
+func (p *Pool) Delete(id string) error {
+	db, err := p.Get(id)
+	if err != nil {
+		if errors.IsResourceNotFoundError(err) {
+			return nil
+		}
+		return err
+	}
+
+	if err := p.Unregister(id); err != nil {
+		return err
+	}
 	return os.Remove(db.Path)
 }
 
