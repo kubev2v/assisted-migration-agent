@@ -93,6 +93,28 @@ func initV2(cfg *config.Configuration) (*server.Server, func(), error) {
 		return nil, nil, err
 	}
 
+	initialized := false
+	defer func() {
+		if !initialized {
+			pool.Close()
+		}
+	}()
+
+	if cfg.Agent.AutoMigrate {
+		err = pool.Migrate(context.Background())
+	} else {
+		err = pool.ValidateMigrations(context.Background())
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := bootstrap.CleanupStaleCollections(context.Background(), pool, cfg.Agent.DataFolder); err != nil {
+		if !cfg.Agent.AutoMigrate {
+			return nil, nil, fmt.Errorf("failed to cleanup stale collections: %w", err)
+		}
+		zap.S().Errorw("failed to cleanup stale collections", "error", err)
+	}
+
 	consoleClient, km, err := initShared(cfg)
 	if err != nil {
 		return nil, nil, err
@@ -138,6 +160,7 @@ func initV2(cfg *config.Configuration) (*server.Server, func(), error) {
 		zap.S().Info("v2 service and pool closed")
 	}
 
+	initialized = true
 	return srv, cleanup, nil
 }
 

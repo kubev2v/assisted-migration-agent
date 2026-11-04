@@ -367,6 +367,25 @@ var _ = Describe("Pool", func() {
 		})
 	})
 
+	Context("Unregister", func() {
+		It("retains the file and falls back to the previous latest collection", func() {
+			older, err := pool.NewDatabase("older", filepath.Join(tmpDir, "older.duckdb"), time.Now().Add(-time.Hour), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			Expect(err).NotTo(HaveOccurred())
+			pool.Add(older)
+			newer, err := pool.NewDatabase("newer", filepath.Join(tmpDir, "newer.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			Expect(err).NotTo(HaveOccurred())
+			pool.Add(newer)
+
+			Expect(pool.Unregister(newer.ID)).To(Succeed())
+			Expect(newer.Path).To(BeAnExistingFile())
+			_, err = pool.Get(newer.ID)
+			Expect(err).To(HaveOccurred())
+			latest, err := pool.Latest()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(latest.ID).To(Equal(older.ID))
+		})
+	})
+
 	Context("Close", func() {
 		It("should close all connections without removing entries", func() {
 			dbPath := filepath.Join(tmpDir, "close.duckdb")

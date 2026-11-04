@@ -45,6 +45,11 @@
 //   - connected: Agent sends updates to console.redhat.com
 //   - disconnected: Agent operates in standalone mode
 //
+// AutoMigrate defaults to true. The agent run command accepts --auto-migrate=false
+// (or AGENT_AUTO_MIGRATE=false) to require current database migration histories
+// without running startup migrations. Host-managed upgrades use this after the
+// offline migration CLI; it does not disable normal application writes.
+//
 // # Console Configuration
 //
 //	┌───────┬─────────────────────────┬────────────────────────────────────────┐

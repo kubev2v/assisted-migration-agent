@@ -365,7 +365,7 @@ Built-in options include `WithSort`, `WithLimit`, `WithOffset`, `WithVMIDs`, and
 
 ### Migrations
 
-SQL migration files live in `internal/store/migrations/sql/` and are numbered sequentially (`001_`, `002_`, etc.). They are embedded and executed automatically on startup. The migration runner tracks applied versions in a `schema_migrations` table.
+SQL migration files live in `internal/store/migrations/{main,collection}/{up,down}/` and are numbered sequentially (`001_`, `002_`, etc.). Migrations above the permanent recovery baseline (main 001, collection 002) require executable down SQL in a file with the same basename; baseline down files contain only comments explaining why they are never reversed. Forward migrations run automatically on startup; offline recovery uses `agent migrate` (see `docs/database-migration-rollback.md`). Applied versions are tracked separately in `schema_migrations` and `collection_schema_migrations`.
 
 ### Filtering
 
