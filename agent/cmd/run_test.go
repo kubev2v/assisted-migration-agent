@@ -677,3 +677,45 @@ var _ = Describe("Run Command", func() {
 	})
 
 })
+
+var _ = Describe("Startup auto-migration flag", func() {
+	It("defaults to enabled in both the configuration and root command", func() {
+		cfg := config.NewConfigurationWithOptionsAndDefaults()
+		Expect(cfg.Agent.AutoMigrate).To(BeTrue())
+		root := NewRootCommand("test", "test", "test")
+		run, _, err := root.Find([]string{"run"})
+		Expect(err).NotTo(HaveOccurred())
+		enabled, err := run.Flags().GetBool("auto-migrate")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(enabled).To(BeTrue())
+	})
+
+	It("accepts an explicit false flag", func() {
+		cfg := config.NewConfigurationWithOptionsAndDefaults()
+		cmd := NewRunCommand(cfg)
+		Expect(cmd.ParseFlags([]string{"--auto-migrate=false"})).To(Succeed())
+		Expect(cfg.Agent.AutoMigrate).To(BeFalse())
+	})
+
+	It("accepts AGENT_AUTO_MIGRATE=false", func() {
+		GinkgoT().Setenv("AGENT_AUTO_MIGRATE", "false")
+		cfg := config.NewConfigurationWithOptionsAndDefaults()
+		cmd := NewRunCommand(cfg)
+		Expect(cmd.ParseFlags([]string{})).To(Succeed())
+		setupViperForEnvVars("AGENT")
+		defer viper.Reset()
+		cobraflags.PresetRequiredFlags("AGENT", make(map[*pflag.Flag]bool), cmd)
+		Expect(cfg.Agent.AutoMigrate).To(BeFalse())
+	})
+
+	It("lets an explicit flag override the environment", func() {
+		GinkgoT().Setenv("AGENT_AUTO_MIGRATE", "false")
+		cfg := config.NewConfigurationWithOptionsAndDefaults()
+		cmd := NewRunCommand(cfg)
+		Expect(cmd.ParseFlags([]string{"--auto-migrate=true"})).To(Succeed())
+		setupViperForEnvVars("AGENT")
+		defer viper.Reset()
+		cobraflags.PresetRequiredFlags("AGENT", make(map[*pflag.Flag]bool), cmd)
+		Expect(cfg.Agent.AutoMigrate).To(BeTrue())
+	})
+})

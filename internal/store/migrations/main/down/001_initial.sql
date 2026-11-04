@@ -1,0 +1,3 @@
+-- No rollback SQL: this migration is part of the minimum supported baseline (main 001).
+-- Rollback never reverses this migration.
+-- Future main migrations (002 onward) must provide executable down SQL.
