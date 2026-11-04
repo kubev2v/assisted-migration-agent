@@ -53,18 +53,20 @@ func InitPool(dataFolder string) (*store.Pool, error) {
 		createdAt := time.Unix(ts, 0)
 		hash := sha256.Sum256([]byte(match))
 		id := hex.EncodeToString(hash[:])[:6]
+		// A collection that cannot be opened or migrated fails startup instead of silently
+		// disappearing from the UI; after an update this triggers the image rollback.
 		db, err := pool.NewDatabase(id, match, createdAt, store.LazyConnectionInitilization, 512, store.ReadWriteDatabase)
 		if err != nil {
-			zap.S().Warnw("skipping collection database", "file", match, "error", err)
-			continue
+			pool.Close()
+			return nil, fmt.Errorf("opening collection database %s: %w", name, err)
 		}
 
 		if err := db.Migrate(context.Background(), func(ctx context.Context, db *sql.DB) error {
 			return migrations.RunCollection(ctx, db, name)
 		}); err != nil {
-			zap.S().Errorw("failed to migrate collection database", "db_name", name, "error", err)
 			_ = db.Close()
-			continue
+			pool.Close()
+			return nil, fmt.Errorf("migrating collection database %s: %w", name, err)
 		}
 
 		if err := db.Close(); err != nil {
