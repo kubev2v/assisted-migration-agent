@@ -64,10 +64,11 @@ type VM struct {
 	ToolsStatus        string
 	ToolsRunningStatus string
 
-	Disks         []Disk
-	NICs          []NIC
-	Devices       []Device
-	GuestNetworks []GuestNetwork
+	Disks            []Disk
+	HostPhysicalNICs []HostPhysicalNIC
+	NICs             []NIC
+	Devices          []Device
+	GuestNetworks    []GuestNetwork
 
 	Issues []Issue
 
@@ -122,6 +123,11 @@ type DiskDatastore struct {
 	BackingDeviceIDs       []string
 	Vendor                 string
 	Model                  string
+}
+
+type HostPhysicalNIC struct {
+	ID            string
+	LinkSpeedMbps *int32
 }
 
 type NIC struct {
