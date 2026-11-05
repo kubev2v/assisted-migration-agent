@@ -114,6 +114,9 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 	}
 	details.HostPhysicalNics = &hostNICs
 
+	if vm.Annotation != "" {
+		details.Annotation = &vm.Annotation
+	}
 	if vm.UUID != "" {
 		details.Uuid = &vm.UUID
 	}
@@ -232,11 +235,16 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 	}
 
 	for _, n := range vm.NICs {
+		ipv4 := append([]string{}, n.IPv4Addresses...)
+		ipv6 := append([]string{}, n.IPv6Addresses...)
 		nic := VirtualMachineNIC{
-			Adapter: &n.Adapter,
-			Mac:     &n.MAC,
-			Network: &n.Network,
-			Index:   &n.Index,
+			Adapter:       &n.Adapter,
+			Mac:           &n.MAC,
+			Network:       &n.Network,
+			Index:         &n.Index,
+			VlanId:        &n.VlanID,
+			Ipv4Addresses: &ipv4,
+			Ipv6Addresses: &ipv6,
 		}
 		details.Nics = append(details.Nics, nic)
 	}

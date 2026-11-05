@@ -39,10 +39,10 @@ func (l *lexer) Scan() (int, Token, string) {
 	// keywords and identifiers
 	if isIdentifierStart(ch) {
 		start := l.tokenStart()
-		for isIdentifierStart(l.ch) || isDot(l.ch) {
+		for isIdentifierStart(l.ch) || isDigit(l.ch) || isDot(l.ch) {
 			if isDot(l.ch) {
 				l.next()
-				if !isIdentifierStart(l.ch) {
+				if !isIdentifierStart(l.ch) && !isDigit(l.ch) {
 					return pos, illegal, "identifier cannot end with a dot or have consecutive dots"
 				}
 			}

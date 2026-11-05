@@ -47,7 +47,7 @@ Pull request images use `on-pr-<commit-sha>` for both the binary and image label
 
 ### Upgrade compatibility metadata
 
-The appliance image's `min-upgrade-version` label identifies the oldest installed
+The appliance image's `io.kubev2v.oma.min-upgrade-version` label identifies the oldest installed
 image version supported as the starting point for an upgrade to that image.
 It is separate from `org.opencontainers.image.version`, which identifies the
 candidate image itself.

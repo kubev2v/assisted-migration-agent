@@ -172,6 +172,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 	var groups StringArray
 	var metadata duckdb.Composite[map[string][]string]
 	var hostNICs duckdb.Composite[[]models.HostPhysicalNIC]
+	var annotation string
 	var (
 		uMoid                                               sql.NullString
 		uVmName                                             sql.NullString
@@ -185,7 +186,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 	)
 
 	if err := rows.Scan(
-		&pvm.ID, &pvm.Name, &pvm.Folder, &pvm.Host, &pvm.UUID,
+		&pvm.ID, &pvm.Name, &annotation, &pvm.Folder, &pvm.Host, &pvm.UUID,
 		&pvm.Firmware, &pvm.PowerState, &pvm.ConnectionState,
 		&pvm.FaultToleranceEnabled, &pvm.CpuCount, &pvm.MemoryMB,
 		&pvm.GuestName, &pvm.GuestNameFromVmwareTools, &pvm.HostName,
@@ -214,6 +215,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 
 	result := fromDB(pvm)
 	result.HostPhysicalNICs = hostNICs.Get()
+	result.Annotation = annotation
 	result.Metadata = metadata.Get()
 	if result.Metadata == nil {
 		result.Metadata = make(map[string][]string)
@@ -408,12 +410,13 @@ func fromDB(pvm duckdb_models.VM) models.VM {
 	nics := make([]models.NIC, 0, len(pvm.NICs))
 	for i, n := range pvm.NICs {
 		nics = append(nics, models.NIC{
-			Adapter:     n.Adapter,
-			MAC:         n.MAC,
-			Network:     n.Network.ID,
-			Index:       i,
-			IPv4Address: n.IPv4Address,
-			IPv6Address: n.IPv6Address,
+			Adapter:       n.Adapter,
+			MAC:           n.MAC,
+			Network:       n.Network.ID,
+			Index:         i,
+			IPv4Addresses: n.IPv4Addresses,
+			IPv6Addresses: n.IPv6Addresses,
+			VlanID:        n.VlanID,
 		})
 	}
 

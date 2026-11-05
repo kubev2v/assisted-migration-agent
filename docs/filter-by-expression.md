@@ -161,8 +161,8 @@ curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=net.ne
 # VMs with E1000 adapter
 curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=net.adapter = 'E1000'"
 
-# VMs with a specific IPv4 subnet
-curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=net.ipv4 ~ /^192\\.168\\.1\\./"
+# VMs with a specific IPv4 address
+curl -G "http://localhost:8000/api/v1/vms" --data-urlencode "byExpression=net.ipv4 contains '192.168.1.10'"
 ```
 
 ### Filter by datastore
@@ -343,8 +343,8 @@ Rows from the latest inspection run per VM (`vm_inspection_concerns` joined at m
 | `net.connected`     | boolean | Connected                   |
 | `net.starts_connected` | boolean | Starts connected         |
 | `net.type`          | string  | Type                        |
-| `net.ipv4`          | string  | IPv4 address                |
-| `net.ipv6`          | string  | IPv6 address                |
+| `net.ipv4`          | array   | IPv4 addresses. An IP address may also contain a CIDR suffix. |
+| `net.ipv6`          | array   | IPv6 addresses. An IP address may also contain a CIDR suffix. |
 | `net.cluster`       | string  | Cluster                     |
 
 ### vdatastore (datastore.*) — datastore attributes

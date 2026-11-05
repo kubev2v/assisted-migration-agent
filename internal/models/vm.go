@@ -31,6 +31,7 @@ type VM struct {
 	NICCount        int32
 	ID              string
 	Name            string
+	Annotation      string
 	VCenterID       string
 	UUID            string
 	Firmware        string
@@ -130,12 +131,13 @@ type HostPhysicalNIC struct {
 }
 
 type NIC struct {
-	Adapter     string
-	MAC         string
-	Network     string
-	Index       int
-	IPv4Address string
-	IPv6Address string
+	Adapter       string
+	MAC           string
+	Network       string
+	Index         int
+	IPv4Addresses []string
+	IPv6Addresses []string
+	VlanID        string
 }
 
 type Device struct {
