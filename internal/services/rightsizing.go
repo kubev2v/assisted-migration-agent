@@ -200,6 +200,14 @@ func (s *RightsizingService) ComputeUtilization(ctx context.Context, reportID st
 	return nil
 }
 
+func (s *RightsizingService) DeleteByVCenter(ctx context.Context, vcenterID string) error {
+	if err := s.store.RightSizing().DeleteByVCenter(ctx, vcenterID); err != nil {
+		return fmt.Errorf("deleting rightsizing data: %w", err)
+	}
+
+	return nil
+}
+
 func resolveCounters(ctx context.Context, pm *performance.Manager) (metricIDs []types.PerfMetricId, countersByKey map[int32]*types.PerfCounterInfo, warnings []string) {
 	countersByName, err := pm.CounterInfoByName(ctx)
 	if err != nil {

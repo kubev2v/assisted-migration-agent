@@ -232,6 +232,7 @@ Identifiers are **case-insensitive**. Dotted names refer to joined tables (e.g. 
 | Identifier       | Type    | Description (backing column)        |
 |------------------|---------|-------------------------------------|
 | `id`             | string  | VM ID                               |
+| `vcenter_id`     | string  | vCenter ID (`VI SDK UUID`)           |
 | `name`           | string  | VM name                             |
 | `folder_id`      | string  | Folder ID                           |
 | `folder`         | string  | Folder path                         |

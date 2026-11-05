@@ -257,6 +257,47 @@ func (s *GroupService) Delete(ctx context.Context, id uuid.UUID) error {
 	})
 }
 
+func (s *GroupService) RefreshInventory(ctx context.Context, group models.Group) (models.Group, error) {
+	if err := s.store.Group().RefreshMatches(ctx, group.ID); err != nil {
+		return models.Group{}, fmt.Errorf("refreshing matches for group %s: %w", group.ID, err)
+	}
+
+	vmIDs, err := s.store.Group().GetMatchedIDs(ctx, group.ID)
+	if err != nil {
+		return models.Group{}, fmt.Errorf("getting matched IDs for group %s: %w", group.ID, err)
+	}
+
+	var inv *inventory.Inventory
+	if len(vmIDs) > 0 {
+		inv, err = s.inventoryBuilder.BuildInventory(ctx, vmIDs)
+		if err != nil {
+			return models.Group{}, fmt.Errorf("building filtered inventory: %w", err)
+		}
+	}
+
+	if err := s.store.Group().UpdateInventory(ctx, group.ID, inv); err != nil {
+		return models.Group{}, fmt.Errorf("updating inventory for group %s: %w", group.ID, err)
+	}
+
+	group.Inventory = inv
+	return group, nil
+}
+
+func (s *GroupService) RefreshAll(ctx context.Context) error {
+	groups, _, err := s.List(ctx, GroupListParams{})
+	if err != nil {
+		return fmt.Errorf("listing groups: %w", err)
+	}
+
+	for _, group := range groups {
+		if _, err := s.RefreshInventory(ctx, group); err != nil {
+			return fmt.Errorf("refreshing inventory for group %s: %w", group.ID, err)
+		}
+	}
+
+	return nil
+}
+
 func buildGroupInventoryEventData(group *models.Group) ([]byte, error) {
 	apiInventory := converters.ToAPI(group.Inventory)
 

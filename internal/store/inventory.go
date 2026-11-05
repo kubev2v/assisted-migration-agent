@@ -107,6 +107,25 @@ func (s *InventoryStore) SaveSubset(ctx context.Context, data []byte) error {
 	return s.save(ctx, data, true)
 }
 
+func (s *InventoryStore) Delete(ctx context.Context, filter sq.Sqlizer) error {
+	builder := sq.Delete("inventory")
+
+	if filter != nil {
+		builder = builder.Where(filter)
+	}
+
+	query, args, err := builder.ToSql()
+	if err != nil {
+		return err
+	}
+
+	if _, err := s.db.ExecContext(ctx, query, args...); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (s *InventoryStore) save(ctx context.Context, data []byte, isSubset bool) error {
 	// Remark:
 	// Inventory is passed as bytes to keep backwards compability with the services

@@ -98,6 +98,38 @@ func (s *RightSizingStore) CreateReport(ctx context.Context, r models.RightSizin
 	return id, createdAt, nil
 }
 
+// DeleteByVCenter removes all rightsizing data tied to a vCenter: the per-VM
+// metrics, warnings and utilization rows first, then the reports themselves.
+func (s *RightSizingStore) DeleteByVCenter(ctx context.Context, vcenterID string) error {
+	reportIDs := sq.Select(rsReportsColID).From(rsReportsTable).Where(sq.Eq{rsReportsColVCenter: vcenterID})
+
+	for _, table := range []string{rsMetricsTable, rsWarningsTable, rsUtilizationTable} {
+		query, args, err := sq.Delete(table).
+			Where(sq.Expr(rsMetricsColReportID+" IN (?)", reportIDs)).
+			ToSql()
+		if err != nil {
+			return fmt.Errorf("building delete query for %s: %w", table, err)
+		}
+
+		if _, err := s.db.ExecContext(ctx, query, args...); err != nil {
+			return fmt.Errorf("deleting from %s: %w", table, err)
+		}
+	}
+
+	query, args, err := sq.Delete(rsReportsTable).
+		Where(sq.Eq{rsReportsColVCenter: vcenterID}).
+		ToSql()
+	if err != nil {
+		return fmt.Errorf("building delete reports query: %w", err)
+	}
+
+	if _, err := s.db.ExecContext(ctx, query, args...); err != nil {
+		return fmt.Errorf("deleting reports: %w", err)
+	}
+
+	return nil
+}
+
 // WriteBatch inserts metric rows for a slice of RightSizingMetrics.
 // Rows with zero SampleCount are skipped. Duplicate rows are silently ignored.
 func (s *RightSizingStore) WriteBatch(ctx context.Context, reportID string, metrics []models.RightSizingMetric) error {

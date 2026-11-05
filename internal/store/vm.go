@@ -320,6 +320,85 @@ func (s *VMStore) GetGuestApps(ctx context.Context) ([]models.VMGuestApps, error
 	return result, rows.Err()
 }
 
+// DuckDB does not support ON CASCADE on FK
+// We need to remove the depending data first and after the vms.
+// Ref: https://duckdb.org/docs/1.4/sql/statements/create_table#limitations
+func (s *VMStore) Delete(ctx context.Context, filter sq.Sqlizer) error {
+	dependentTables := []struct {
+		name       string
+		vmIDColumn string
+	}{
+		{name: "vm_inspection_concerns", vmIDColumn: `"VM ID"`},
+		{name: "vm_metadata", vmIDColumn: "vm_id"},
+		{name: "vcpu", vmIDColumn: `"VM ID"`},
+		{name: "vmemory", vmIDColumn: `"VM ID"`},
+		{name: "vdisk", vmIDColumn: `"VM ID"`},
+		{name: "vnetwork", vmIDColumn: `"VM ID"`},
+		{name: "concerns", vmIDColumn: `"VM_ID"`},
+		{name: "vm_inspection_status", vmIDColumn: `"VM ID"`},
+		{name: "vm_applications", vmIDColumn: "vm_id"},
+	}
+
+	filterQuery := vmFilterSubquery
+	if filter != nil {
+		filterQuery = filterQuery.Where(filter)
+	}
+
+	query, args, err := filterQuery.ToSql()
+	if err != nil {
+		return err
+	}
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+
+	var vmIDs []string
+	for rows.Next() {
+		var vmID string
+		if err := rows.Scan(&vmID); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		vmIDs = append(vmIDs, vmID)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return err
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	if len(vmIDs) == 0 {
+		return nil
+	}
+
+	for _, table := range dependentTables {
+		query, args, err := sq.Delete(table.name).
+			Where(sq.Eq{table.vmIDColumn: vmIDs}).
+			ToSql()
+		if err != nil {
+			return err
+		}
+		if _, err := s.db.ExecContext(ctx, query, args...); err != nil {
+			return err
+		}
+	}
+
+	query, args, err = sq.Delete("vinfo").
+		Where(sq.Eq{`"VM ID"`: vmIDs}).
+		ToSql()
+	if err != nil {
+		return err
+	}
+	if _, err := s.db.ExecContext(ctx, query, args...); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // normalizeCategory validates and normalizes an issue category (case-insensitive).
 func normalizeCategory(category, issueID string) string {
 	// Valid issue categories (lowercase for case-insensitive comparison)

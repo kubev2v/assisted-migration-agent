@@ -21,7 +21,7 @@ import (
 //
 // vinfo (v) — flat names:
 //
-//	id, name, folder_id, folder, host, smbios_uuid, vm_uuid, firmware,
+//	id, vcenter_id, name, folder_id, folder, host, smbios_uuid, vm_uuid, firmware,
 //	powerstate (alias: status), connection_state, ft_state, cpus, memory,
 //	os_config, os_tools, dns_name, ip_address, storage_used, template,
 //	cbt, enable_uuid, datacenter, cluster, cluster_id, hw_version, total_disk_capacity,
@@ -82,6 +82,8 @@ var DefaultMapper filter.MapFunc = func(name string) (string, filter.FieldType, 
 	// vinfo (v) — string fields
 	case "id":
 		return `v."VM ID"`, filter.StringField, nil
+	case "vcenter_id":
+		return `v."VI SDK UUID"`, filter.StringField, nil
 	case "name":
 		return `v."VM"`, filter.StringField, nil
 	case "folder_id":
@@ -385,6 +387,15 @@ var ApplicationMapper filter.MapFunc = func(name string) (string, filter.FieldTy
 	}
 }
 
+var InventoryMapper filter.MapFunc = func(name string) (string, filter.FieldType, error) {
+	switch strings.ToLower(name) {
+	case "vcenter_id":
+		return "id", filter.StringField, nil
+	default:
+		return "", 0, fmt.Errorf("unknown inventory filter field: %s", name)
+	}
+}
+
 // ParseWithDefaultMap parses a filter expression using the DefaultMapper (VM fields).
 // This is a convenience wrapper around filter.Parse() for VM filtering operations.
 func ParseWithDefaultMap(src []byte) (sq.Sqlizer, error) {
@@ -413,4 +424,8 @@ func ParseWithCollectionMap(src []byte) (sq.Sqlizer, error) {
 // This is a convenience wrapper around filter.Parse() for application filtering operations.
 func ParseWithApplicationMap(src []byte) (sq.Sqlizer, error) {
 	return filter.Parse(src, ApplicationMapper)
+}
+
+func ParseWithInventoryMap(src []byte) (sq.Sqlizer, error) {
+	return filter.Parse(src, InventoryMapper)
 }

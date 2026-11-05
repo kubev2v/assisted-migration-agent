@@ -528,6 +528,26 @@ paths:
           description: No collections, inventory, or matching vCenter found
         '500':
           description: Internal server error
+    delete:
+      tags:
+        - Inventories
+      summary: Delete a vcenter inventory from the latest collection
+      parameters:
+        - name: vid
+          in: path
+          required: true
+          description: ID of the vCenter
+          schema:
+            type: string
+      responses:
+        '204':
+          description: No content
+        '400':
+          description: bad request if vcenter id is not a valid UUID
+        '404':
+          description: No collections, inventory, or matching vCenter found
+        '500':
+          description: Internal server error
 
   /collections:
     get:

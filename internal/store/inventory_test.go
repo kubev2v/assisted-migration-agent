@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
+	sq "github.com/Masterminds/squirrel"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -56,6 +57,38 @@ var _ = Describe("InventoryStore", func() {
 		if tmpDir != "" {
 			_ = os.RemoveAll(tmpDir)
 		}
+	})
+
+	Context("Delete", func() {
+		BeforeEach(func() {
+			Expect(s.Inventory().SaveSubset(ctx, []byte(`{"vcenter_id":"vc-one"}`))).To(Succeed())
+			Expect(s.Inventory().SaveSubset(ctx, []byte(`{"vcenter_id":"vc-two"}`))).To(Succeed())
+		})
+
+		It("deletes only the matching inventory", func() {
+			Expect(s.Inventory().Delete(ctx, sq.Eq{"id": "vc-one"})).To(Succeed())
+
+			var ids []string
+			rows, err := s.Querier().QueryContext(ctx, `SELECT id FROM inventory`)
+			Expect(err).NotTo(HaveOccurred())
+			DeferCleanup(rows.Close)
+			for rows.Next() {
+				var id string
+				Expect(rows.Scan(&id)).To(Succeed())
+				ids = append(ids, id)
+			}
+			Expect(rows.Err()).NotTo(HaveOccurred())
+			Expect(ids).To(ConsistOf("vc-two"))
+		})
+
+		It("deletes all inventories when no filter is provided", func() {
+			Expect(s.Inventory().Delete(ctx, nil)).To(Succeed())
+
+			var count int
+			err := s.Querier().QueryRowContext(ctx, `SELECT count(*) FROM inventory`).Scan(&count)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(count).To(BeZero())
+		})
 	})
 
 	Context("Save", func() {
