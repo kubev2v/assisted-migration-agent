@@ -215,7 +215,7 @@ var vmsQuery = `
 			-- Aggregate NICs per host to keep one export row per VM.
 			LEFT JOIN (
 				SELECT
-					"Host",
+					"Host ID",
 					to_json(LIST(
 						CASE
 							WHEN "Speed" IS NULL THEN json_object('id', "Network Device")
@@ -224,9 +224,9 @@ var vmsQuery = `
 						ORDER BY "Network Device"
 					)) AS nics
 				FROM vnic
-				WHERE "Host" != ''
-				GROUP BY "Host"
-			) hn ON hn."Host" = v."Host"
+				WHERE "Host ID" != ''
+				GROUP BY "Host ID"
+			) hn ON hn."Host ID" = v."Host ID"
 ` + vmDiskTotalsJoin + `
 ` + vmAssessmentJoins + `
 
