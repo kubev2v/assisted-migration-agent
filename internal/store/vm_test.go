@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/csv"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -66,6 +67,133 @@ var _ = Describe("VMStore", func() {
 		if tmpDir != "" {
 			_ = os.RemoveAll(tmpDir)
 		}
+	})
+
+	Context("Delete", func() {
+		BeforeEach(func() {
+			_, err := s.Querier().ExecContext(ctx, `
+				INSERT INTO vinfo ("VM ID", "VM") VALUES
+					('vm-delete-1', 'first'),
+					('vm-delete-2', 'second')
+			`)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("deletes only the matching VM", func() {
+			Expect(s.VM().Delete(ctx, store.ByFilter("id = 'vm-delete-1'"))).To(Succeed())
+
+			var ids []string
+			rows, err := s.Querier().QueryContext(ctx, `SELECT "VM ID" FROM vinfo`)
+			Expect(err).NotTo(HaveOccurred())
+			DeferCleanup(rows.Close)
+			for rows.Next() {
+				var id string
+				Expect(rows.Scan(&id)).To(Succeed())
+				ids = append(ids, id)
+			}
+			Expect(rows.Err()).NotTo(HaveOccurred())
+			Expect(ids).To(ConsistOf("vm-delete-2"))
+		})
+
+		It("deletes all VMs when no filter is provided", func() {
+			Expect(s.VM().Delete(ctx, nil)).To(Succeed())
+
+			var count int
+			err := s.Querier().QueryRowContext(ctx, `SELECT count(*) FROM vinfo`).Scan(&count)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(count).To(BeZero())
+		})
+
+		It("keeps the selected VM IDs when the filter uses rows being deleted", func() {
+			_, err := s.Querier().ExecContext(ctx, `
+				INSERT INTO vdisk ("VM ID", "Capacity MiB") VALUES
+					('vm-delete-1', 200),
+					('vm-delete-2', 50)
+			`)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = s.Querier().ExecContext(ctx, `
+				INSERT INTO vnetwork ("VM ID") VALUES ('vm-delete-1'), ('vm-delete-2')
+			`)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(s.VM().Delete(ctx, store.ByFilter("disk.capacity >= 100"))).To(Succeed())
+
+			var vmID string
+			err = s.Querier().QueryRowContext(ctx, `SELECT "VM ID" FROM vinfo`).Scan(&vmID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vmID).To(Equal("vm-delete-2"))
+
+			var networkVMID string
+			err = s.Querier().QueryRowContext(ctx, `SELECT "VM ID" FROM vnetwork`).Scan(&networkVMID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(networkVMID).To(Equal("vm-delete-2"))
+		})
+
+		It("deletes dependent rows only for the matching VM", func() {
+			fixtures := []struct {
+				table     string
+				column    string
+				insertSQL string
+			}{
+				{
+					table: "vm_inspection_concerns", column: `"VM ID"`,
+					insertSQL: `INSERT INTO vm_inspection_concerns ("VM ID", inspection_id) VALUES ('vm-delete-1', 1), ('vm-delete-2', 2)`,
+				},
+				{
+					table: "vm_metadata", column: "vm_id",
+					insertSQL: `INSERT INTO vm_metadata (vm_id, key, value) VALUES ('vm-delete-1', 'env', 'one'), ('vm-delete-2', 'env', 'two')`,
+				},
+				{
+					table: "vcpu", column: `"VM ID"`,
+					insertSQL: `INSERT INTO vcpu ("VM ID") VALUES ('vm-delete-1'), ('vm-delete-2')`,
+				},
+				{
+					table: "vmemory", column: `"VM ID"`,
+					insertSQL: `INSERT INTO vmemory ("VM ID") VALUES ('vm-delete-1'), ('vm-delete-2')`,
+				},
+				{
+					table: "vdisk", column: `"VM ID"`,
+					insertSQL: `INSERT INTO vdisk ("VM ID") VALUES ('vm-delete-1'), ('vm-delete-2')`,
+				},
+				{
+					table: "vnetwork", column: `"VM ID"`,
+					insertSQL: `INSERT INTO vnetwork ("VM ID") VALUES ('vm-delete-1'), ('vm-delete-2')`,
+				},
+				{
+					table: "concerns", column: `"VM_ID"`,
+					insertSQL: `INSERT INTO concerns ("VM_ID") VALUES ('vm-delete-1'), ('vm-delete-2')`,
+				},
+				{
+					table: "vm_inspection_status", column: `"VM ID"`,
+					insertSQL: `INSERT INTO vm_inspection_status ("VM ID", status) VALUES ('vm-delete-1', 'done'), ('vm-delete-2', 'done')`,
+				},
+				{
+					table: "vm_applications", column: "vm_id",
+					insertSQL: `INSERT INTO vm_applications (app_name, app_desc, vm_id, vm_name) VALUES ('app', 'test', 'vm-delete-1', 'first'), ('app', 'test', 'vm-delete-2', 'second')`,
+				},
+			}
+
+			for _, fixture := range fixtures {
+				_, err := s.Querier().ExecContext(ctx, fixture.insertSQL)
+				Expect(err).NotTo(HaveOccurred(), fixture.table)
+			}
+
+			Expect(s.VM().Delete(ctx, store.ByFilter("id = 'vm-delete-1'"))).To(Succeed())
+
+			for _, fixture := range fixtures {
+				query := fmt.Sprintf("SELECT count(*) FROM %s WHERE %s = ?", fixture.table, fixture.column)
+
+				var deletedCount int
+				err := s.Querier().QueryRowContext(ctx, query, "vm-delete-1").Scan(&deletedCount)
+				Expect(err).NotTo(HaveOccurred(), fixture.table)
+				Expect(deletedCount).To(BeZero(), fixture.table)
+
+				var remainingCount int
+				err = s.Querier().QueryRowContext(ctx, query, "vm-delete-2").Scan(&remainingCount)
+				Expect(err).NotTo(HaveOccurred(), fixture.table)
+				Expect(remainingCount).To(Equal(1), fixture.table)
+			}
+		})
 	})
 
 	// Helper to insert test data into vinfo table

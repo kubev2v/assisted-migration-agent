@@ -6,8 +6,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/kubev2v/migration-planner/pkg/inventory"
-
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 )
@@ -61,27 +59,11 @@ func RefreshGroupInventories(ctx context.Context, newSt *store.Store, groupSvc *
 		before := g.Inventory
 
 		if err := newSt.WithTx(ctx, func(txCtx context.Context) error {
-			if err := newSt.Group().RefreshMatches(txCtx, g.ID); err != nil {
-				return fmt.Errorf("refreshing matches for group %s: %w", g.ID, err)
-			}
-			vmIDs, err := newSt.Group().GetMatchedIDs(txCtx, g.ID)
+			var err error
+			g, err = groupSvc.RefreshInventory(txCtx, g)
 			if err != nil {
-				return fmt.Errorf("getting matched IDs for group %s: %w", g.ID, err)
+				return err
 			}
-
-			var inv *inventory.Inventory
-			if len(vmIDs) > 0 {
-				inv, err = groupSvc.inventoryBuilder.BuildInventory(txCtx, vmIDs)
-				if err != nil {
-					return fmt.Errorf("building filtered inventory: %w", err)
-				}
-			}
-
-			if err := newSt.Group().UpdateInventory(txCtx, g.ID, inv); err != nil {
-				return fmt.Errorf("updating inventory for group %s: %w", g.ID, err)
-			}
-
-			g.Inventory = inv
 			return nil
 		}); err != nil {
 			return nil, err

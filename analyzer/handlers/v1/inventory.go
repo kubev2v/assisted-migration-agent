@@ -97,6 +97,35 @@ func (h *Handler) GetLatestVcenterInventory(c *gin.Context, vid string) {
 	c.JSON(http.StatusOK, v1api.Inventory{Inventory: inventory})
 }
 
+func (h *Handler) DeleteInventoryVcentersVid(c *gin.Context, vid string) {
+	vcenterID, err := uuid.Parse(vid)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "vcenter id should be a valid UUID"})
+		return
+	}
+
+	invSvc, err := h.svc.LatestInventoryService()
+	if err != nil {
+		if srvErrors.IsResourceNotFoundError(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "no collections found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := invSvc.DeleteVCenterInventory(c.Request.Context(), vcenterID); err != nil {
+		if srvErrors.IsResourceNotFoundError(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "no inventory found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
 // ── Private shared logic ───────────────────────────────────────────────
 
 func (h *Handler) getInventory(c *gin.Context, invSvc *services.InventoryService) {

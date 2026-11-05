@@ -11,6 +11,7 @@ import (
 
 	"github.com/kubev2v/assisted-migration-agent/pkg/converters"
 
+	"github.com/kubev2v/assisted-migration-agent/internal/filter"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 )
@@ -265,6 +266,20 @@ func (s *VMService) UpdateLabels(ctx context.Context, id string, labels []string
 // The labels and counts are returned in the same order (sorted alphabetically by label).
 func (s *VMService) GetAllLabels(ctx context.Context) ([]string, []int, error) {
 	return s.store.VM().GetAllLabels(ctx)
+}
+
+// Delete removes the VMs matching the filter expression together with their dependent data.
+func (s *VMService) Delete(ctx context.Context, expression string) error {
+	vmFilter, err := filter.ParseWithDefaultMap([]byte(expression))
+	if err != nil {
+		return fmt.Errorf("parsing filter expression: %w", err)
+	}
+
+	if err := s.store.VM().Delete(ctx, vmFilter); err != nil {
+		return fmt.Errorf("deleting VMs: %w", err)
+	}
+
+	return nil
 }
 
 // RemoveLabelFromAllVMs removes a label from all VMs in the system.
