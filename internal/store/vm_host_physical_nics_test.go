@@ -54,9 +54,9 @@ var _ = Describe("VM host physical NICs", func() {
 		})).To(Succeed())
 	})
 	It("preserves host ownership and nullable speeds in both APIs and CSV/XLSX exports", func() {
-		_, err := st.Querier().ExecContext(ctx, `INSERT INTO vinfo ("VM ID", "VM", "Host") VALUES
-     ('vm-1','first','host-1'), ('vm-2','second','host-1'), ('vm-3','third','host-2'),
-     ('vm-4','unknown',''), ('vm-5','missing',NULL);
+		_, err := st.Querier().ExecContext(ctx, `INSERT INTO vinfo ("VM ID", "VM", "Host", "Host ID") VALUES
+     ('vm-1','first','esxi-1','host-1'), ('vm-2','second','esxi-1','host-1'), ('vm-3','third','esxi-2','host-2'),
+     ('vm-4','unknown','',NULL), ('vm-5','missing',NULL,NULL);
      INSERT INTO vnetwork ("VM ID", "NIC label", "Network", "Mac Address") VALUES ('vm-1','adapter','network','00:11:22:33:44:55')`)
 		Expect(err).NotTo(HaveOccurred())
 		vm, err := st.VM().Get(ctx, "vm-1")
@@ -64,9 +64,9 @@ var _ = Describe("VM host physical NICs", func() {
 		Expect(vm.HostPhysicalNICs).To(BeEmpty())
 		Expect(st.Export().CopyScope(ctx, "vms", filepath.Join(dir, "empty.csv"))).To(Succeed())
 		Expect(db.Migrate(ctx, func(ctx context.Context, raw *sql.DB) error { return migrations.RunCollection(ctx, raw, "collection") })).To(Succeed())
-		_, err = st.Querier().ExecContext(ctx, `INSERT INTO vnic VALUES
-     ('host-1','vmnic1',NULL), ('host-1','vmnic0',10000),
-     ('host-2','vmnic0',25000), ('','unowned',1000), (NULL,'unowned-null',1000)`)
+		_, err = st.Querier().ExecContext(ctx, `INSERT INTO vnic ("Host", "Host ID", "Network Device", "Speed") VALUES
+     ('esxi-1','host-1','vmnic1',NULL), ('esxi-1','host-1','vmnic0',10000),
+     ('esxi-2','host-2','vmnic0',25000), ('',NULL,'unowned',1000), (NULL,NULL,'unowned-null',1000)`)
 		Expect(err).NotTo(HaveOccurred())
 		want := map[string]string{
 			"vm-1": `[{"id":"vmnic0","linkSpeedMbps":10000},{"id":"vmnic1"}]`,
@@ -138,13 +138,20 @@ var _ = Describe("VM host physical NICs", func() {
 			for sheet, rows := range map[string][][]interface{}{
 				"vInfo": {
 					{"VM ID", "VM", "Host", "Cluster", "VI SDK UUID", "CPUs", "Memory", "Template"},
-					{"vm-1", "first", "host-1", "cluster", "vc", 2, 4096, "false"},
-					{"vm-2", "second", "host-1", "cluster", "vc", 2, 4096, "false"},
-					{"vm-3", "third", "host-2", "cluster", "vc", 2, 4096, "false"},
+					{"vm-1", "first", "esxi-1", "cluster", "vc", 2, 4096, "false"},
+					{"vm-2", "second", "esxi-1", "cluster", "vc", 2, 4096, "false"},
+					{"vm-3", "third", "esxi-2", "cluster", "vc", 2, 4096, "false"},
+					{"vm-4", "ambiguous", "shared-name", "cluster", "vc", 2, 4096, "false"},
+				},
+				"vHost": {
+					{"Host", "Object ID", "Datacenter", "Cluster", "# Cores", "# CPU", "# Memory", "Model", "Vendor", "Config status"},
+					{"esxi-1", "host-1"}, {"esxi-2", "host-2"},
+					{"shared-name", "host-10"}, {"shared-name", "host-20"},
 				},
 				"vNIC": {
 					{"Host", "Network Device", "Speed"},
-					{"host-1", "vmnic1", 0}, {"host-1", "vmnic0", 10000}, {"host-2", "vmnic0", 25000},
+					{"esxi-1", "vmnic1", 0}, {"esxi-1", "vmnic0", 10000}, {"esxi-2", "vmnic0", 25000},
+					{"shared-name", "vmnic9", 1000},
 				},
 			} {
 				_, err := workbook.NewSheet(sheet)
@@ -165,11 +172,16 @@ var _ = Describe("VM host physical NICs", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(result.IsValid()).To(BeTrue(), "%v", result.Errors)
 		Expect(st.Querier().QueryRowContext(ctx, `SELECT COUNT(*) FROM vnic`).Scan(&count)).To(Succeed())
-		Expect(count).To(Equal(3))
+		if source == "rvtools" {
+			Expect(count).To(Equal(4))
+		} else {
+			Expect(count).To(Equal(3))
+		}
 		want := map[string]string{
 			"vm-1": `[{"id":"vmnic0","linkSpeedMbps":10000},{"id":"vmnic1"}]`,
 			"vm-2": `[{"id":"vmnic0","linkSpeedMbps":10000},{"id":"vmnic1"}]`,
 			"vm-3": `[{"id":"vmnic0","linkSpeedMbps":25000}]`,
+			"vm-4": `[]`,
 		}
 		for id, expected := range want {
 			vm, err := st.VM().Get(ctx, id)
@@ -189,7 +201,7 @@ var _ = Describe("VM host physical NICs", func() {
 		DeferCleanup(output.Close)
 		rows, err := csv.NewReader(output).ReadAll()
 		Expect(err).NotTo(HaveOccurred())
-		Expect(rows).To(HaveLen(4))
+		Expect(rows).To(HaveLen(len(want) + 1))
 		idColumn := slices.Index(rows[0], "id")
 		nicColumn := slices.Index(rows[0], "host_physical_nics")
 		Expect(idColumn).To(BeNumerically(">=", 0))
@@ -210,6 +222,8 @@ func createHostPhysicalNICForkliftSource(path string) {
 		&vsphere.Cluster{Base: vsphere.Base{ID: "cluster", Name: "cluster"}},
 		&vsphere.Host{Base: vsphere.Base{ID: "host-1"}, Cluster: "cluster", Network: vsphere.HostNetwork{PNICs: []vsphere.PNIC{{Key: "vmnic1"}, {Key: "vmnic0", LinkSpeed: 10000}}}},
 		&vsphere.Host{Base: vsphere.Base{ID: "host-2"}, Cluster: "cluster", Network: vsphere.HostNetwork{PNICs: []vsphere.PNIC{{Key: "vmnic0", LinkSpeed: 25000}}}},
+		&vsphere.Host{Base: vsphere.Base{ID: "host-3"}, Cluster: "cluster"},
+		&vsphere.VM{Base: vsphere.Base{ID: "vm-4", Name: "no-nics"}, Host: "host-3", CpuCount: 2, MemoryMB: 4096},
 		&vsphere.VM{Base: vsphere.Base{ID: "vm-1", Name: "first"}, Host: "host-1", CpuCount: 2, MemoryMB: 4096},
 		&vsphere.VM{Base: vsphere.Base{ID: "vm-2", Name: "second"}, Host: "host-1", CpuCount: 2, MemoryMB: 4096},
 		&vsphere.VM{Base: vsphere.Base{ID: "vm-3", Name: "third"}, Host: "host-2", CpuCount: 2, MemoryMB: 4096},

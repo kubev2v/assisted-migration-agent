@@ -144,8 +144,8 @@ host_nics AS (
     SELECT LIST({'ID': n."Network Device", 'LinkSpeedMbps': n."Speed"}
         ORDER BY n."Network Device") AS nics
     FROM vnic n
-    JOIN filtered_vm fv ON n."Host" = fv."Host"
-    WHERE n."Host" != ''
+    JOIN filtered_vm fv ON n."Host ID" = fv."Host ID"
+    WHERE n."Host ID" != ''
 ),
 concerns_agg AS (
     SELECT
