@@ -1,2 +1,2 @@
 # UI image commit shared by the Agent and RVTools container builds.
-AGENT_UI_IMAGE_TAG=bc23f4e482b8d3ac322df922b00836995db78b55
+AGENT_UI_IMAGE_TAG=695f8185a741832596cc411e92bb674612965c22
