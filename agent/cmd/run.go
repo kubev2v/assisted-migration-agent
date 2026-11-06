@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/go-extras/cobraflags"
@@ -15,10 +16,12 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/agent/app"
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
+	"github.com/kubev2v/assisted-migration-agent/internal/upgrade"
 	"github.com/kubev2v/assisted-migration-agent/internal/util"
 )
 
 func NewRunCommand(cfg *config.Configuration) *cobra.Command {
+	opts := upgrade.Options{}
 	runCmd := &cobra.Command{
 		Use:   "run",
 		Short: "Run agent",
@@ -32,13 +35,22 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
   # Run agent in production mode
   agent run --agent-id 550e8400-e29b-41d4-a716-446655440000 --source-id 6ba7b810-9dad-11d1-80b4-00c04fd430c8 --server-mode prod --server-statics-folder /var/www/statics`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
+			if err := opts.Validate(); err != nil {
+				return err
+			}
+			if opts.AttemptID != "" {
+				return nil
+			}
 			return validateConfiguration(cfg)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return app.Run(cfg)
+			return app.RunManaged(cfg, opts)
 		},
 	}
 
+	runCmd.Flags().StringVar(&opts.AttemptID, "upgrade-attempt-id", "", "Run read-only probation for this prepared upgrade attempt")
+	runCmd.Flags().StringVar(&opts.ImageID, "upgrade-image-id", "", "Immutable Podman image ID supplied by the host")
+	runCmd.Flags().DurationVar(&opts.Timeout, "upgrade-timeout", 300*time.Second, "Deadline for each maintenance or probation validation phase")
 	registerFlags(runCmd, cfg)
 	cobraflags.CobraOnInitialize("AGENT", runCmd)
 

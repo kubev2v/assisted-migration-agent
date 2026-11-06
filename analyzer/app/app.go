@@ -18,6 +18,7 @@ import (
 	analyzerHandlers "github.com/kubev2v/assisted-migration-agent/analyzer/handlers/v1"
 	"github.com/kubev2v/assisted-migration-agent/internal/bootstrap"
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
+	"github.com/kubev2v/assisted-migration-agent/internal/datalock"
 	"github.com/kubev2v/assisted-migration-agent/internal/handlers"
 	"github.com/kubev2v/assisted-migration-agent/internal/server"
 	"github.com/kubev2v/assisted-migration-agent/internal/services"
@@ -27,6 +28,14 @@ import (
 const apiV1 = "/api/v1"
 
 func Run(ctx context.Context, cfg *config.Configuration) error {
+	if err := os.MkdirAll(cfg.Agent.DataFolder, 0750); err != nil {
+		return err
+	}
+	lock, err := datalock.Acquire(cfg.Agent.DataFolder)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = lock.Close() }()
 	srv, cleanup, err := bootstrapAnalyzer(cfg)
 	if err != nil {
 		return err

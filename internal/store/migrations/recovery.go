@@ -13,8 +13,9 @@ import (
 	"regexp"
 	"slices"
 	"strings"
-	"syscall"
 	"text/template"
+
+	"github.com/kubev2v/assisted-migration-agent/internal/datalock"
 
 	_ "github.com/duckdb/duckdb-go/v2"
 )
@@ -94,14 +95,11 @@ func (r *Recovery) Run(ctx context.Context, request Request) (Result, error) {
 		return result, fmt.Errorf("opening data folder: %w", err)
 	}
 	defer func() { _ = root.Close() }()
-	lock, err := root.Open(".")
+	lock, err := datalock.Acquire(r.dataFolder)
 	if err != nil {
 		return result, err
 	}
 	defer func() { _ = lock.Close() }()
-	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
-		return result, fmt.Errorf("migration data folder is busy: %w", err)
-	}
 
 	if request.Operation == "prepare" {
 		return r.prepare(ctx, root, request, result)

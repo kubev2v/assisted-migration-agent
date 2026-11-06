@@ -8,14 +8,13 @@ import (
 	"os"
 	"os/signal"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
-	"github.com/ecordell/optgen/helpers"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
+	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/pkg/opa"
 	"go.uber.org/zap"
 
@@ -23,10 +22,12 @@ import (
 	v2Handlers "github.com/kubev2v/assisted-migration-agent/agent/handlers/v2"
 	"github.com/kubev2v/assisted-migration-agent/internal/bootstrap"
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
+	"github.com/kubev2v/assisted-migration-agent/internal/datalock"
 	"github.com/kubev2v/assisted-migration-agent/internal/handlers"
 	"github.com/kubev2v/assisted-migration-agent/internal/server"
 	service "github.com/kubev2v/assisted-migration-agent/internal/services"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
+	"github.com/kubev2v/assisted-migration-agent/internal/upgrade"
 	"github.com/kubev2v/assisted-migration-agent/pkg/console"
 	"github.com/kubev2v/assisted-migration-agent/pkg/crypto"
 )
@@ -36,73 +37,138 @@ const (
 )
 
 func Run(cfg *config.Configuration) error {
-	zap.S().Infow("using configuration",
-		"agent", helpers.Flatten(cfg.Agent.DebugMap()),
-		"server", helpers.Flatten(cfg.Server.DebugMap()),
-		"console", helpers.Flatten(cfg.Console.DebugMap()),
-		"auth", helpers.Flatten(cfg.Auth.DebugMap()),
-	)
+	return RunManaged(cfg, upgrade.Options{})
+}
 
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGQUIT)
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-
-	srv, cleanup, err := initV2(cfg)
+// RunManaged holds the data lock across probation release and normal startup.
+func RunManaged(cfg *config.Configuration, opts upgrade.Options) error {
+	lock, err := datalock.Acquire(cfg.Agent.DataFolder)
 	if err != nil {
 		return err
 	}
-	defer cleanup()
-
-	go func() {
-		defer func() {
-			wg.Done()
-			cancel()
-		}()
-		zap.S().Infof("Starting HTTP server on port %d", cfg.Server.HTTPPort)
-
-		if err := srv.Start(ctx); err != nil {
-			if !errors.Is(err, http.ErrServerClosed) {
-				zap.S().Fatalw("failed to start http server", "error", err)
-			}
+	defer func() { _ = lock.Close() }()
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGQUIT)
+	defer cancel()
+	for {
+		srv, cleanup, lifecycle, err := initV2Managed(cfg, opts)
+		if err != nil {
+			return err
 		}
-	}()
-
-	go func() {
-		<-ctx.Done()
-		stopCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		srv.Stop(stopCtx)
-	}()
-
-	<-ctx.Done()
-	wg.Wait()
-
-	zap.S().Info("server shutdown")
-
-	return nil
+		serverDone := make(chan error, 1)
+		go func() { serverDone <- srv.Start(ctx) }()
+		restart := false
+		select {
+		case <-ctx.Done():
+		case opts = <-lifecycle.Restart():
+			restart = true
+		case err = <-serverDone:
+			lifecycle.Close()
+			cleanup()
+			if err != nil && !errors.Is(err, http.ErrServerClosed) {
+				return err
+			}
+			return nil
+		}
+		srv.Stop(context.WithoutCancel(ctx))
+		// Finish every request before closing services or releasing the data lock.
+		err = <-serverDone
+		lifecycle.Close()
+		cleanup()
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return err
+		}
+		if !restart {
+			return nil
+		}
+		cfg.Agent.AutoMigrate = false
+	}
 }
 
-func initV2(cfg *config.Configuration) (*server.Server, func(), error) {
+func initV2Managed(cfg *config.Configuration, opts upgrade.Options) (*server.Server, func(), *upgrade.Service, error) {
+	timeout := opts.Timeout
+	if timeout == 0 {
+		timeout = 300 * time.Second
+	}
+	if err := upgrade.Authorize(cfg.Agent.DataFolder, opts, false); err != nil {
+		return nil, nil, nil, err
+	}
+	if opts.AttemptID != "" {
+		lifecycle, err := upgrade.NewService(cfg.Agent.DataFolder, opts, nil, timeout)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		if err := lifecycle.ValidateProbation(ctx); err != nil {
+			return nil, nil, nil, err
+		}
+		handler := v2Handlers.NewUpgradeHandler(v2Handlers.NewHandler(*cfg, nil), lifecycle)
+		swagger, err := v2.GetSwagger()
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		srv, err := server.NewServer(cfg.Server, map[string]server.APIGroup{apiV2: {Swagger: swagger, RegisterFn: func(router *gin.RouterGroup) { router.Use(handler.Admission); v2.RegisterHandlers(router, handler) }}})
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		return srv, func() {}, lifecycle, nil
+	}
+
+	// Probation skips ordinary CLI validation. Validate identities before a
+	// released process opens writable stores or constructs the console service.
+	if cfg.Agent.RVToolsMode {
+		cfg.Agent.Mode = "disconnected"
+		if cfg.Agent.ID == "" {
+			cfg.Agent.ID = uuid.NewString()
+		}
+		if cfg.Agent.SourceID == "" {
+			cfg.Agent.SourceID = uuid.NewString()
+		}
+	}
+	if _, err := uuid.Parse(cfg.Agent.ID); err != nil {
+		return nil, nil, nil, fmt.Errorf("invalid agent-id: %w", err)
+	}
+	if _, err := uuid.Parse(cfg.Agent.SourceID); err != nil {
+		return nil, nil, nil, fmt.Errorf("invalid source-id: %w", err)
+	}
+
 	opaValidator, err := opa.NewValidatorFromDir(cfg.Agent.OpaPoliciesFolder)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to initialize OPA validator: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to initialize OPA validator: %w", err)
 	}
 
 	pool, err := bootstrap.InitPool(cfg.Agent.DataFolder, cfg.Agent.AutoMigrate)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
+	initialized := false
+	defer func() {
+		if !initialized {
+			pool.Close()
+		}
+	}()
 	consoleClient, km, err := initShared(cfg)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	v2SvcMgr, err := NewAgentServiceManager(cfg, pool, consoleClient, km, service.WithOpaValidator(opaValidator))
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to initialize v2 service: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to initialize v2 service: %w", err)
 	}
 
+	defer func() {
+		if !initialized {
+			v2SvcMgr.ConsoleService().Stop()
+			v2SvcMgr.Stop(context.Background())
+		}
+	}()
+	lifecycle, err := upgrade.NewService(cfg.Agent.DataFolder, opts, v2SvcMgr, timeout)
+	if err != nil {
+		v2SvcMgr.ConsoleService().Stop()
+		return nil, nil, nil, err
+	}
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		handlers.RegisterValidators(v)
 	}
@@ -117,28 +183,32 @@ func initV2(cfg *config.Configuration) (*server.Server, func(), error) {
 
 	swagger, err := v2.GetSwagger()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to load v2 swagger spec: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to load v2 swagger spec: %w", err)
 	}
 
+	handler := v2Handlers.NewUpgradeHandler(v2H, lifecycle)
 	srv, err := server.NewServer(cfg.Server, map[string]server.APIGroup{
 		apiV2: {
 			Swagger: swagger,
 			RegisterFn: func(router *gin.RouterGroup) {
-				v2.RegisterHandlers(router, v2H)
+				router.Use(handler.Admission)
+				v2.RegisterHandlers(router, handler)
 			},
 		},
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create http server: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to create http server: %w", err)
 	}
 
 	cleanup := func() {
+		v2SvcMgr.ConsoleService().Stop()
 		v2SvcMgr.Stop(context.Background())
 		pool.Close()
 		zap.S().Info("v2 service and pool closed")
 	}
 
-	return srv, cleanup, nil
+	initialized = true
+	return srv, cleanup, lifecycle, nil
 }
 
 // NewAgentServiceManager assembles the services required by the Agent.

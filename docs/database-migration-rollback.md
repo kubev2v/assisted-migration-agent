@@ -2,8 +2,9 @@
 
 The agent provides an offline migration CLI for a host-coordinated appliance
 upgrade. **Stop the agent and all other database users before invoking it.**
-This change supplies the migration engine and CLI; maintenance/probation mode
-and the host's activation/reboot protocol are follow-up work. It does not make
+The migration engine and CLI are paired with the agent-side
+[lifecycle controls](appliance-upgrade-lifecycle.md). The host activation/reboot
+protocol remains separate planner work. It does not make
 Podman's existing automatic image rollback safe for schema-changing upgrades.
 
 The host must retain both images by immutable image ID. Run every command below
@@ -37,7 +38,7 @@ The separate RVTools Analyzer retains its existing automatic migration behavior.
 agent migrate prepare --data-folder /var/lib/agent --attempt-id <uuid> \
   --previous-image sha256:<old-id> --candidate-image sha256:<candidate-id>
 agent migrate apply --data-folder /var/lib/agent --attempt-id <uuid>
-# Start and validate the candidate without enabling ordinary writes (follow-up).
+# Start and validate the candidate in probation (see appliance-upgrade-lifecycle.md).
 # That host-managed startup must pass --auto-migrate=false.
 # If upgrade fails, stop it and invoke:
 agent migrate rollback --data-folder /var/lib/agent --attempt-id <uuid> --dry-run
@@ -86,8 +87,8 @@ unknown/gapped history, missing history/files, a changed file inventory, a
 symlink database, or a mismatched candidate registry fails preflight. Rollback
 never initializes missing databases and never goes below initialized version 1.
 The directory lock serializes these offline commands; DuckDB file locks reject
-other processes holding databases. Full application/CLI data exclusion belongs
-to the follow-up maintenance implementation.
+other processes holding databases. Application and analyzer processes now hold the same directory lock; see
+[agent lifecycle controls](appliance-upgrade-lifecycle.md).
 
 Each executed command writes one JSON result to stdout. `steps` lists planned
 steps for dry-run and attempted steps for execution; `versions` lists observed
