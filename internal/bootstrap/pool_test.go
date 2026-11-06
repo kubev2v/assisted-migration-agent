@@ -58,7 +58,7 @@ var _ = Describe("Pool", func() {
 
 			seedPool.Close()
 
-			pool, err := bootstrap.InitPool(tmpDir)
+			pool, err := bootstrap.InitPool(tmpDir, true)
 			Expect(err).NotTo(HaveOccurred())
 			defer pool.Close()
 
@@ -84,7 +84,7 @@ var _ = Describe("Pool", func() {
 
 			seedPool.Close()
 
-			pool, err := bootstrap.InitPool(tmpDir)
+			pool, err := bootstrap.InitPool(tmpDir, true)
 			Expect(err).NotTo(HaveOccurred())
 			defer pool.Close()
 
@@ -108,7 +108,7 @@ var _ = Describe("Pool", func() {
 
 			seedPool.Close()
 
-			pool, err := bootstrap.InitPool(tmpDir)
+			pool, err := bootstrap.InitPool(tmpDir, true)
 			Expect(err).NotTo(HaveOccurred())
 			defer pool.Close()
 
@@ -125,7 +125,7 @@ var _ = Describe("Pool", func() {
 		It("should be a no-op when no stale collections exist", func() {
 			seedPool.Close()
 
-			pool, err := bootstrap.InitPool(tmpDir)
+			pool, err := bootstrap.InitPool(tmpDir, true)
 			Expect(err).NotTo(HaveOccurred())
 			defer pool.Close()
 
@@ -154,7 +154,7 @@ var _ = Describe("Pool", func() {
 
 			seedPool.Close()
 
-			pool, err := bootstrap.InitPool(tmpDir)
+			pool, err := bootstrap.InitPool(tmpDir, true)
 			Expect(err).NotTo(HaveOccurred())
 			defer pool.Close()
 

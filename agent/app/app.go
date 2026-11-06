@@ -88,7 +88,7 @@ func initV2(cfg *config.Configuration) (*server.Server, func(), error) {
 		return nil, nil, fmt.Errorf("failed to initialize OPA validator: %w", err)
 	}
 
-	pool, err := bootstrap.InitPool(cfg.Agent.DataFolder)
+	pool, err := bootstrap.InitPool(cfg.Agent.DataFolder, cfg.Agent.AutoMigrate)
 	if err != nil {
 		return nil, nil, err
 	}

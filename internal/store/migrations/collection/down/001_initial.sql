@@ -1,0 +1,20 @@
+-- Appliance recovery never downgrades below the initialized version 1 baseline.
+DROP TABLE tag_categories;
+DROP TABLE vm_applications;
+ALTER TABLE vinfo DROP COLUMN labels;
+ALTER TABLE vinfo DROP COLUMN migration_excluded;
+ALTER TABLE vdatastore DROP COLUMN "Backing Devices";
+DROP TABLE rightsizing_vm_utilization;
+DROP TABLE rightsizing_vm_warnings;
+DROP TABLE rightsizing_metrics;
+DROP TABLE rightsizing_reports;
+DROP TABLE vm_inspection_concerns;
+DROP SEQUENCE vm_inspection_id_seq;
+DROP SEQUENCE vm_inspection_concerns_seq;
+DROP TABLE group_matches;
+DROP TABLE groups;
+DROP TABLE outbox;
+DROP SEQUENCE outbox_id_seq;
+DROP TABLE vm_inspection_status;
+DROP SEQUENCE vm_inspection_status_seq;
+DROP TABLE inventory;
