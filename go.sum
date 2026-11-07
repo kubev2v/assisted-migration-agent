@@ -576,8 +576,8 @@ github.com/opencontainers/runtime-tools v0.9.1-0.20261017090856-bd3b0bd00f44 h1:
 github.com/opencontainers/runtime-tools v0.9.1-0.20261017090856-bd3b0bd00f44/go.mod h1:DKDEfzxvRkoQ6n9TGhxQgg2IM1lY4aM0eaQP4e3oElw=
 github.com/opencontainers/selinux v1.15.1 h1:ERxeh5caJvCzNAKdI8WQbJmB1LDTn4BuaAg8wihLBpA=
 github.com/opencontainers/selinux v1.15.1/go.mod h1:LenyElirjUHszfxrjuFqC85HIeXZKumHcKMQtnaDlQQ=
-github.com/openshift/api v0.0.0-20261105213926-861a8c73dbf4 h1:WU8lCRQNRX8XUx0HDE0XVAb3mY0Vu++pbUd3dlr1DE0=
-github.com/openshift/api v0.0.0-20261105213926-861a8c73dbf4/go.mod h1:2oI3aXQFDjjl7l4xA9ZPSkB+l+lyfWLg7P2sWg9yEvM=
+github.com/openshift/api v0.0.0-20261107000926-248dd91956ce h1:FUT6kBuZ+GbNRyxu54j8vFYOiUpgv7UVSBYg0QvUFhQ=
+github.com/openshift/api v0.0.0-20261107000926-248dd91956ce/go.mod h1:2oI3aXQFDjjl7l4xA9ZPSkB+l+lyfWLg7P2sWg9yEvM=
 github.com/openshift/client-go v0.0.0-20261027103500-48133ed95dad h1:KJ8Fs8QpXjtT854HjMLZyIjptLEHm4I6RC2OCZu6DvY=
 github.com/openshift/client-go v0.0.0-20261027103500-48133ed95dad/go.mod h1:g4WVqRD/NuQWnM6lQP+LhLSryRganEdhYq68YghbXi4=
 github.com/openshift/custom-resource-status v1.1.2 h1:C3DL44LEbvlbItfd8mT5jWrqPfHnSOQoQf/sypqA6A4=
