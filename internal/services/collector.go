@@ -108,3 +108,18 @@ func (c *CollectorService) Stop() {
 		s.Close()
 	}
 }
+
+// IsBusy includes finalization: a terminal UI state can precede its last writes.
+func (c *CollectorService) IsBusy() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.done == nil {
+		return false
+	}
+	select {
+	case <-c.done:
+		return false
+	default:
+		return true
+	}
+}

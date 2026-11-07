@@ -160,13 +160,8 @@ RUN mkdir -p /var/lib/agent /app/.cache/libvirt && \
 
 ENV LIBGUESTFS_BACKEND=direct
 
-# Create entrypoint script
-RUN printf '#!/bin/sh\n\
-# Copy DuckDB extensions to persistent data folder\n\
-if [ -d /app/extensions ] && [ -d /var/lib/agent ]; then\n\
-    cp -n /app/extensions/*.duckdb_extension /var/lib/agent/ 2>/dev/null || true\n\
-fi\n\
-exec /app/agent "$@"\n' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+# Install the entrypoint with host-managed probation guards.
+COPY --chmod=0755 agent/entrypoint.sh /app/entrypoint.sh
 
 ARG RELEASE_TAGS=""
 LABEL konflux.additional-tags="${RELEASE_TAGS}"

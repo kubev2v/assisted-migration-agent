@@ -59,7 +59,14 @@ COPY --from=duckdb-extensions /extensions /app/extensions
 RUN mkdir -p /var/lib/agent && \
     chown -R 1001:0 /app/static /app/policies /app/extensions /var/lib/agent
 RUN printf '#!/bin/sh\n\
-cp --remove-destination /app/extensions/*.duckdb_extension /var/lib/agent/ || exit 1\n\
+probation=false\n\
+[ -z "${AGENT_UPGRADE_ATTEMPT_ID:-}" ] || probation=true\n\
+for arg in "$@"; do\n\
+    case "$arg" in --upgrade-attempt-id|--upgrade-attempt-id=*) probation=true ;; esac\n\
+done\n\
+if [ "${1:-}" = run ] && [ "$probation" = false ] && [ ! -e /var/lib/agent/updates/authorization.json ]; then\n\
+    cp --remove-destination /app/extensions/*.duckdb_extension /var/lib/agent/ || exit 1\n\
+fi\n\
 exec /app/agent "$@"\n' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 ARG RELEASE_TAGS=""
 LABEL konflux.additional-tags="${RELEASE_TAGS}"

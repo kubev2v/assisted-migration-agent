@@ -28,6 +28,55 @@ tags:
   - name: Version
     description: Agent version information
 paths:
+  /upgrade:
+    get:
+      tags: [Agent]
+      summary: Read the host-only upgrade lifecycle
+      operationId: getUpgrade
+      parameters:
+        - in: header
+          name: X-Upgrade-Token
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lifecycle state, bound to an attempt and image
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpgradeStatus'
+        '403':
+          description: Requires a loopback peer and the local control token
+    put:
+      tags: [Agent]
+      summary: Request a host-only maintenance or release transition
+      operationId: putUpgrade
+      parameters:
+        - in: header
+          name: X-Upgrade-Token
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpgradeRequest'
+      responses:
+        '202':
+          description: Transition accepted; poll GET for completion
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpgradeStatus'
+        '400':
+          description: Invalid request
+        '403':
+          description: Requires a loopback peer and the local control token
+        '409':
+          description: Attempt, image, phase, or release authorization conflict
   # ── Agent ──────────────────────────────────────────────────────────────
   /agent:
     get:
@@ -1543,6 +1592,37 @@ paths:
 # ══════════════════════════════════════════════════════════════════════════
 components:
   schemas:
+    UpgradeRequest:
+      type: object
+      required: [action, attempt_id]
+      properties:
+        action:
+          type: string
+          enum: [maintenance, resume, release]
+        attempt_id:
+          type: string
+          pattern: '^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$'
+        previous_image:
+          type: string
+          pattern: '^sha256:[0-9a-f]{64}$'
+        candidate_image:
+          type: string
+          pattern: '^sha256:[0-9a-f]{64}$'
+    UpgradeStatus:
+      type: object
+      required: [contract_version, state, attempt_id, image_id]
+      properties:
+        contract_version:
+          type: integer
+        state:
+          type: string
+          enum: [normal, draining, maintenance, probation, ready, failed, releasing]
+        attempt_id:
+          type: string
+        image_id:
+          type: string
+        error:
+          type: string
     # ── Collections ──────────────────────────────────────────────────────
     Collection:
       type: object
