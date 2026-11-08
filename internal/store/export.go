@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
 )
 
 // ExportStore runs DuckDB COPY queries for CSV export scopes.
@@ -65,7 +67,15 @@ func (s *ExportStore) CopyScope(ctx context.Context, scope, path string) error {
 	if !ok {
 		return fmt.Errorf("unknown export scope: %s", scope)
 	}
-	return s.copyQueryToFile(ctx, spec.query, path, spec.filename)
+	query := spec.query
+	if scope == "datastores" || scope == "disks" {
+		topology, err := duckdb_parser.StorageTopologyQuery(ctx, s.db)
+		if err != nil {
+			return fmt.Errorf("resolving storage topology: %w", err)
+		}
+		query = strings.ReplaceAll(query, "{storage_topology}", topology)
+	}
+	return s.copyQueryToFile(ctx, query, path, spec.filename)
 }
 
 // ExportUtilization writes vm_utilization.csv and cluster_utilization.csv into dir.

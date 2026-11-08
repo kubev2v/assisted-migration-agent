@@ -1,7 +1,5 @@
 package store
 
-import "github.com/kubev2v/migration-planner/pkg/duckdb_parser"
-
 // Export COPY queries build migration-planning CSV views, not raw table dumps.
 // They join inventory with concerns, inspection, utilization, and groups and
 // compute migration_status (Ready/Review/Blocked/Excluded) aligned with the VM API.
@@ -240,7 +238,6 @@ const hostsQuery = `
 
 		COPY (
 			SELECT
-				COALESCE(h."Host", '') AS name,
 				COALESCE(h."Object ID", '') AS id,
 				COALESCE(h."Datacenter", '') AS datacenter,
 				COALESCE(h."Cluster", '') AS cluster,
@@ -251,7 +248,11 @@ const hostsQuery = `
 				COALESCE(h."Vendor", '') AS vendor,
 				COALESCE(h."Model", '') AS model,
 				COALESCE(h."Config status", '') AS config_status,
-				COALESCE(vm_counts.vm_count, 0) AS vm_count
+				COALESCE(vm_counts.vm_count, 0) AS vm_count,
+				h."VMotion support" AS vmotion_supported,
+				h."Storage VMotion support" AS storage_vmotion_supported,
+				CASE WHEN LOWER(TRIM(h."VI SDK UUID")) = 'vm' THEN NULL
+                    ELSE NULLIF(TRIM(h."VI SDK UUID"), '') END AS vcenter_id
 
 			FROM vhost h
 
@@ -300,11 +301,103 @@ const clustersQuery = `
 	
 `
 
+const datastoreProtocolExpr = `COALESCE(
+    NULLIF(backing_info.protocols, ''),
+    CASE
+        WHEN LOWER(TRIM(ds."Storage Protocol")) IN ('fibrechannel', 'fibre channel', 'fc') THEN 'FibreChannel'
+        ELSE NULLIF(TRIM(ds."Storage Protocol"), '')
+    END
+)`
+
+// Keep these access categories aligned with inventory.StorageProtocolFromDatastoreType.
+const datastoreAccessCategoryExpr = `CASE UPPER(TRIM(ds."Type"))
+    WHEN 'VMFS' THEN 'Block'
+    WHEN 'NFS' THEN 'File'
+    WHEN 'NFS41' THEN 'File'
+    WHEN 'NFS4.1' THEN 'File'
+    WHEN 'NFS 4.1' THEN 'File'
+    WHEN 'VSAN' THEN 'Object'
+END`
+
+const exportStorageTopologyQuery = `
+            export_host_candidates AS (
+                SELECT ds.datastore_row_id, TRIM(member.reference) AS reference, MIN(h.rowid) AS host_row_id
+                FROM storage_datastores ds
+                CROSS JOIN UNNEST(COALESCE(
+                    TRY(from_json(ds."Hosts", '["VARCHAR"]')),
+                    string_split(COALESCE(ds."Hosts", ''), ',')
+                )) AS member(reference)
+                JOIN vhost h ON TRIM(member.reference) = TRIM(h."Object ID")
+                    OR LOWER(TRIM(member.reference)) = LOWER(TRIM(h."Host"))
+                WHERE TRIM(member.reference) != ''
+                GROUP BY ds.datastore_row_id, TRIM(member.reference)
+                HAVING COUNT(DISTINCT h.rowid) = 1
+            ),
+            export_datastore_hosts AS (
+                SELECT DISTINCT c.datastore_row_id, c.host_row_id, TRIM(h."Object ID") AS host_id
+                FROM export_host_candidates c
+                JOIN vhost h ON h.rowid = c.host_row_id
+            ),
+            export_storage_owners AS (
+                SELECT TRIM("Object ID") AS host_id
+                FROM vhost
+                WHERE NULLIF(TRIM("Object ID"), '') IS NOT NULL
+                GROUP BY TRIM("Object ID")
+                HAVING COUNT(*) = 1
+            ),
+            export_storage_scsi AS (
+                SELECT TRIM(s."Host ID") AS "Host ID",
+                    s."HBA Device" AS "HBA Device",
+                    s."Canonical Name" AS "Canonical Name",
+                    s."LUN Vendor" AS "LUN Vendor",
+                    s."LUN Model" AS "LUN Model"
+                FROM vhostscsi s
+                JOIN export_storage_owners owner ON owner.host_id = TRIM(s."Host ID")
+            ),
+            export_storage_hbas AS (
+                SELECT TRIM(h."Host ID") AS "Host ID",
+                    h."Device" AS "Device", h."Protocol" AS "Protocol"
+                FROM vhba h
+                JOIN export_storage_owners owner ON owner.host_id = TRIM(h."Host ID")
+            ),
+            export_disk_candidates AS (
+                SELECT dk."VM ID", dk.rowid AS disk_row_id, ds.datastore_row_id,
+                    member.host_row_id IS NOT NULL AS host_match
+                FROM vdisk dk
+                JOIN storage_datastores ds
+                    ON ds."Name" = COALESCE(
+                        NULLIF(TRIM(regexp_extract(TRIM(dk."Path"), '^\[([^\]]+)\]', 1)), ''),
+                        NULLIF(TRIM(regexp_extract(TRIM(dk."Disk Path"), '^\[([^\]]+)\]', 1)), '')
+                    )
+                LEFT JOIN vinfo i ON i."VM ID" = dk."VM ID"
+                LEFT JOIN storage_host_references vm_host ON vm_host.reference = TRIM(i."Host")
+                LEFT JOIN export_datastore_hosts member
+                    ON member.datastore_row_id = ds.datastore_row_id
+                    AND member.host_row_id = vm_host.host_row_id
+            ),
+            export_disk_datastores AS (
+                SELECT "VM ID", disk_row_id, datastore_row_id
+                FROM export_disk_candidates
+                QUALIFY COUNT(*) OVER (PARTITION BY "VM ID", disk_row_id) = 1
+                    OR (host_match AND COUNT(*) FILTER (WHERE host_match)
+                        OVER (PARTITION BY "VM ID", disk_row_id) = 1)
+            )
+`
+
+const exportDatastoreBackingInfoQuery = `
+vm_datastores AS (SELECT * FROM storage_datastores),
+backing_datastore_hosts AS (SELECT * FROM export_datastore_hosts),
+backing_scsi AS (SELECT * FROM export_storage_scsi),
+backing_hbas AS (SELECT * FROM export_storage_hbas),
+` + datastoreBackingInfoQuery
+
 // datastoresQuery — scope "datastores": capacity, free space, used_percent, and VM count per datastore.
 var datastoresQuery = `
 
 		COPY (
-			WITH ` + duckdb_parser.DatastoreResolutionQuery() + `
+			WITH {storage_topology},
+            ` + exportStorageTopologyQuery + `,
+            ` + exportDatastoreBackingInfoQuery + `
 			SELECT
 				COALESCE(ds."Name", '') AS name,
 				COALESCE(ds."Object ID", '') AS id,
@@ -321,21 +414,66 @@ var datastoresQuery = `
 				END AS used_percent,
 				COALESCE(ds."MHA", false) AS mha_enabled,
 				COALESCE(ds."Hosts", '') AS hosts,
-				COALESCE(vm_counts.vm_count, 0) AS vm_count
+				COALESCE(vm_counts.vm_count, 0) AS vm_count,
+                (ds."Capacity MiB" - ds."Free MiB") / 1024.0 AS used_gib,
+                ds."Storage Protocol" AS storage_protocol,
+                ds."Filesystem Type" AS filesystem_type,
+                ds."Filesystem Major Version" AS filesystem_major_version,
+                ds."Backing Devices" AS backing_devices,
+                ds."SIOC Enabled" AS sioc_enabled,
+                ` + datastoreProtocolExpr + ` AS protocol_type,
+                ` + datastoreAccessCategoryExpr + ` AS storage_access_category,
+                backing_info.vendor AS vendor,
+                backing_info.model AS model
 
 			FROM storage_datastores ds
+            LEFT JOIN backing_info ON backing_info.datastore_row_id = ds.datastore_row_id
 
 			LEFT JOIN (
 				SELECT
 					datastore_row_id,
 					COUNT(DISTINCT "VM ID") AS vm_count
-				FROM storage_disk_datastores
+				FROM export_disk_datastores
 				GROUP BY datastore_row_id
 			) vm_counts ON ds.datastore_row_id = vm_counts.datastore_row_id
 
 			ORDER BY ds."Name"
 		) TO ? (FORMAT CSV, HEADER TRUE)
 	
+`
+
+// hostStorageOwners resolves only host IDs that identify a single inventory row.
+const hostStorageOwners = `
+    SELECT TRIM("Object ID") AS host_id, MIN("Host") AS host
+    FROM vhost
+    WHERE NULLIF(TRIM("Object ID"), '') IS NOT NULL
+    GROUP BY TRIM("Object ID")
+    HAVING COUNT(*) = 1
+`
+
+const hbasQuery = `
+    COPY (
+        SELECT h."Host ID" AS host_id, owners.host AS host, h."Device" AS device,
+            h."Type" AS adapter_type, h."Protocol" AS protocol,
+            h."Model" AS model, h."Driver" AS driver,
+            h."Node WWN" AS node_wwn, h."Port WWN" AS port_wwn,
+            h."HBA Key" AS adapter_key
+        FROM vhba h
+        LEFT JOIN (` + hostStorageOwners + `) owners ON TRIM(h."Host ID") = owners.host_id
+        ORDER BY host_id, device, adapter_key
+    ) TO ? (FORMAT CSV, HEADER TRUE)
+`
+
+const lunsQuery = `
+    COPY (
+        SELECT s."Host ID" AS host_id, owners.host AS host,
+            s."HBA Device" AS hba_device, s."Canonical Name" AS canonical_name,
+            s."LUN Vendor" AS lun_vendor, s."LUN Model" AS lun_model,
+            s."LUN UUID" AS lun_uuid, s."SCSI Disk Key" AS scsi_disk_key
+        FROM vhostscsi s
+        LEFT JOIN (` + hostStorageOwners + `) owners ON TRIM(s."Host ID") = owners.host_id
+        ORDER BY host_id, hba_device, canonical_name, scsi_disk_key
+    ) TO ? (FORMAT CSV, HEADER TRUE)
 `
 
 // networkQuery — scope "network": one row per NIC from vnetwork with stable nic_index ordering per VM.
@@ -379,6 +517,9 @@ const networkQuery = `
 // disksQuery — scope "disks": one row per stored virtual disk with its VM identity.
 const disksQuery = `
 		COPY (
+            WITH {storage_topology},
+            ` + exportStorageTopologyQuery + `,
+            ` + exportDatastoreBackingInfoQuery + `
 			SELECT
 				COALESCE(v."VM", '') AS vm_name,
 				d."VM ID" AS vm_id,
@@ -398,9 +539,23 @@ const disksQuery = `
 				COALESCE(d."Thin", false) AS thin,
 				COALESCE(d."Controller", '') AS controller,
 				COALESCE(d."Label", '') AS label,
-				COALESCE(d."SCSI Unit #", '') AS scsi_unit_number
+				COALESCE(d."SCSI Unit #", '') AS scsi_unit_number,
+                CASE WHEN d."Raw" THEN d."RDM LUN UUID" END AS rdm_lun_uuid,
+                ds."Object ID" AS datastore_id,
+                ds."Name" AS datastore_name,
+                ds."Type" AS datastore_type,
+                ds."Filesystem Type" AS datastore_filesystem_type,
+                ds."Filesystem Major Version" AS datastore_filesystem_major_version,
+                ` + datastoreProtocolExpr + ` AS datastore_protocol_type,
+                ` + datastoreAccessCategoryExpr + ` AS datastore_storage_protocol,
+                ds."Backing Devices" AS datastore_backing_devices,
+                backing_info.vendor AS datastore_vendor,
+                backing_info.model AS datastore_model
 			FROM vdisk d
 			LEFT JOIN vinfo v ON d."VM ID" = v."VM ID"
+            LEFT JOIN export_disk_datastores resolved ON resolved.disk_row_id = d.rowid AND resolved."VM ID" = d."VM ID"
+            LEFT JOIN storage_datastores ds ON ds.datastore_row_id = resolved.datastore_row_id
+            LEFT JOIN backing_info ON backing_info.datastore_row_id = ds.datastore_row_id
 			ORDER BY v."VM", d."VM ID", TRY_CAST(d."Disk Key" AS BIGINT), d."Disk Key",
 				TRY_CAST(d."Unit #" AS BIGINT), d."Unit #", d."Path", d."Disk Path"
 		) TO ? (FORMAT CSV, HEADER TRUE)
@@ -627,6 +782,8 @@ var exportScopes = map[string]exportScopeSpec{
 	"hosts":            {filename: "hosts.csv", query: hostsQuery},
 	"clusters":         {filename: "clusters.csv", query: clustersQuery},
 	"datastores":       {filename: "datastores.csv", query: datastoresQuery},
+	"hbas":             {filename: "hbas.csv", query: hbasQuery},
+	"luns":             {filename: "luns.csv", query: lunsQuery},
 	"vms":              {filename: "vms.csv", query: vmsQuery},
 	"network":          {filename: "networks.csv", query: networkQuery},
 	"disks":            {filename: "disks.csv", query: disksQuery},

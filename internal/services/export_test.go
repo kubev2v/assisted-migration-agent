@@ -76,6 +76,13 @@ var _ = Describe("Virtual disk export", func() {
 			)
 		}
 
+		expected[0] = append(expected[0], "rdm_lun_uuid", "datastore_id", "datastore_name", "datastore_type",
+			"datastore_filesystem_type", "datastore_filesystem_major_version", "datastore_protocol_type",
+			"datastore_storage_protocol", "datastore_backing_devices", "datastore_vendor", "datastore_model")
+		for i := 1; i < len(expected); i++ {
+			expected[i] = append(expected[i], "", "", "", "", "", "", "", "", "", "", "")
+		}
+
 		var buf bytes.Buffer
 		scopes := []string{"overview", "disks"}
 		if format == "zip" {
