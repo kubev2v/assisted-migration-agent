@@ -487,8 +487,8 @@ github.com/kubev2v/forklift v0.0.0-20261026091318-a32be2396310 h1:DXGIcdiH+xMVtW
 github.com/kubev2v/forklift v0.0.0-20261026091318-a32be2396310/go.mod h1:WfFrRlOtCh1GJh/y/WrIpeGAq50VZ9hQLeoVrZCbYVU=
 github.com/kubev2v/migration-event-streamer v0.0.0-20261105115111-c59ac09c4048 h1:b0MQCP3AX0whCCLN+4BhyTBkUcCMp+JdO7ARJYDrZh0=
 github.com/kubev2v/migration-event-streamer v0.0.0-20261105115111-c59ac09c4048/go.mod h1:oUuu5tM9Z+MlhlK0kXUF5Ah2Rs9HU6mu6Ft9CA3h0h8=
-github.com/kubev2v/migration-planner v0.28.1-0.20261108113956-3530a4e580e1 h1:v94KI7D2Ni17UkRWWJKaPu2MXRkL2AFGZuHMAVU7j8E=
-github.com/kubev2v/migration-planner v0.28.1-0.20261108113956-3530a4e580e1/go.mod h1:1kJU/0UAiRHG+AnTH/Br7lfijPg0kZ0qpZuLMpnCXck=
+github.com/kubev2v/migration-planner v0.28.1-0.20261108152747-e103e046ea70 h1:OWdcbwIU6ZZSXM81c0BIQO/D5PYT5hpEUlQc0aFt/xg=
+github.com/kubev2v/migration-planner v0.28.1-0.20261108152747-e103e046ea70/go.mod h1:1kJU/0UAiRHG+AnTH/Br7lfijPg0kZ0qpZuLMpnCXck=
 github.com/kubev2v/vm-migration-detective v0.0.0-20261006023354-140bc9526c2c h1:LDM3os216uY4xlJMLyfos2JIuG1/5wUM6FgQAabN8Qc=
 github.com/kubev2v/vm-migration-detective v0.0.0-20261006023354-140bc9526c2c/go.mod h1:G/1I29xQDnu3LBZL/GUWrAGnECnVcktqMrGjvMK63ug=
 github.com/kylelemons/godebug v1.1.0 h1:RPNrshWIDI6G2gRW9EHilWtl7Z6Sb1BR0xunSBf0SNc=
