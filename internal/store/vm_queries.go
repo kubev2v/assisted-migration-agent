@@ -5,6 +5,19 @@ import (
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
 )
 
+// Only attach NICs when their host ID identifies one source owner.
+const hostPhysicalNICsQuery = `
+SELECT DISTINCT n."Host ID", n."Network Device", n."Speed"
+FROM vnic n
+JOIN (
+    SELECT "Object ID"
+    FROM vhost
+    GROUP BY "Object ID"
+    HAVING COUNT(*) = 1
+        OR (COUNT("VI SDK UUID") = COUNT(*) AND COUNT(DISTINCT "VI SDK UUID") = 1)
+) h ON h."Object ID" = n."Host ID"
+`
+
 // vmGetQuery fetches a single VM by ID with full details (disks, NICs, concerns)
 // plus utilization data from the latest rightsizing report.
 // filtered_vm is resolved first to scope all subsequent CTEs to one VM,
@@ -144,7 +157,7 @@ host_nics AS (
     SELECT n."Host ID",
         LIST({'ID': n."Network Device", 'LinkSpeedMbps': n."Speed"}
             ORDER BY n."Network Device") AS nics
-    FROM vnic n
+    FROM (` + hostPhysicalNICsQuery + `) n
     WHERE n."Host ID" IN (SELECT "Host ID" FROM filtered_vm)
       AND n."Host ID" != ''
     GROUP BY n."Host ID"

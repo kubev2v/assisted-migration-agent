@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/csv"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -29,6 +30,7 @@ import (
 var _ = Describe("VM host physical NICs", func() {
 	var (
 		ctx    context.Context
+		pool   *store.Pool
 		dir    string
 		db     *store.Database
 		st     *store.Store
@@ -37,7 +39,7 @@ var _ = Describe("VM host physical NICs", func() {
 	BeforeEach(func() {
 		ctx = context.Background()
 		dir = GinkgoT().TempDir()
-		pool := store.NewPool(time.Minute)
+		pool = store.NewPool(time.Minute)
 		DeferCleanup(pool.Close)
 		var err error
 		db, err = pool.NewDatabase("coll", filepath.Join(dir, "collection.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
@@ -59,6 +61,8 @@ var _ = Describe("VM host physical NICs", func() {
      ('vm-1','first','esxi-1','host-1'), ('vm-2','second','esxi-1','host-1'), ('vm-3','third','esxi-2','host-2'),
      ('vm-4','unknown','',NULL), ('vm-5','missing',NULL,NULL),
      ('vm-6','no-nics','esxi-3','host-3');
+     INSERT INTO vhost ("Host", "Object ID", "VI SDK UUID") VALUES
+     ('esxi-1','host-1','vc'), ('esxi-2','host-2',NULL), ('esxi-3','host-3','vc');
      INSERT INTO vnetwork ("VM ID", "NIC label", "Network", "Mac Address") VALUES ('vm-1','adapter','network','00:11:22:33:44:55')`)
 		Expect(err).NotTo(HaveOccurred())
 		vm, err := st.VM().Get(ctx, "vm-1")
@@ -128,6 +132,100 @@ var _ = Describe("VM host physical NICs", func() {
 		Expect(err).NotTo(HaveOccurred())
 		checkRows(rows)
 	})
+	DescribeTable("keeps RVTools NICs only for unambiguous host ownership after merging files", func(sources []string, want string) {
+		for i, source := range sources {
+			id := fmt.Sprintf("source_%d", i)
+			sourceDB, err := pool.NewDatabase(id, filepath.Join(dir, id+".duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			Expect(err).NotTo(HaveOccurred())
+			DeferCleanup(sourceDB.Close)
+			Expect(sourceDB.Migrate(ctx, func(ctx context.Context, raw *sql.DB) error {
+				if err := duckdb_parser.New(raw, nil).Init(); err != nil {
+					return err
+				}
+				return migrations.RunCollection(ctx, raw, id)
+			})).To(Succeed())
+			sourceStore, err := sourceDB.Store()
+			Expect(err).NotTo(HaveOccurred())
+
+			speed := 10000
+			if source == "vc-2" {
+				speed = 25000
+			}
+			workbook := excelize.NewFile()
+			DeferCleanup(workbook.Close)
+			for sheet, rows := range map[string][][]interface{}{
+				"vInfo": {
+					{"VM ID", "VM", "Host", "Cluster", "VI SDK UUID", "CPUs", "Memory", "Template"},
+					{fmt.Sprintf("vm-%d", i), fmt.Sprintf("vm%d", i), "esxi-1", "cluster", source, 2, 4096, "false"},
+				},
+				"vHost": {
+					{"Host", "Object ID", "VI SDK UUID", "Datacenter", "Cluster", "# Cores", "# CPU", "# Memory", "Model", "Vendor", "Config status"},
+					{"esxi-1", "host-1", source, "dc", "cluster", 8, 1, 32768, "model", "vendor", "green"},
+				},
+				"vNIC": {
+					{"Host", "Network Device", "Speed"},
+					{"esxi-1", "vmnic0", speed},
+				},
+			} {
+				_, err := workbook.NewSheet(sheet)
+				Expect(err).NotTo(HaveOccurred())
+				for rowIndex, row := range rows {
+					cell, err := excelize.CoordinatesToCellName(1, rowIndex+1)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(workbook.SetSheetRow(sheet, cell, &row)).To(Succeed())
+				}
+			}
+			path := filepath.Join(dir, id+".xlsx")
+			Expect(workbook.SaveAs(path)).To(Succeed())
+			result, err := duckdb_parser.New(sourceStore.Querier(), nil).IngestRvTools(ctx, path)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.IsValid()).To(BeTrue(), "%v", result.Errors)
+			Expect(sourceStore.Checkpoint(ctx)).To(Succeed())
+			Expect(sourceDB.Close()).To(Succeed())
+			Expect(db.Append(ctx, sourceDB)).To(Succeed())
+		}
+
+		for i := range sources {
+			id := fmt.Sprintf("vm-%d", i)
+			vm, err := st.VM().Get(ctx, id)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vm.ID).To(Equal(id))
+			for _, detail := range []interface{}{v2.NewVirtualMachineDetailFromModel(*vm), v1.NewVirtualMachineDetailFromModel(*vm)} {
+				encoded, err := json.Marshal(detail)
+				Expect(err).NotTo(HaveOccurred())
+				var response map[string]json.RawMessage
+				Expect(json.Unmarshal(encoded, &response)).To(Succeed())
+				Expect(string(response["hostPhysicalNics"])).To(MatchJSON(want))
+			}
+		}
+		checkRows := func(rows [][]string) {
+			Expect(rows).To(HaveLen(len(sources) + 1))
+			column := slices.Index(rows[0], "host_physical_nics")
+			Expect(column).To(BeNumerically(">=", 0))
+			for _, row := range rows[1:] {
+				Expect(row[column]).To(MatchJSON(want))
+			}
+		}
+		path := filepath.Join(dir, "merged.csv")
+		Expect(st.Export().CopyScope(ctx, "vms", path)).To(Succeed())
+		data, err := os.ReadFile(path)
+		Expect(err).NotTo(HaveOccurred())
+		rows, err := csv.NewReader(bytes.NewReader(data)).ReadAll()
+		Expect(err).NotTo(HaveOccurred())
+		checkRows(rows)
+		var output bytes.Buffer
+		Expect(services.NewExportService(st).WriteExcel(ctx, []string{"vms"}, &output)).To(Succeed())
+		workbook, err := excelize.OpenReader(bytes.NewReader(output.Bytes()))
+		Expect(err).NotTo(HaveOccurred())
+		DeferCleanup(workbook.Close)
+		rows, err = workbook.GetRows("VMs")
+		Expect(err).NotTo(HaveOccurred())
+		checkRows(rows)
+	},
+		Entry("same vCenter repeated host", []string{"vc-1", "vc-1"}, `[{"id":"vmnic0","linkSpeedMbps":10000}]`),
+		Entry("different vCenters with identical host details", []string{"vc-1", "vc-2"}, `[]`),
+	)
+
 	DescribeTable("imports fresh source data through both APIs and VM exports", func(source string) {
 		var count int
 		Expect(st.Querier().QueryRowContext(ctx, `SELECT COUNT(*) FROM vnic`).Scan(&count)).To(Succeed())
