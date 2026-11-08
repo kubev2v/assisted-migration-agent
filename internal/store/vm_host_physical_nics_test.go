@@ -15,14 +15,15 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/xuri/excelize/v2"
 
+	vsphere "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
+	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
+	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
+
 	v2 "github.com/kubev2v/assisted-migration-agent/agent/api/v2"
 	v1 "github.com/kubev2v/assisted-migration-agent/analyzer/api/v1"
 	"github.com/kubev2v/assisted-migration-agent/internal/services"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
-	vsphere "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
-	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
-	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
 )
 
 var _ = Describe("VM host physical NICs", func() {
