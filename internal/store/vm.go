@@ -153,9 +153,10 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 	if err != nil {
 		return nil, err
 	}
+	network := duckdb_parser.NetworkTopologyQuery()
 	// Both positional parameters bind to the same VM ID:
 	// the first is used by the topology CTE, the second by filtered_vm.
-	rows, err := s.db.QueryContext(ctx, "WITH "+topology+", "+vmGetQuery, id, id)
+	rows, err := s.db.QueryContext(ctx, "WITH "+topology+", "+network+", "+vmGetQuery, id, id)
 	if err != nil {
 		return nil, fmt.Errorf("querying VM %s: %w", id, err)
 	}
@@ -168,6 +169,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 		return nil, srvErrors.NewResourceNotFoundError("vm", id)
 	}
 
+	var interfacesJSON string
 	var nicCount int32
 	var pvm duckdb_models.VM
 	var groups StringArray
@@ -208,6 +210,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 		&inspectionState, &inspectionDetails, &inspectionError, &nicCount,
 		&hostNICs,
 		&vAppProducts,
+		&interfacesJSON,
 	); err != nil {
 		return nil, fmt.Errorf("scanning VM %s: %w", id, err)
 	}
@@ -219,6 +222,10 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 	result := fromDB(pvm)
 	result.HostPhysicalNICs = hostNICs.Get()
 	result.Annotation = annotation
+
+	if err := json.Unmarshal([]byte(interfacesJSON), &result.HostVMkernelInterfaces); err != nil {
+		return nil, fmt.Errorf("decoding VMkernel interfaces: %w", err)
+	}
 	result.Metadata = metadata.Get()
 	if result.Metadata == nil {
 		result.Metadata = make(map[string][]string)
@@ -554,6 +561,23 @@ func fromDB(pvm duckdb_models.VM) models.VM {
 
 	nics := make([]models.NIC, 0, len(pvm.NICs))
 	for i, n := range pvm.NICs {
+		var portGroup *models.NetworkPortGroup
+		if group := n.PortGroup; group != nil {
+			portGroup = &models.NetworkPortGroup{
+				ID:   group.ID,
+				Name: group.Name,
+				Type: group.Type,
+			}
+			if sw := group.Switch; sw != nil {
+				portGroup.Switch = &models.VirtualSwitch{
+					ID:     sw.ID,
+					Name:   sw.Name,
+					Type:   sw.Type,
+					MTU:    sw.MTU,
+					MaxMTU: sw.MaxMTU,
+				}
+			}
+		}
 		nics = append(nics, models.NIC{
 			Adapter:       n.Adapter,
 			MAC:           n.MAC,
@@ -562,6 +586,7 @@ func fromDB(pvm duckdb_models.VM) models.VM {
 			IPv4Addresses: n.IPv4Addresses,
 			IPv6Addresses: n.IPv6Addresses,
 			VlanID:        n.VlanID,
+			PortGroup:     portGroup,
 		})
 	}
 

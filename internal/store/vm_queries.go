@@ -149,6 +149,7 @@ nics AS (
         vnetwork."VM ID",
         LIST({
             'Network': "Network",
+            'PortGroup': ng.port_group,
             'MAC': "Mac Address",
             'Label': "NIC label",
             'Adapter': "Adapter",
@@ -161,6 +162,7 @@ nics AS (
             'IPv6Addresses': "IPv6 Addresses"
         } ORDER BY "Mac Address" ASC) AS nics
     FROM vnetwork
+    LEFT JOIN network_adapter_links ng ON ng.nic_row_id = vnetwork.rowid
     JOIN filtered_vm fv ON vnetwork."VM ID" = fv."VM ID"
     GROUP BY vnetwork."VM ID"
 ),
@@ -282,10 +284,12 @@ SELECT
     COALESCE(ins.error, '') AS "InspectionError",
     COALESCE(i."NICs", 0) AS "NICCount",
     COALESCE(hn.nics, []) AS "HostPhysicalNICs",
-    COALESCE(vapp.products, []) AS "products"
+    COALESCE(vapp.products, []) AS "products",
+    COALESCE(hv.interfaces, '[]') AS "HostVMkernelInterfaces"
 FROM filtered_vm i
 CROSS JOIN metadata_agg metadata
 LEFT JOIN host_nics hn ON hn."Host ID" = i."Host ID"
+LEFT JOIN network_host_interfaces hv ON hv.host = i."Host"
 LEFT JOIN vcpu c ON i."VM ID" = c."VM ID"
 LEFT JOIN vmemory m ON i."VM ID" = m."VM ID"
 LEFT JOIN disks d ON i."VM ID" = d."VM ID"

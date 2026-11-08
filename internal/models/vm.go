@@ -64,11 +64,12 @@ type VM struct {
 	ToolsStatus        string
 	ToolsRunningStatus string
 
-	Disks            []Disk
-	HostPhysicalNICs []HostPhysicalNIC
-	NICs             []NIC
-	Devices          []Device
-	GuestNetworks    []GuestNetwork
+	Disks                  []Disk
+	HostPhysicalNICs       []HostPhysicalNIC
+	HostVMkernelInterfaces []VMkernelInterface
+	NICs                   []NIC
+	Devices                []Device
+	GuestNetworks          []GuestNetwork
 
 	Issues []Issue
 
@@ -145,6 +146,7 @@ type HostPhysicalNIC struct {
 }
 
 type NIC struct {
+	PortGroup     *NetworkPortGroup
 	Adapter       string
 	MAC           string
 	Network       string
@@ -152,6 +154,28 @@ type NIC struct {
 	IPv4Addresses []string
 	IPv6Addresses []string
 	VlanID        string
+}
+
+type VirtualSwitch struct {
+	ID     string
+	Name   string
+	Type   string
+	MTU    *int32
+	MaxMTU *int32
+}
+
+type NetworkPortGroup struct {
+	ID     string
+	Name   string
+	Type   string
+	Switch *VirtualSwitch
+}
+
+type VMkernelInterface struct {
+	Device       string
+	MTU          *int32
+	PortGroupRef string
+	PortGroup    *NetworkPortGroup
 }
 
 type Device struct {
