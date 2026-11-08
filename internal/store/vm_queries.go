@@ -18,6 +18,55 @@ JOIN (
 ) h ON h."Object ID" = n."Host ID"
 `
 
+const datastoreBackingInfoQuery = `
+-- Resolve each datastore backing device's transport and vendor/model through datastore hosts, SCSI LUNs, and HBAs.
+backing_paths AS (
+    SELECT
+        ds.datastore_row_id,
+        CASE
+            WHEN LOWER(TRIM(hba."Protocol")) IN ('fibrechannel', 'fibre channel', 'fc') THEN 'FibreChannel'
+            ELSE NULLIF(TRIM(hba."Protocol"), '')
+        END AS protocol,
+        NULLIF(TRIM(scsi."LUN Vendor"), '') AS vendor,
+        NULLIF(TRIM(scsi."LUN Model"), '') AS model
+    FROM vm_datastores ds
+    CROSS JOIN UNNEST(COALESCE(
+        TRY(from_json(NULLIF(ds."Backing Devices", ''), '["VARCHAR"]')),
+        []::VARCHAR[]
+    )) AS backing(device)
+    JOIN backing_datastore_hosts member_host
+        ON member_host.datastore_row_id = ds.datastore_row_id
+    LEFT JOIN backing_scsi scsi
+        ON scsi."Host ID" = member_host.host_id
+        AND NULLIF(LOWER(TRIM(scsi."Canonical Name")), '') =
+            NULLIF(LOWER(TRIM(backing.device)), '')
+    LEFT JOIN backing_hbas hba
+        ON hba."Host ID" = scsi."Host ID"
+        AND NULLIF(TRIM(hba."Device"), '') = NULLIF(TRIM(scsi."HBA Device"), '')
+),
+-- Aggregate distinct protocols, vendors, and models per datastore, excluding unknown protocols.
+backing_info AS (
+    SELECT
+        datastore_row_id,
+        string_agg(DISTINCT protocol, ', ' ORDER BY protocol)
+            FILTER (WHERE protocol IS NOT NULL AND LOWER(TRIM(protocol)) != 'unknown') AS protocols,
+        string_agg(
+            DISTINCT vendor, ', ' ORDER BY vendor
+        ) FILTER (WHERE vendor IS NOT NULL) AS vendor,
+        string_agg(
+            DISTINCT model, ', ' ORDER BY model
+        ) FILTER (WHERE model IS NOT NULL) AS model
+    FROM backing_paths
+    GROUP BY datastore_row_id
+)
+`
+
+const vmDatastoreBackingInfoQuery = `
+backing_datastore_hosts AS (SELECT * FROM storage_datastore_hosts),
+backing_scsi AS (SELECT * FROM storage_scsi),
+backing_hbas AS (SELECT * FROM storage_hbas),
+` + datastoreBackingInfoQuery
+
 // vmGetQuery fetches a single VM by ID with full details (disks, NICs, concerns)
 // plus utilization data from the latest rightsizing report.
 // filtered_vm is resolved first to scope all subsequent CTEs to one VM,
@@ -47,45 +96,7 @@ vm_datastores AS (
         WHERE resolved.datastore_row_id = ds.datastore_row_id
     )
 ),
--- Resolve each datastore backing device's transport and vendor/model through datastore hosts, SCSI LUNs, and HBAs.
-backing_paths AS (
-    SELECT
-        ds.datastore_row_id,
-        CASE
-            WHEN LOWER(TRIM(hba."Protocol")) IN ('fibrechannel', 'fibre channel', 'fc') THEN 'FibreChannel'
-            ELSE NULLIF(TRIM(hba."Protocol"), '')
-        END AS protocol,
-        NULLIF(TRIM(scsi."LUN Vendor"), '') AS vendor,
-        NULLIF(TRIM(scsi."LUN Model"), '') AS model
-    FROM vm_datastores ds
-    CROSS JOIN UNNEST(COALESCE(
-        TRY(from_json(NULLIF(ds."Backing Devices", ''), '["VARCHAR"]')),
-        []::VARCHAR[]
-    )) AS backing(device)
-    JOIN storage_datastore_hosts member_host
-        ON member_host.datastore_row_id = ds.datastore_row_id
-    LEFT JOIN storage_scsi scsi
-        ON scsi."Host ID" = member_host.host_id
-        AND LOWER(TRIM(scsi."Canonical Name")) = LOWER(TRIM(backing.device))
-    LEFT JOIN storage_hbas hba
-        ON hba."Host ID" = scsi."Host ID"
-        AND hba."Device" = scsi."HBA Device"
-),
--- Aggregate distinct protocols, vendors, and models per datastore, excluding unknown protocols.
-backing_info AS (
-    SELECT
-        datastore_row_id,
-        string_agg(DISTINCT protocol, ', ' ORDER BY protocol)
-            FILTER (WHERE protocol IS NOT NULL AND LOWER(TRIM(protocol)) != 'unknown') AS protocols,
-        string_agg(
-            DISTINCT vendor, ', ' ORDER BY vendor
-        ) FILTER (WHERE vendor IS NOT NULL) AS vendor,
-        string_agg(
-            DISTINCT model, ', ' ORDER BY model
-        ) FILTER (WHERE model IS NOT NULL) AS model
-    FROM backing_paths
-    GROUP BY datastore_row_id
-),
+` + vmDatastoreBackingInfoQuery + `,
 disks AS (
     SELECT
         dk."VM ID",

@@ -143,6 +143,8 @@ var sheetNames = map[string]string{
 	"hosts":            "Hosts",
 	"clusters":         "Clusters",
 	"datastores":       "Datastores",
+	"hbas":             "Host Storage Adapters",
+	"luns":             "Host Storage LUNs",
 	"vms":              "VMs",
 	"network":          "Networks",
 	"disks":            "Virtual Disks",
