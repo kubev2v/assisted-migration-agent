@@ -223,7 +223,7 @@ var vmsQuery = `
 						END
 						ORDER BY "Network Device"
 					)) AS nics
-				FROM vnic
+				FROM (` + hostPhysicalNICsQuery + `) n
 				WHERE "Host ID" != ''
 				GROUP BY "Host ID"
 			) hn ON hn."Host ID" = v."Host ID"
