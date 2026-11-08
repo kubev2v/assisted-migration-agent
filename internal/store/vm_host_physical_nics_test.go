@@ -56,7 +56,8 @@ var _ = Describe("VM host physical NICs", func() {
 	It("preserves host ownership and nullable speeds in both APIs and CSV/XLSX exports", func() {
 		_, err := st.Querier().ExecContext(ctx, `INSERT INTO vinfo ("VM ID", "VM", "Host", "Host ID") VALUES
      ('vm-1','first','esxi-1','host-1'), ('vm-2','second','esxi-1','host-1'), ('vm-3','third','esxi-2','host-2'),
-     ('vm-4','unknown','',NULL), ('vm-5','missing',NULL,NULL);
+     ('vm-4','unknown','',NULL), ('vm-5','missing',NULL,NULL),
+     ('vm-6','no-nics','esxi-3','host-3');
      INSERT INTO vnetwork ("VM ID", "NIC label", "Network", "Mac Address") VALUES ('vm-1','adapter','network','00:11:22:33:44:55')`)
 		Expect(err).NotTo(HaveOccurred())
 		vm, err := st.VM().Get(ctx, "vm-1")
@@ -72,11 +73,12 @@ var _ = Describe("VM host physical NICs", func() {
 			"vm-1": `[{"id":"vmnic0","linkSpeedMbps":10000},{"id":"vmnic1"}]`,
 			"vm-2": `[{"id":"vmnic0","linkSpeedMbps":10000},{"id":"vmnic1"}]`,
 			"vm-3": `[{"id":"vmnic0","linkSpeedMbps":25000}]`,
-			"vm-4": `[]`, "vm-5": `[]`,
+			"vm-4": `[]`, "vm-5": `[]`, "vm-6": `[]`,
 		}
 		for id, expected := range want {
 			vm, err := st.VM().Get(ctx, id)
 			Expect(err).NotTo(HaveOccurred())
+			Expect(vm.ID).To(Equal(id))
 			detail := v2.NewVirtualMachineDetailFromModel(*vm)
 			encoded, err := json.Marshal(detail)
 			Expect(err).NotTo(HaveOccurred())
