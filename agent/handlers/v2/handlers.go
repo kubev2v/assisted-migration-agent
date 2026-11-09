@@ -33,7 +33,6 @@ type ServiceProvider interface {
 	GetCollectorStatus() models.CollectorStatus
 	StartCollecting(ctx context.Context) (models.CollectorStatus, error)
 	StopCollecting() error
-	StartRVToolsCollecting(rvtoolFiles []string, _ bool) (models.CollectorStatus, error)
 
 	DeleteData(ctx context.Context) error
 	Stop(ctx context.Context)

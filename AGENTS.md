@@ -10,9 +10,8 @@ agent/
   cmd/         Agent CLI commands
   app/         Agent application composition
   api/v2/      Agent OpenAPI spec and generated API types/routes
-  handlers/v2/ Agent HTTP handlers, including RVTools mode
+  handlers/v2/ Agent HTTP handlers
   Containerfile
-  Containerfile.rvtools
 analyzer/
   main.go      analyzer CLI entry point
   cmd/         analyzer CLI commands
@@ -20,7 +19,6 @@ analyzer/
   api/v1/      analyzer OpenAPI spec and generated API types/routes
   handlers/v1/ analyzer HTTP handlers, including RVTools mode
   Containerfile
-  Containerfile.rvtools
 internal/
   config/      Configuration
   handlers/    Shared validator registration

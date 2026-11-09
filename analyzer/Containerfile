@@ -1,13 +1,25 @@
+# =============================================================================
+# Stage 1: Fetch the UI
+# =============================================================================
 ARG OFFLINE_ANALYZER_UI_IMAGE=quay.io/redhat-user-workloads/assisted-migration-tenant/oma-rvtool-offline-analyzer-ui
 ARG OFFLINE_ANALYZER_UI_IMAGE_TAG
+ARG ANALYZER_VERSION=""
 FROM --platform=linux/amd64 ${OFFLINE_ANALYZER_UI_IMAGE}:${OFFLINE_ANALYZER_UI_IMAGE_TAG} AS ui-builder
 
+
+# =============================================================================
+# Stage 2: Build the backend
+# =============================================================================
 FROM registry.access.redhat.com/ubi9/go-toolset AS backend-builder
+
+USER 0
 WORKDIR /src
+
+# Copy go module files first for better caching
 COPY go.mod go.sum ./
 ENV GOTOOLCHAIN=auto
 RUN go mod download
-USER 0
+
 COPY analyzer/main.go ./analyzer/main.go
 COPY analyzer/api ./analyzer/api
 COPY analyzer/app ./analyzer/app
@@ -15,14 +27,25 @@ COPY analyzer/cmd ./analyzer/cmd
 COPY analyzer/handlers ./analyzer/handlers
 COPY internal ./internal
 COPY pkg ./pkg
+
 ARG ANALYZER_GIT_COMMIT=unknown
-ARG ANALYZER_VERSION=v0.0.0
-RUN go build -buildvcs=false -ldflags="-X main.gitCommit=${ANALYZER_GIT_COMMIT} -X main.version=${ANALYZER_VERSION}" \
+ARG ANALYZER_VERSION
+RUN : "${ANALYZER_VERSION:?ANALYZER_VERSION must be set}" && \
+    go build -buildvcs=false -ldflags="-X main.gitCommit=${ANALYZER_GIT_COMMIT} -X main.version=${ANALYZER_VERSION}" \
     -o /tmp/rvtools-analyzer ./analyzer/main.go
 
+
+# =============================================================================
+# Stage 3: Setup OPA policies
+# =============================================================================
 FROM registry.access.redhat.com/ubi9/ubi-minimal AS opa-builder
-RUN microdnf install -y wget tar gzip ca-certificates && microdnf clean all
+
+RUN microdnf install -y wget tar gzip ca-certificates && \
+    microdnf clean all
+
 WORKDIR /app
+
+# Download and extract OPA policies from forklift
 RUN mkdir -p /app/policies /app/forklift && \
     cd /app/forklift && \
     wget https://github.com/kubev2v/forklift/archive/main.tar.gz && \
@@ -31,9 +54,18 @@ RUN mkdir -p /app/policies /app/forklift && \
         -name "*.rego" ! -name "*_test.rego" \
         -exec cp {} /app/policies/ \;
 
+
+# =============================================================================
+# Stage 4: Download DuckDB extensions (for air-gapped environments)
+# =============================================================================
 FROM registry.access.redhat.com/ubi9/ubi-minimal AS duckdb-extensions
-RUN microdnf install -y wget gzip ca-certificates && microdnf clean all
+
+RUN microdnf install -y wget gzip ca-certificates && \
+    microdnf clean all
+
 WORKDIR /extensions
+
+# Download sqlite_scanner extension for DuckDB v1.4.3, verified against pinned SHA-256 checksums
 ARG DUCKDB_VERSION=v1.4.3
 ARG DUCKDB_SQLITE_SCANNER_SHA256_AMD64=75ead0bb623cd67c8c7e40d30f96e5fc2823fd3df90eb2ecd289aae177b15820
 ARG DUCKDB_SQLITE_SCANNER_SHA256_ARM64=03aa6ee4f8c4044d179b08632f3836cfd1cc426a50b8d687444847adb801888b
@@ -46,19 +78,51 @@ RUN case "$(uname -m)" in \
     echo "${checksum}  sqlite_scanner.duckdb_extension.gz" | sha256sum -c - && \
     gunzip sqlite_scanner.duckdb_extension.gz
 
+
+# =============================================================================
+# Stage 5: Final runtime image
+# =============================================================================
 FROM registry.access.redhat.com/ubi9/ubi
-RUN dnf install -y ca-certificates tzdata && dnf clean all
+
+RUN dnf install -y ca-certificates tzdata && \
+    dnf clean all
+
 WORKDIR /app
+
+# Copy the binary from backend builder
 COPY --from=backend-builder /tmp/rvtools-analyzer /app/rvtools-analyzer
+
+# Copy UI static files from ui builder
 COPY --from=ui-builder /apps/offline-analyzer/dist /app/static
+
+# Copy OPA policies
 COPY --from=opa-builder /app/policies /app/policies
+
+# Copy DuckDB extensions
 COPY --from=duckdb-extensions /extensions /app/extensions
+
+# Create data directory
 RUN mkdir -p /var/lib/analyzer && \
     chown -R 1001:0 /app/static /app/policies /app/extensions /var/lib/analyzer
+
+# Create entrypoint script
 RUN printf '#!/bin/sh\n\
 cp --remove-destination /app/extensions/*.duckdb_extension /var/lib/analyzer/ || exit 1\n\
 exec /app/rvtools-analyzer "$@"\n' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+
+ARG RELEASE_TAGS=""
+LABEL konflux.additional-tags="${RELEASE_TAGS}"
+
+ARG ANALYZER_VERSION
+LABEL org.opencontainers.image.version="${ANALYZER_VERSION}"
+
+ARG BRANCH_TAG=""
+LABEL konflux.release.branch-tag="${BRANCH_TAG}"
+
 USER 1001
+
+# Expose HTTP port (configurable via --server-http-port, default: 8000)
 EXPOSE 8000
+
 ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["run", "--server-mode", "prod", "--server-statics-folder", "/app/static", "--opa-policies-folder", "/app/policies", "--data-folder", "/var/lib/analyzer"]

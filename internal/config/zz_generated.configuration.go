@@ -223,7 +223,6 @@ func (a *Agent) ToOption() AgentOption {
 		to.UpdateInterval = a.UpdateInterval
 		to.LegacyStatusEnabled = a.LegacyStatusEnabled
 		to.RetainCollections = a.RetainCollections
-		to.RVToolsMode = a.RVToolsMode
 	}
 }
 
@@ -242,7 +241,6 @@ func (a *Agent) DebugMap() map[string]any {
 	debugMap["UpdateInterval"] = helpers.DebugValue(a.UpdateInterval, false)
 	debugMap["LegacyStatusEnabled"] = helpers.DebugValue(a.LegacyStatusEnabled, false)
 	debugMap["RetainCollections"] = helpers.DebugValue(a.RetainCollections, false)
-	debugMap["RVToolsMode"] = helpers.DebugValue(a.RVToolsMode, false)
 	return debugMap
 }
 
@@ -343,13 +341,6 @@ func WithLegacyStatusEnabled(legacyStatusEnabled bool) AgentOption {
 func WithRetainCollections(retainCollections int) AgentOption {
 	return func(a *Agent) {
 		a.RetainCollections = retainCollections
-	}
-}
-
-// WithRVToolsMode returns an option that can set RVToolsMode on a Agent
-func WithRVToolsMode(rVToolsMode bool) AgentOption {
-	return func(a *Agent) {
-		a.RVToolsMode = rVToolsMode
 	}
 }
 

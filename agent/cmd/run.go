@@ -10,7 +10,6 @@ import (
 	"github.com/jzelinskie/cobrautil/v2"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"go.uber.org/zap"
 
 	"github.com/kubev2v/assisted-migration-agent/agent/app"
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
@@ -91,28 +90,6 @@ func validateConfiguration(cfg *config.Configuration) error {
 		return fmt.Errorf("invalid server mode %q: must be %q or %q", cfg.Server.ServerMode, config.ServerModeProd, config.ServerModeDev)
 	}
 
-	// validate flags for rvtools mode
-	// In rvtools mode:
-	// - we don't care about agent-id and source-id.
-	// - only v2 api
-	// - connected / disconnected ignored. the agent is in disconnected only
-	if cfg.Agent.RVToolsMode {
-		if cfg.Agent.Mode == "connected" {
-			zap.S().Info("In rvtools-mode, connected mode ignored. The agent is running only in disconnected mode")
-		}
-
-		if cfg.Agent.Version == "v1" {
-			return fmt.Errorf("RVTools mode is available only in api v2")
-		}
-
-		cfg.Agent.Mode = "disconnected"
-		// need to set random UUIDs here because console service.
-		cfg.Agent.ID = uuid.NewString()
-		cfg.Agent.SourceID = uuid.NewString()
-
-		return nil
-	}
-
 	if err := validateUUID(cfg.Agent.ID, "agent-id"); err != nil {
 		return err
 	}
@@ -158,7 +135,6 @@ func registerAgentFlags(flagSet *pflag.FlagSet, config *config.Configuration) {
 	flagSet.StringVar(&config.Agent.Version, "version", config.Agent.Version, "Agent version to report to console")
 	flagSet.StringVar(&config.Agent.DataFolder, "data-folder", config.Agent.DataFolder, "Path to the persistent data folder")
 	flagSet.BoolVar(&config.Agent.AutoMigrate, "auto-migrate", config.Agent.AutoMigrate, "Apply database migrations on startup; disable after offline migration")
-	flagSet.BoolVar(&config.Agent.RVToolsMode, "rvtools-mode", config.Agent.RVToolsMode, "RVTool mode: enabled or disabled (default: disable)")
 }
 
 func registerConsoleFlags(flagSet *pflag.FlagSet, config *config.Configuration) {

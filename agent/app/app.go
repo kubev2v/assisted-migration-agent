@@ -129,13 +129,7 @@ func initV2(cfg *config.Configuration) (*server.Server, func(), error) {
 		handlers.RegisterValidators(v)
 	}
 
-	var v2H v2.ServerInterface
-	if cfg.Agent.RVToolsMode {
-		zap.S().Info("rvtools mode enabled: credentials, inspector, and vCenter collector endpoints are disabled")
-		v2H = v2Handlers.NewRVToolsHandler(*cfg, v2SvcMgr)
-	} else {
-		v2H = v2Handlers.NewHandler(*cfg, v2SvcMgr)
-	}
+	v2H := v2Handlers.NewHandler(*cfg, v2SvcMgr)
 
 	swagger, err := v2.GetSwagger()
 	if err != nil {
