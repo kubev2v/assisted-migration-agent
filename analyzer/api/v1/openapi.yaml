@@ -634,6 +634,38 @@ paths:
           description: Collection already in progress
         '500':
           description: Internal server error
+    put:
+      tags:
+      - Collector
+      summary: Update the lastest collection from RVTools files
+      operationId: updateRvtoolsCollector
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - files
+              properties:
+                files:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+      responses:
+        '202':
+          description: Collection started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CollectorStatus'
+        '400':
+          description: No files provided
+        '409':
+          description: Collection already in progress
+        '500':
+          description: Internal server error
 
   /collections/{id}/inventory:
     get:

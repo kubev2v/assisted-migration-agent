@@ -22,7 +22,7 @@ type ServiceProvider interface {
 	LatestApplicationService() (*services.ApplicationService, error)
 	GetCollectorStatus() models.CollectorStatus
 	StopCollecting() error
-	StartRVToolsCollecting([]string) (models.CollectorStatus, error)
+	StartRVToolsCollecting([]string, bool) (models.CollectorStatus, error)
 	DeleteCollections(context.Context) error
 }
 

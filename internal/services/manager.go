@@ -139,7 +139,7 @@ func (m *ServiceManager) StopCollecting() error {
 	return nil
 }
 
-func (m *ServiceManager) StartRVToolsCollecting(rvtoolFiles []string) (models.CollectorStatus, error) {
+func (m *ServiceManager) StartRVToolsCollecting(rvtoolFiles []string, isUpdateOp bool) (models.CollectorStatus, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -151,7 +151,7 @@ func (m *ServiceManager) StartRVToolsCollecting(rvtoolFiles []string) (models.Co
 		return models.CollectorStatus{}, srvErrors.NewCollectionInProgressError()
 	}
 
-	factory, err := newRvtoolWorkFactory(m.pool, rvtoolFiles, m.dataFolder, m.validator)
+	factory, err := newRvtoolWorkFactory(m.pool, rvtoolFiles, isUpdateOp, m.dataFolder, m.validator)
 	if err != nil {
 		return models.CollectorStatus{}, err
 	}

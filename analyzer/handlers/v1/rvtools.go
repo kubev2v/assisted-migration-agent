@@ -15,6 +15,14 @@ import (
 
 // StartRvtoolsCollector accepts RVTools Excel files and starts a collection pipeline.
 func (h *Handler) StartRvtoolsCollector(c *gin.Context) {
+	h.startRvtoolsCollector(c, false)
+}
+
+func (h *Handler) UpdateRvtoolsCollector(c *gin.Context) {
+	h.startRvtoolsCollector(c, true)
+}
+
+func (h *Handler) startRvtoolsCollector(c *gin.Context, isUpdateOp bool) {
 	form, err := c.MultipartForm()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid multipart form"})
@@ -40,7 +48,7 @@ func (h *Handler) StartRvtoolsCollector(c *gin.Context) {
 		savedPaths = append(savedPaths, destPath)
 	}
 
-	status, err := h.svc.StartRVToolsCollecting(savedPaths)
+	status, err := h.svc.StartRVToolsCollecting(savedPaths, isUpdateOp)
 	if err != nil {
 		for _, path := range savedPaths {
 			_ = os.Remove(path)

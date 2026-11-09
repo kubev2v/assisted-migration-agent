@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,14 +30,16 @@ type rvtoolsWorkFactory struct {
 	dataDir      string
 	validator    *opa.Validator
 	rvToolsFiles []string
+	updateOp     bool
 }
 
-func newRvtoolWorkFactory(pool *store.Pool, rvToolsFiles []string, dataDir string, validator *opa.Validator) (*rvtoolsWorkFactory, error) {
+func newRvtoolWorkFactory(pool *store.Pool, rvToolsFiles []string, isUpdateOp bool, dataDir string, validator *opa.Validator) (*rvtoolsWorkFactory, error) {
 	return &rvtoolsWorkFactory{
 		pool:         pool,
 		dataDir:      dataDir,
 		validator:    validator,
 		rvToolsFiles: rvToolsFiles,
+		updateOp:     isUpdateOp,
 	}, nil
 }
 
@@ -46,64 +49,141 @@ func (f *rvtoolsWorkFactory) Build() work.WorkBuilder[models.CollectorStatus, mo
 	var collectionDb *store.Database
 	database := fmt.Sprintf("collection_%d", time.Now().Unix())
 
-	units := []work.WorkUnit[models.CollectorStatus, models.CollectorResult]{
-		// 1. Provision: record collection marker, create and migrate the collection DB.
-		{
+	units := []work.WorkUnit[models.CollectorStatus, models.CollectorResult]{}
+
+	// check if we already have a collection
+	// if not start normal collection
+	updateOp := f.updateOp
+	if _, err := f.pool.Latest(); err != nil {
+		updateOp = false
+	}
+
+	if updateOp {
+		units = append(units, work.WorkUnit[models.CollectorStatus, models.CollectorResult]{
 			Status: func() models.CollectorStatus {
 				return models.CollectorStatus{State: models.CollectorStateCollecting}
 			},
 			Work: func(ctx context.Context, r models.CollectorResult) (models.CollectorResult, error) {
-				mainDB, err := f.pool.Get(store.MainDatabaseID)
+				db, err := f.pool.Latest()
 				if err != nil {
-					r.Err = fmt.Errorf("getting main database: %w", err)
-					return r, r.Err
-				}
-				mainStore, err := mainDB.Store()
-				if err != nil {
-					r.Err = fmt.Errorf("getting main store: %w", err)
-					return r, r.Err
+					r.Err = err
+					return r, err
 				}
 
-				if _, err := mainStore.Collection().Create(ctx, database); err != nil {
-					r.Err = fmt.Errorf("creating collection marker for %s: %w", database, err)
-					return r, r.Err
+				cloneDB, err := db.Clone(ctx)
+				if err != nil {
+					r.Err = err
+					return r, err
 				}
+				defer func() {
+					if err := os.Remove(cloneDB.Path); err != nil {
+						zap.S().Warnw("failed to remove clone", "path", cloneDB.Path, "error", err)
+					}
+				}()
+
+				if err := cloneDB.Close(); err != nil {
+					r.Err = err
+					return r, err
+				}
+
+				in, err := os.Open(cloneDB.Path)
+				if err != nil {
+					r.Err = err
+					return r, err
+				}
+				defer func() { _ = in.Close() }()
 
 				dbPath := filepath.Join(f.dataDir, database+".duckdb")
 				hash := sha256.Sum256([]byte(dbPath))
 				id := hex.EncodeToString(hash[:])[:6]
 
+				out, err := os.Create(dbPath)
+				if err != nil {
+					r.Err = err
+					return r, err
+				}
+				defer func() { _ = out.Close() }()
+
+				if _, err := io.Copy(out, in); err != nil {
+					r.Err = err
+					return r, err
+				}
+
+				if err := out.Sync(); err != nil {
+					r.Err = err
+					return r, err
+				}
+
+				var dbError error
+				collectionDb, dbError = f.pool.NewDatabase(cloneDB.ID, dbPath, time.Now(), store.EagerConnectionInitilization, 1024, store.ReadWriteDatabase)
+				if dbError != nil {
+					r.Err = fmt.Errorf("opening collection database %s: %w", database, dbError)
+					return r, r.Err
+				}
+				collectionDb.ID = id
+
+				return r, nil
+			},
+		})
+	}
+
+	units = append(units, work.WorkUnit[models.CollectorStatus, models.CollectorResult]{
+		Status: func() models.CollectorStatus {
+			return models.CollectorStatus{State: models.CollectorStateCollecting}
+		},
+		Work: func(ctx context.Context, r models.CollectorResult) (models.CollectorResult, error) {
+			mainDB, err := f.pool.Get(store.MainDatabaseID)
+			if err != nil {
+				r.Err = fmt.Errorf("getting main database: %w", err)
+				return r, r.Err
+			}
+			mainStore, err := mainDB.Store()
+			if err != nil {
+				r.Err = fmt.Errorf("getting main store: %w", err)
+				return r, r.Err
+			}
+
+			if _, err := mainStore.Collection().Create(ctx, database); err != nil {
+				r.Err = fmt.Errorf("creating collection marker for %s: %w", database, err)
+				return r, r.Err
+			}
+
+			dbPath := filepath.Join(f.dataDir, database+".duckdb")
+			hash := sha256.Sum256([]byte(dbPath))
+			id := hex.EncodeToString(hash[:])[:6]
+
+			if collectionDb == nil {
 				var dbError error
 				collectionDb, dbError = f.pool.NewDatabase(id, dbPath, time.Now(), store.EagerConnectionInitilization, 1024, store.ReadWriteDatabase)
 				if dbError != nil {
 					r.Err = fmt.Errorf("opening collection database %s: %w", database, dbError)
 					return r, r.Err
 				}
+			}
 
-				if err := collectionDb.Migrate(ctx, func(ctx context.Context, sqlDb *sql.DB) error {
-					st, err := collectionDb.Store()
-					if err != nil {
-						return err
-					}
-
-					parser := duckdb_parser.New(st.Querier(), f.validator)
-					if err := parser.Init(); err != nil {
-						return err
-					}
-
-					return migrations.RunCollection(ctx, sqlDb, database)
-				}); err != nil {
-					_ = collectionDb.Close()
-					r.Err = fmt.Errorf("migrating collection database %s: %w", database, err)
-					return r, r.Err
+			if err := collectionDb.Migrate(ctx, func(ctx context.Context, sqlDb *sql.DB) error {
+				st, err := collectionDb.Store()
+				if err != nil {
+					return err
 				}
 
-				log.Infow("collection database created", "path", collectionDb.Path)
+				parser := duckdb_parser.New(st.Querier(), f.validator)
+				if err := parser.Init(); err != nil {
+					return err
+				}
 
-				return r, nil
-			},
+				return migrations.RunCollection(ctx, sqlDb, database)
+			}); err != nil {
+				_ = collectionDb.Close()
+				r.Err = fmt.Errorf("migrating collection database %s: %w", database, err)
+				return r, r.Err
+			}
+
+			log.Infow("collection database created", "path", collectionDb.Path)
+
+			return r, nil
 		},
-	}
+	})
 
 	// 2. Ingest: parse each RVTools Excel file in the temporary DB, then append
 	// its tables to the collection DB before cleaning up for the next file.
