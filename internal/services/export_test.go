@@ -210,3 +210,98 @@ var _ = Describe("Guest process export", func() {
 		Entry("empty Excel", "xlsx", false),
 	)
 })
+
+var _ = Describe("Host export", func() {
+	var (
+		ctx  context.Context
+		pool *store.Pool
+		db   *store.Database
+		st   *store.Store
+		svc  *services.ExportService
+	)
+
+	BeforeEach(func() {
+		ctx = context.Background()
+		pool = store.NewPool(5 * time.Minute)
+		var err error
+		db, err = pool.NewDatabase("host-export", filepath.Join(GinkgoT().TempDir(), "collection.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		Expect(err).NotTo(HaveOccurred())
+		pool.Add(db)
+		DeferCleanup(pool.Close)
+		st, err = db.Store()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(duckdb_parser.New(st.Querier(), nil).Init()).To(Succeed())
+		Expect(db.Migrate(ctx, func(ctx context.Context, sqlDB *sql.DB) error {
+			return migrations.RunCollection(ctx, sqlDB, "collection")
+		})).To(Succeed())
+		svc = services.NewExportService(st)
+	})
+
+	DescribeTable("exports host CPU model and hardware serial", func(format string, legacyCollection bool) {
+		if legacyCollection {
+			_, err := st.Querier().ExecContext(ctx, `
+				ALTER TABLE vhost DROP COLUMN "CPU Model";
+				ALTER TABLE vhost DROP COLUMN "Serial Number";
+				DELETE FROM collection_schema_migrations WHERE version = 4;
+			`)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(db.Migrate(ctx, func(ctx context.Context, sqlDB *sql.DB) error {
+				return migrations.RunCollection(ctx, sqlDB, "collection")
+			})).To(Succeed())
+		}
+
+		_, err := st.Querier().ExecContext(ctx, `
+			INSERT INTO vhost ("Datacenter", "Cluster", "# Cores", "# CPU", "# Memory", "Vendor", "Model", "Host", "Object ID", "Config status", "CPU Model", "Serial Number")
+			VALUES ('dc-1', 'cluster-1', 32, 2, 262144, 'Dell', 'PowerEdge', 'esx-1', 'host-1', 'green', 'Xeon Gold 6338', 'SN-1'),
+			       ('dc-1', 'cluster-1', 16, 1, 131072, 'HPE', 'ProLiant', 'esx-2', 'host-2', 'green', NULL, NULL);
+			INSERT INTO vinfo ("VM ID", "VM", "Host") VALUES ('vm-1', 'vm-1', 'esx-1');
+		`)
+		Expect(err).NotTo(HaveOccurred())
+
+		var output bytes.Buffer
+		if format == "zip" {
+			Expect(svc.WriteZip(ctx, []string{"hosts"}, &output)).To(Succeed())
+		} else {
+			Expect(svc.WriteExcel(ctx, []string{"hosts"}, &output)).To(Succeed())
+		}
+
+		var rows [][]string
+		if format == "zip" {
+			archive, err := zip.NewReader(bytes.NewReader(output.Bytes()), int64(output.Len()))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(archive.File).To(HaveLen(1))
+			file, err := archive.File[0].Open()
+			Expect(err).NotTo(HaveOccurred())
+			DeferCleanup(file.Close)
+			rows, err = csv.NewReader(file).ReadAll()
+			Expect(err).NotTo(HaveOccurred())
+		} else {
+			workbook, err := excelize.OpenReader(bytes.NewReader(output.Bytes()))
+			Expect(err).NotTo(HaveOccurred())
+			DeferCleanup(workbook.Close)
+			Expect(workbook.GetSheetList()).To(Equal([]string{"Hosts"}))
+			rows, err = workbook.GetRows("Hosts")
+			Expect(err).NotTo(HaveOccurred())
+		}
+
+		header := []string{"id", "datacenter", "cluster", "cpu_sockets", "cpu_cores", "memory_mib", "memory_gib", "vendor", "model", "config_status", "vm_count", "cpu_model", "serial_number", "vmotion_supported", "storage_vmotion_supported", "vcenter_id"}
+		Expect(rows).To(HaveLen(3))
+		Expect(rows[0]).To(Equal(header))
+		for i := range rows {
+			for len(rows[i]) < len(header) {
+				rows[i] = append(rows[i], "")
+			}
+		}
+		Expect(rows[1][0:3]).To(Equal([]string{"host-1", "dc-1", "cluster-1"}))
+		Expect(rows[1][3:5]).To(Equal([]string{"2", "32"}))
+		Expect(rows[2][0:3]).To(Equal([]string{"host-2", "dc-1", "cluster-1"}))
+		Expect(rows[1][11:13]).To(Equal([]string{"Xeon Gold 6338", "SN-1"}))
+		Expect(rows[2][11:13]).To(Equal([]string{"", ""}))
+	},
+		Entry("CSV ZIP with current collection", "zip", false),
+		Entry("Excel with current collection", "xlsx", false),
+		Entry("CSV ZIP upgrades a collection without host hardware columns", "zip", true),
+		Entry("Excel upgrades a collection without host hardware columns", "xlsx", true),
+	)
+})

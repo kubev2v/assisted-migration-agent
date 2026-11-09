@@ -58,9 +58,11 @@ var _ = Describe("Storage export", func() {
 
 	DescribeTable("extends existing host and datastore exports", func(format string) {
 		const seed = `
-            INSERT INTO vhost ("Object ID", "Host", "VMotion support", "Storage VMotion support")
-                VALUES ('host-1', 'esxi-1', true, false), ('host-2', 'esxi-2', NULL, NULL),
-                       ('duplicate', 'ambiguous-a', false, false), ('duplicate', 'ambiguous-b', false, false);
+			INSERT INTO vhost ("Object ID", "Host", "CPU Model", "Serial Number", "VMotion support", "Storage VMotion support")
+				VALUES ('host-1', 'esxi-1', 'Xeon Gold 6338', 'SN-1', true, false),
+				       ('host-2', 'esxi-2', NULL, NULL, NULL, NULL),
+				       ('duplicate', 'ambiguous-a', NULL, NULL, false, false),
+				       ('duplicate', 'ambiguous-b', NULL, NULL, false, false);
             INSERT INTO vdatastore ("Object ID", "Name", "Hosts", "Capacity MiB", "Free MiB", "Storage Protocol", "Filesystem Type", "Filesystem Major Version", "Backing Devices", "SIOC Enabled")
                 VALUES ('ds-1', 'data', '["host-1","esxi-2","duplicate","missing"]', 2048, 512, 'FC', 'VMFS', 6, '["naa.1"]', true),
                        ('ds-2', 'empty', 'host-1', 0, 0, NULL, NULL, NULL, '[]', NULL),
@@ -126,10 +128,11 @@ var _ = Describe("Storage export", func() {
 		Expect(datastoreRows[3][12]).To(Equal("0.0009765625"))
 		Expect(datastoreRows[4][12]).To(BeEmpty())
 
-		Expect(hostRows[0]).To(Equal([]string{"id", "datacenter", "cluster", "cpu_sockets", "cpu_cores", "memory_mib", "memory_gib", "vendor", "model", "config_status", "vm_count", "vmotion_supported", "storage_vmotion_supported", "vcenter_id"}))
+		Expect(hostRows[0]).To(Equal([]string{"id", "datacenter", "cluster", "cpu_sockets", "cpu_cores", "memory_mib", "memory_gib", "vendor", "model", "config_status", "vm_count", "cpu_model", "serial_number", "vmotion_supported", "storage_vmotion_supported", "vcenter_id"}))
 		Expect(hostRows[0]).NotTo(ContainElement("name"))
-		Expect(hostRows[3][11:]).To(Equal([]string{"true", "false", ""}))
-		Expect(hostRows[4][11:]).To(Equal([]string{"", "", ""}))
+		Expect(hostRows[3][11:13]).To(Equal([]string{"Xeon Gold 6338", "SN-1"}))
+		Expect(hostRows[3][13:]).To(Equal([]string{"true", "false", ""}))
+		Expect(hostRows[4][11:]).To(Equal([]string{"", "", "", "", ""}))
 	},
 		Entry("CSV ZIP", "zip"),
 		Entry("Excel", "xlsx"),

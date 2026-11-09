@@ -316,8 +316,8 @@ var rvtoolsStorageSheets = []rvtoolsSheet{
 	},
 	{
 		name:    "vHost",
-		headers: []string{"Datacenter", "Cluster", "# Cores", "# CPU", "Object ID", "# Memory", "Model", "Vendor", "Host", "Config status", "VMotion support", "Storage VMotion support"},
-		row:     []string{"dc1", "cluster1", "8", "2", "host-1", "32768", "ESXi", "VMware", "esxi1", "green", "true", "true"},
+		headers: []string{"Datacenter", "Cluster", "# Cores", "# CPU", "Object ID", "# Memory", "Model", "Vendor", "Host", "Config status", "VMotion support", "Storage VMotion support", "CPU Model", "Serial number", "Service tag"},
+		row:     []string{"dc1", "cluster1", "8", "2", "host-1", "32768", "ESXi", "VMware", "esxi1", "green", "true", "true", " Xeon Gold 6338 ", " SN-1 ", "TAG-1"},
 	},
 	{
 		name:    "vHBA",

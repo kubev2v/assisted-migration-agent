@@ -108,7 +108,7 @@ var _ = Describe("Inventory handler", func() {
 	}
 
 	saveMainInventory := func(collSt *store.Store) {
-		inventoryJSON := `{"vcenter_id":"vc-test","clusters":{"cluster-1":{"vms":{"total":5},"infra":{}}}}`
+		inventoryJSON := `{"vcenter_id":"vc-test","vcenter":{"infra":{"hosts":[{"id":"host-1","vendor":"Dell","model":"PowerEdge","datacenter":"dc1","cluster":"cluster1","cpuModel":"Xeon Gold 6338","serialNumber":"SN-1"}]}},"clusters":{"cluster-1":{"vms":{"total":5},"infra":{}}}}`
 		Expect(collSt.Inventory().Save(context.Background(), []byte(inventoryJSON))).To(Succeed())
 	}
 
@@ -174,6 +174,18 @@ var _ = Describe("Inventory handler", func() {
 			Expect(resp.Inventory.AgentId.String()).To(Equal(agentID))
 			Expect(resp.Inventory.Inventory.VcenterId).To(Equal("vc-test"))
 			Expect(resp.Inventory.Inventory.Clusters).To(HaveKey("cluster-1"))
+			Expect(resp.Inventory.Inventory.Vcenter).NotTo(BeNil())
+			Expect(resp.Inventory.Inventory.Vcenter.Infra.Hosts).NotTo(BeNil())
+			Expect(*resp.Inventory.Inventory.Vcenter.Infra.Hosts).To(HaveLen(1))
+			host := (*resp.Inventory.Inventory.Vcenter.Infra.Hosts)[0]
+			Expect(host.Datacenter).NotTo(BeNil())
+			Expect(*host.Datacenter).To(Equal("dc1"))
+			Expect(host.Cluster).NotTo(BeNil())
+			Expect(*host.Cluster).To(Equal("cluster1"))
+			Expect(host.CpuModel).NotTo(BeNil())
+			Expect(*host.CpuModel).To(Equal("Xeon Gold 6338"))
+			Expect(host.SerialNumber).NotTo(BeNil())
+			Expect(*host.SerialNumber).To(Equal("SN-1"))
 		})
 
 		It("returns JSON when scope is explicitly main", func() {
