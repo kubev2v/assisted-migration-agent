@@ -34,7 +34,5 @@ type ConsoleStatus struct {
 }
 
 type AgentStatus struct {
-	Console     ConsoleStatus
-	Collector   CollectorStatus
-	RVToolsMode bool
+	Console ConsoleStatus
 }

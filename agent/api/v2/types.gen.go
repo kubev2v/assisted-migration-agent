@@ -1108,11 +1108,6 @@ type ListVirtualMachinesParams struct {
 	PageSize *int `form:"pageSize,omitempty" json:"pageSize,omitempty"`
 }
 
-// StartRvtoolsCollectorMultipartBody defines parameters for StartRvtoolsCollector.
-type StartRvtoolsCollectorMultipartBody struct {
-	Files []openapi_types.File `json:"files"`
-}
-
 // GetForecasterRunsParams defines parameters for GetForecasterRuns.
 type GetForecasterRunsParams struct {
 	// PairName Filter runs by pair name
@@ -1186,9 +1181,6 @@ type ListLatestVirtualMachinesParams struct {
 
 // SetAgentModeJSONRequestBody defines body for SetAgentMode for application/json ContentType.
 type SetAgentModeJSONRequestBody = AgentModeRequest
-
-// StartRvtoolsCollectorMultipartRequestBody defines body for StartRvtoolsCollector for multipart/form-data ContentType.
-type StartRvtoolsCollectorMultipartRequestBody StartRvtoolsCollectorMultipartBody
 
 // PutCredentialsJSONRequestBody defines body for PutCredentials for application/json ContentType.
 type PutCredentialsJSONRequestBody = VcenterCredentials

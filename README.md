@@ -13,40 +13,43 @@ This produces the binary at `bin/agent`.
 Agent-specific code lives under `agent/`: `main.go` is the CLI entry point,
 `cmd/` defines its commands, and `app/` assembles the application. `api/v2/`
 defines the HTTP contract, and `handlers/v2/` implements it. Shared
-implementation remains in `internal/` and `pkg/`. The RVTools proof of
-concept remains available as an Agent mode and uses `agent/Containerfile.rvtools`.
+implementation remains in `internal/` and `pkg/`. The standalone RVTools
+Analyzer lives under `analyzer/` and uses `analyzer/Containerfile`.
 
 ## Container images
 
-`build-config/ui-image` pins UI commit SHAs: `AGENT_UI_IMAGE_TAG` for
-`agent/Containerfile` and `agent/Containerfile.rvtools`, and
-`OFFLINE_ANALYZER_UI_IMAGE_TAG` for `analyzer/Containerfile`. Local Make targets
-and all Agent/RVTools Konflux pipelines use this config:
+`build-config/ui-image` pins both UI image tags: `AGENT_UI_IMAGE_TAG` for
+`agent/Containerfile` and `OFFLINE_ANALYZER_UI_IMAGE_TAG` for
+`analyzer/Containerfile`. Local Make targets and the Agent and Analyzer Konflux
+pipelines use this file:
 
 ```bash
 make image
+make image.analyzer
 ```
 
 For a direct Podman/Buildah build, pass the config explicitly:
 
 ```bash
 podman build --build-arg-file build-config/ui-image --build-arg-file build-config/min-upgrade-version --build-arg APPLIANCE_VERSION=main-release-0.31-383f77d -f agent/Containerfile .
-podman build --build-arg-file build-config/ui-image --build-arg APPLIANCE_VERSION=main-release-0.31-383f77d -f agent/Containerfile.rvtools .
-podman build --build-arg-file build-config/ui-image -f analyzer/Containerfile .
+podman build --build-arg-file build-config/ui-image --build-arg ANALYZER_VERSION=main-release-0.31-383f77d -f analyzer/Containerfile .
 ```
 
 For local testing, override the pin with `make image AGENT_UI_IMAGE_TAG=<sha>`
 or `AGENT_UI_IMAGE_TAG=<sha> make image`, and
 `make image.analyzer OFFLINE_ANALYZER_UI_IMAGE_TAG=<sha>` for the analyzer.
 
-For appliance and Agent RVTools images, `APPLIANCE_VERSION` is shared by the binary
-and the `org.opencontainers.image.version` label. The version API and UI therefore report
+For appliance images, `APPLIANCE_VERSION` is shared by the binary and the
+`org.opencontainers.image.version` label. The version API and UI therefore report
 the full appliance version, such as `main-release-0.31-383f77d`,
 `stable-release-0.31-383f77d`, or `v0.31.0`. Use
 `make image APPLIANCE_VERSION=<version>` to set it locally; the default is `DEV`.
 For direct Podman/Buildah builds, pass
 `--build-arg APPLIANCE_VERSION=<version>` explicitly; empty values fail the build.
 Pull request images use `on-pr-<commit-sha>` for both the binary and image label.
+Analyzer images use `ANALYZER_VERSION` for the binary and version label. Set it
+locally with `make image.analyzer ANALYZER_VERSION=<version>` or pass
+`--build-arg ANALYZER_VERSION=<version>` to Podman or Buildah.
 
 ### Upgrade compatibility metadata
 
@@ -67,7 +70,7 @@ make image IMAGE_ENV=production
 
 Konflux selects `dev` for pushes to `main`, `stage` for pushes to `stable`, and
 `production` for Git tag builds. Pull request builds use `dev`. All appliance
-pipelines read `build-config/min-upgrade-version`; the RVTools image is unaffected.
+pipelines read `build-config/min-upgrade-version`; the Analyzer image is unaffected.
 
 Direct Podman/Buildah builds load both files under `build-config/` and use
 `--build-arg IMAGE_ENV=stage` (default: `dev`). An explicit
@@ -106,7 +109,8 @@ installed on this repository with contents and pull request write access.
 
 ## RVTools Analyzer
 
-The Analyzer runs independently of Agent IDs and the Migration Planner console. It has its own API under `/api/v1`; the Agent's `--rvtools-mode` and `/api/v2/collector/rvtools` remain available.
+The Analyzer runs independently of Agent IDs and the Migration Planner console.
+It exposes RVTools collection through its own API under `/api/v1`.
 
 Build and run it locally with separate data and policy folders:
 
@@ -126,9 +130,11 @@ curl http://localhost:8001/api/v1/virtualmachines
 
 `GET /api/v1/collector` reports when analysis is `collected`. The full API contract is in [analyzer/api/v1/openapi.yaml](analyzer/api/v1/openapi.yaml). Native runs need DuckDB's SQLite scanner extension available in the data folder or downloadable on first use.
 
-Build the Analyzer image with `make image.analyzer`. It bundles the same UI image used by the Agent RVTools image for now, along with OPA policies and the DuckDB extension. The image serves UI files from `/app/static` and uses `/var/lib/analyzer` for persistent data. Set `ANALYZER_UI_IMAGE` and `ANALYZER_UI_IMAGE_TAG` to select a different UI image. The Agent image remains `make image`.
-
-The current Agent UI bundle calls `/api/v2`, while Analyzer exposes `/api/v1`. Its page and assets load in the Analyzer image, but its data views need an Analyzer-compatible UI build.
+Build the Analyzer image with `make image.analyzer`. It bundles the offline
+Analyzer UI, OPA policies, and the DuckDB extension. The image serves UI files
+from `/app/static` and uses `/var/lib/analyzer` for persistent data. Set
+`OFFLINE_ANALYZER_UI_IMAGE` and `OFFLINE_ANALYZER_UI_IMAGE_TAG` to select a
+different UI image. Build the Agent image with `make image`.
 
 ## Run
 
