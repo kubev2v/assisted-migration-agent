@@ -133,6 +133,39 @@ type CollectorStatus struct {
 // CollectorStatusStatus defines model for CollectorStatus.Status.
 type CollectorStatusStatus string
 
+// ComplexityDiskScoreEntry One entry in the disk complexity breakdown
+type ComplexityDiskScoreEntry struct {
+	// Score Complexity score from 1 to 4, where 1 is the least complex disk footprint and 4 is the most complex. Score 1: <=10 TB provisioned; score 2: <=20 TB; score 3: <=50 TB; score 4: >50 TB.
+	Score int `json:"score"`
+
+	// TotalSizeTB Total provisioned storage in TB for VMs at this score
+	TotalSizeTB float64 `json:"totalSizeTB"`
+
+	// VmCount Number of VMs at this complexity score
+	VmCount int `json:"vmCount"`
+}
+
+// ComplexityOSNameEntry One entry in the per-OS-name complexity breakdown.
+type ComplexityOSNameEntry struct {
+	// OsName The OS name exactly as it appears in vms.osInfo (e.g. "Red Hat Enterprise Linux 9 (64-bit)").
+	OsName string `json:"osName"`
+
+	// Score Complexity score assigned by ClassifyOS. 0 = unknown, 1 = least complex, 4 = most complex.
+	Score int `json:"score"`
+
+	// VmCount Number of VMs running this OS.
+	VmCount int `json:"vmCount"`
+}
+
+// ComplexityOSScoreEntry One entry in the OS complexity breakdown
+type ComplexityOSScoreEntry struct {
+	// Score Complexity score from 0 to 4, where 1 indicates the least complex OS to migrate and 0 indicates an OS with unknown complexity.
+	Score int `json:"score"`
+
+	// VmCount Number of VMs at this complexity score
+	VmCount int `json:"vmCount"`
+}
+
 // CreateGroupRequest defines model for CreateGroupRequest.
 type CreateGroupRequest struct {
 	Description *string `binding:"omitempty,max=500" json:"description,omitempty"`
@@ -234,6 +267,30 @@ type InspectionStatusState string
 type InventoryResponse struct {
 	Data     externalRef0.Inventory `json:"data"`
 	Vcenters []SubResource          `json:"vcenters"`
+}
+
+// MigrationComplexityRequest Request payload for calculating migration complexity estimation
+type MigrationComplexityRequest struct {
+	// FilterExpression Filter by expression
+	FilterExpression *string `json:"filterExpression,omitempty"`
+}
+
+// MigrationComplexityResponse Migration complexity estimation results
+type MigrationComplexityResponse struct {
+	// ComplexityByDisk Disk-size complexity scores, one entry per score level (1-4). Score 1 is the least complex disk footprint; score 4 is the most complex. Scores correspond to provisioned disk size: 1 (<=10 TB), 2 (<=20 TB), 3 (<=50 TB), 4 (>50 TB). All four score levels are always present.
+	ComplexityByDisk []ComplexityDiskScoreEntry `json:"complexityByDisk"`
+
+	// ComplexityByOS OS complexity scores, one entry per score level (0-4). Score 1 indicates the least complex OS to migrate; score 0 indicates an OS with unknown complexity. All five score levels are always present.
+	ComplexityByOS []ComplexityOSScoreEntry `json:"complexityByOS"`
+
+	// ComplexityByOSName Per-OS-name complexity breakdown. One entry per distinct OS name found in the cluster's inventory. Each entry carries the OS name string, its numeric complexity score (0–4), and the number of VMs running it.
+	ComplexityByOSName []ComplexityOSNameEntry `json:"complexityByOSName"`
+
+	// DiskSizeRatings Static lookup table mapping each disk-size tier label to its numeric complexity score. The content is identical for every cluster and reflects the DiskSizeScores configuration in the complexity package.
+	DiskSizeRatings map[string]int `json:"diskSizeRatings"`
+
+	// OsRatings Per-OS-name score for every OS found in this cluster's inventory. Keys are the OS name strings exactly as they appear in vms.osInfo; values are the numeric complexity score assigned by ClassifyOS (0 = unknown, 1-4 = increasing complexity). The map contains one entry per distinct OS name in the cluster, regardless of how many VMs run it.
+	OsRatings map[string]int `json:"osRatings"`
 }
 
 // Process defines model for Process.
@@ -757,6 +814,9 @@ type StartRvtoolsCollectorMultipartRequestBody StartRvtoolsCollectorMultipartBod
 
 // UpdateRvtoolsCollectorMultipartRequestBody defines body for UpdateRvtoolsCollector for multipart/form-data ContentType.
 type UpdateRvtoolsCollectorMultipartRequestBody UpdateRvtoolsCollectorMultipartBody
+
+// CalculateMigrationComplexityJSONRequestBody defines body for CalculateMigrationComplexity for application/json ContentType.
+type CalculateMigrationComplexityJSONRequestBody = MigrationComplexityRequest
 
 // CreateLatestGroupJSONRequestBody defines body for CreateLatestGroup for application/json ContentType.
 type CreateLatestGroupJSONRequestBody = CreateGroupRequest

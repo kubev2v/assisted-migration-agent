@@ -428,3 +428,38 @@ func NewVCenterInventory(m models.VCenterInventory) (InventoryResponse, error) {
 
 	return resp, nil
 }
+
+func NewMigrationComplexityResponseFromModel(result models.MigrationComplexityResult) MigrationComplexityResponse {
+	response := MigrationComplexityResponse{
+		ComplexityByDisk:   make([]ComplexityDiskScoreEntry, len(result.ComplexityByDisk)),
+		ComplexityByOS:     make([]ComplexityOSScoreEntry, len(result.ComplexityByOS)),
+		ComplexityByOSName: make([]ComplexityOSNameEntry, len(result.ComplexityByOSName)),
+		DiskSizeRatings:    result.DiskSizeRatings,
+		OsRatings:          result.OSRatings,
+	}
+
+	for i, entry := range result.ComplexityByDisk {
+		response.ComplexityByDisk[i] = ComplexityDiskScoreEntry{
+			Score:       entry.Score,
+			VmCount:     entry.VMCount,
+			TotalSizeTB: entry.TotalSizeTB,
+		}
+	}
+
+	for i, entry := range result.ComplexityByOS {
+		response.ComplexityByOS[i] = ComplexityOSScoreEntry{
+			Score:   entry.Score,
+			VmCount: entry.VMCount,
+		}
+	}
+
+	for i, entry := range result.ComplexityByOSName {
+		response.ComplexityByOSName[i] = ComplexityOSNameEntry{
+			OsName:  entry.Name,
+			Score:   entry.Score,
+			VmCount: entry.VMCount,
+		}
+	}
+
+	return response
+}
