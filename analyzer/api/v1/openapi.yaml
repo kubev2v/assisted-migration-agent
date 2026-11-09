@@ -1046,6 +1046,36 @@ paths:
               schema:
                 $ref: '#/components/schemas/AnalyzerStatus'
 
+  /complexity-estimation:
+    post:
+      tags:
+        - recommendations
+      description: Calculate migration complexity estimation for the latest collection
+      operationId: calculateMigrationComplexity
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MigrationComplexityRequest"
+        required: true
+      responses:
+        "200":
+          description: Migration complexity estimation successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MigrationComplexityResponse"
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Assessment not found
+        "500":
+          description: Internal error
+
 components:
   schemas:
 
@@ -1134,6 +1164,129 @@ components:
       properties:
         inventory:
           $ref: https://raw.githubusercontent.com/kubev2v/migration-planner/e103e046ea70f8abab8b8d1290e493290f4ce560/api/v1alpha1/openapi.yaml#/components/schemas/Inventory
+
+    MigrationComplexityRequest:
+      type: object
+      description: Request payload for calculating migration complexity estimation
+      properties:
+        filterExpression:
+          type: string
+          description: Filter by expression
+          example:  "cluster = 'cluster-34'"
+
+    MigrationComplexityResponse:
+      type: object
+      description: Migration complexity estimation results
+      properties:
+        complexityByDisk:
+          type: array
+          description: >
+            Disk-size complexity scores, one entry per score level (1-4).
+            Score 1 is the least complex disk footprint; score 4 is the most complex.
+            Scores correspond to provisioned disk size: 1 (<=10 TB), 2 (<=20 TB),
+            3 (<=50 TB), 4 (>50 TB). All four score levels are always present.
+          items:
+            $ref: "#/components/schemas/ComplexityDiskScoreEntry"
+        complexityByOS:
+          type: array
+          description: >
+            OS complexity scores, one entry per score level (0-4).
+            Score 1 indicates the least complex OS to migrate; score 0 indicates an
+            OS with unknown complexity. All five score levels are always present.
+          items:
+            $ref: "#/components/schemas/ComplexityOSScoreEntry"
+        diskSizeRatings:
+          type: object
+          description: >
+            Static lookup table mapping each disk-size tier label to its numeric complexity
+            score. The content is identical for every cluster and reflects the DiskSizeScores
+            configuration in the complexity package.
+          additionalProperties:
+            type: integer
+        osRatings:
+          type: object
+          description: >
+            Per-OS-name score for every OS found in this cluster's inventory. Keys are the
+            OS name strings exactly as they appear in vms.osInfo; values are the numeric
+            complexity score assigned by ClassifyOS (0 = unknown, 1-4 = increasing
+            complexity). The map contains one entry per distinct OS name in the cluster,
+            regardless of how many VMs run it.
+          additionalProperties:
+            type: integer
+        complexityByOSName:
+          type: array
+          description: >
+            Per-OS-name complexity breakdown. One entry per distinct OS name found in the
+            cluster's inventory. Each entry carries the OS name string, its numeric
+            complexity score (0–4), and the number of VMs running it.
+          items:
+            $ref: "#/components/schemas/ComplexityOSNameEntry"
+      required:
+        - complexityByDisk
+        - complexityByOS
+        - diskSizeRatings
+        - osRatings
+        - complexityByOSName
+
+    ComplexityDiskScoreEntry:
+      type: object
+      description: One entry in the disk complexity breakdown
+      properties:
+        score:
+          type: integer
+          description: >
+            Complexity score from 1 to 4, where 1 is the least complex disk footprint
+            and 4 is the most complex. Score 1: <=10 TB provisioned; score 2: <=20 TB;
+            score 3: <=50 TB; score 4: >50 TB.
+        vmCount:
+          type: integer
+          description: Number of VMs at this complexity score
+        totalSizeTB:
+          type: number
+          format: double
+          description: Total provisioned storage in TB for VMs at this score
+      required:
+        - score
+        - vmCount
+        - totalSizeTB
+
+    ComplexityOSScoreEntry:
+      type: object
+      description: One entry in the OS complexity breakdown
+      properties:
+        score:
+          type: integer
+          description: >
+            Complexity score from 0 to 4, where 1 indicates the least complex OS
+            to migrate and 0 indicates an OS with unknown complexity.
+        vmCount:
+          type: integer
+          description: Number of VMs at this complexity score
+      required:
+        - score
+        - vmCount
+
+    ComplexityOSNameEntry:
+      type: object
+      description: One entry in the per-OS-name complexity breakdown.
+      properties:
+        osName:
+          type: string
+          description: >
+            The OS name exactly as it appears in vms.osInfo (e.g.
+            "Red Hat Enterprise Linux 9 (64-bit)").
+        score:
+          type: integer
+          description: >
+            Complexity score assigned by ClassifyOS. 0 = unknown, 1 = least
+            complex, 4 = most complex.
+        vmCount:
+          type: integer
+          description: Number of VMs running this OS.
+      required:
+        - osName
+        - score
+        - vmCount
 
     VirtualMachine:
       type: object

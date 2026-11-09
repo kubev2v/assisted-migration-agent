@@ -226,6 +226,14 @@ func (m *ServiceManager) InventoryService(collectionID string) (*InventoryServic
 	return m.inventoryService(db)
 }
 
+func (m *ServiceManager) EstimationService(collectionID string) (*EstimationService, error) {
+	db, err := m.pool.Get(collectionID)
+	if err != nil {
+		return nil, err
+	}
+	return m.estimationService(db)
+}
+
 func (m *ServiceManager) VirtualMachineService(collectionID string) (*VMService, error) {
 	db, err := m.pool.Get(collectionID)
 	if err != nil {
@@ -304,6 +312,14 @@ func (m *ServiceManager) LatestInventoryService() (*InventoryService, error) {
 		return nil, err
 	}
 	return m.inventoryService(db)
+}
+
+func (m *ServiceManager) LatestEstimationService() (*EstimationService, error) {
+	db, err := m.pool.Latest()
+	if err != nil {
+		return nil, err
+	}
+	return m.estimationService(db)
 }
 
 func (m *ServiceManager) LatestRightsizingService() (*RightsizingService, error) {
@@ -393,6 +409,14 @@ func (m *ServiceManager) inventoryService(db *store.Database) (*InventoryService
 		return nil, err
 	}
 	return NewInventoryService(st), nil
+}
+
+func (m *ServiceManager) estimationService(db *store.Database) (*EstimationService, error) {
+	st, err := db.Store()
+	if err != nil {
+		return nil, err
+	}
+	return NewEstimationService(st, duckdb_parser.New(st.Querier(), nil)), nil
 }
 
 func (m *ServiceManager) rightsizingService(db *store.Database) (*RightsizingService, error) {

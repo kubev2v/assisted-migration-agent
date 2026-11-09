@@ -18,6 +18,7 @@ type ServiceProvider interface {
 	LatestVirtualMachineService() (*services.VMService, error)
 	LatestGroupService() (*services.GroupService, error)
 	LatestInventoryService() (*services.InventoryService, error)
+	LatestEstimationService() (*services.EstimationService, error)
 	LatestRightsizingService() (*services.RightsizingService, error)
 	LatestApplicationService() (*services.ApplicationService, error)
 	GetCollectorStatus() models.CollectorStatus
