@@ -459,15 +459,13 @@ var _ = Describe("Startup migration policy", func() {
 			Expect(db.Close()).To(Succeed())
 
 			mainHistory := readStartupMainHistory(folder)
+			collectionHistory := readStartupCollectionHistory(folder)
 			pool, err := startPool(folder, false)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(pool.List()).To(HaveLen(2))
 			pool.Close()
 			Expect(readStartupMainHistory(folder)).To(Equal(mainHistory))
-			db = openStartupDatabase(folder, "collection_100.duckdb")
-			var unchanged int
-			Expect(db.QueryRow(`SELECT count(*) FROM collection_schema_migrations WHERE applied_at='2000-01-01'`).Scan(&unchanged)).To(Succeed())
-			Expect(unchanged).To(Equal(3))
+			Expect(readStartupCollectionHistory(folder)).To(Equal(collectionHistory))
 		})
 
 		DescribeTable("rejects invalid main histories without repairing them",
@@ -598,6 +596,24 @@ type startupMigrationEntry struct {
 func readStartupMainHistory(folder string) []startupMigrationEntry {
 	db := openStartupDatabase(folder, "agent.duckdb")
 	rows, err := db.Query(`SELECT version, applied_at FROM schema_migrations ORDER BY version`)
+	Expect(err).NotTo(HaveOccurred())
+	defer func() { _ = rows.Close() }()
+
+	var history []startupMigrationEntry
+	for rows.Next() {
+		var entry startupMigrationEntry
+		Expect(rows.Scan(&entry.Version, &entry.AppliedAt)).To(Succeed())
+		history = append(history, entry)
+	}
+	Expect(rows.Err()).NotTo(HaveOccurred())
+	Expect(rows.Close()).To(Succeed())
+	Expect(db.Close()).To(Succeed())
+	return history
+}
+
+func readStartupCollectionHistory(folder string) []startupMigrationEntry {
+	db := openStartupDatabase(folder, "collection_100.duckdb")
+	rows, err := db.Query(`SELECT version, applied_at FROM collection_schema_migrations ORDER BY version`)
 	Expect(err).NotTo(HaveOccurred())
 	defer func() { _ = rows.Close() }()
 

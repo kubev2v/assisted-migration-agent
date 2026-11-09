@@ -249,6 +249,8 @@ const hostsQuery = `
 				COALESCE(h."Model", '') AS model,
 				COALESCE(h."Config status", '') AS config_status,
 				COALESCE(vm_counts.vm_count, 0) AS vm_count,
+				COALESCE(h."CPU Model", '') AS cpu_model,
+				COALESCE(h."Serial Number", '') AS serial_number,
 				h."VMotion support" AS vmotion_supported,
 				h."Storage VMotion support" AS storage_vmotion_supported,
 				CASE WHEN LOWER(TRIM(h."VI SDK UUID")) = 'vm' THEN NULL

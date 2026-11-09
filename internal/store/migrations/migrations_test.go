@@ -227,7 +227,7 @@ var _ = Describe("RDM LUN UUID collection migration", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		_, err = db.ExecContext(ctx, `
-			DELETE FROM collection_schema_migrations WHERE version IN (2, 3);
+			DELETE FROM collection_schema_migrations WHERE version > 1;
 			ALTER TABLE vdisk DROP COLUMN "RDM LUN UUID";
 			INSERT INTO vinfo ("VM ID", "VM") VALUES ('vm-1', 'legacy-vm');
 			INSERT INTO vdisk ("VM ID", "Raw", "Capacity MiB", "Disk UUID")
@@ -250,7 +250,7 @@ var _ = Describe("RDM LUN UUID collection migration", func() {
 
 		_, err = db.ExecContext(ctx, `
 			UPDATE vdisk SET "RDM LUN UUID" = 'collected-lun-uuid';
-			DELETE FROM collection_schema_migrations WHERE version IN (2, 3);
+			DELETE FROM collection_schema_migrations WHERE version > 1;
 		`)
 		Expect(err).NotTo(HaveOccurred())
 

@@ -17,8 +17,8 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/jzelinskie/cobrautil/v2 v2.0.0-20260922163232-4fb24ed00480
-	github.com/kubev2v/forklift v0.0.0-20261029124612-a8e8350a4032
-	github.com/kubev2v/migration-planner v0.28.1-0.20261109122526-4c26df296ca6
+	github.com/kubev2v/forklift v0.0.0-20261110114915-def3d784a934
+	github.com/kubev2v/migration-planner v0.28.1-0.20261112080519-050497adaf7f
 	github.com/kubev2v/migration-planner-common/estimations v0.0.0-20261105094532-64089d3d55a8
 	github.com/kubev2v/vm-migration-detective v0.0.0-20261006023354-140bc9526c2c
 	github.com/oapi-codegen/gin-middleware v1.0.2
@@ -208,7 +208,7 @@ require (
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/opencontainers/runtime-tools v0.9.1-0.20261017090856-bd3b0bd00f44 // indirect
 	github.com/opencontainers/selinux v1.15.1 // indirect
-	github.com/openshift/api v0.0.0-20261109202217-f6e8a0876ff9 // indirect
+	github.com/openshift/api v0.0.0-20261111192622-61403fc4e89f // indirect
 	github.com/openshift/client-go v0.0.0-20261109191322-505de3dc15d7 // indirect
 	github.com/openshift/custom-resource-status v1.1.2 // indirect
 	github.com/openshift/imagebuilder v1.2.22 // indirect

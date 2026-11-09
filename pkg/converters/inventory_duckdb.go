@@ -226,8 +226,12 @@ func infraFromDuckDB(i *inventory.InfraData) api.Infra {
 	hosts := make([]api.Host, 0, len(i.Hosts))
 	for _, h := range i.Hosts {
 		host := api.Host{
-			Vendor: h.Vendor,
-			Model:  h.Model,
+			Vendor:       h.Vendor,
+			Model:        h.Model,
+			Datacenter:   optionalString(h.Datacenter),
+			Cluster:      optionalString(h.Cluster),
+			CpuModel:     optionalString(h.CpuModel),
+			SerialNumber: optionalString(h.SerialNumber),
 		}
 		if h.ID != "" {
 			id := h.ID

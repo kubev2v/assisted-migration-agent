@@ -46,7 +46,10 @@ func TestCollectorWork_CollectionTimeAndStorage(t *testing.T) {
 		`CREATE TABLE fixture.Cluster (ID VARCHAR, Name VARCHAR, Parent VARCHAR, Variant VARCHAR, DasEnabled BOOLEAN, DrsEnabled BOOLEAN, DrsBehavior VARCHAR)`,
 		`INSERT INTO fixture.Cluster VALUES ('cluster-1', 'cluster1', '{}', 'ClusterComputeResource', false, false, '')`,
 		`CREATE TABLE fixture.Host (ID VARCHAR, Cluster VARCHAR, CpuCores INTEGER, CpuSockets INTEGER, MemoryBytes BIGINT, Model VARCHAR, Vendor VARCHAR, Datastores VARCHAR, VMotionSupported BOOLEAN, StorageVMotionSupported BOOLEAN)`,
-		`INSERT INTO fixture.Host VALUES ('host-1', 'cluster-1', 8, 2, 34359738368, 'ESXi', 'VMware', '[]', true, true)`,
+		`ALTER TABLE fixture.Host ADD COLUMN CpuModel VARCHAR`,
+		`ALTER TABLE fixture.Host ADD COLUMN SerialNumber VARCHAR`,
+		`ALTER TABLE fixture.Host ADD COLUMN ServiceTag VARCHAR`,
+		`INSERT INTO fixture.Host (ID, Cluster, CpuCores, CpuSockets, MemoryBytes, Model, Vendor, Datastores, VMotionSupported, StorageVMotionSupported, CpuModel, SerialNumber, ServiceTag) VALUES ('host-1', 'cluster-1', 8, 2, 34359738368, 'ESXi', 'VMware', '[]', true, true, ' Xeon Gold 6338 ', ' SN-1 ', ' TAG-1 ')`,
 		`ALTER TABLE fixture.Host ADD COLUMN HbaDiskInfo VARCHAR`,
 		`ALTER TABLE fixture.Host ADD COLUMN HostScsiDisks VARCHAR`,
 		`ALTER TABLE fixture.Host ADD COLUMN HostScsiTopology VARCHAR`,
@@ -140,4 +143,6 @@ func assertCollectedStorage(g Gomega, raw []byte, adapters, luns string) {
 	g.Expect(host).To(HaveKey("storageLuns"))
 	g.Expect(string(host["storageAdapters"])).To(MatchJSON(adapters))
 	g.Expect(string(host["storageLuns"])).To(MatchJSON(luns))
+	g.Expect(string(host["cpuModel"])).To(Equal(`"Xeon Gold 6338"`))
+	g.Expect(string(host["serialNumber"])).To(Equal(`"SN-1"`))
 }
