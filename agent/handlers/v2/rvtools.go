@@ -46,7 +46,7 @@ func (h *Handler) StartRvtoolsCollector(c *gin.Context) {
 		savedPaths = append(savedPaths, destPath)
 	}
 
-	status, err := h.svc.StartRVToolsCollecting(savedPaths)
+	status, err := h.svc.StartRVToolsCollecting(savedPaths, false)
 	if err != nil {
 		if srvErrors.IsOperationInProgressError(err) {
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})

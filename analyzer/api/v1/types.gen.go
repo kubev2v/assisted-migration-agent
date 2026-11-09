@@ -699,6 +699,11 @@ type StartRvtoolsCollectorMultipartBody struct {
 	Files []openapi_types.File `json:"files"`
 }
 
+// UpdateRvtoolsCollectorMultipartBody defines parameters for UpdateRvtoolsCollector.
+type UpdateRvtoolsCollectorMultipartBody struct {
+	Files []openapi_types.File `json:"files"`
+}
+
 // ListLatestGroupsParams defines parameters for ListLatestGroups.
 type ListLatestGroupsParams struct {
 	// ByName Filter groups by name (case-insensitive substring match)
@@ -749,6 +754,9 @@ type ListLatestVirtualMachinesParams struct {
 
 // StartRvtoolsCollectorMultipartRequestBody defines body for StartRvtoolsCollector for multipart/form-data ContentType.
 type StartRvtoolsCollectorMultipartRequestBody StartRvtoolsCollectorMultipartBody
+
+// UpdateRvtoolsCollectorMultipartRequestBody defines body for UpdateRvtoolsCollector for multipart/form-data ContentType.
+type UpdateRvtoolsCollectorMultipartRequestBody UpdateRvtoolsCollectorMultipartBody
 
 // CreateLatestGroupJSONRequestBody defines body for CreateLatestGroup for application/json ContentType.
 type CreateLatestGroupJSONRequestBody = CreateGroupRequest

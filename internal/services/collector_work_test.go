@@ -120,14 +120,12 @@ func TestCollectorWork_CollectionTimeAndStorage(t *testing.T) {
 	var stored []byte
 	g.Expect(db.QueryRowContext(ctx, "SELECT data FROM inventory LIMIT 1").Scan(&stored)).To(Succeed())
 	g.Expect(stored).To(Equal(result.Inventory))
-	assertCollectedStorage(t, stored,
+	assertCollectedStorage(g, stored,
 		`[{"device":"vmhba1","key":"hba-1","protocol":"FibreChannel","nodeWwn":"000123","portWwn":"000456"}]`,
 		`[{"canonicalName":"naa.001","key":"lun-1","vendor":"NETAPP","model":"LUN","adapterDevices":["vmhba1"]}]`)
 }
 
-func assertCollectedStorage(t *testing.T, raw []byte, adapters, luns string) {
-	t.Helper()
-	g := NewWithT(t)
+func assertCollectedStorage(g Gomega, raw []byte, adapters, luns string) {
 	var inventory struct {
 		VCenter struct {
 			Infra struct {

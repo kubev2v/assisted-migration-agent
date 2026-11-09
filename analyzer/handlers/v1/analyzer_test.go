@@ -32,7 +32,7 @@ type testServices struct {
 	files []string
 }
 
-func (s *testServices) StartRVToolsCollecting(files []string) (models.CollectorStatus, error) {
+func (s *testServices) StartRVToolsCollecting(files []string, isUpdateOp bool) (models.CollectorStatus, error) {
 	s.files = files
 	return models.CollectorStatus{State: models.CollectorStateConnecting}, nil
 }
