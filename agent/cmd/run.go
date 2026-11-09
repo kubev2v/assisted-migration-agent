@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/go-extras/cobraflags"
@@ -19,6 +20,7 @@ import (
 )
 
 func NewRunCommand(cfg *config.Configuration) *cobra.Command {
+	maintenanceTimeout := 300 * time.Second
 	runCmd := &cobra.Command{
 		Use:   "run",
 		Short: "Run agent",
@@ -32,13 +34,17 @@ func NewRunCommand(cfg *config.Configuration) *cobra.Command {
   # Run agent in production mode
   agent run --agent-id 550e8400-e29b-41d4-a716-446655440000 --source-id 6ba7b810-9dad-11d1-80b4-00c04fd430c8 --server-mode prod --server-statics-folder /var/www/statics`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
+			if maintenanceTimeout <= 0 {
+				return fmt.Errorf("maintenance timeout must be positive")
+			}
 			return validateConfiguration(cfg)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return app.Run(cfg)
+			return app.Run(cfg, maintenanceTimeout)
 		},
 	}
 
+	runCmd.Flags().DurationVar(&maintenanceTimeout, "maintenance-timeout", maintenanceTimeout, "Deadline to drain existing work before an upgrade; expiry preserves active jobs")
 	registerFlags(runCmd, cfg)
 	cobraflags.CobraOnInitialize("AGENT", runCmd)
 

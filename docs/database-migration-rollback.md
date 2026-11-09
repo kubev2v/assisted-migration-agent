@@ -2,9 +2,9 @@
 
 The agent provides an offline migration CLI for a host-coordinated appliance
 upgrade. **Stop the agent and all other database users before invoking it.**
-This change supplies the migration engine and CLI; maintenance/probation mode
-and the host's activation/reboot protocol are follow-up work. It does not make
-Podman's existing automatic image rollback safe for schema-changing upgrades.
+The migration engine is complemented by [job draining and offline saved-data
+validation](appliance-upgrade-lifecycle.md). The host must orchestrate these
+operations; Podman image rollback alone cannot recover schema-changing upgrades.
 
 The host must retain both images by immutable image ID. Run every command below
 from the **candidate image**, including rollback after candidate startup fails.
@@ -44,8 +44,9 @@ The separate RVTools Analyzer retains its existing automatic migration behavior.
 agent migrate prepare --data-folder /var/lib/agent --attempt-id <uuid> \
   --previous-image sha256:<old-id> --candidate-image sha256:<candidate-id>
 agent migrate apply --data-folder /var/lib/agent --attempt-id <uuid>
-# Start and validate the candidate without enabling ordinary writes (follow-up).
-# That host-managed startup must pass --auto-migrate=false.
+agent upgrade validate --data-folder /var/lib/agent --attempt-id <uuid> \
+  --image-id sha256:<candidate-id>
+# Only after validation succeeds may the host start with --auto-migrate=false.
 # If upgrade fails, stop it and invoke:
 agent migrate rollback --data-folder /var/lib/agent --attempt-id <uuid> --dry-run
 agent migrate rollback --data-folder /var/lib/agent --attempt-id <uuid>
@@ -89,8 +90,8 @@ executing SQL migrations. It does not prove that down SQL will succeed and
 creates no tables, manifest, lock file, or database. Executing rollback and
 `verify` check migration versions against the baseline. They do not prove schema
 correctness, data integrity, or previous-image usability. Test the up/down SQL
-and data preservation; application usability checks belong to the follow-up
-maintenance/probation lifecycle.
+and data preservation; application usability checks are provided by the separate offline
+`agent upgrade validate` command.
 
 A retry re-reads committed history and skips completed steps. Nothing depends
 on a separate progress file being written between SQL commits. A database with
@@ -101,8 +102,8 @@ starting version. Main version 001 and collection versions 001/002 are permanent
 history and cannot be reversed. The minimum is checked both during preparation
 and when loading a manifest.
 The directory lock serializes these offline commands; DuckDB file locks reject
-other processes holding databases. Full application/CLI data exclusion belongs
-to the follow-up maintenance implementation.
+other processes holding databases. The host must stop every data consumer and confirm exit before running offline
+commands; the directory lock does not replace container shutdown.
 
 Each executed command writes one JSON result to stdout. `steps` lists planned
 steps for dry-run and attempted steps for execution; `versions` lists observed
@@ -143,12 +144,12 @@ commits the upgrade; a down file alone cannot recover lost values.
 
 ## Host follow-up contract
 
-Load candidate → stop old agent → prepare baseline → apply migrations → start
-candidate in probation → validate previously usable collections → durably commit
-→ enable normal work.
+Load candidate → drain old agent → stop all data consumers and confirm exit →
+prepare baseline → apply migrations → validate candidate offline → durably accept
+candidate → start normal work with --auto-migrate=false.
 
 On failure before commit: stop candidate and disable restart → run candidate
-rollback CLI → verify baseline → select/start old image → validate old image →
+rollback CLI → verify baseline → validate old image offline → select/start old image →
 publish `rolled-back`. A failed rollback leaves the agent stopped and retains
 both images, data, archive, and attempt. Disable automatic image rollback, using
 `--rollback=false` if keeping `podman auto-update` for activation. Never start the

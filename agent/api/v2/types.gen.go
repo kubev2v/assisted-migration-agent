@@ -77,6 +77,20 @@ const (
 	InspectorStatusStateRunning InspectorStatusState = "running"
 )
 
+// Defines values for UpgradeRequestAction.
+const (
+	UpgradeRequestActionMaintenance UpgradeRequestAction = "maintenance"
+	UpgradeRequestActionResume      UpgradeRequestAction = "resume"
+)
+
+// Defines values for UpgradeStatusState.
+const (
+	UpgradeStatusStateDraining    UpgradeStatusState = "draining"
+	UpgradeStatusStateFailed      UpgradeStatusState = "failed"
+	UpgradeStatusStateMaintenance UpgradeStatusState = "maintenance"
+	UpgradeStatusStateNormal      UpgradeStatusState = "normal"
+)
+
 // Defines values for VirtualMachineIssueCategory.
 const (
 	VirtualMachineIssueCategoryAdvisory    VirtualMachineIssueCategory = "Advisory"
@@ -634,6 +648,32 @@ type UpdateLabelVMsRequest struct {
 	Remove *[]string `binding:"omitempty,dive,required" json:"remove,omitempty"`
 }
 
+// UpgradeRequest defines model for UpgradeRequest.
+type UpgradeRequest struct {
+	Action         UpgradeRequestAction `json:"action"`
+	AttemptId      string               `json:"attempt_id"`
+	CandidateImage *string              `json:"candidate_image,omitempty"`
+	PreviousImage  *string              `json:"previous_image,omitempty"`
+}
+
+// UpgradeRequestAction defines model for UpgradeRequest.Action.
+type UpgradeRequestAction string
+
+// UpgradeStatus defines model for UpgradeStatus.
+type UpgradeStatus struct {
+	AttemptId       string  `json:"attempt_id"`
+	ContractVersion int     `json:"contract_version"`
+	Error           *string `json:"error,omitempty"`
+	ImageId         string  `json:"image_id"`
+
+	// ServicesClosed True after normal services close. A failed drain with this false can resume without canceling active jobs.
+	ServicesClosed bool               `json:"services_closed"`
+	State          UpgradeStatusState `json:"state"`
+}
+
+// UpgradeStatusState defines model for UpgradeStatus.State.
+type UpgradeStatusState string
+
 // VMFilterOptionsResponse defines model for VMFilterOptionsResponse.
 type VMFilterOptionsResponse struct {
 	// Applications Distinct detected application names
@@ -1169,6 +1209,16 @@ type GetLatestInventoryParams struct {
 // GetLatestInventoryParamsScope defines parameters for GetLatestInventory.
 type GetLatestInventoryParamsScope string
 
+// GetUpgradeParams defines parameters for GetUpgrade.
+type GetUpgradeParams struct {
+	XUpgradeToken string `json:"X-Upgrade-Token"`
+}
+
+// PutUpgradeParams defines parameters for PutUpgrade.
+type PutUpgradeParams struct {
+	XUpgradeToken string `json:"X-Upgrade-Token"`
+}
+
 // ListLatestVirtualMachinesParams defines parameters for ListLatestVirtualMachines.
 type ListLatestVirtualMachinesParams struct {
 	// ByExpression Filter by expression
@@ -1210,6 +1260,9 @@ type StartInspectionJSONRequestBody = StartInspectionRequest
 
 // PutInspectorVddkMultipartRequestBody defines body for PutInspectorVddk for multipart/form-data ContentType.
 type PutInspectorVddkMultipartRequestBody PutInspectorVddkMultipartBody
+
+// PutUpgradeJSONRequestBody defines body for PutUpgrade for application/json ContentType.
+type PutUpgradeJSONRequestBody = UpgradeRequest
 
 // BatchUpdateLatestVMExclusionJSONRequestBody defines body for BatchUpdateLatestVMExclusion for application/json ContentType.
 type BatchUpdateLatestVMExclusionJSONRequestBody = BatchUpdateExclusionRequest

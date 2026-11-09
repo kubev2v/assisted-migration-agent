@@ -469,3 +469,20 @@ func (m *ServiceManager) ComparisonService(aId, bId string) (*ComparisonService,
 		models.CollectionMeta{ID: dbB.ID, CreatedAt: dbB.CreatedAt},
 	), nil
 }
+
+// UpgradeBusy is checked only after HTTP admission has been closed and drained.
+func (m *ServiceManager) UpgradeBusy() bool {
+	m.mu.Lock()
+	busy := (m.collector != nil && m.collector.IsBusy()) || (m.inspector != nil && m.inspector.IsBusy())
+	m.mu.Unlock()
+	return busy || (m.forecaster != nil && m.forecaster.GetStatus().State == models.ForecasterStateRunning)
+}
+
+// StopForUpgrade leaves active work untouched; the caller must first drain it.
+func (m *ServiceManager) StopForUpgrade() {
+	m.Stop(context.Background())
+	if m.console != nil {
+		m.console.Stop()
+	}
+	m.pool.Close()
+}

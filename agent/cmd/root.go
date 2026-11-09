@@ -43,7 +43,7 @@ func NewRootCommand(version, gitCommit, uiGitCommit string) *cobra.Command {
 	}
 	root.PersistentFlags().StringVar(&cfg.LogFormat, "log-format", cfg.LogFormat, "format of the logs: console or json")
 	root.PersistentFlags().StringVar(&cfg.LogLevel, "log-level", cfg.LogLevel, "log level")
-	root.AddCommand(NewRunCommand(cfg), NewVersionCommand(cfg), NewMigrateCommand())
+	root.AddCommand(NewRunCommand(cfg), NewVersionCommand(cfg), NewMigrateCommand(), NewUpgradeCommand())
 	return root
 }
 
