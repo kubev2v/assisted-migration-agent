@@ -626,8 +626,8 @@ github.com/opencontainers/runtime-tools v0.9.1-0.20261017090856-bd3b0bd00f44 h1:
 github.com/opencontainers/runtime-tools v0.9.1-0.20261017090856-bd3b0bd00f44/go.mod h1:DKDEfzxvRkoQ6n9TGhxQgg2IM1lY4aM0eaQP4e3oElw=
 github.com/opencontainers/selinux v1.15.1 h1:ERxeh5caJvCzNAKdI8WQbJmB1LDTn4BuaAg8wihLBpA=
 github.com/opencontainers/selinux v1.15.1/go.mod h1:LenyElirjUHszfxrjuFqC85HIeXZKumHcKMQtnaDlQQ=
-github.com/openshift/api v0.0.0-20261107000926-248dd91956ce h1:FUT6kBuZ+GbNRyxu54j8vFYOiUpgv7UVSBYg0QvUFhQ=
-github.com/openshift/api v0.0.0-20261107000926-248dd91956ce/go.mod h1:2oI3aXQFDjjl7l4xA9ZPSkB+l+lyfWLg7P2sWg9yEvM=
+github.com/openshift/api v0.0.0-20261109202217-f6e8a0876ff9 h1:kMpI8KDdRUVg9+WweBahw3w5D0fRsURAkVZ50KttC90=
+github.com/openshift/api v0.0.0-20261109202217-f6e8a0876ff9/go.mod h1:2oI3aXQFDjjl7l4xA9ZPSkB+l+lyfWLg7P2sWg9yEvM=
 github.com/openshift/assisted-image-service v0.0.0-20261031020327-e0b16b6ec041 h1:bSnGZqxqXNyTAIJMsOQG3QugKFISif/CyYQaBsGl8rk=
 github.com/openshift/assisted-image-service v0.0.0-20261031020327-e0b16b6ec041/go.mod h1:UISm+/gQYW3cQ0VOgsgFtvtcj1juqyC3cNWvJS1xRkQ=
 github.com/openshift/client-go v0.0.0-20261027103500-48133ed95dad h1:KJ8Fs8QpXjtT854HjMLZyIjptLEHm4I6RC2OCZu6DvY=
