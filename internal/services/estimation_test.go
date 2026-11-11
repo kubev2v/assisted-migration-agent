@@ -208,7 +208,7 @@ var _ = Describe("EstimationService", func() {
 				result, err := srv.CalculateMigrationComplexity(ctx, "")
 
 				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("listing VMs for complexity estimation"))
+				Expect(err.Error()).To(ContainSubstring("listing VMs for estimation"))
 				Expect(result).To(BeNil())
 				Expect(builder.calls).To(BeZero())
 			})

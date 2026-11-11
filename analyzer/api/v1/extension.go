@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/kubev2v/migration-planner-common/estimations/estimation"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
 
@@ -488,4 +490,103 @@ func NewMigrationComplexityResponseFromModel(result models.MigrationComplexityRe
 	}
 
 	return response
+}
+
+func (r MigrationEstimationRequest) ToModel() models.MigrationEstimationRequestParams {
+	var params models.MigrationEstimationRequestParams
+	if r.FilterExpression != nil {
+		params.Expression = *r.FilterExpression
+	}
+	if r.EstimationSchema != nil {
+		params.Schemas = *r.EstimationSchema
+	}
+	if r.Params != nil {
+		params.Parameters = make([]estimation.Param, 0, len(*r.Params))
+		for key, value := range *r.Params {
+			params.Parameters = append(params.Parameters, estimation.Param{Key: key, Value: value})
+		}
+	}
+	return params
+}
+
+func NewMigrationEstimationResponseFromModel(result models.MigrationEstimationResult) MigrationEstimationResponse {
+	return MigrationEstimationResponse{
+		Estimation:        newSchemaEstimations(result.Estimation),
+		EstimationContext: newEstimationContext(result.EstimationContext),
+	}
+}
+
+func NewMigrationEstimationByComplexityResponseFromModel(result models.MigrationEstimationByComplexityResult) MigrationEstimationByComplexityResponse {
+	entries := make([]OsDiskEstimationEntry, len(result.ComplexityByOSDisk))
+	for i, bucket := range result.ComplexityByOSDisk {
+		entries[i] = OsDiskEstimationEntry{
+			Score:           bucket.Score,
+			VmCount:         bucket.VMCount,
+			TotalDiskSizeTB: float32(bucket.TotalSizeTB),
+		}
+		if bucket.Estimation != nil {
+			estimates := newSchemaEstimations(bucket.Estimation)
+			entries[i].Estimation = &estimates
+		}
+	}
+
+	matrix := make(map[string]map[string]int, len(result.ComplexityMatrix))
+	for osScore, diskScores := range result.ComplexityMatrix {
+		inner := make(map[string]int, len(diskScores))
+		for diskScore, combinedScore := range diskScores {
+			inner[strconv.Itoa(diskScore)] = combinedScore
+		}
+		matrix[strconv.Itoa(osScore)] = inner
+	}
+
+	ctx := newEstimationContext(result.EstimationContext)
+	return MigrationEstimationByComplexityResponse{
+		ComplexityByOsDisk: entries,
+		ComplexityMatrix:   matrix,
+		EstimationContext:  &ctx,
+	}
+}
+
+func newSchemaEstimations(results map[string]estimation.Result) map[string]SchemaEstimationResult {
+	estimates := make(map[string]SchemaEstimationResult, len(results))
+	for schema, result := range results {
+		breakdown := make(map[string]EstimationDetail, len(result.Breakdown))
+		for name, estimate := range result.Breakdown {
+			detail := EstimationDetail{Reason: estimate.Reason}
+			if estimate.IsRanged() {
+				minDuration := estimate.MinDuration.String()
+				maxDuration := estimate.MaxDuration.String()
+				detail.MinDuration = &minDuration
+				detail.MaxDuration = &maxDuration
+			} else {
+				duration := estimate.Duration.String()
+				detail.Duration = &duration
+			}
+			breakdown[name] = detail
+		}
+
+		estimates[schema] = SchemaEstimationResult{
+			MinTotalDuration: result.MinTotalDuration.String(),
+			MaxTotalDuration: result.MaxTotalDuration.String(),
+			Breakdown:        breakdown,
+		}
+	}
+	return estimates
+}
+
+func newEstimationContext(ctx models.EstimationContext) EstimationContext {
+	params := make(map[string]float32, len(ctx.Parameters))
+	for _, param := range ctx.Parameters {
+		switch value := param.Value.(type) {
+		case float64:
+			params[param.Key] = float32(value)
+		case float32:
+			params[param.Key] = value
+		case int:
+			params[param.Key] = float32(value)
+		case int64:
+			params[param.Key] = float32(value)
+		}
+	}
+	return EstimationContext{Schemas: &ctx.Schemas, Params: &params}
 }
