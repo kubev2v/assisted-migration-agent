@@ -1067,12 +1067,60 @@ paths:
                 $ref: "#/components/schemas/MigrationComplexityResponse"
         "400":
           description: Bad Request
-        "401":
-          description: Unauthorized
-        "403":
-          description: Forbidden
         "404":
-          description: Assessment not found
+          description: Not found
+        "500":
+          description: Internal error
+
+  /migration-estimation:
+    post:
+      tags:
+        - recommendations
+      description: Calculate migration time estimation for the latest collection
+      operationId: calculateMigrationEstimation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MigrationEstimationRequest"
+        required: true
+      responses:
+        "200":
+          description: Migration estimation calculation successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MigrationEstimationResponse"
+        "400":
+          description: Bad Request
+        "404":
+          description: Not found
+        "500":
+          description: Internal error
+
+  /migration-estimation/by-complexity:
+    post:
+      tags:
+        - recommendations
+      description: Calculate migration time estimation broken down by combined OS+Disk complexity
+      operationId: CalculateMigrationEstimationByComplexity
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MigrationEstimationRequest"
+        required: true
+      responses:
+        "200":
+          description: Migration estimation by complexity calculation successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MigrationEstimationByComplexityResponse"
+        "400":
+          description: Bad Request
+        "404":
+          description: Not found
         "500":
           description: Internal error
 
@@ -1173,6 +1221,149 @@ components:
           type: string
           description: Filter by expression
           example:  "cluster = 'cluster-34'"
+
+    MigrationEstimationRequest:
+      type: object
+      description: Request payload for calculating migration time estimation
+      properties:
+        filterExpression:
+          type: string
+          description: >
+            Filter expression selecting VMs to estimate.
+            When omitted, all VMs are selected.
+        estimationSchema:
+          type: array
+          description: >
+            Schemas to run. Valid values: "network-based", "storage-offload".
+            If omitted, all schemas are run.
+          items:
+            type: string
+        params:
+          type: object
+          description: >
+            Optional calculator parameter overrides. Keys must match known calculator
+            param names (e.g. "transfer_rate_mbps", "work_hours_per_day",
+            "troubleshoot_mins_per_vm", "post_migration_engineers").
+            User-supplied settings override defaults. VM counts and disk sizes always
+            come from inventory and cannot be overridden. Unknown keys are rejected with HTTP 400.
+          additionalProperties: true
+
+    MigrationEstimationResponse:
+      type: object
+      description: >
+        Migration estimation result, including per-schema results and the parameters used.
+      required:
+        - estimation
+        - estimationContext
+      properties:
+        estimation:
+          type: object
+          description: Estimation results keyed by schema name (e.g. "network-based", "storage-offload").
+          additionalProperties:
+            $ref: "#/components/schemas/SchemaEstimationResult"
+        estimationContext:
+          $ref: "#/components/schemas/EstimationContext"
+          description: Parameters used to compute the estimates.
+
+    MigrationEstimationByComplexityResponse:
+      type: object
+      required:
+        - complexityByOsDisk
+        - complexityMatrix
+      properties:
+        complexityByOsDisk:
+          type: array
+          items:
+            $ref: '#/components/schemas/OsDiskEstimationEntry'
+          description: "Combined OS+Disk complexity distribution with per-bucket estimation. All 5 score levels (0-4) always present."
+        complexityMatrix:
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties:
+              type: integer
+          description: "Decision matrix: outer keys are OS scores (0-4), inner keys are disk scores (1-4), values are combined scores."
+        estimationContext:
+          $ref: '#/components/schemas/EstimationContext'
+          description: "Parameters used to compute the estimates."
+
+    OsDiskEstimationEntry:
+      type: object
+      required:
+        - score
+        - vmCount
+        - totalDiskSizeTB
+      properties:
+        score:
+          type: integer
+          description: "Combined OS+Disk complexity score (0-4)."
+        vmCount:
+          type: integer
+          description: "Number of VMs at this complexity level."
+        totalDiskSizeTB:
+          type: number
+          description: "Total provisioned disk across VMs in this bucket, in TiB."
+        estimation:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/SchemaEstimationResult'
+          description: "Full estimation breakdown keyed by schema name. Absent for empty buckets (vmCount == 0)."
+
+    EstimationContext:
+      type: object
+      properties:
+        schemas:
+          type: array
+          items:
+            type: string
+        params:
+          type: object
+          additionalProperties:
+            type: number
+
+    SchemaEstimationResult:
+      type: object
+      description: Estimation results for a single schema
+      properties:
+        minTotalDuration:
+          type: string
+          description: Minimum total estimated duration across all calculators
+          example: "1h20m0s"
+        maxTotalDuration:
+          type: string
+          description: Maximum total estimated duration across all calculators
+          example: "5h20m0s"
+        breakdown:
+          type: object
+          description: Per-calculator results
+          additionalProperties:
+            $ref: "#/components/schemas/EstimationDetail"
+      required:
+        - minTotalDuration
+        - maxTotalDuration
+        - breakdown
+
+    EstimationDetail:
+      type: object
+      description: Detailed estimation result from a single calculator
+      properties:
+        duration:
+          type: string
+          description: Estimated duration for this component (point calculators only)
+          example: "3h40m0s"
+        minDuration:
+          type: string
+          description: Minimum estimated duration (ranged calculators only)
+          example: "8m20s"
+        maxDuration:
+          type: string
+          description: Maximum estimated duration (ranged calculators only)
+          example: "33m20s"
+        reason:
+          type: string
+          description: Explanation of how the estimation was calculated
+      required:
+        - reason
 
     MigrationComplexityResponse:
       type: object

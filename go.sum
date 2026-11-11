@@ -489,8 +489,8 @@ github.com/kubev2v/migration-event-streamer v0.0.0-20261105115111-c59ac09c4048 h
 github.com/kubev2v/migration-event-streamer v0.0.0-20261105115111-c59ac09c4048/go.mod h1:oUuu5tM9Z+MlhlK0kXUF5Ah2Rs9HU6mu6Ft9CA3h0h8=
 github.com/kubev2v/migration-planner v0.28.1-0.20261112080519-050497adaf7f h1:kLV6M/ihiuvFbAj7pLAvxTDoFaAohSq3Yec+tuGgulM=
 github.com/kubev2v/migration-planner v0.28.1-0.20261112080519-050497adaf7f/go.mod h1:0YWSkRLsJG40jZjUW+ddDKEPdqwYT/6NwMyKxNInuOg=
-github.com/kubev2v/migration-planner-common/estimations v0.0.0-20261105094532-64089d3d55a8 h1:2znbMipCiBtKFIiTfT0d9QpK6gGTcUu+dPZk1Cm9U6U=
-github.com/kubev2v/migration-planner-common/estimations v0.0.0-20261105094532-64089d3d55a8/go.mod h1:61ut7Ah7mEo5PUGFQ+OluucCko1L9tWek172ZofSjCg=
+github.com/kubev2v/migration-planner-common/estimations v0.0.0-20261112132701-67c604c0066b h1:zjUUqRXiPkGEHJUJOonAoJtYTGaLy50ps7aJlUbl9uA=
+github.com/kubev2v/migration-planner-common/estimations v0.0.0-20261112132701-67c604c0066b/go.mod h1:61ut7Ah7mEo5PUGFQ+OluucCko1L9tWek172ZofSjCg=
 github.com/kubev2v/vm-migration-detective v0.0.0-20261006023354-140bc9526c2c h1:LDM3os216uY4xlJMLyfos2JIuG1/5wUM6FgQAabN8Qc=
 github.com/kubev2v/vm-migration-detective v0.0.0-20261006023354-140bc9526c2c/go.mod h1:G/1I29xQDnu3LBZL/GUWrAGnECnVcktqMrGjvMK63ug=
 github.com/kylelemons/godebug v1.1.0 h1:RPNrshWIDI6G2gRW9EHilWtl7Z6Sb1BR0xunSBf0SNc=

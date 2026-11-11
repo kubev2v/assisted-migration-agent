@@ -182,6 +182,27 @@ type DeleteLabelGloballyResponse struct {
 	Label string `json:"label"`
 }
 
+// EstimationContext defines model for EstimationContext.
+type EstimationContext struct {
+	Params  *map[string]float32 `json:"params,omitempty"`
+	Schemas *[]string           `json:"schemas,omitempty"`
+}
+
+// EstimationDetail Detailed estimation result from a single calculator
+type EstimationDetail struct {
+	// Duration Estimated duration for this component (point calculators only)
+	Duration *string `json:"duration,omitempty"`
+
+	// MaxDuration Maximum estimated duration (ranged calculators only)
+	MaxDuration *string `json:"maxDuration,omitempty"`
+
+	// MinDuration Minimum estimated duration (ranged calculators only)
+	MinDuration *string `json:"minDuration,omitempty"`
+
+	// Reason Explanation of how the estimation was calculated
+	Reason string `json:"reason"`
+}
+
 // Group defines model for Group.
 type Group struct {
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
@@ -293,6 +314,50 @@ type MigrationComplexityResponse struct {
 	OsRatings map[string]int `json:"osRatings"`
 }
 
+// MigrationEstimationByComplexityResponse defines model for MigrationEstimationByComplexityResponse.
+type MigrationEstimationByComplexityResponse struct {
+	// ComplexityByOsDisk Combined OS+Disk complexity distribution with per-bucket estimation. All 5 score levels (0-4) always present.
+	ComplexityByOsDisk []OsDiskEstimationEntry `json:"complexityByOsDisk"`
+
+	// ComplexityMatrix Decision matrix: outer keys are OS scores (0-4), inner keys are disk scores (1-4), values are combined scores.
+	ComplexityMatrix  map[string]map[string]int `json:"complexityMatrix"`
+	EstimationContext *EstimationContext        `json:"estimationContext,omitempty"`
+}
+
+// MigrationEstimationRequest Request payload for calculating migration time estimation
+type MigrationEstimationRequest struct {
+	// EstimationSchema Schemas to run. Valid values: "network-based", "storage-offload". If omitted, all schemas are run.
+	EstimationSchema *[]string `json:"estimationSchema,omitempty"`
+
+	// FilterExpression Filter expression selecting VMs to estimate. When omitted, all VMs are selected.
+	FilterExpression *string `json:"filterExpression,omitempty"`
+
+	// Params Optional calculator parameter overrides. Keys must match known calculator param names (e.g. "transfer_rate_mbps", "work_hours_per_day", "troubleshoot_mins_per_vm", "post_migration_engineers"). User-supplied settings override defaults. VM counts and disk sizes always come from inventory and cannot be overridden. Unknown keys are rejected with HTTP 400.
+	Params *map[string]interface{} `json:"params,omitempty"`
+}
+
+// MigrationEstimationResponse Migration estimation result, including per-schema results and the parameters used.
+type MigrationEstimationResponse struct {
+	// Estimation Estimation results keyed by schema name (e.g. "network-based", "storage-offload").
+	Estimation        map[string]SchemaEstimationResult `json:"estimation"`
+	EstimationContext EstimationContext                 `json:"estimationContext"`
+}
+
+// OsDiskEstimationEntry defines model for OsDiskEstimationEntry.
+type OsDiskEstimationEntry struct {
+	// Estimation Full estimation breakdown keyed by schema name. Absent for empty buckets (vmCount == 0).
+	Estimation *map[string]SchemaEstimationResult `json:"estimation,omitempty"`
+
+	// Score Combined OS+Disk complexity score (0-4).
+	Score int `json:"score"`
+
+	// TotalDiskSizeTB Total provisioned disk across VMs in this bucket, in TiB.
+	TotalDiskSizeTB float32 `json:"totalDiskSizeTB"`
+
+	// VmCount Number of VMs at this complexity level.
+	VmCount int `json:"vmCount"`
+}
+
 // Process defines model for Process.
 type Process struct {
 	// Name Name of the process
@@ -306,6 +371,18 @@ type Process struct {
 type RDMBacking struct {
 	// LunUuid LUN UUID reported directly by the RDM disk backing, when available
 	LunUuid *string `json:"lunUuid,omitempty"`
+}
+
+// SchemaEstimationResult Estimation results for a single schema
+type SchemaEstimationResult struct {
+	// Breakdown Per-calculator results
+	Breakdown map[string]EstimationDetail `json:"breakdown"`
+
+	// MaxTotalDuration Maximum total estimated duration across all calculators
+	MaxTotalDuration string `json:"maxTotalDuration"`
+
+	// MinTotalDuration Minimum total estimated duration across all calculators
+	MinTotalDuration string `json:"minTotalDuration"`
 }
 
 // SubResource defines model for SubResource.
@@ -823,6 +900,12 @@ type CreateLatestGroupJSONRequestBody = CreateGroupRequest
 
 // UpdateLatestGroupJSONRequestBody defines body for UpdateLatestGroup for application/json ContentType.
 type UpdateLatestGroupJSONRequestBody = UpdateGroupRequest
+
+// CalculateMigrationEstimationJSONRequestBody defines body for CalculateMigrationEstimation for application/json ContentType.
+type CalculateMigrationEstimationJSONRequestBody = MigrationEstimationRequest
+
+// CalculateMigrationEstimationByComplexityJSONRequestBody defines body for CalculateMigrationEstimationByComplexity for application/json ContentType.
+type CalculateMigrationEstimationByComplexityJSONRequestBody = MigrationEstimationRequest
 
 // BatchUpdateLatestVMExclusionJSONRequestBody defines body for BatchUpdateLatestVMExclusion for application/json ContentType.
 type BatchUpdateLatestVMExclusionJSONRequestBody = BatchUpdateExclusionRequest
