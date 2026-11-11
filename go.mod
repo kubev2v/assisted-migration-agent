@@ -253,7 +253,7 @@ require (
 	github.com/tidwall/gjson v1.20.1 // indirect
 	github.com/tidwall/match v1.2.0 // indirect
 	github.com/tidwall/pretty v1.2.2 // indirect
-	github.com/tidwall/sjson v1.2.6 // indirect
+	github.com/tidwall/sjson v1.2.7 // indirect
 	github.com/tiendc/go-deepcopy v1.7.2 // indirect
 	github.com/tonistiigi/dchapes-mode v0.0.0-20250318174251-73d941a28323 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
