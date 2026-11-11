@@ -120,14 +120,20 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 
 	interfaces := make([]VMkernelInterface, 0, len(vm.HostVMkernelInterfaces))
 	for _, iface := range vm.HostVMkernelInterfaces {
-		item := VMkernelInterface{Device: iface.Device, Mtu: iface.MTU}
+		item := VMkernelInterface{
+			Device: iface.Device,
+			Mtu:    iface.MTU,
+		}
+
 		if iface.PortGroupRef != "" {
 			ref := iface.PortGroupRef
 			item.PortGroupRef = &ref
 		}
+
 		item.PortGroup = newNetworkPortGroup(iface.PortGroup)
 		interfaces = append(interfaces, item)
 	}
+
 	details.HostVmkernelInterfaces = &interfaces
 
 	if vm.UUID != "" {
@@ -758,18 +764,32 @@ func newNetworkPortGroup(group *models.NetworkPortGroup) *NetworkPortGroup {
 	if group == nil {
 		return nil
 	}
-	result := &NetworkPortGroup{Name: group.Name, Type: group.Type}
+
+	result := &NetworkPortGroup{
+		Name: group.Name,
+		Type: group.Type,
+	}
+
 	if group.ID != "" {
 		result.Id = &group.ID
 	}
-	if sw := group.Switch; sw != nil {
-		result.Switch = &VirtualSwitch{Type: sw.Type, Mtu: sw.MTU, MaxMtu: sw.MaxMTU}
+
+	sw := group.Switch
+	if sw != nil {
+		result.Switch = &VirtualSwitch{
+			Type:   sw.Type,
+			Mtu:    sw.MTU,
+			MaxMtu: sw.MaxMTU,
+		}
+
 		if sw.ID != "" {
 			result.Switch.Id = &sw.ID
 		}
+
 		if sw.Name != "" {
 			result.Switch.Name = &sw.Name
 		}
 	}
+
 	return result
 }

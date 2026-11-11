@@ -35,12 +35,30 @@ var _ = Describe("VMStore", func() {
 	)
 
 	It("retains VMkernel and per-adapter network context in APIs and exports", func() {
-		_, err := db.Exec(`INSERT INTO vinfo ("VM ID", "VM", "Host") VALUES ('net-vm','network-vm','host-1');
-INSERT INTO vport ("Host", "Port Group", "Switch") VALUES ('host-1','management','vSwitch0');
-INSERT INTO vswitch VALUES ('host-1','vSwitch0','switch-key',1500);
-INSERT INTO vsc_vmk VALUES ('host-1','vmk0','vmk-key','management','standard',9000),('host-1','vmk1','vmk-key1','missing','standard',NULL);
-INSERT INTO vnetwork ("VM ID","Network","Mac Address","Switch","Type") VALUES ('net-vm','management','01','vSwitch0','assigned'),('net-vm','management','02','vSwitch0','manual');`)
+		_, err := db.Exec(`
+INSERT INTO vinfo ("VM ID", "VM", "Host")
+VALUES
+    ('net-vm','network-vm','host-1');
+
+INSERT INTO vport ("Host", "Port Group", "Switch")
+VALUES
+    ('host-1','management','vSwitch0');
+
+INSERT INTO vswitch
+VALUES
+    ('host-1','vSwitch0','switch-key',1500);
+
+INSERT INTO vsc_vmk
+VALUES
+    ('host-1','vmk0','vmk-key','management','standard',9000),
+    ('host-1','vmk1','vmk-key1','missing','standard',NULL);
+
+INSERT INTO vnetwork ("VM ID", "Network", "Mac Address", "Switch", "Type")
+VALUES
+    ('net-vm','management','01','vSwitch0','assigned'),
+    ('net-vm','management','02','vSwitch0','manual');`)
 		Expect(err).NotTo(HaveOccurred())
+
 		vm, err := s.VM().Get(ctx, "net-vm")
 		Expect(err).NotTo(HaveOccurred())
 		Expect(vm.HostVMkernelInterfaces).To(HaveLen(2))
@@ -50,33 +68,60 @@ INSERT INTO vnetwork ("VM ID","Network","Mac Address","Switch","Type") VALUES ('
 		Expect(vm.HostVMkernelInterfaces[1].PortGroup).To(BeNil())
 		Expect(vm.NICs).To(HaveLen(2))
 		Expect(vm.NICs[0].PortGroup.Switch.Name).To(Equal("vSwitch0"))
+
 		groupJSON := `{
-            "name": "management", "type": "standard",
-            "switch": {"id": "switch-key", "name": "vSwitch0", "type": "standard", "mtu": 1500}
+            "name": "management",
+            "type": "standard",
+            "switch": {
+                "id": "switch-key",
+                "name": "vSwitch0",
+                "type": "standard",
+                "mtu": 1500
+            }
         }`
+
 		interfacesJSON := `[
-            {"device": "vmk0", "mtu": 9000, "portGroupRef": "management", "portGroup": ` + groupJSON + `},
-            {"device": "vmk1", "portGroupRef": "missing"}
+            {
+                "device": "vmk0",
+                "mtu": 9000,
+                "portGroupRef": "management",
+                "portGroup": ` + groupJSON + `
+            },
+            {
+                "device": "vmk1",
+                "portGroupRef": "missing"
+            }
         ]`
-		for _, detail := range []any{v2.NewVirtualMachineDetailFromModel(*vm), analyzerapi.NewVirtualMachineDetailFromModel(*vm)} {
+		details := []any{
+			v2.NewVirtualMachineDetailFromModel(*vm),
+			analyzerapi.NewVirtualMachineDetailFromModel(*vm),
+		}
+
+		for _, detail := range details {
 			encoded, err := json.Marshal(detail)
 			Expect(err).NotTo(HaveOccurred())
+
 			var obj map[string]json.RawMessage
 			Expect(json.Unmarshal(encoded, &obj)).To(Succeed())
 			Expect(obj["hostVmkernelInterfaces"]).To(MatchJSON(interfacesJSON))
 			Expect(string(obj["nics"])).To(ContainSubstring(`"portGroup"`))
 		}
+
 		for _, scope := range []string{"vms", "network"} {
 			path := filepath.Join(tmpDir, scope+".csv")
 			Expect(s.Export().CopyScope(ctx, scope, path)).To(Succeed())
+
 			file, err := os.Open(path)
 			Expect(err).NotTo(HaveOccurred())
+
 			rows, err := csv.NewReader(file).ReadAll()
 			Expect(file.Close()).To(Succeed())
 			Expect(err).NotTo(HaveOccurred())
+
 			if scope == "vms" {
 				Expect(rows).To(HaveLen(2))
 				Expect(rows[0]).To(ContainElement("host_vmkernel_interfaces"))
+
 				for col, header := range rows[0] {
 					if header == "host_vmkernel_interfaces" {
 						Expect(rows[1][col]).To(MatchJSON(interfacesJSON))
@@ -85,6 +130,7 @@ INSERT INTO vnetwork ("VM ID","Network","Mac Address","Switch","Type") VALUES ('
 			} else {
 				Expect(rows).To(HaveLen(3))
 				Expect(rows[0]).To(ContainElement("port_group"))
+
 				for col, header := range rows[0] {
 					if header == "type" {
 						Expect([]string{rows[1][col], rows[2][col]}).To(ConsistOf("assigned", "manual"))
@@ -96,7 +142,6 @@ INSERT INTO vnetwork ("VM ID","Network","Mac Address","Switch","Type") VALUES ('
 				}
 			}
 		}
-
 	})
 
 	BeforeEach(func() {

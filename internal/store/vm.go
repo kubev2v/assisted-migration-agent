@@ -153,7 +153,9 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	network := duckdb_parser.NetworkTopologyQuery()
+
 	// Both positional parameters bind to the same VM ID:
 	// the first is used by the topology CTE, the second by filtered_vm.
 	rows, err := s.db.QueryContext(ctx, "WITH "+topology+", "+network+", "+vmGetQuery, id, id)
@@ -226,6 +228,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 	if err := json.Unmarshal([]byte(interfacesJSON), &result.HostVMkernelInterfaces); err != nil {
 		return nil, fmt.Errorf("decoding VMkernel interfaces: %w", err)
 	}
+
 	result.Metadata = metadata.Get()
 	if result.Metadata == nil {
 		result.Metadata = make(map[string][]string)
@@ -562,13 +565,17 @@ func fromDB(pvm duckdb_models.VM) models.VM {
 	nics := make([]models.NIC, 0, len(pvm.NICs))
 	for i, n := range pvm.NICs {
 		var portGroup *models.NetworkPortGroup
-		if group := n.PortGroup; group != nil {
+		group := n.PortGroup
+
+		if group != nil {
 			portGroup = &models.NetworkPortGroup{
 				ID:   group.ID,
 				Name: group.Name,
 				Type: group.Type,
 			}
-			if sw := group.Switch; sw != nil {
+
+			sw := group.Switch
+			if sw != nil {
 				portGroup.Switch = &models.VirtualSwitch{
 					ID:     sw.ID,
 					Name:   sw.Name,
@@ -578,6 +585,7 @@ func fromDB(pvm duckdb_models.VM) models.VM {
 				}
 			}
 		}
+
 		nics = append(nics, models.NIC{
 			Adapter:       n.Adapter,
 			MAC:           n.MAC,
