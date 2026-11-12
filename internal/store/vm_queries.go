@@ -109,6 +109,15 @@ disks AS (
             'RDM': dk."Raw",
             -- Row JSON keeps older read-only collections without this column queryable.
             'RDMLunUUID': to_json(dk)->>'RDM LUN UUID',
+            'RDMDeviceName': dk."RDM Device Name",
+            'RDMCompatibilityMode': dk."RDM Compatibility Mode",
+            'RDMBackingUUID': dk."RDM Backing UUID",
+            'RDMHostID': rdm_match.host_id,
+            'RDMHostLunKey': rdm_match.lun_key,
+            'RDMHostLunCanonicalName': rdm_match.canonical_name,
+            'RDMHostLunUUID': rdm_match.lun_uuid,
+            'ThinProvisioned': dk."Thin Provisioned",
+            'EagerlyScrubbed': dk."Eagerly Scrubbed",
             'Bus': dk."Shared Bus",
             'Mode': dk."Disk Mode",
             'Serial': dk."Disk UUID",
@@ -140,6 +149,7 @@ disks AS (
     JOIN filtered_vm fv ON dk."VM ID" = fv."VM ID"
     LEFT JOIN storage_disk_datastores resolved
         ON resolved.disk_row_id = dk.rowid AND resolved."VM ID" = dk."VM ID"
+    LEFT JOIN storage_rdm_lun_matches rdm_match ON rdm_match.disk_row_id = dk.rowid
     LEFT JOIN storage_datastores ds ON ds.datastore_row_id = resolved.datastore_row_id
     LEFT JOIN backing_info ON backing_info.datastore_row_id = ds.datastore_row_id
     GROUP BY dk."VM ID"

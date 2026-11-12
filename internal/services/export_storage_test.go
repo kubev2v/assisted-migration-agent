@@ -142,14 +142,14 @@ var _ = Describe("Storage export", func() {
 		const seed = `
             INSERT INTO vhost ("Object ID", "Host", "VI SDK UUID") VALUES ('host-1', 'esxi-1', 'vc-1');
             INSERT INTO vhba ("Host ID", "Device", "HBA Key", "Protocol") VALUES (' host-1 ', 'vmhba1', 'key-1', 'FC');
-            INSERT INTO vhostscsi ("Host ID", "HBA Device", "Canonical Name", "LUN Vendor", "LUN Model")
-                VALUES (' host-1 ', 'vmhba1', 'naa.1', 'vendor', 'model');
+            INSERT INTO vhostscsi ("Host ID", "HBA Device", "Canonical Name", "LUN Vendor", "LUN Model", "SCSI Disk Key", "LUN UUID")
+                VALUES (' host-1 ', 'vmhba1', 'naa.1', 'vendor', 'model', 'key-vmlun-1', 'lun-uuid');
             INSERT INTO vdatastore ("Object ID", "Name", "Hosts", "Type", "Filesystem Type", "Filesystem Major Version", "Backing Devices")
                 VALUES ('ds-1', 'data', '["host-1"]', 'VMFS', 'VMFS', 6, '["naa.1"]');
-            INSERT INTO vinfo ("VM ID", "VM", "Host") VALUES ('vm-1', 'test-vm', 'esxi-1');
-            INSERT INTO vdisk ("VM ID", "Disk Key", "Path", "Raw", "RDM LUN UUID") VALUES
-                ('vm-1', '1', '[data] vm/rdm', true, 'lun-uuid'),
-                ('vm-1', '2', '[data] vm/file', false, 'not-rdm');`
+            INSERT INTO vinfo ("VM ID", "VM", "Host", "VI SDK UUID") VALUES ('vm-1', 'test-vm', 'esxi-1', 'vc-1');
+            INSERT INTO vdisk ("VM ID", "Disk Key", "Path", "Raw", "RDM LUN UUID", "RDM LUN UUID Source", "RDM Device Name", "RDM Backing UUID", "RDM Compatibility Mode", "Thin Provisioned", "Eagerly Scrubbed") VALUES
+                ('vm-1', '1', '[data] vm/rdm', true, 'lun-uuid', 'forklift-rdm', '/vmfs/devices/disks/naa.1', 'backing-uuid', 'physical', false, true),
+                ('vm-1', '2', '[data] vm/file', false, 'not-rdm', 'forklift-rdm', 'garbage-name', 'garbage-backing', 'physical', NULL, NULL);`
 
 		_, err := st.Querier().ExecContext(ctx, seed)
 		Expect(err).NotTo(HaveOccurred())
@@ -173,7 +173,11 @@ var _ = Describe("Storage export", func() {
 			"datastores.csv": {"protocol_type": "FibreChannel", "storage_access_category": "Block", "vendor": "vendor", "model": "model"},
 			"hosts.csv":      {"vcenter_id": "vc-1"},
 			"hbas.csv":       {"adapter_key": "key-1"},
-			"disks.csv":      {"rdm_lun_uuid": "lun-uuid", "datastore_id": "ds-1", "datastore_name": "data", "datastore_type": "VMFS", "datastore_filesystem_type": "VMFS", "datastore_filesystem_major_version": "6", "datastore_protocol_type": "FibreChannel", "datastore_storage_protocol": "Block", "datastore_backing_devices": `["naa.1"]`, "datastore_vendor": "vendor", "datastore_model": "model"},
+			"disks.csv": {"rdm_lun_uuid": "lun-uuid", "rdm_device_name": "/vmfs/devices/disks/naa.1", "rdm_backing_uuid": "backing-uuid",
+				"rdm_compatibility_mode": "physical", "rdm_host_lun_host_id": "host-1", "rdm_host_lun_key": "key-vmlun-1",
+				"rdm_host_lun_canonical_name": "naa.1", "rdm_host_lun_lun_uuid": "lun-uuid",
+				"thin_provisioned": "false", "eagerly_scrubbed": "true",
+				"datastore_id": "ds-1", "datastore_name": "data", "datastore_type": "VMFS", "datastore_filesystem_type": "VMFS", "datastore_filesystem_major_version": "6", "datastore_protocol_type": "FibreChannel", "datastore_storage_protocol": "Block", "datastore_backing_devices": `["naa.1"]`, "datastore_vendor": "vendor", "datastore_model": "model"},
 		}
 
 		for filename, columns := range expected {
@@ -207,8 +211,14 @@ var _ = Describe("Storage export", func() {
 			}
 
 			if filename == "disks.csv" {
-				index := slices.Index(rows[0], "rdm_lun_uuid")
-				Expect(rows[2][index]).To(BeEmpty())
+				// The ordinary disk exports no RDM values and no guessed flags.
+				for _, column := range []string{"rdm_lun_uuid", "rdm_device_name", "rdm_backing_uuid", "rdm_compatibility_mode",
+					"rdm_host_lun_host_id", "rdm_host_lun_key", "rdm_host_lun_canonical_name", "rdm_host_lun_lun_uuid",
+					"thin_provisioned", "eagerly_scrubbed"} {
+					index := slices.Index(rows[0], column)
+					Expect(index).NotTo(Equal(-1), filename+" missing "+column)
+					Expect(rows[2][index]).To(BeEmpty(), filename+" "+column)
+				}
 			}
 		}
 	},

@@ -537,17 +537,33 @@ func fromDB(pvm duckdb_models.VM) models.VM {
 		}
 		var rdmBacking *models.RDMBacking
 		if d.RDM && d.RDMBacking != nil {
-			rdmBacking = &models.RDMBacking{LunUUID: d.RDMBacking.LunUUID}
+			rdmBacking = &models.RDMBacking{
+				LunUUID:           d.RDMBacking.LunUUID,
+				DeviceName:        d.RDMBacking.DeviceName,
+				CompatibilityMode: d.RDMBacking.CompatibilityMode,
+				BackingUUID:       d.RDMBacking.BackingUUID,
+			}
+
+			if d.RDMBacking.HostLun != nil {
+				rdmBacking.HostLun = &models.RDMHostLun{
+					HostID:        d.RDMBacking.HostLun.HostID,
+					Key:           d.RDMBacking.HostLun.Key,
+					CanonicalName: d.RDMBacking.HostLun.CanonicalName,
+					LunUUID:       d.RDMBacking.HostLun.LunUUID,
+				}
+			}
 		}
 		disks = append(disks, models.Disk{
-			File:       d.File,
-			Capacity:   d.Capacity,
-			Shared:     d.Shared,
-			RDM:        d.RDM,
-			RDMBacking: rdmBacking,
-			Bus:        d.Bus,
-			Mode:       d.Mode,
-			Datastore:  datastore,
+			File:            d.File,
+			Capacity:        d.Capacity,
+			Shared:          d.Shared,
+			RDM:             d.RDM,
+			RDMBacking:      rdmBacking,
+			Bus:             d.Bus,
+			Mode:            d.Mode,
+			Datastore:       datastore,
+			ThinProvisioned: d.ThinProvisioned,
+			EagerlyScrubbed: d.EagerlyScrubbed,
 		})
 		totalDiskCapacityMiB += d.Capacity
 	}

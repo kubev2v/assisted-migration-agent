@@ -111,19 +111,32 @@ type Issue struct {
 }
 
 type Disk struct {
-	Key        int32
-	File       string
-	Capacity   int64
-	Shared     bool
-	RDM        bool
-	RDMBacking *RDMBacking
-	Bus        string
-	Mode       string
-	Datastore  *DiskDatastore
+	Key             int32
+	File            string
+	Capacity        int64
+	Shared          bool
+	RDM             bool
+	RDMBacking      *RDMBacking
+	Bus             string
+	Mode            string
+	Datastore       *DiskDatastore
+	ThinProvisioned *bool
+	EagerlyScrubbed *bool
 }
 
 type RDMBacking struct {
-	LunUUID string
+	LunUUID           string
+	DeviceName        string
+	CompatibilityMode string
+	BackingUUID       string
+	HostLun           *RDMHostLun
+}
+
+type RDMHostLun struct {
+	HostID        string
+	Key           string
+	CanonicalName string
+	LunUUID       string
 }
 
 type DiskDatastore struct {

@@ -1599,6 +1599,12 @@ components:
           description: Whether this is a Raw Device Mapping
         rdmBacking:
           $ref: '#/components/schemas/RDMBacking'
+        thinProvisioned:
+          type: boolean
+          description: Source-reported thin provisioning; omitted when unavailable
+        eagerlyScrubbed:
+          type: boolean
+          description: Source-reported eager scrubbing; omitted when unavailable
         bus:
           type: string
           description: Bus type (scsi, ide, sata, nvme)
@@ -1615,6 +1621,36 @@ components:
         lunUuid:
           type: string
           description: LUN UUID reported directly by the RDM disk backing, when available
+        deviceName:
+          type: string
+          description: Device name reported directly by the RDM disk backing
+        compatibilityMode:
+          type: string
+          enum: [physical, virtual, unknown]
+          description: Source-normalized RDM compatibility mode
+        backingUuid:
+          type: string
+          description: UUID explicitly identifying the RDM backing, when available
+        hostLun:
+          $ref: '#/components/schemas/RDMHostLun'
+
+    RDMHostLun:
+      type: object
+      description: Host LUN matched to the RDM disk backing through a verified identifier relationship and the VM's running host
+      required: [hostId]
+      properties:
+        hostId:
+          type: string
+          description: Object ID of the uniquely resolved running host that owns the matched LUN
+        key:
+          type: string
+          description: SCSI disk key of the matched host LUN, when available
+        canonicalName:
+          type: string
+          description: Canonical name (e.g. NAA) of the matched host LUN, when available
+        lunUuid:
+          type: string
+          description: LUN UUID of the matched host LUN, when available
 
     VirtualMachineDatastore:
       type: object
