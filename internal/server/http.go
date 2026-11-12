@@ -18,6 +18,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3filter"
 	oapimiddleware "github.com/oapi-codegen/gin-middleware"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
@@ -35,8 +36,9 @@ type Server struct {
 }
 
 type APIGroup struct {
-	Swagger    *openapi3.T
-	RegisterFn func(router *gin.RouterGroup)
+	Swagger              *openapi3.T
+	RegisterFn           func(router *gin.RouterGroup)
+	StreamingUploadPaths []string
 }
 
 func NewServer(cfg config.Server, groups map[string]APIGroup) (*Server, error) {
@@ -97,7 +99,20 @@ func NewServer(cfg config.Server, groups map[string]APIGroup) (*Server, error) {
 					c.Abort()
 				},
 			}
-			mws = append(mws, oapimiddleware.OapiRequestValidatorWithOptions(group.Swagger, &oapiOpts))
+			validate := oapimiddleware.OapiRequestValidatorWithOptions(group.Swagger, &oapiOpts)
+			streamOpts := oapiOpts
+			streamOpts.Options = openapi3filter.Options{ExcludeRequestBody: true}
+			validateStream := oapimiddleware.OapiRequestValidatorWithOptions(group.Swagger, &streamOpts)
+			mws = append(mws, func(c *gin.Context) {
+				for _, uploadPath := range group.StreamingUploadPaths {
+					if c.Request.Method == http.MethodPut && c.Request.URL.Path == prefix+uploadPath {
+						// These handlers enforce multipart structure and byte limits while streaming.
+						validateStream(c)
+						return
+					}
+				}
+				validate(c)
+			})
 		}
 
 		router.Use(mws...)

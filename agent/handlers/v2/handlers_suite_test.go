@@ -38,6 +38,7 @@ func (s *stubServiceProvider) ConsoleService() *svc.Console                     
 func (s *stubServiceProvider) CollectionService() *svc.CollectionService        { return nil }
 func (s *stubServiceProvider) InspectorService() (*svc.InspectorService, error) { return nil, nil }
 func (s *stubServiceProvider) VddkService() *svc.VddkService                    { return nil }
+func (s *stubServiceProvider) UpdateService() *svc.UpdateService                { return nil }
 func (s *stubServiceProvider) CredentialsService() *svc.CredentialsService      { return nil }
 func (s *stubServiceProvider) ForecasterService() *svc.ForecasterService        { return nil }
 func (s *stubServiceProvider) ApplicationService(_ string) (*svc.ApplicationService, error) {
