@@ -209,6 +209,65 @@ var _ = Describe("Migrations", func() {
 	})
 })
 
+var _ = Describe("RDM backing collection migration", func() {
+	It("restores the OMA-2505 columns on legacy collections and preserves disk data", func() {
+		ctx := context.Background()
+		db, err := sql.Open("duckdb", "")
+		Expect(err).NotTo(HaveOccurred())
+		DeferCleanup(db.Close)
+
+		Expect(duckdb_parser.New(db, nil).Init()).To(Succeed())
+		Expect(migrations.RunCollection(ctx, db, "memory")).To(Succeed())
+
+		downSQL, err := os.ReadFile("collection/down/003_application_catalog.sql")
+		Expect(err).NotTo(HaveOccurred())
+		_, err = db.ExecContext(ctx, string(downSQL))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("migrating a legacy disk with no RDM backing columns")
+		_, err = db.ExecContext(ctx, `
+			DELETE FROM collection_schema_migrations WHERE version > 1;
+			ALTER TABLE vdisk DROP COLUMN "RDM Device Name";
+			ALTER TABLE vdisk DROP COLUMN "RDM Backing UUID";
+			ALTER TABLE vdisk DROP COLUMN "RDM Compatibility Mode";
+			ALTER TABLE vdisk DROP COLUMN "RDM LUN UUID Source";
+			ALTER TABLE vdisk DROP COLUMN "Thin Provisioned";
+			ALTER TABLE vdisk DROP COLUMN "Eagerly Scrubbed";
+			INSERT INTO vinfo ("VM ID", "VM") VALUES ('vm-1', 'legacy-vm');
+			INSERT INTO vdisk ("VM ID", "Raw", "Capacity MiB", "Disk UUID", "RDM LUN UUID")
+			VALUES ('vm-1', true, 100, 'not-a-lun-uuid', 'lun-uuid-A');
+		`)
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(migrations.RunCollection(ctx, db, "memory")).To(Succeed())
+		Expect(migrations.RunCollection(ctx, db, "memory")).To(Succeed())
+
+		var capacity int64
+		var uuid, deviceName, mode sql.NullString
+		var thin sql.NullBool
+		Expect(db.QueryRowContext(ctx, `SELECT "Capacity MiB", "RDM LUN UUID", "RDM Device Name", "RDM Compatibility Mode", "Thin Provisioned" FROM vdisk`).Scan(&capacity, &uuid, &deviceName, &mode, &thin)).To(Succeed())
+		Expect(capacity).To(Equal(int64(100)))
+		Expect(uuid.String).To(Equal("lun-uuid-A"))
+		Expect(deviceName.Valid).To(BeFalse())
+		Expect(mode.Valid).To(BeFalse())
+		Expect(thin.Valid).To(BeFalse())
+
+		By("preserving collected backing values when the migration runs again")
+		_, err = db.ExecContext(ctx, string(downSQL))
+		Expect(err).NotTo(HaveOccurred())
+
+		_, err = db.ExecContext(ctx, `
+			UPDATE vdisk SET "RDM Device Name" = 'collected-device-name';
+			DELETE FROM collection_schema_migrations WHERE version > 1;
+		`)
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(migrations.RunCollection(ctx, db, "memory")).To(Succeed())
+		Expect(db.QueryRowContext(ctx, `SELECT "RDM Device Name" FROM vdisk`).Scan(&deviceName)).To(Succeed())
+		Expect(deviceName.String).To(Equal("collected-device-name"))
+	})
+})
+
 var _ = Describe("RDM LUN UUID collection migration", func() {
 	It("preserves disk data when the migration is applied again", func() {
 		ctx := context.Background()

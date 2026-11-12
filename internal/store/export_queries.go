@@ -539,10 +539,19 @@ const disksQuery = `
 				COALESCE(d."Disk Mode", '') AS disk_mode,
 				COALESCE(d."Disk UUID", '') AS disk_uuid,
 				COALESCE(d."Thin", false) AS thin,
+				d."Thin Provisioned" AS thin_provisioned,
+				d."Eagerly Scrubbed" AS eagerly_scrubbed,
 				COALESCE(d."Controller", '') AS controller,
 				COALESCE(d."Label", '') AS label,
 				COALESCE(d."SCSI Unit #", '') AS scsi_unit_number,
                 CASE WHEN d."Raw" THEN d."RDM LUN UUID" END AS rdm_lun_uuid,
+                CASE WHEN d."Raw" THEN d."RDM Device Name" END AS rdm_device_name,
+                CASE WHEN d."Raw" THEN d."RDM Backing UUID" END AS rdm_backing_uuid,
+                CASE WHEN d."Raw" THEN d."RDM Compatibility Mode" END AS rdm_compatibility_mode,
+                rdm_match.host_id AS rdm_host_lun_host_id,
+                rdm_match.lun_key AS rdm_host_lun_key,
+                rdm_match.canonical_name AS rdm_host_lun_canonical_name,
+                rdm_match.lun_uuid AS rdm_host_lun_lun_uuid,
                 ds."Object ID" AS datastore_id,
                 ds."Name" AS datastore_name,
                 ds."Type" AS datastore_type,
@@ -556,6 +565,7 @@ const disksQuery = `
 			FROM vdisk d
 			LEFT JOIN vinfo v ON d."VM ID" = v."VM ID"
             LEFT JOIN export_disk_datastores resolved ON resolved.disk_row_id = d.rowid AND resolved."VM ID" = d."VM ID"
+            LEFT JOIN storage_rdm_lun_matches rdm_match ON rdm_match.disk_row_id = d.rowid
             LEFT JOIN storage_datastores ds ON ds.datastore_row_id = resolved.datastore_row_id
             LEFT JOIN backing_info ON backing_info.datastore_row_id = ds.datastore_row_id
 			ORDER BY v."VM", d."VM ID", TRY_CAST(d."Disk Key" AS BIGINT), d."Disk Key",

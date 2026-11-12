@@ -1,0 +1,11 @@
+-- Existing collections need these Planner-owned columns before VM detail and
+-- disk export queries read them.
+ALTER TABLE IF EXISTS vdisk ADD COLUMN IF NOT EXISTS "RDM Device Name" VARCHAR;
+ALTER TABLE IF EXISTS vdisk ADD COLUMN IF NOT EXISTS "RDM Backing UUID" VARCHAR;
+ALTER TABLE IF EXISTS vdisk ADD COLUMN IF NOT EXISTS "RDM Compatibility Mode" VARCHAR;
+ALTER TABLE IF EXISTS vdisk ADD COLUMN IF NOT EXISTS "RDM LUN UUID Source" VARCHAR;
+ALTER TABLE IF EXISTS vdisk ADD COLUMN IF NOT EXISTS "Thin Provisioned" BOOLEAN;
+ALTER TABLE IF EXISTS vdisk ADD COLUMN IF NOT EXISTS "Eagerly Scrubbed" BOOLEAN;
+-- The RDM host-LUN resolution reads the VM's explicit host identity and source.
+ALTER TABLE IF EXISTS vinfo ADD COLUMN IF NOT EXISTS "Host ID" VARCHAR;
+ALTER TABLE IF EXISTS vinfo ADD COLUMN IF NOT EXISTS "VI SDK UUID" VARCHAR;

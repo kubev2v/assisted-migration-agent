@@ -183,16 +183,55 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 	for _, d := range vm.Disks {
 		capacityBytes := d.Capacity * 1024 * 1024
 		disk := VirtualMachineDisk{
-			File:     &d.File,
-			Capacity: &capacityBytes,
-			Shared:   &d.Shared,
-			Rdm:      &d.RDM,
-			Bus:      &d.Bus,
-			Mode:     &d.Mode,
+			File:            &d.File,
+			Capacity:        &capacityBytes,
+			Shared:          &d.Shared,
+			Rdm:             &d.RDM,
+			Bus:             &d.Bus,
+			Mode:            &d.Mode,
+			ThinProvisioned: d.ThinProvisioned,
+			EagerlyScrubbed: d.EagerlyScrubbed,
 		}
-		if d.RDM && d.RDMBacking != nil && d.RDMBacking.LunUUID != "" {
-			lunUUID := d.RDMBacking.LunUUID
-			disk.RdmBacking = &RDMBacking{LunUuid: &lunUUID}
+		if d.RDM && d.RDMBacking != nil {
+			backing := RDMBacking{}
+
+			if d.RDMBacking.LunUUID != "" {
+				backing.LunUuid = &d.RDMBacking.LunUUID
+			}
+
+			if d.RDMBacking.DeviceName != "" {
+				backing.DeviceName = &d.RDMBacking.DeviceName
+			}
+
+			if d.RDMBacking.BackingUUID != "" {
+				backing.BackingUuid = &d.RDMBacking.BackingUUID
+			}
+
+			mode := RDMBackingCompatibilityMode(d.RDMBacking.CompatibilityMode)
+			if mode == "" {
+				mode = Unknown
+			}
+			backing.CompatibilityMode = &mode
+
+			if d.RDMBacking.HostLun != nil {
+				hostLun := RDMHostLun{HostId: d.RDMBacking.HostLun.HostID}
+
+				if d.RDMBacking.HostLun.Key != "" {
+					hostLun.Key = &d.RDMBacking.HostLun.Key
+				}
+
+				if d.RDMBacking.HostLun.CanonicalName != "" {
+					hostLun.CanonicalName = &d.RDMBacking.HostLun.CanonicalName
+				}
+
+				if d.RDMBacking.HostLun.LunUUID != "" {
+					hostLun.LunUuid = &d.RDMBacking.HostLun.LunUUID
+				}
+
+				backing.HostLun = &hostLun
+			}
+
+			disk.RdmBacking = &backing
 		}
 		if d.Key != 0 {
 			key := d.Key

@@ -88,7 +88,7 @@ var _ = DescribeTable("VM disk storage metadata", func(disk models.Disk, want st
 	}, `{
 		"key":2000,"file":"[shared] vm/rdm.vmdk","capacity":1048576,
 		"shared":true,"rdm":true,"bus":"scsi","mode":"independent_persistent",
-		"rdmBacking":{"lunUuid":"rdm-lun-uuid"},
+		"rdmBacking":{"lunUuid":"rdm-lun-uuid","compatibilityMode":"unknown"},
 		"datastore":{
 			"id":"datastore-1","name":"shared","type":"VMFS",
 			"filesystemType":"VMFS","filesystemMajorVersion":6,
@@ -109,9 +109,62 @@ var _ = DescribeTable("VM disk storage metadata", func(disk models.Disk, want st
 	Entry("omits unavailable storage details from a legacy RDM disk", models.Disk{
 		RDM: true,
 	}, `{"file":"","capacity":0,"shared":false,"rdm":true,"bus":"","mode":""}`),
-	Entry("omits an empty RDM UUID", models.Disk{
+	Entry("reports unknown mode for a domain backing without identifiers", models.Disk{
 		RDM: true, RDMBacking: &models.RDMBacking{},
-	}, `{"file":"","capacity":0,"shared":false,"rdm":true,"bus":"","mode":""}`),
+	}, `{
+		"file":"","capacity":0,"shared":false,"rdm":true,"bus":"","mode":"",
+		"rdmBacking":{"compatibilityMode":"unknown"}
+	}`),
+	Entry("exposes a device-only v2 backing with its mode", models.Disk{
+		RDM: true,
+		RDMBacking: &models.RDMBacking{
+			DeviceName: "/vmfs/devices/disks/naa.v2", CompatibilityMode: "physical",
+		},
+	}, `{
+		"file":"","capacity":0,"shared":false,"rdm":true,"bus":"","mode":"",
+		"rdmBacking":{"deviceName":"/vmfs/devices/disks/naa.v2","compatibilityMode":"physical"}
+	}`),
+	Entry("exposes every identifier with the matched host LUN", models.Disk{
+		RDM: true,
+		RDMBacking: &models.RDMBacking{
+			LunUUID: "lun-uuid-A", DeviceName: "/vmfs/devices/disks/naa.001",
+			CompatibilityMode: "virtual", BackingUUID: "backing-uuid-A",
+			HostLun: &models.RDMHostLun{
+				HostID: "host-1", Key: "lun-1", CanonicalName: "naa.001", LunUUID: "lun-uuid-A",
+			},
+		},
+	}, `{
+		"file":"","capacity":0,"shared":false,"rdm":true,"bus":"","mode":"",
+		"rdmBacking":{
+			"lunUuid":"lun-uuid-A","deviceName":"/vmfs/devices/disks/naa.001",
+			"compatibilityMode":"virtual","backingUuid":"backing-uuid-A",
+			"hostLun":{"hostId":"host-1","key":"lun-1","canonicalName":"naa.001","lunUuid":"lun-uuid-A"}
+		}
+	}`),
+	Entry("omits optional host LUN fields without reported values", models.Disk{
+		RDM: true,
+		RDMBacking: &models.RDMBacking{
+			LunUUID: "lun-uuid-B", CompatibilityMode: "unknown",
+			HostLun: &models.RDMHostLun{HostID: "host-2"},
+		},
+	}, `{
+		"file":"","capacity":0,"shared":false,"rdm":true,"bus":"","mode":"",
+		"rdmBacking":{"lunUuid":"lun-uuid-B","compatibilityMode":"unknown","hostLun":{"hostId":"host-2"}}
+	}`),
+	Entry("preserves known false flags and omits unknown ones", models.Disk{
+		RDM:             false,
+		ThinProvisioned: &[]bool{false}[0],
+	}, `{
+		"file":"","capacity":0,"shared":false,"rdm":false,"bus":"","mode":"",
+		"thinProvisioned":false
+	}`),
+	Entry("preserves known true flags on an RDM disk", models.Disk{
+		RDM:             true,
+		ThinProvisioned: &[]bool{true}[0], EagerlyScrubbed: &[]bool{true}[0],
+	}, `{
+		"file":"","capacity":0,"shared":false,"rdm":true,"bus":"","mode":"",
+		"thinProvisioned":true,"eagerlyScrubbed":true
+	}`),
 )
 
 var _ = Describe("Inventory schema", func() {
