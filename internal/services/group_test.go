@@ -514,6 +514,116 @@ var _ = Describe("GroupService", func() {
 		})
 	})
 
+	Context("ListAppliances", func() {
+		BeforeEach(func() {
+			Expect(database.Migrate(ctx, test.InsertVMs)).To(Succeed())
+
+			_, err := st.Querier().ExecContext(ctx, `
+				INSERT INTO vm_vapp_products (vm_id, key, name, vendor, version)
+				VALUES
+					('vm-001', 1, 'DataSync', 'AWS', '2.0'),
+					('vm-002', 1, 'DataSync', 'AWS', '2.0'),
+					('vm-005', 1, 'BIG-IP', 'F5', '17.1')
+			`)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should return appliances running on the group's VMs", func() {
+			// Arrange
+			created, err := srv.Create(ctx, models.Group{
+				Name: "prod-appliances", Filter: "cluster = 'production'",
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act
+			appliances, err := srv.ListAppliances(ctx, created.ID)
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(appliances).To(HaveLen(1))
+			Expect(appliances[0].Name).To(Equal("DataSync"))
+			Expect(appliances[0].VirtualMachines).To(HaveKeyWithValue("vm-001", "web-server-1"))
+			Expect(appliances[0].VirtualMachines).To(HaveKeyWithValue("vm-002", "web-server-2"))
+		})
+
+		It("should return appliance metadata and the matching VM", func() {
+			// Arrange
+			created, err := srv.Create(ctx, models.Group{
+				Name: "staging-appliances", Filter: "cluster = 'staging'",
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act
+			appliances, err := srv.ListAppliances(ctx, created.ID)
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(appliances).To(HaveLen(1))
+			Expect(appliances[0].Name).To(Equal("BIG-IP"))
+			Expect(appliances[0].Vendor).To(Equal("F5"))
+			Expect(appliances[0].Version).To(Equal("17.1"))
+			Expect(appliances[0].Confidence).To(Equal(100))
+			Expect(appliances[0].VirtualMachines).To(HaveKeyWithValue("vm-005", "app-server-1"))
+		})
+
+		It("should return all appliances across the group's VMs", func() {
+			// Arrange
+			created, err := srv.Create(ctx, models.Group{
+				Name: "all-appliances", Filter: "memory > 0",
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act
+			appliances, err := srv.ListAppliances(ctx, created.ID)
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(appliances).To(HaveLen(2))
+			Expect(appliances[0].Name).To(Equal("BIG-IP"))
+			Expect(appliances[1].Name).To(Equal("DataSync"))
+		})
+
+		It("should return empty list when the group matches no VMs", func() {
+			// Arrange
+			created, err := srv.Create(ctx, models.Group{
+				Name: "no-vms-appliances", Filter: "cluster = 'nonexistent'",
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act
+			appliances, err := srv.ListAppliances(ctx, created.ID)
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(appliances).To(BeEmpty())
+		})
+
+		It("should return empty list when the group has no appliances", func() {
+			// Arrange
+			created, err := srv.Create(ctx, models.Group{
+				Name: "dev-appliances", Filter: "cluster = 'development'",
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Act
+			appliances, err := srv.ListAppliances(ctx, created.ID)
+
+			// Assert
+			Expect(err).NotTo(HaveOccurred())
+			Expect(appliances).To(BeEmpty())
+		})
+
+		It("should return not found for non-existent group", func() {
+			// Act
+			appliances, err := srv.ListAppliances(ctx, uuid.New())
+
+			// Assert
+			Expect(err).To(HaveOccurred())
+			Expect(srvErrors.IsResourceNotFoundError(err)).To(BeTrue())
+			Expect(appliances).To(BeEmpty())
+		})
+	})
+
 	Context("Atomic Transactions", func() {
 		var (
 			realService *services.GroupService

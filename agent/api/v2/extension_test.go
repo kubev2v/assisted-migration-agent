@@ -150,3 +150,47 @@ var _ = Describe("Inventory schema", func() {
 		Expect(groupHosts.Properties).To(HaveKey("storageLuns"))
 	})
 })
+
+var _ = Describe("NewApplianceList", func() {
+	It("should map appliance fields and count its VMs", func() {
+		// Arrange
+		appliances := []models.Appliance{{
+			Name:       "DataSync",
+			Vendor:     "AWS",
+			Version:    "2.0",
+			Confidence: 100,
+			VirtualMachines: models.VirtualMachinesIdentites{
+				"vm-1": "web-server",
+				"vm-2": "db-server",
+			},
+		}}
+
+		// Act
+		result := v2.NewApplianceList(appliances)
+
+		// Assert
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Name).To(Equal("DataSync"))
+		Expect(result[0].Vendor).To(Equal("AWS"))
+		Expect(result[0].Version).To(Equal("2.0"))
+		Expect(result[0].Confidence).To(Equal(100))
+		Expect(result[0].VmCount).To(Equal(2))
+		Expect(result[0].Vms).To(ConsistOf(
+			v2.VirtualMachineIdentity{Id: "vm-1", Name: "web-server"},
+			v2.VirtualMachineIdentity{Id: "vm-2", Name: "db-server"},
+		))
+	})
+
+	It("should return a non-nil empty list", func() {
+		// Act
+		result := v2.NewApplianceList(nil)
+
+		// Assert
+		Expect(result).ToNot(BeNil())
+		Expect(result).To(BeEmpty())
+
+		raw, err := json.Marshal(v2.ApplianceListResponse{Appliances: result})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(string(raw)).To(Equal(`{"appliances":[]}`))
+	})
+})

@@ -740,3 +740,26 @@ func NewApplicationList(apps []models.ApplicationOverview) []ApplicationOverview
 
 	return apiApps
 }
+
+func NewApplianceList(appliances []models.Appliance) []Appliance {
+	apiAppliances := make([]Appliance, 0, len(appliances))
+
+	for _, appliance := range appliances {
+		vms := make([]VirtualMachineIdentity, 0, len(appliance.VirtualMachines))
+
+		for id, name := range appliance.VirtualMachines {
+			vms = append(vms, VirtualMachineIdentity{Id: id, Name: name})
+		}
+
+		apiAppliances = append(apiAppliances, Appliance{
+			Name:       appliance.Name,
+			Vendor:     appliance.Vendor,
+			Version:    appliance.Version,
+			Confidence: appliance.Confidence,
+			VmCount:    len(vms),
+			Vms:        vms,
+		})
+	}
+
+	return apiAppliances
+}
