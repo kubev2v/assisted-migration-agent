@@ -35,6 +35,13 @@ const (
 	InspectionStatusStateRunning   InspectionStatusState = "running"
 )
 
+// Defines values for RDMBackingCompatibilityMode.
+const (
+	Physical RDMBackingCompatibilityMode = "physical"
+	Unknown  RDMBackingCompatibilityMode = "unknown"
+	Virtual  RDMBackingCompatibilityMode = "virtual"
+)
+
 // Defines values for VirtualMachineIssueCategory.
 const (
 	VirtualMachineIssueCategoryAdvisory    VirtualMachineIssueCategory = "Advisory"
@@ -342,7 +349,37 @@ type Process struct {
 
 // RDMBacking Source-provided backing identity for an RDM disk; omitted when unavailable
 type RDMBacking struct {
+	// BackingUuid UUID explicitly identifying the RDM backing, when available
+	BackingUuid *string `json:"backingUuid,omitempty"`
+
+	// CompatibilityMode Source-normalized RDM compatibility mode
+	CompatibilityMode *RDMBackingCompatibilityMode `json:"compatibilityMode,omitempty"`
+
+	// DeviceName Device name reported directly by the RDM disk backing
+	DeviceName *string `json:"deviceName,omitempty"`
+
+	// HostLun Host LUN matched to the RDM disk backing through a verified identifier relationship and the VM's running host
+	HostLun *RDMHostLun `json:"hostLun,omitempty"`
+
 	// LunUuid LUN UUID reported directly by the RDM disk backing, when available
+	LunUuid *string `json:"lunUuid,omitempty"`
+}
+
+// RDMBackingCompatibilityMode Source-normalized RDM compatibility mode
+type RDMBackingCompatibilityMode string
+
+// RDMHostLun Host LUN matched to the RDM disk backing through a verified identifier relationship and the VM's running host
+type RDMHostLun struct {
+	// CanonicalName Canonical name (e.g. NAA) of the matched host LUN, when available
+	CanonicalName *string `json:"canonicalName,omitempty"`
+
+	// HostId Object ID of the uniquely resolved running host that owns the matched LUN
+	HostId string `json:"hostId"`
+
+	// Key SCSI disk key of the matched host LUN, when available
+	Key *string `json:"key,omitempty"`
+
+	// LunUuid LUN UUID of the matched host LUN, when available
 	LunUuid *string `json:"lunUuid,omitempty"`
 }
 
@@ -647,6 +684,9 @@ type VirtualMachineDisk struct {
 	// Datastore Datastore backing this virtual disk
 	Datastore *VirtualMachineDatastore `json:"datastore,omitempty"`
 
+	// EagerlyScrubbed Source-reported eager scrubbing; omitted when unavailable
+	EagerlyScrubbed *bool `json:"eagerlyScrubbed,omitempty"`
+
 	// File VMDK file path in the datastore
 	File *string `json:"file,omitempty"`
 
@@ -664,6 +704,9 @@ type VirtualMachineDisk struct {
 
 	// Shared Whether the disk is shared between multiple VirtualMachines
 	Shared *bool `json:"shared,omitempty"`
+
+	// ThinProvisioned Source-reported thin provisioning; omitted when unavailable
+	ThinProvisioned *bool `json:"thinProvisioned,omitempty"`
 }
 
 // VirtualMachineInspectionConcern defines model for VirtualMachineInspectionConcern.

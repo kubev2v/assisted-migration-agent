@@ -352,6 +352,29 @@ curl http://localhost:8000/api/v1/vms/vm-001
       "capacity": 107374182400,
       "shared": false,
       "rdm": false,
+      "thinProvisioned": true,
+      "bus": "scsi",
+      "mode": "persistent"
+    },
+    {
+      "key": 2001,
+      "file": "[datastore1] vm-001/rdm1.vmdk",
+      "capacity": 107374182400,
+      "shared": false,
+      "rdm": true,
+      "rdmBacking": {
+        "lunUuid": "lun-uuid-A",
+        "deviceName": "/vmfs/devices/disks/naa.001",
+        "compatibilityMode": "physical",
+        "backingUuid": "backing-uuid-A",
+        "hostLun": {
+          "hostId": "host-12",
+          "key": "key-vmlun-1",
+          "canonicalName": "naa.001",
+          "lunUuid": "lun-uuid-A"
+        }
+      },
+      "eagerlyScrubbed": false,
       "bus": "scsi",
       "mode": "persistent"
     }
@@ -431,13 +454,36 @@ curl http://localhost:8000/api/v1/vms/vm-001
 | `shared` | boolean | Whether disk is shared between multiple VMs |
 | `rdm` | boolean | Whether this is a Raw Device Mapping |
 | `rdmBacking` | object | Optional RDM backing identity (see RDM Backing Object) |
+| `thinProvisioned` | boolean | Source-reported thin provisioning; omitted when unavailable |
+| `eagerlyScrubbed` | boolean | Source-reported eager scrubbing; omitted when unavailable |
 | `bus` | string | Bus type (`scsi`, `ide`, `sata`, `nvme`) |
 | `mode` | string | Disk mode (`persistent`, `independent_persistent`, `independent_nonpersistent`) |
 | `datastore` | object | Datastore backing this disk (see Virtual Machine Datastore Object) |
 
+`thinProvisioned` and `eagerlyScrubbed` come from Forklift `thinProvisioned`/`eagerlyScrub` or RVTools `vDisk.Thin`/`vDisk.Eagerly Scrub`. A reported false is preserved as `false`; only unavailable values are omitted. The flags apply to ordinary disks as well as RDM disks.
+
 #### RDM Backing Object
 
-`rdmBacking.lunUuid` is the LUN UUID supplied directly by an RDM disk backing. It is populated from Forklift `lunUuid` or RVTools `vDisk.Raw LUN ID` when available. The object is omitted for ordinary disks and when the source supplies no LUN UUID. Existing collections are not backfilled. Datastore backing-device IDs and generic disk UUIDs are separate identities.
+| Field | Type | Description |
+|-------|------|-------------|
+| `lunUuid` | string | LUN UUID supplied directly by an RDM disk backing, when available |
+| `deviceName` | string | Device name supplied directly by an RDM disk backing, when available |
+| `compatibilityMode` | string | Source-normalized RDM compatibility mode: `physical`, `virtual`, or `unknown` |
+| `backingUuid` | string | UUID explicitly identifying the RDM backing, when available |
+| `hostLun` | object | Optional host LUN matched to this backing (see RDM Host LUN Object) |
+
+Each identifier comes from its own source field; none is a fallback for another. `lunUuid` is populated from Forklift `lunUuid` or RVTools `vDisk.Raw LUN ID`, `deviceName` from Forklift `deviceName`, and `backingUuid` from Forklift `backingUuid`. RVTools has no established device-name or RDM backing-UUID columns, so those stay omitted for RVTools sources; the generic `Disk UUID` is never substituted for an RDM identifier. `compatibilityMode` is normalized across sources: an explicit Forklift or RVTools mode wins, a legacy `physicalMode = true` proves `physical`, and anything else — including a historical `physicalMode` that was omitted because it was false — stays `unknown`. The object appears only on `rdm` disks with at least one reported backing value (an identifier, a physical or virtual mode, or a matched host LUN); a mode of `unknown` alone never creates it. Ordinary disks never expose `rdmBacking`, and sources without any backing values keep `rdm: true` with the object omitted.
+
+#### RDM Host LUN Object
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `hostId` | string | Object ID of the uniquely resolved running host that owns the matched LUN |
+| `key` | string | SCSI disk key of the matched host LUN, when available |
+| `canonicalName` | string | Canonical name (e.g. NAA) of the matched host LUN, when available |
+| `lunUuid` | string | LUN UUID of the matched host LUN, when available |
+
+`hostLun` references an already collected host LUN and is populated only when the disk's RDM LUN UUID matches a LUN of the VM's uniquely resolved running host through a verified identifier relationship (Forklift v1 `lunUuid` to host SCSI `uuid`). Matches stay within one collection and one host: shared datastore membership, cluster membership, or an inventory-wide UUID lookup never establishes the association, and a duplicate host ID across vCenters suppresses the match. RVTools linkage stays absent until its identifier relationship is verified. A failed or ambiguous match only omits `hostLun`; the disk and its source backing values are unaffected.
 
 #### Virtual Machine Datastore Object
 

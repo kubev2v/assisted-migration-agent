@@ -51,7 +51,8 @@ var _ = Describe("Virtual disk export", func() {
 		expected := [][]string{{
 			"vm_name", "vm_id", "datacenter", "cluster", "host", "disk_key", "unit_number",
 			"path", "disk_path", "capacity_mib", "sharing_mode", "raw", "shared_bus",
-			"disk_mode", "disk_uuid", "thin", "controller", "label", "scsi_unit_number",
+			"disk_mode", "disk_uuid", "thin", "thin_provisioned", "eagerly_scrubbed",
+			"controller", "label", "scsi_unit_number",
 		}}
 		if populated {
 			_, err := st.Querier().ExecContext(ctx, `
@@ -70,17 +71,19 @@ var _ = Describe("Virtual disk export", func() {
 			`)
 			Expect(err).NotTo(HaveOccurred())
 			expected = append(expected,
-				[]string{"'=inventory", "vm-1", "dc", "cluster", "host", "2", "0", "'@disk", "[ds] vm/boot.vmdk", "2048", "false", "false", "noSharing", "persistent", "uuid-2", "false", "SCSI controller 0", "Hard disk 1", "0"},
-				[]string{"'=inventory", "vm-1", "dc", "cluster", "host", "10", "1", "[ds] vm/disk.vmdk", "rdm://disk-1", "102400", "true", "true", "physicalSharing", "independent_persistent", "uuid-1", "true", "SCSI controller 0", "Hard disk 2", "1"},
-				[]string{"other-vm", "vm-2", "", "", "", "2000", "", "", "", "0", "false", "false", "", "", "", "false", "", "", ""},
+				[]string{"'=inventory", "vm-1", "dc", "cluster", "host", "2", "0", "'@disk", "[ds] vm/boot.vmdk", "2048", "false", "false", "noSharing", "persistent", "uuid-2", "false", "", "", "SCSI controller 0", "Hard disk 1", "0"},
+				[]string{"'=inventory", "vm-1", "dc", "cluster", "host", "10", "1", "[ds] vm/disk.vmdk", "rdm://disk-1", "102400", "true", "true", "physicalSharing", "independent_persistent", "uuid-1", "true", "", "", "SCSI controller 0", "Hard disk 2", "1"},
+				[]string{"other-vm", "vm-2", "", "", "", "2000", "", "", "", "0", "false", "false", "", "", "", "false", "", "", "", "", ""},
 			)
 		}
 
-		expected[0] = append(expected[0], "rdm_lun_uuid", "datastore_id", "datastore_name", "datastore_type",
+		expected[0] = append(expected[0], "rdm_lun_uuid", "rdm_device_name", "rdm_backing_uuid", "rdm_compatibility_mode",
+			"rdm_host_lun_host_id", "rdm_host_lun_key", "rdm_host_lun_canonical_name", "rdm_host_lun_lun_uuid",
+			"datastore_id", "datastore_name", "datastore_type",
 			"datastore_filesystem_type", "datastore_filesystem_major_version", "datastore_protocol_type",
 			"datastore_storage_protocol", "datastore_backing_devices", "datastore_vendor", "datastore_model")
 		for i := 1; i < len(expected); i++ {
-			expected[i] = append(expected[i], "", "", "", "", "", "", "", "", "", "", "")
+			expected[i] = append(expected[i], "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "")
 		}
 
 		var buf bytes.Buffer
@@ -242,7 +245,7 @@ var _ = Describe("Host export", func() {
 			_, err := st.Querier().ExecContext(ctx, `
 				ALTER TABLE vhost DROP COLUMN "CPU Model";
 				ALTER TABLE vhost DROP COLUMN "Serial Number";
-				DELETE FROM collection_schema_migrations WHERE version = 4;
+				DELETE FROM collection_schema_migrations WHERE version > 3;
 			`)
 			Expect(err).NotTo(HaveOccurred())
 

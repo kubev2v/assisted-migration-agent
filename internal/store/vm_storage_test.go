@@ -23,10 +23,11 @@ import (
 
 var _ = Describe("VMStore storage metadata", func() {
 	var (
-		ctx  context.Context
-		path string
-		pool *store.Pool
-		st   *store.Store
+		ctx      context.Context
+		path     string
+		pool     *store.Pool
+		st       *store.Store
+		database *store.Database
 	)
 
 	BeforeEach(func() {
@@ -38,7 +39,8 @@ var _ = Describe("VMStore storage metadata", func() {
 
 	Context("current collections", func() {
 		BeforeEach(func() {
-			database, err := pool.NewDatabase("collection", path, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			var err error
+			database, err = pool.NewDatabase("collection", path, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			pool.Add(database)
 			Expect(database.Migrate(ctx, func(ctx context.Context, db *sql.DB) error {
@@ -77,8 +79,8 @@ var _ = Describe("VMStore storage metadata", func() {
 					byFile[d["file"].(string)] = d
 					Expect(d).NotTo(HaveKey("key"), "this feature does not change disk.key exposure")
 				}
-				Expect(byFile["[shared-ds] vm/a.vmdk"]["rdmBacking"]).To(Equal(map[string]any{"lunUuid": "lun-uuid-A"}))
-				Expect(byFile["[shared-ds] vm/b.vmdk"]["rdmBacking"]).To(Equal(map[string]any{"lunUuid": "lun-uuid-B"}))
+				Expect(byFile["[shared-ds] vm/a.vmdk"]["rdmBacking"]).To(Equal(map[string]any{"lunUuid": "lun-uuid-A", "compatibilityMode": "unknown"}))
+				Expect(byFile["[shared-ds] vm/b.vmdk"]["rdmBacking"]).To(Equal(map[string]any{"lunUuid": "lun-uuid-B", "compatibilityMode": "unknown"}))
 				Expect(byFile["[shared-ds] vm/c.vmdk"]).NotTo(HaveKey("rdmBacking"))
 				Expect(byFile["[shared-ds] vm/d.vmdk"]).NotTo(HaveKey("rdmBacking"))
 				Expect(byFile["[shared-ds] vm/c.vmdk"]["rdm"]).To(Equal(false))
@@ -88,6 +90,77 @@ var _ = Describe("VMStore storage metadata", func() {
 				Expect(ds["name"]).To(Equal("shared-ds"))
 				Expect(ds["filesystemMajorVersion"]).To(Equal(float64(6)))
 				Expect(ds["backingDeviceIds"]).To(Equal([]any{"naa.datastore-extent"}))
+			})
+		})
+
+		Context("RDM backing details", func() {
+			BeforeEach(func() {
+				_, err := st.Querier().ExecContext(ctx, `INSERT INTO vhost ("Object ID", "Host", "Cluster", "Datacenter", "VI SDK UUID") VALUES
+ ('host-1', 'esxi-1', 'cluster', 'dc', 'vc-1'),
+ ('host-2', 'esxi-2', 'cluster', 'dc', 'vc-1');
+INSERT INTO vhostscsi ("Host ID", "SCSI Disk Key", "Canonical Name", "LUN UUID") VALUES
+ ('host-1', 'key-1', 'naa.001', 'lun-uuid-A'),
+ ('host-2', 'key-2', 'naa.002', 'lun-uuid-other');
+INSERT INTO vinfo ("VM ID","VM","Template","Host","Host ID","VI SDK UUID") VALUES ('vm-1','rdm-vm',false,'esxi-1','host-1','vc-1');
+INSERT INTO vdatastore ("Object ID","Name","Type") VALUES ('ds-1','shared-ds','VMFS');
+INSERT INTO vdisk ("VM ID", "Disk Key", "Path", "Raw", "Capacity MiB", "RDM LUN UUID", "RDM LUN UUID Source",
+    "RDM Device Name", "RDM Backing UUID", "RDM Compatibility Mode", "Thin Provisioned", "Eagerly Scrubbed") VALUES
+ ('vm-1','3000','[shared-ds] vm/a.vmdk',true,100,'lun-uuid-A','forklift-rdm','/vmfs/devices/disks/naa.001','backing-A','physical',false,true),
+ ('vm-1','3001','[shared-ds] vm/b.vmdk',true,200,NULL,NULL,'/vmfs/devices/disks/naa.v2',NULL,'virtual',NULL,NULL),
+ ('vm-1','3002','[shared-ds] vm/c.vmdk',true,300,NULL,NULL,NULL,NULL,NULL,NULL,NULL),
+ ('vm-1','3003','[shared-ds] vm/d.vmdk',false,400,'must-not-leak','forklift-rdm','garbage-name','garbage-backing','physical',false,NULL),
+ ('vm-1','3004','[shared-ds] vm/e.vmdk',true,500,'lun-uuid-other','forklift-rdm',NULL,NULL,'unknown',NULL,NULL);`)
+				Expect(err).NotTo(HaveOccurred())
+			})
+			It("exposes collected backing details, nullable flags, and the matched host LUN", func() {
+				vm, err := st.VM().Get(ctx, "vm-1")
+				Expect(err).NotTo(HaveOccurred())
+				data, err := json.Marshal(v2.NewVirtualMachineDetailFromModel(*vm))
+				Expect(err).NotTo(HaveOccurred())
+				var got struct {
+					Disks []map[string]any `json:"disks"`
+				}
+				Expect(json.Unmarshal(data, &got)).NotTo(HaveOccurred())
+				Expect(got.Disks).To(HaveLen(5))
+				byFile := map[string]map[string]any{}
+				for _, d := range got.Disks {
+					byFile[d["file"].(string)] = d
+				}
+
+				// A fully sourced disk carries every identifier, both flags,
+				// and the LUN matched on its own running host.
+				Expect(byFile["[shared-ds] vm/a.vmdk"]["rdmBacking"]).To(Equal(map[string]any{
+					"lunUuid": "lun-uuid-A", "deviceName": "/vmfs/devices/disks/naa.001",
+					"compatibilityMode": "physical", "backingUuid": "backing-A",
+					"hostLun": map[string]any{"hostId": "host-1", "key": "key-1", "canonicalName": "naa.001", "lunUuid": "lun-uuid-A"},
+				}))
+				Expect(byFile["[shared-ds] vm/a.vmdk"]["thinProvisioned"]).To(Equal(false))
+				Expect(byFile["[shared-ds] vm/a.vmdk"]["eagerlyScrubbed"]).To(Equal(true))
+
+				// A device-only v2 backing is exposed without any UUID and
+				// unknown flags stay omitted.
+				Expect(byFile["[shared-ds] vm/b.vmdk"]["rdmBacking"]).To(Equal(map[string]any{
+					"deviceName": "/vmfs/devices/disks/naa.v2", "compatibilityMode": "virtual",
+				}))
+				Expect(byFile["[shared-ds] vm/b.vmdk"]).NotTo(HaveKey("thinProvisioned"))
+				Expect(byFile["[shared-ds] vm/b.vmdk"]).NotTo(HaveKey("eagerlyScrubbed"))
+
+				// A disk without any backing value keeps rdm: true and no object.
+				Expect(byFile["[shared-ds] vm/c.vmdk"]["rdm"]).To(Equal(true))
+				Expect(byFile["[shared-ds] vm/c.vmdk"]).NotTo(HaveKey("rdmBacking"))
+
+				// An ordinary disk never exposes RDM-only values, even when
+				// malformed input supplies them; its flags survive.
+				Expect(byFile["[shared-ds] vm/d.vmdk"]["rdm"]).To(Equal(false))
+				Expect(byFile["[shared-ds] vm/d.vmdk"]).NotTo(HaveKey("rdmBacking"))
+				Expect(byFile["[shared-ds] vm/d.vmdk"]["thinProvisioned"]).To(Equal(false))
+				Expect(byFile["[shared-ds] vm/d.vmdk"]).NotTo(HaveKey("eagerlyScrubbed"))
+
+				// A LUN that belongs to another host never matches through a
+				// shared datastore; only the source backing survives.
+				Expect(byFile["[shared-ds] vm/e.vmdk"]["rdmBacking"]).To(Equal(map[string]any{
+					"lunUuid": "lun-uuid-other", "compatibilityMode": "unknown",
+				}))
 			})
 		})
 
@@ -332,55 +405,43 @@ INSERT INTO vdisk ("VM ID", "Disk Key", "Path", "Disk Path", "Capacity MiB", "Ra
 				}
 			})
 		})
-	})
 
-	Context("legacy collections", func() {
-		var db *sql.DB
-
-		BeforeEach(func() {
-			var err error
-			db, err = sql.Open("duckdb", path)
-			Expect(err).NotTo(HaveOccurred())
-			DeferCleanup(db.Close)
-		})
-
-		openReadOnlyCollection := func() {
-			Expect(db.Close()).To(Succeed())
-			database, err := pool.NewDatabase("legacy", path, time.Now(), store.EagerConnectionInitilization, 0, store.ReadOnlyDatabase)
-			Expect(err).NotTo(HaveOccurred())
-			pool.Add(database)
-			st, err = database.Store()
-			Expect(err).NotTo(HaveOccurred())
-		}
-
-		Context("missing RDM LUN UUID column", func() {
+		Context("collections upgraded from before RDM backing details", func() {
 			BeforeEach(func() {
-				Expect(duckdb_parser.New(db, nil).Init()).NotTo(HaveOccurred())
-				Expect(migrations.RunCollection(ctx, db, "collection")).NotTo(HaveOccurred())
-				_, err := db.Exec(`ALTER TABLE vdisk DROP COLUMN "RDM LUN UUID";
- INSERT INTO vinfo ("VM ID","VM","Template") VALUES ('vm-1','legacy-vm',false);
- INSERT INTO vdisk ("VM ID","Disk Key","Raw","Capacity MiB","Disk UUID") VALUES ('vm-1','2000',true,100,'not-a-lun-uuid');`)
-				Expect(err).NotTo(HaveOccurred())
+				Expect(database.Migrate(ctx, func(ctx context.Context, db *sql.DB) error {
+					_, err := db.ExecContext(ctx, `DELETE FROM collection_schema_migrations WHERE version = 5;
+ALTER TABLE vdisk DROP COLUMN "RDM Device Name";
+ALTER TABLE vdisk DROP COLUMN "RDM Backing UUID";
+ALTER TABLE vdisk DROP COLUMN "RDM Compatibility Mode";
+ALTER TABLE vdisk DROP COLUMN "RDM LUN UUID Source";
+ALTER TABLE vdisk DROP COLUMN "Thin Provisioned";
+ALTER TABLE vdisk DROP COLUMN "Eagerly Scrubbed";
+INSERT INTO vinfo ("VM ID","VM","Template") VALUES ('vm-1','legacy-vm',false);
+INSERT INTO vdisk ("VM ID","Disk Key","Raw","Capacity MiB","Disk UUID","RDM LUN UUID") VALUES ('vm-1','2000',true,100,'not-a-lun-uuid','lun-uuid-A');`)
+					if err != nil {
+						return err
+					}
+					// The startup migration upgrades the legacy collection in
+					// place, exactly as Pool.Migrate does on agent startup.
+					return migrations.RunCollection(ctx, db, "collection")
+				})).To(Succeed())
 			})
-			It("reads legacy RDM collections without adding missing columns", func() {
-				openReadOnlyCollection()
+			It("reads upgraded collections with the new fields absent", func() {
 				vm, err := st.VM().Get(ctx, "vm-1")
 				Expect(err).NotTo(HaveOccurred())
 				Expect(vm.Disks).To(HaveLen(1))
 				Expect(vm.Disks[0].RDM).To(BeTrue())
+				Expect(vm.Disks[0].Capacity).To(Equal(int64(100)))
 				data, err := json.Marshal(v2.NewVirtualMachineDetailFromModel(*vm))
 				Expect(err).NotTo(HaveOccurred())
 				var got struct {
 					Disks []map[string]any `json:"disks"`
 				}
 				Expect(json.Unmarshal(data, &got)).NotTo(HaveOccurred())
-				Expect(got.Disks[0]).NotTo(HaveKey("rdmBacking"))
-				Expect(got.Disks[0]["capacity"]).To(Equal(float64(100 * 1024 * 1024)))
-				var columns int
-				Expect(st.Querier().QueryRowContext(ctx, `SELECT count(*) FROM information_schema.columns WHERE table_name='vdisk' AND column_name='RDM LUN UUID'`).Scan(&columns)).NotTo(HaveOccurred())
-				Expect(columns).To(BeZero())
+				Expect(got.Disks[0]["rdmBacking"]).To(Equal(map[string]any{"lunUuid": "lun-uuid-A", "compatibilityMode": "unknown"}))
+				Expect(got.Disks[0]).NotTo(HaveKey("thinProvisioned"))
+				Expect(got.Disks[0]).NotTo(HaveKey("eagerlyScrubbed"))
 			})
 		})
-
 	})
 })
