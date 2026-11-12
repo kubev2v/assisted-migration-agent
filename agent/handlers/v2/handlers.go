@@ -17,6 +17,7 @@ type ServiceProvider interface {
 	ForecasterService() *svc.ForecasterService
 
 	ApplicationService(collectionID string) (*svc.ApplicationService, error)
+	ApplianceService(collectionID string) (*svc.ApplianceService, error)
 	ComparisonService(aId, bId string) (*svc.ComparisonService, error)
 	ExportService(collectionID string) (*svc.ExportService, error)
 	VirtualMachineService(collectionID string) (*svc.VMService, error)

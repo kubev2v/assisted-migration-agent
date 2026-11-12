@@ -85,6 +85,7 @@ func (s *Store) Outbox() *OutboxStore               { return NewOutboxStore(s.qi
 func (s *Store) RightSizing() *RightSizingStore     { return NewRightSizingStore(s.qi) }
 func (s *Store) Forecast() *ForecastStore           { return NewForecastStore(s.qi) }
 func (s *Store) Application() *ApplicationStore     { return NewApplicationStore(s.qi) }
+func (s *Store) Appliance() *ApplianceStore         { return NewApplianceStore(s.qi) }
 func (s *Store) Credentials() *CredentialsStore     { return NewCredentialsStore(s.qi) }
 func (s *Store) Collection() *CollectionStore       { return NewCollectionStore(s.qi) }
 func (s *Store) Export() *ExportStore               { return NewExportStore(s.qi) }

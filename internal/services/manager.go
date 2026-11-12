@@ -342,6 +342,30 @@ func (m *ServiceManager) LatestApplicationService() (*ApplicationService, error)
 	return NewApplicationService(st)
 }
 
+func (m *ServiceManager) ApplianceService(collectionID string) (*ApplianceService, error) {
+	db, err := m.pool.Get(collectionID)
+	if err != nil {
+		return nil, err
+	}
+	st, err := db.Store()
+	if err != nil {
+		return nil, err
+	}
+	return NewApplianceService(st)
+}
+
+func (m *ServiceManager) LatestApplianceService() (*ApplianceService, error) {
+	db, err := m.pool.Latest()
+	if err != nil {
+		return nil, err
+	}
+	st, err := db.Store()
+	if err != nil {
+		return nil, err
+	}
+	return NewApplianceService(st)
+}
+
 func (m *ServiceManager) Stop(ctx context.Context) {
 	m.mu.Lock()
 	inspector := m.inspector

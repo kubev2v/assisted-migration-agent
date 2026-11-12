@@ -409,6 +409,23 @@ var ApplicationMapper filter.MapFunc = func(name string) (string, filter.FieldTy
 	}
 }
 
+var ApplianceMapper filter.MapFunc = func(name string) (string, filter.FieldType, error) {
+	switch strings.ToLower(name) {
+	case "name":
+		return "name", filter.StringField, nil
+	case "vendor":
+		return "vendor", filter.StringField, nil
+	case "version":
+		return "version", filter.StringField, nil
+	case "vm_id":
+		return "vm_id", filter.StringField, nil
+	case "vm_name":
+		return `v."VM"`, filter.StringField, nil
+	default:
+		return "", 0, fmt.Errorf("unknown appliance filter field: %s", name)
+	}
+}
+
 var InventoryMapper filter.MapFunc = func(name string) (string, filter.FieldType, error) {
 	switch strings.ToLower(name) {
 	case "vcenter_id":
@@ -446,6 +463,13 @@ func ParseWithCollectionMap(src []byte) (sq.Sqlizer, error) {
 // This is a convenience wrapper around filter.Parse() for application filtering operations.
 func ParseWithApplicationMap(src []byte) (sq.Sqlizer, error) {
 	return filter.Parse(src, ApplicationMapper)
+}
+
+// ParseWithApplianceMap parses a filter expression using the ApplianceMapper.
+// Columns stay unqualified because the appliance store query aliases vm_vapp_products,
+// and DuckDB rejects table names that are shadowed by an alias.
+func ParseWithApplianceMap(src []byte) (sq.Sqlizer, error) {
+	return filter.Parse(src, ApplianceMapper)
 }
 
 func ParseWithInventoryMap(src []byte) (sq.Sqlizer, error) {

@@ -70,6 +70,9 @@ func (s *stubServiceProvider) LatestRightsizingService() (*svc.RightsizingServic
 func (s *stubServiceProvider) LatestApplicationService() (*svc.ApplicationService, error) {
 	return nil, nil
 }
+func (s *stubServiceProvider) ApplianceService(_ string) (*svc.ApplianceService, error) {
+	return nil, nil
+}
 func (s *stubServiceProvider) GetCollectorStatus() models.CollectorStatus {
 	return models.CollectorStatus{State: models.CollectorStateReady}
 }

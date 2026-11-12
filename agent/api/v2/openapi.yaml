@@ -19,6 +19,8 @@ tags:
     description: VirtualMachine group management
   - name: Applications
     description: Detected application inventory
+  - name: Appliances
+    description: Detected virtual appliance inventory
   - name: Rightsizing
     description: Rightsizing reports and cluster/VM utilization
   - name: Inspector
@@ -505,6 +507,30 @@ paths:
         '500':
           description: Internal server error
 
+  /groups/{groupId}/appliances:
+    get:
+      tags: [Groups]
+      summary: List detected appliances for a group
+      operationId: listGroupAppliances
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          description: Group ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of detected appliances
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplianceListResponse'
+        '404':
+          description: No collections or group not found
+        '500':
+          description: Internal server error
+
   /inventory:
     get:
       tags: [Inventories]
@@ -862,6 +888,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApplicationListResponse'
+        '404':
+          description: Collection not found
+        '500':
+          description: Internal server error
+
+  # ── Appliances ────────────────────────────────────────────────────────
+  /collections/{id}/appliances:
+    get:
+      tags: [Appliances]
+      summary: List detected appliances in a collection
+      operationId: listAppliances
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Collection ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of detected appliances
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplianceListResponse'
         '404':
           description: Collection not found
         '500':
@@ -2525,6 +2576,61 @@ components:
             $ref: '#/components/schemas/ApplicationVM'
 
     ApplicationVM:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+          description: VM ID
+        name:
+          type: string
+          description: VM name
+
+    # ── Appliances ──────────────────────────────────────────────────────
+    ApplianceListResponse:
+      type: object
+      required:
+        - appliances
+      properties:
+        appliances:
+          type: array
+          items:
+            $ref: '#/components/schemas/Appliance'
+
+    Appliance:
+      type: object
+      required:
+        - name
+        - vendor
+        - version
+        - vmCount
+        - confidence
+        - vms
+      properties:
+        name:
+          type: string
+          description: Appliance product name
+        vendor:
+          type: string
+          description: Appliance vendor; defaults to Unknown when not reported
+        version:
+          type: string
+          description: Appliance product version; defaults to empty when not reported
+        confidence:
+          type: integer
+          minimum: 0
+          maximum: 100
+        vmCount:
+          type: integer
+          description: Number of VMs running this appliance
+        vms:
+          type: array
+          items:
+            $ref: '#/components/schemas/VirtualMachineIdentity'
+
+    VirtualMachineIdentity:
       type: object
       required:
         - id

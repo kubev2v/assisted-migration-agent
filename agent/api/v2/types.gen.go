@@ -137,6 +137,29 @@ type AgentStatusConsoleConnectionStatus string
 // AgentStatusMode Target mode for the agent
 type AgentStatusMode string
 
+// Appliance defines model for Appliance.
+type Appliance struct {
+	Confidence int `json:"confidence"`
+
+	// Name Appliance product name
+	Name string `json:"name"`
+
+	// Vendor Appliance vendor; defaults to Unknown when not reported
+	Vendor string `json:"vendor"`
+
+	// Version Appliance product version; defaults to empty when not reported
+	Version string `json:"version"`
+
+	// VmCount Number of VMs running this appliance
+	VmCount int                      `json:"vmCount"`
+	Vms     []VirtualMachineIdentity `json:"vms"`
+}
+
+// ApplianceListResponse defines model for ApplianceListResponse.
+type ApplianceListResponse struct {
+	Appliances []Appliance `json:"appliances"`
+}
+
 // ApplicationListResponse defines model for ApplicationListResponse.
 type ApplicationListResponse struct {
 	Applications []ApplicationOverview `json:"applications"`
@@ -950,6 +973,15 @@ type VirtualMachineDisk struct {
 
 	// Shared Whether the disk is shared between multiple VirtualMachines
 	Shared *bool `json:"shared,omitempty"`
+}
+
+// VirtualMachineIdentity defines model for VirtualMachineIdentity.
+type VirtualMachineIdentity struct {
+	// Id VM ID
+	Id string `json:"id"`
+
+	// Name VM name
+	Name string `json:"name"`
 }
 
 // VirtualMachineInspectionConcern defines model for VirtualMachineInspectionConcern.

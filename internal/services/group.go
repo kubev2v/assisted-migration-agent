@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
@@ -296,6 +297,35 @@ func (s *GroupService) RefreshAll(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// ListAppliances returns appliances running on the VMs matched by the group.
+func (s *GroupService) ListAppliances(ctx context.Context, id uuid.UUID) ([]models.Appliance, error) {
+	if _, err := s.store.Group().Get(ctx, id); err != nil {
+		return []models.Appliance{}, err
+	}
+
+	vmIDs, err := s.store.Group().GetMatchedIDs(ctx, id)
+	if err != nil {
+		return []models.Appliance{}, err
+	}
+
+	if len(vmIDs) == 0 {
+		return []models.Appliance{}, nil
+	}
+
+	expression := fmt.Sprintf("vm_id in ['%s']", strings.Join(vmIDs, "','")) // => "vm_id in ['id1','id2']"
+	applianceFilter, err := vmfilter.ParseWithApplianceMap([]byte(expression))
+	if err != nil {
+		return []models.Appliance{}, err
+	}
+
+	appliances, err := s.store.Appliance().List(ctx, applianceFilter)
+	if err != nil {
+		return []models.Appliance{}, err
+	}
+
+	return appliances, nil
 }
 
 func buildGroupInventoryEventData(group *models.Group) ([]byte, error) {
