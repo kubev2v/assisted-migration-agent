@@ -7,7 +7,7 @@ require (
 	github.com/creasty/defaults v1.8.0
 	github.com/duckdb/duckdb-go/v2 v2.5.4
 	github.com/ecordell/optgen v0.1.1
-	github.com/fatih/color v1.18.0
+	github.com/fatih/color v1.19.0
 	github.com/getkin/kin-openapi v0.152.0
 	github.com/gin-contrib/zap v1.1.10
 	github.com/gin-gonic/gin v1.12.0
@@ -33,8 +33,8 @@ require (
 	github.com/stretchr/testify v1.12.1
 	github.com/vmware/govmomi v0.52.0
 	github.com/xuri/excelize/v2 v2.11.1
-	go.podman.io/common v0.68.1
-	go.podman.io/podman/v6 v6.0.2
+	go.podman.io/common v0.69.2
+	go.podman.io/podman/v6 v6.1.3
 	go.uber.org/zap v1.28.0
 	golang.org/x/crypto v0.59.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -91,7 +91,7 @@ require (
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/docker/distribution v2.8.3+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.9.12 // indirect
-	github.com/docker/go-connections v0.7.0 // indirect
+	github.com/docker/go-connections v0.8.1 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/duckdb/duckdb-go-bindings v0.20000.0 // indirect
 	github.com/duckdb/duckdb-go-bindings/darwin-amd64 v0.1.24 // indirect
@@ -203,7 +203,7 @@ require (
 	github.com/oasdiff/yaml v0.1.3 // indirect
 	github.com/oasdiff/yaml3 v0.0.16 // indirect
 	github.com/open-policy-agent/opa v1.6.0 // indirect
-	github.com/opencontainers/cgroups v0.0.6 // indirect
+	github.com/opencontainers/cgroups v0.0.8 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/opencontainers/runtime-tools v0.9.1-0.20261017090856-bd3b0bd00f44 // indirect
@@ -261,8 +261,11 @@ require (
 	github.com/ulikunitz/xz v0.5.17 // indirect
 	github.com/varlink/go v0.4.1-0.20261015173642-c935be0c53f7 // indirect
 	github.com/vbatts/tar-split v0.12.3 // indirect
-	github.com/vbauerster/mpb/v8 v8.12.1 // indirect
+	github.com/vbauerster/cupwriter v0.0.4 // indirect
+	github.com/vbauerster/mpb/v8 v8.14.0 // indirect
 	github.com/vektah/gqlparser/v2 v2.5.64 // indirect
+	github.com/vishvananda/netlink v1.3.1 // indirect
+	github.com/vishvananda/netns v0.0.5 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
@@ -284,15 +287,14 @@ require (
 	go.opentelemetry.io/otel/metric v1.47.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.47.0 // indirect
 	go.opentelemetry.io/otel/trace v1.47.0 // indirect
-	go.podman.io/buildah v1.44.1 // indirect
-	go.podman.io/image/v5 v5.40.0 // indirect
+	go.podman.io/buildah v1.45.1 // indirect
+	go.podman.io/image/v5 v5.41.2 // indirect
 	go.podman.io/storage v1.65.0 // indirect
 	go.uber.org/goleak v1.3.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.5 // indirect
 	go.yaml.in/yaml/v3 v3.0.6 // indirect
 	golang.org/x/arch v0.29.0 // indirect
-	golang.org/x/crypto/openpgp v0.1.0-deprecated // indirect
 	golang.org/x/exp v0.0.0-20261014143641-f0251eb4aa3e // indirect
 	golang.org/x/mod v0.42.0 // indirect
 	golang.org/x/net v0.62.0 // indirect
