@@ -65,8 +65,8 @@ github.com/apapsch/go-jsonmerge/v2 v2.0.0/go.mod h1:lvDnEdqiQrp0O42VQGgmlKpxL1AP
 github.com/arbovm/levenshtein v0.0.0-20160628152529-48b4e1c0c4d0 h1:jfIu9sQUG6Ig+0+Ap1h4unLjW6YQJpKZVmUzxsD4E/Q=
 github.com/arbovm/levenshtein v0.0.0-20160628152529-48b4e1c0c4d0/go.mod h1:t2tdKJDJF9BV14lnkjHmOQgcvEKgtqs5a1N3LNdJhGE=
 github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a/go.mod h1:lB+ZfQJz7igIIfQNfa7Ml4HSf2uFQQRzpGGRXenZAgY=
-github.com/aws/aws-sdk-go-v2 v1.47.7 h1:jBmtzRtGWVAzbfc4RBWo1dTte0ZZH8p9U42YJIw2+Bw=
-github.com/aws/aws-sdk-go-v2 v1.47.7/go.mod h1:I8lFSH4MGrZiw2m7miCrRYHsgpC1+HW8uiVGOiPYPcw=
+github.com/aws/aws-sdk-go-v2 v1.47.8 h1:fuClo7Un+Bi0EDTnSIPWxVEoJcze+wkGzNA4Vo3jRcQ=
+github.com/aws/aws-sdk-go-v2 v1.47.8/go.mod h1:I8lFSH4MGrZiw2m7miCrRYHsgpC1+HW8uiVGOiPYPcw=
 github.com/aws/aws-sdk-go-v2/service/ec2 v1.343.0 h1:pOxNUJbUOy779gx205gEpySpT5fu3B0ifPD8jBxujZI=
 github.com/aws/aws-sdk-go-v2/service/ec2 v1.343.0/go.mod h1:khWfxrzSgMjGMAZIaYAHu3IobEo7KRRNwPYaHb1zpng=
 github.com/aws/smithy-go v1.28.8 h1:aEmdAq7gVCoGCnvf1NnELlu3I6D/nhqrC321FyFiQkQ=
@@ -487,8 +487,8 @@ github.com/kubev2v/forklift v0.0.0-20261029124612-a8e8350a4032 h1:cldccJxVmGGstM
 github.com/kubev2v/forklift v0.0.0-20261029124612-a8e8350a4032/go.mod h1:WfFrRlOtCh1GJh/y/WrIpeGAq50VZ9hQLeoVrZCbYVU=
 github.com/kubev2v/migration-event-streamer v0.0.0-20261105115111-c59ac09c4048 h1:b0MQCP3AX0whCCLN+4BhyTBkUcCMp+JdO7ARJYDrZh0=
 github.com/kubev2v/migration-event-streamer v0.0.0-20261105115111-c59ac09c4048/go.mod h1:oUuu5tM9Z+MlhlK0kXUF5Ah2Rs9HU6mu6Ft9CA3h0h8=
-github.com/kubev2v/migration-planner v0.28.1-0.20261109122526-4c26df296ca6 h1:ku8ifdQ+tKZYmuUqD3ubEjFKwDxqvCchA4Q1nG9g7Po=
-github.com/kubev2v/migration-planner v0.28.1-0.20261109122526-4c26df296ca6/go.mod h1:zBE0N+ZkMU+22LOp6wCX5nS7S629VO0Ndg30q9LkyjU=
+github.com/kubev2v/migration-planner v0.28.1-0.20261110092510-76f54083fc9f h1:QSE2qd8gt6ujEsyD+C3ujpqn/WeTblQxMXvb0yOk6R0=
+github.com/kubev2v/migration-planner v0.28.1-0.20261110092510-76f54083fc9f/go.mod h1:e1eXGG/XoaRosK1RfQ4ukc7r9VsFrmzK6yNOV/khfeI=
 github.com/kubev2v/migration-planner-common/estimations v0.0.0-20261105094532-64089d3d55a8 h1:2znbMipCiBtKFIiTfT0d9QpK6gGTcUu+dPZk1Cm9U6U=
 github.com/kubev2v/migration-planner-common/estimations v0.0.0-20261105094532-64089d3d55a8/go.mod h1:61ut7Ah7mEo5PUGFQ+OluucCko1L9tWek172ZofSjCg=
 github.com/kubev2v/vm-migration-detective v0.0.0-20261006023354-140bc9526c2c h1:LDM3os216uY4xlJMLyfos2JIuG1/5wUM6FgQAabN8Qc=
