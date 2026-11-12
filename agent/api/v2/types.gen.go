@@ -510,6 +510,14 @@ type InspectorStatus struct {
 // InspectorStatusState Inspector state
 type InspectorStatusState string
 
+// NetworkPortGroup defines model for NetworkPortGroup.
+type NetworkPortGroup struct {
+	Id     *string        `json:"id,omitempty"`
+	Name   string         `json:"name"`
+	Switch *VirtualSwitch `json:"switch,omitempty"`
+	Type   string         `json:"type"`
+}
+
 // OperationCapability defines model for OperationCapability.
 type OperationCapability struct {
 	// Enabled Whether stored credentials have sufficient privileges
@@ -662,6 +670,19 @@ type VMLabelsResponse struct {
 
 	// Labels Distinct labels currently in use
 	Labels []string `json:"labels"`
+}
+
+// VMkernelInterface defines model for VMkernelInterface.
+type VMkernelInterface struct {
+	// Device Interface device identity scoped to the VM host
+	Device string `json:"device"`
+
+	// Mtu Reported MTU in bytes; omitted when unknown
+	Mtu       *int32            `json:"mtu,omitempty"`
+	PortGroup *NetworkPortGroup `json:"portGroup,omitempty"`
+
+	// PortGroupRef Source-reported port-group reference, retained even when unresolved
+	PortGroupRef *string `json:"portGroupRef,omitempty"`
 }
 
 // VcenterCredentials defines model for VcenterCredentials.
@@ -851,6 +872,9 @@ type VirtualMachineDetail struct {
 	// HostPhysicalNics Physical NICs reported on the VM's host. An empty array means no records were retained.
 	HostPhysicalNics *[]HostPhysicalNIC `json:"hostPhysicalNics,omitempty"`
 
+	// HostVmkernelInterfaces VMkernel interfaces reported on the VM's host
+	HostVmkernelInterfaces *[]VMkernelInterface `json:"hostVmkernelInterfaces,omitempty"`
+
 	// Id Unique identifier for the VirtualMachine in vCenter
 	Id string `json:"id"`
 
@@ -1011,7 +1035,8 @@ type VirtualMachineNIC struct {
 	Mac *string `json:"mac,omitempty"`
 
 	// Network Network reference
-	Network *string `json:"network,omitempty"`
+	Network   *string           `json:"network,omitempty"`
+	PortGroup *NetworkPortGroup `json:"portGroup,omitempty"`
 
 	// VlanId Port-group VLAN configuration when supplied; empty when unknown.
 	VlanId *string `json:"vlanId,omitempty"`
@@ -1024,6 +1049,17 @@ type VirtualMachineUpdateRequest struct {
 
 	// MigrationExcluded Whether to exclude this VM from migration
 	MigrationExcluded *bool `binding:"omitempty" json:"migrationExcluded,omitempty"`
+}
+
+// VirtualSwitch defines model for VirtualSwitch.
+type VirtualSwitch struct {
+	Id     *string `json:"id,omitempty"`
+	MaxMtu *int32  `json:"maxMtu,omitempty"`
+	Mtu    *int32  `json:"mtu,omitempty"`
+	Name   *string `json:"name,omitempty"`
+
+	// Type Standard or distributed switch configuration
+	Type string `json:"type"`
 }
 
 // VmUtilizationDetails defines model for VmUtilizationDetails.

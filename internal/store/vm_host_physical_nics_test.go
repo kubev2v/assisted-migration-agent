@@ -107,7 +107,8 @@ var _ = Describe("VM host physical NICs", func() {
 			idCol := slices.Index(rows[0], "id")
 			nicCol := slices.Index(rows[0], "host_physical_nics")
 			Expect(idCol).To(BeNumerically(">=", 0))
-			Expect(nicCol).To(Equal(len(rows[0]) - 1))
+			Expect(nicCol).To(Equal(len(rows[0]) - 2))
+			Expect(rows[0][nicCol+1]).To(Equal("host_vmkernel_interfaces"))
 			Expect(rows[0]).To(ContainElement("network_1"))
 			seen := map[string]bool{}
 			for _, row := range rows[1:] {
