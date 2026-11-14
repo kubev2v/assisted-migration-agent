@@ -20,7 +20,7 @@ require (
 	github.com/kubev2v/forklift v0.0.0-20261110114915-def3d784a934
 	github.com/kubev2v/migration-planner v0.28.1-0.20261112080519-050497adaf7f
 	github.com/kubev2v/migration-planner-common/estimations v0.0.0-20261112132701-67c604c0066b
-	github.com/kubev2v/vm-migration-detective v0.0.0-20261006023354-140bc9526c2c
+	github.com/kubev2v/vm-migration-detective v0.0.0-20261110092334-17a1481816aa
 	github.com/oapi-codegen/gin-middleware v1.0.2
 	github.com/oapi-codegen/runtime v1.8.0
 	github.com/onsi/ginkgo/v2 v2.34.0
