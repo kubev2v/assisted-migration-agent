@@ -67,6 +67,7 @@ func (s *ExportStore) CopyScope(ctx context.Context, scope, path string) error {
 	if !ok {
 		return fmt.Errorf("unknown export scope: %s", scope)
 	}
+
 	query := spec.query
 	if scope == "datastores" || scope == "disks" {
 		topology, err := duckdb_parser.StorageTopologyQuery(ctx, s.db)
@@ -75,6 +76,16 @@ func (s *ExportStore) CopyScope(ctx context.Context, scope, path string) error {
 		}
 		query = strings.ReplaceAll(query, "{storage_topology}", topology)
 	}
+
+	if scope == "vms" || scope == "network" {
+		topology, err := duckdb_parser.NetworkTopologyQuery()
+		if err != nil {
+			return fmt.Errorf("building network topology query: %w", err)
+		}
+
+		query = strings.ReplaceAll(query, "{network_topology}", topology)
+	}
+
 	return s.copyQueryToFile(ctx, query, path, spec.filename)
 }
 

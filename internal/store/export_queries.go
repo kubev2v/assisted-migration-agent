@@ -146,6 +146,7 @@ var overviewQuery = `
 var vmsQuery = `
 
 		COPY (
+			WITH {network_topology}
 			SELECT
 				v."VM" AS name,
 				v."VM ID" AS id,
@@ -207,7 +208,8 @@ var vmsQuery = `
 				-- Migration Assessment
 				v."migration_excluded" AS migration_excluded,
 ` + vmAssessmentSelectCols + `,
-				COALESCE(hn.nics, '[]') AS host_physical_nics
+				COALESCE(hn.nics, '[]') AS host_physical_nics,
+				COALESCE(hv.interfaces, '[]') AS host_vmkernel_interfaces
 
 			FROM vinfo v
 			-- Aggregate NICs per host to keep one export row per VM.
@@ -215,16 +217,17 @@ var vmsQuery = `
 				SELECT
 					"Host ID",
 					to_json(LIST(
-						CASE
-							WHEN "Speed" IS NULL THEN json_object('id', "Network Device")
-							ELSE json_object('id', "Network Device", 'linkSpeedMbps', "Speed")
-						END
+						{
+						    'id': "Network Device",
+						    'linkSpeedMbps': "Speed"
+						}
 						ORDER BY "Network Device"
 					)) AS nics
 				FROM (` + hostPhysicalNICsQuery + `) n
 				WHERE "Host ID" != ''
 				GROUP BY "Host ID"
 			) hn ON hn."Host ID" = v."Host ID"
+			LEFT JOIN network_host_interfaces hv ON hv.host_id = v."Host ID"
 ` + vmDiskTotalsJoin + `
 ` + vmAssessmentJoins + `
 
@@ -482,6 +485,7 @@ const lunsQuery = `
 const networkQuery = `
 
 		COPY (
+			WITH {network_topology}
 			SELECT
 				COALESCE(v."VM", '') AS vm_name,
 				COALESCE(n."VM ID", '') AS vm_id,
@@ -495,6 +499,7 @@ const networkQuery = `
 				) - 1 AS nic_index,
 				COALESCE(v."NICs", 0) AS nic_count,
 				COALESCE(n."Network", '') AS network,
+				ng.port_group AS port_group,
 				COALESCE(n."Switch", '') AS switch,
 				COALESCE(n."Type", '') AS type,
 				COALESCE(n."NIC label", '') AS nic_label,
@@ -507,6 +512,7 @@ const networkQuery = `
 				COALESCE(n."Starts Connected", false) AS starts_connected
 
 			FROM vnetwork n
+			LEFT JOIN network_adapter_links ng ON ng.nic_row_id = n.rowid
 
 			-- Join with vinfo to get VM name
 			LEFT JOIN vinfo v ON n."VM ID" = v."VM ID"

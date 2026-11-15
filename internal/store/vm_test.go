@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
 
 	v2 "github.com/kubev2v/assisted-migration-agent/agent/api/v2"
+	analyzerapi "github.com/kubev2v/assisted-migration-agent/analyzer/api/v1"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
@@ -31,6 +33,161 @@ var _ = Describe("VMStore", func() {
 		db     *sql.DB
 		pool   *store.Pool
 		tmpDir string
+	)
+
+	DescribeTableSubtree("VMkernel and adapter network context",
+		func(switchType, sourceMTU, expectedMTU string) {
+			var groupJSON, interfacesJSON string
+
+			BeforeEach(func() {
+				_, err := db.Exec(`
+					INSERT INTO vinfo ("VM ID", "VM", "Host", "Host ID")
+					VALUES ('net-vm', 'network-vm', 'host-1', 'host-101');
+
+					INSERT INTO vsc_vmk ("Host", "Host ID", "Device", "Key", "Port Group", "Type", "MTU")
+					VALUES
+					    ('host-1', 'host-101', 'vmk0', 'vmk-key', 'management', 'standard', 9000),
+					    ('host-1', 'host-101', 'vmk1', 'vmk-key1', 'missing', 'standard', NULL);
+
+					INSERT INTO vnetwork ("VM ID", "Network", "Mac Address", "Switch", "Type")
+					VALUES
+					    ('net-vm', 'management', '01', 'vSwitch0', 'assigned'),
+					    ('net-vm', 'management', '02', 'vSwitch0', 'manual');
+				`)
+				Expect(err).NotTo(HaveOccurred())
+
+				if switchType == "standard" {
+					_, err = db.Exec(fmt.Sprintf(`
+						INSERT INTO vport ("Host", "Port Group", "Switch")
+						VALUES ('host-1', 'management', 'vSwitch0');
+
+						INSERT INTO vswitch
+						VALUES ('host-1', 'vSwitch0', 'switch-key', %s);
+					`, sourceMTU))
+				} else {
+					_, err = db.Exec(fmt.Sprintf(`
+						INSERT INTO dvport ("Port", "Switch", "Key", "Switch ID")
+						VALUES ('management', 'vSwitch0', 'management', 'switch-key');
+
+						INSERT INTO dvswitch
+						VALUES ('vSwitch0', 'vSwitch0', 'switch-key', %s);
+
+						UPDATE vsc_vmk SET "Type" = 'distributed';
+					`, sourceMTU))
+				}
+				Expect(err).NotTo(HaveOccurred())
+
+				groupJSON = fmt.Sprintf(`{
+    "name": "management",
+    "type": "%s",
+    "switch": {
+        "id": "switch-key",
+        "name": "vSwitch0",
+        "type": "%s",
+        "mtu": %s
+    }
+}`, switchType, switchType, expectedMTU)
+
+				interfacesJSON = `[
+    {
+        "device": "vmk0",
+        "mtu": 9000,
+        "portGroupRef": "management",
+        "portGroup": ` + groupJSON + `
+    },
+    {
+        "device": "vmk1",
+        "mtu": null,
+        "portGroupRef": "missing"
+    }
+]`
+			})
+
+			It("retains both adapters and the host's interfaces", func() {
+				vm, err := s.VM().Get(ctx, "net-vm")
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(vm.HostVMkernelInterfaces).To(HaveLen(2))
+				Expect(vm.HostVMkernelInterfaces[0].MTU).NotTo(BeNil())
+				Expect(*vm.HostVMkernelInterfaces[0].MTU).To(Equal(int32(9000)))
+				Expect(vm.HostVMkernelInterfaces[1].MTU).To(BeNil())
+				Expect(vm.HostVMkernelInterfaces[1].PortGroup).To(BeNil())
+				Expect(vm.NICs).To(HaveLen(2))
+				Expect(vm.NICs[0].PortGroup.Switch.Name).To(Equal("vSwitch0"))
+
+				mtu, err := json.Marshal(vm.NICs[0].PortGroup.Switch.MTU)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(mtu).To(MatchJSON(expectedMTU))
+			})
+
+			DescribeTable("returns the same network context in VM details",
+				func(api string) {
+					vm, err := s.VM().Get(ctx, "net-vm")
+					Expect(err).NotTo(HaveOccurred())
+
+					var detail any
+					if api == "appliance" {
+						detail = v2.NewVirtualMachineDetailFromModel(*vm)
+					} else {
+						detail = analyzerapi.NewVirtualMachineDetailFromModel(*vm)
+					}
+					encoded, err := json.Marshal(detail)
+					Expect(err).NotTo(HaveOccurred())
+
+					var response map[string]json.RawMessage
+					Expect(json.Unmarshal(encoded, &response)).To(Succeed())
+					Expect(response["hostVmkernelInterfaces"]).To(MatchJSON(interfacesJSON))
+					Expect(string(response["nics"])).To(ContainSubstring(`"portGroup"`))
+					Expect(string(encoded)).NotTo(ContainSubstring(`"maxMtu"`))
+				},
+				Entry("appliance v2", "appliance"),
+
+				Entry("analyzer v1", "analyzer"),
+			)
+
+			It("exports host interfaces in the VM CSV", func() {
+				path := filepath.Join(tmpDir, "vms.csv")
+				Expect(s.Export().CopyScope(ctx, "vms", path)).To(Succeed())
+
+				file, err := os.Open(path)
+				Expect(err).NotTo(HaveOccurred())
+				rows, err := csv.NewReader(file).ReadAll()
+				Expect(file.Close()).To(Succeed())
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(rows).To(HaveLen(2))
+				column := slices.Index(rows[0], "host_vmkernel_interfaces")
+				Expect(column).To(BeNumerically(">=", 0))
+				Expect(rows[1][column]).To(MatchJSON(interfacesJSON))
+			})
+
+			It("exports each adapter's group without changing its assignment type", func() {
+				path := filepath.Join(tmpDir, "network.csv")
+				Expect(s.Export().CopyScope(ctx, "network", path)).To(Succeed())
+
+				file, err := os.Open(path)
+				Expect(err).NotTo(HaveOccurred())
+				rows, err := csv.NewReader(file).ReadAll()
+				Expect(file.Close()).To(Succeed())
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(rows).To(HaveLen(3))
+				groupColumn := slices.Index(rows[0], "port_group")
+				typeColumn := slices.Index(rows[0], "type")
+				Expect(groupColumn).To(BeNumerically(">=", 0))
+				Expect(typeColumn).To(BeNumerically(">=", 0))
+				Expect(rows[1][groupColumn]).To(MatchJSON(groupJSON))
+				Expect(rows[2][groupColumn]).To(MatchJSON(groupJSON))
+				Expect([]string{rows[1][typeColumn], rows[2][typeColumn]}).To(ConsistOf("assigned", "manual"))
+			})
+		},
+		Entry("standard switch with MTU", "standard", "1500", "1500"),
+
+		Entry("distributed switch with MTU", "distributed", "9000", "9000"),
+
+		Entry("standard switch with unknown MTU", "standard", "NULL", "null"),
+
+		Entry("distributed switch with unknown MTU", "distributed", "NULL", "null"),
 	)
 
 	BeforeEach(func() {

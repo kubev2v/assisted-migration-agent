@@ -2079,6 +2079,11 @@ components:
           format: int32
           minimum: 0
           description: Adapter count reported by the source; 0 when unavailable
+        hostVmkernelInterfaces:
+          type: array
+          description: VMkernel interfaces reported on the VM's host
+          items:
+            $ref: '#/components/schemas/VMkernelInterface'
         nics:
           type: array
           items:
@@ -2263,6 +2268,7 @@ components:
       type: object
       required:
         - id
+        - linkSpeedMbps
       properties:
         id:
           type: string
@@ -2270,11 +2276,61 @@ components:
         linkSpeedMbps:
           type: integer
           format: int32
-          description: Reported link speed in Mbps; omitted when unknown. This is not measured throughput.
+          nullable: true
+          description: Reported link speed in Mbps; null when unknown. This is not measured throughput.
+
+    VirtualSwitch:
+      type: object
+      required: [type, mtu]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          description: Standard or distributed switch configuration
+        mtu:
+          type: integer
+          format: int32
+          nullable: true
+          description: Reported configured switch MTU in bytes for either switch type; null when unknown.
+    NetworkPortGroup:
+      type: object
+      required: [name, type]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+        switch:
+          $ref: '#/components/schemas/VirtualSwitch'
+    VMkernelInterface:
+      type: object
+      required: [device, mtu]
+      properties:
+        device:
+          type: string
+          description: Interface device identity scoped to the VM host
+        mtu:
+          type: integer
+          format: int32
+          nullable: true
+          description: Reported MTU in bytes; null when unknown
+        portGroupRef:
+          type: string
+          description: Source-reported port-group reference, retained even when unresolved
+        portGroup:
+          $ref: '#/components/schemas/NetworkPortGroup'
 
     VirtualMachineNIC:
       type: object
       properties:
+        portGroup:
+          $ref: '#/components/schemas/NetworkPortGroup'
+
         adapter:
           type: string
           description: Virtual adapter model, such as Vmxnet3 or E1000

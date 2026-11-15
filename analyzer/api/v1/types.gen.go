@@ -265,8 +265,8 @@ type HostPhysicalNIC struct {
 	// Id Source physical NIC identity, scoped to the VM's host and collection.
 	Id string `json:"id"`
 
-	// LinkSpeedMbps Reported link speed in Mbps; omitted when unknown. This is not measured throughput.
-	LinkSpeedMbps *int32 `json:"linkSpeedMbps,omitempty"`
+	// LinkSpeedMbps Reported link speed in Mbps; null when unknown. This is not measured throughput.
+	LinkSpeedMbps *int32 `json:"linkSpeedMbps"`
 }
 
 // InspectionStatus defines model for InspectionStatus.
@@ -341,6 +341,14 @@ type MigrationEstimationResponse struct {
 	// Estimation Estimation results keyed by schema name (e.g. "network-based", "storage-offload").
 	Estimation        map[string]SchemaEstimationResult `json:"estimation"`
 	EstimationContext EstimationContext                 `json:"estimationContext"`
+}
+
+// NetworkPortGroup defines model for NetworkPortGroup.
+type NetworkPortGroup struct {
+	Id     *string        `json:"id,omitempty"`
+	Name   string         `json:"name"`
+	Switch *VirtualSwitch `json:"switch,omitempty"`
+	Type   string         `json:"type"`
 }
 
 // OsDiskEstimationEntry defines model for OsDiskEstimationEntry.
@@ -431,6 +439,19 @@ type VMLabelsResponse struct {
 
 	// Labels Distinct labels currently in use
 	Labels []string `json:"labels"`
+}
+
+// VMkernelInterface defines model for VMkernelInterface.
+type VMkernelInterface struct {
+	// Device Interface device identity scoped to the VM host
+	Device string `json:"device"`
+
+	// Mtu Reported MTU in bytes; null when unknown
+	Mtu       *int32            `json:"mtu"`
+	PortGroup *NetworkPortGroup `json:"portGroup,omitempty"`
+
+	// PortGroupRef Source-reported port-group reference, retained even when unresolved
+	PortGroupRef *string `json:"portGroupRef,omitempty"`
 }
 
 // VersionInfo defines model for VersionInfo.
@@ -589,6 +610,9 @@ type VirtualMachineDetail struct {
 	// HostPhysicalNics Physical NICs reported on the VM's host. An empty array means no records were retained.
 	HostPhysicalNics *[]HostPhysicalNIC `json:"hostPhysicalNics,omitempty"`
 
+	// HostVmkernelInterfaces VMkernel interfaces reported on the VM's host
+	HostVmkernelInterfaces *[]VMkernelInterface `json:"hostVmkernelInterfaces,omitempty"`
+
 	// Id Unique identifier for the VirtualMachine in vCenter
 	Id string `json:"id"`
 
@@ -743,7 +767,8 @@ type VirtualMachineNIC struct {
 	Mac *string `json:"mac,omitempty"`
 
 	// Network Network reference
-	Network *string `json:"network,omitempty"`
+	Network   *string           `json:"network,omitempty"`
+	PortGroup *NetworkPortGroup `json:"portGroup,omitempty"`
 
 	// VlanId Port-group VLAN configuration when supplied; empty when unknown.
 	VlanId *string `json:"vlanId,omitempty"`
@@ -756,6 +781,18 @@ type VirtualMachineUpdateRequest struct {
 
 	// MigrationExcluded Whether to exclude this VM from migration
 	MigrationExcluded *bool `binding:"omitempty" json:"migrationExcluded,omitempty"`
+}
+
+// VirtualSwitch defines model for VirtualSwitch.
+type VirtualSwitch struct {
+	Id *string `json:"id,omitempty"`
+
+	// Mtu Reported configured switch MTU in bytes for either switch type; null when unknown.
+	Mtu  *int32  `json:"mtu"`
+	Name *string `json:"name,omitempty"`
+
+	// Type Standard or distributed switch configuration
+	Type string `json:"type"`
 }
 
 // VmUtilizationDetails defines model for VmUtilizationDetails.

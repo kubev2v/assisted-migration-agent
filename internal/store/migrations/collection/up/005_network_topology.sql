@@ -1,0 +1,30 @@
+-- Existing collections have no VMkernel or standard-switch records until recollected.
+CREATE TABLE IF NOT EXISTS vswitch (
+    "Host" VARCHAR,
+    "Switch" VARCHAR,
+    "Key" VARCHAR,
+    "MTU" INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS vsc_vmk (
+    "Host" VARCHAR,
+    "Host ID" VARCHAR,
+    "Device" VARCHAR,
+    "Key" VARCHAR,
+    "Port Group" VARCHAR,
+    "Type" VARCHAR,
+    "MTU" INTEGER
+);
+
+ALTER TABLE vnetwork ADD COLUMN IF NOT EXISTS "Port Group ID" VARCHAR;
+ALTER TABLE vnetwork ADD COLUMN IF NOT EXISTS "Port Group Type" VARCHAR;
+
+ALTER TABLE dvport ADD COLUMN IF NOT EXISTS "Object ID" VARCHAR;
+ALTER TABLE dvport ADD COLUMN IF NOT EXISTS "Key" VARCHAR;
+ALTER TABLE dvport ADD COLUMN IF NOT EXISTS "Switch ID" VARCHAR;
+
+ALTER TABLE vport ADD COLUMN IF NOT EXISTS "Key" VARCHAR;
+
+ALTER TABLE dvswitch ADD COLUMN IF NOT EXISTS "Switch" VARCHAR;
+ALTER TABLE dvswitch ADD COLUMN IF NOT EXISTS "Object ID" VARCHAR;
+ALTER TABLE dvswitch ADD COLUMN IF NOT EXISTS "Max MTU" INTEGER;
