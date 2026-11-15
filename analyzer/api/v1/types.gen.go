@@ -545,6 +545,12 @@ type VirtualMachineDatastore struct {
 	// ProtocolType Backing storage transport protocol when available (for example FC, iSCSI, or NFS)
 	ProtocolType *string `json:"protocolType,omitempty"`
 
+	// StorageArrays Source-reported VASA arrays associated with this datastore, when available
+	StorageArrays *[]externalRef0.StorageArray `json:"storageArrays,omitempty"`
+
+	// StorageContainerId Source-reported storage container identifier, when available
+	StorageContainerId *string `json:"storageContainerId,omitempty"`
+
 	// StorageProtocol Datastore storage access category when available (Block, File, or Object)
 	StorageProtocol *string `json:"storageProtocol,omitempty"`
 

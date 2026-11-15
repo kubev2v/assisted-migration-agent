@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	duckdb "github.com/duckdb/duckdb-go/v2"
+	duckdbmodels "github.com/kubev2v/migration-planner/pkg/duckdb_parser/models"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 )
@@ -13,6 +14,52 @@ import (
 // functions to work with both single-row and multi-row query results.
 type rowScanner interface {
 	Scan(dest ...any) error
+}
+
+type vmDetailDisk struct {
+	duckdbmodels.Disk
+	storageArrays      duckdbmodels.StorageArrays
+	storageContainerID string
+}
+
+type vmDetailDisks []vmDetailDisk
+
+func (d *vmDetailDisks) Scan(src any) error {
+	if src == nil {
+		*d = nil
+		return nil
+	}
+
+	rows, ok := src.([]any)
+	if !ok {
+		return fmt.Errorf("scanning VM detail disks: expected []any, got %T", src)
+	}
+
+	var disks duckdbmodels.Disks
+	err := disks.Scan(rows)
+	if err != nil {
+		return err
+	}
+
+	result := make(vmDetailDisks, 0, len(disks))
+	// Planner's scanner preserves the order of the disk structs and skips non-struct entries.
+	for _, row := range rows {
+		fields, ok := row.(map[string]any)
+		if !ok {
+			continue
+		}
+		disk := vmDetailDisk{
+			Disk:               disks[len(result)],
+			storageContainerID: toString(fields["DatastoreStorageContainerID"]),
+		}
+		err = disk.storageArrays.Scan(fields["DatastoreStorageArrays"])
+		if err != nil {
+			return fmt.Errorf("scanning disk datastore storage arrays: %w", err)
+		}
+		result = append(result, disk)
+	}
+	*d = result
+	return nil
 }
 
 // StringArray is a scanner for DuckDB VARCHAR[] arrays.

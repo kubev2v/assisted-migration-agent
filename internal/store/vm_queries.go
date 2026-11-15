@@ -107,8 +107,7 @@ disks AS (
             'Capacity': COALESCE(dk."Capacity MiB", 0),
             'Shared': dk."Sharing mode",
             'RDM': dk."Raw",
-            -- Row JSON keeps older read-only collections without this column queryable.
-            'RDMLunUUID': to_json(dk)->>'RDM LUN UUID',
+            'RDMLunUUID': dk."RDM LUN UUID",
             'RDMDeviceName': dk."RDM Device Name",
             'RDMCompatibilityMode': dk."RDM Compatibility Mode",
             'RDMBackingUUID': dk."RDM Backing UUID",
@@ -143,7 +142,9 @@ disks AS (
                 []::VARCHAR[]
             ),
             'DatastoreVendor': COALESCE(backing_info.vendor, ''),
-            'DatastoreModel': COALESCE(backing_info.model, '')
+            'DatastoreModel': COALESCE(backing_info.model, ''),
+            'DatastoreStorageArrays': ds."Storage Arrays",
+            'DatastoreStorageContainerID': ds."Storage Container ID"
         }) AS disks
     FROM vdisk dk
     JOIN filtered_vm fv ON dk."VM ID" = fv."VM ID"

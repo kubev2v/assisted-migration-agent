@@ -9,6 +9,7 @@ import (
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
+	"github.com/kubev2v/assisted-migration-agent/pkg/converters"
 )
 
 // CredsFromAPI converts a VcenterCredentials API type to models.Credentials.
@@ -263,6 +264,10 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 			if len(d.Datastore.BackingDeviceIDs) > 0 {
 				backingDeviceIDs := append([]string(nil), d.Datastore.BackingDeviceIDs...)
 				datastore.BackingDeviceIds = &backingDeviceIDs
+			}
+			datastore.StorageArrays = converters.StorageArraysToAPI(d.Datastore.StorageArrays)
+			if d.Datastore.StorageContainerID != "" {
+				datastore.StorageContainerId = &d.Datastore.StorageContainerID
 			}
 			if d.Datastore.Vendor != "" {
 				datastore.Vendor = &d.Datastore.Vendor

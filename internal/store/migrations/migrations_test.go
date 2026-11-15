@@ -318,3 +318,36 @@ var _ = Describe("RDM LUN UUID collection migration", func() {
 		Expect(uuid.String).To(Equal("collected-lun-uuid"))
 	})
 })
+
+var _ = Describe("Storage array identity collection migration", func() {
+	It("adds array and container columns without changing an existing datastore", func() {
+		ctx := context.Background()
+		db, err := sql.Open("duckdb", "")
+		Expect(err).NotTo(HaveOccurred())
+		DeferCleanup(db.Close)
+
+		Expect(duckdb_parser.New(db, nil).Init()).To(Succeed())
+		_, err = db.ExecContext(ctx, `
+			ALTER TABLE vdatastore DROP COLUMN IF EXISTS "Storage Arrays";
+			ALTER TABLE vdatastore DROP COLUMN IF EXISTS "Storage Container ID";
+			INSERT INTO vdatastore ("Object ID", "Name", "Type", "Capacity MiB")
+				VALUES ('ds-legacy', 'legacy-data', 'VVOL', 2048);
+		`)
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(migrations.RunCollection(ctx, db, "memory")).To(Succeed())
+
+		var name string
+		var capacity int64
+		var arrays, containerID sql.NullString
+		row := db.QueryRowContext(ctx, `
+			SELECT "Name", "Capacity MiB", "Storage Arrays", "Storage Container ID"
+			FROM vdatastore WHERE "Object ID" = 'ds-legacy'
+		`)
+		Expect(row.Scan(&name, &capacity, &arrays, &containerID)).To(Succeed())
+		Expect(name).To(Equal("legacy-data"))
+		Expect(capacity).To(Equal(int64(2048)))
+		Expect(arrays.Valid).To(BeFalse())
+		Expect(containerID.Valid).To(BeFalse())
+	})
+})

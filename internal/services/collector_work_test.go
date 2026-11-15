@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
+	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/pkg/opa"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -85,11 +86,21 @@ var _ = Describe("Collector work collection time", func() {
 			CpuModel, SerialNumber, ServiceTag,
 			HbaDiskInfo, HostScsiDisks, HostScsiTopology
 		) VALUES (
-			'host-1', 'cluster-1', 8, 2, 34359738368, 'ESXi', 'VMware', '[]', true, true,
+			'host-1', 'cluster-1', 8, 2, 34359738368, 'ESXi', 'VMware', '[{"id":"ds-1"}]', true, true,
 			' Xeon Gold 6338 ', ' SN-1 ', ' TAG-1 ',
 			'[{"key":"hba-1","hbaDevice":"vmhba1","protocol":"FibreChannel","nodeWorldWideName":"000123","portWorldWideName":"000456"}]',
 			'[{"key":"lun-1","canonicalName":"naa.001","vendor":"NETAPP","model":"LUN"}]',
 			'[{"key":"hba-1","scsiDiskKeys":["lun-1"]}]'
+		)`,
+			`CREATE TABLE fixture.Datastore (
+			ID VARCHAR, Name VARCHAR, Free BIGINT, Capacity BIGINT, MaintenanceMode VARCHAR,
+			Type VARCHAR, BackingDevicesNames VARCHAR, IORMEnabled BOOLEAN, IORMCongestionThreshold INTEGER,
+			IORMCongestionThresholdMode VARCHAR, IORMPercentOfPeakThroughput INTEGER,
+			StorageArrays VARCHAR, StorageContainerID VARCHAR
+		)`,
+			`INSERT INTO fixture.Datastore VALUES (
+			'ds-1', 'vvol', 1073741824, 2147483648, '', 'VVOL', '["naa.001"]', false, 30, 'automatic', 90,
+			'[{"uuid":" array-1 ","vendorId":" vendor ","modelId":"model"},{"name":"partial"}]', ' container '
 		)`,
 			`CREATE TABLE fixture.VM (
 			ID VARCHAR, Name VARCHAR, Folder VARCHAR, Host VARCHAR, UUID VARCHAR, Firmware VARCHAR,
@@ -229,5 +240,25 @@ var _ = Describe("Collector work collection time", func() {
 		Expect(string(host["storageLuns"])).To(MatchJSON(luns))
 		Expect(string(host["cpuModel"])).To(Equal(`"Xeon Gold 6338"`))
 		Expect(string(host["serialNumber"])).To(Equal(`"SN-1"`))
+	})
+
+	It("includes datastore array identity in vCenter and cluster inventory", func() {
+		var collected api.Inventory
+		Expect(json.Unmarshal(result.Inventory, &collected)).To(Succeed())
+		Expect(collected.Vcenter).NotTo(BeNil())
+		Expect(collected.Clusters).To(HaveLen(1))
+
+		scopes := []api.InventoryData{*collected.Vcenter}
+		for _, cluster := range collected.Clusters {
+			scopes = append(scopes, cluster)
+		}
+		for _, scope := range scopes {
+			datastores := scope.Infra.Datastores
+			Expect(datastores).To(HaveLen(1))
+			encoded, err := json.Marshal(datastores[0].StorageArrays)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(encoded)).To(MatchJSON(`[{"uuid":"array-1","vendorId":"vendor","modelId":"model"},{"name":"partial"}]`))
+			Expect(datastores[0].StorageContainerId).To(HaveValue(Equal("container")))
+		}
 	})
 })

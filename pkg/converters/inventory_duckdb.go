@@ -303,6 +303,8 @@ func infraFromDuckDB(i *inventory.InfraData) api.Infra {
 			ProtocolType:            d.ProtocolType,
 			Vendor:                  d.Vendor,
 		}
+		ds.StorageArrays = StorageArraysToAPI(d.StorageArrays)
+		ds.StorageContainerId = optionalString(d.StorageContainerID)
 		if d.FilesystemType != "" {
 			filesystemType := d.FilesystemType
 			ds.FilesystemType = &filesystemType
@@ -417,6 +419,21 @@ func vmsPerHostAverage(totalVMs, totalHosts int) *float64 {
 	}
 	avg := math.Round(float64(totalVMs*100)/float64(totalHosts)) / 100
 	return &avg
+}
+
+// StorageArraysToAPI converts source-reported datastore arrays and omits an empty list.
+func StorageArraysToAPI(source []inventory.StorageArray) *[]api.StorageArray {
+	if len(source) == 0 {
+		return nil
+	}
+	arrays := make([]api.StorageArray, 0, len(source))
+	for _, array := range source {
+		arrays = append(arrays, api.StorageArray{
+			Uuid: optionalString(array.UUID), Name: optionalString(array.Name),
+			VendorId: optionalString(array.VendorID), ModelId: optionalString(array.ModelID),
+		})
+	}
+	return &arrays
 }
 
 func optionalString(value string) *string {

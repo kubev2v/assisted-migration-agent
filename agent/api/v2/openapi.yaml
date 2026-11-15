@@ -1746,7 +1746,7 @@ components:
         - inventory
       properties:
         inventory:
-          $ref: 'https://raw.githubusercontent.com/kubev2v/migration-planner/4b72c27edbe9aa8adfdc616441158dccea648458/api/v1alpha1/openapi.yaml#/components/schemas/UpdateInventory'
+          $ref: 'https://raw.githubusercontent.com/kubev2v/migration-planner/d0c6361703a98449e7d98eca950ab3b03c09d8fc/api/v1alpha1/openapi.yaml#/components/schemas/UpdateInventory'
 
     # ── VCenter Credentials ──────────────────────────────────────────────
     VcenterCredentials:
@@ -2294,6 +2294,14 @@ components:
         model:
           type: string
           description: Model reported by matching backing devices when available
+        storageArrays:
+          type: array
+          description: Source-reported VASA arrays associated with this datastore, when available
+          items:
+            $ref: 'https://raw.githubusercontent.com/kubev2v/migration-planner/d0c6361703a98449e7d98eca950ab3b03c09d8fc/api/v1alpha1/openapi.yaml#/components/schemas/StorageArray'
+        storageContainerId:
+          type: string
+          description: Source-reported storage container identifier, when available
 
     HostPhysicalNIC:
       type: object
@@ -2508,7 +2516,7 @@ components:
         group:
           $ref: '#/components/schemas/Group'
         inventory:
-          $ref: 'https://raw.githubusercontent.com/kubev2v/migration-planner/4b72c27edbe9aa8adfdc616441158dccea648458/api/v1alpha1/openapi.yaml#/components/schemas/Inventory'
+          $ref: 'https://raw.githubusercontent.com/kubev2v/migration-planner/d0c6361703a98449e7d98eca950ab3b03c09d8fc/api/v1alpha1/openapi.yaml#/components/schemas/Inventory'
         vms:
           type: array
           items:

@@ -161,6 +161,64 @@ var _ = Describe("Inventory handler", func() {
 		}
 	})
 
+	Context("datastore array identity", func() {
+		BeforeEach(func() {
+			ctx := context.Background()
+			buildEnv(ctx, func(collSt *store.Store) {
+				inventoryJSON := `{
+					"vcenter_id": "vc-test",
+					"vcenter": {
+						"infra": {
+							"datastores": [{
+								"diskId": "vvol",
+								"storageArrays": [
+									{"uuid": "array-1", "name": "Main", "vendorId": "vendor", "modelId": "model"},
+									{"name": "partial"}
+								],
+								"storageContainerId": "container"
+							}]
+						}
+					},
+					"clusters": {}
+				}`
+				Expect(collSt.Inventory().Save(ctx, []byte(inventoryJSON))).To(Succeed())
+			})
+		})
+
+		expectDatastoreIdentity := func(inv v1.Inventory) {
+			Expect(inv.Vcenter).NotTo(BeNil())
+			datastores := inv.Vcenter.Infra.Datastores
+			Expect(datastores).To(HaveLen(1))
+			datastore := datastores[0]
+			Expect(datastore.DiskId).To(Equal("vvol"))
+			Expect(datastore.StorageArrays).To(HaveValue(HaveLen(2)))
+			arrays := *datastore.StorageArrays
+			Expect(arrays[0].Uuid).To(HaveValue(Equal("array-1")))
+			Expect(arrays[1].Name).To(HaveValue(Equal("partial")))
+			Expect(datastore.StorageContainerId).To(HaveValue(Equal("container")))
+		}
+
+		It("returns datastore array identity in the latest inventory response", func() {
+			w := doRequest("")
+			Expect(w.Code).To(Equal(http.StatusOK), w.Body.String())
+
+			var response v2api.Inventory
+			Expect(json.Unmarshal(w.Body.Bytes(), &response)).To(Succeed())
+			expectDatastoreIdentity(response.Inventory.Inventory)
+		})
+
+		It("returns datastore array identity in the inventory bundle", func() {
+			w := doRequest("all")
+			Expect(w.Code).To(Equal(http.StatusOK))
+
+			files := readZip(w.Body.Bytes())
+			Expect(files).To(HaveKey("inventory.json"))
+			var response v1.Inventory
+			Expect(json.Unmarshal(files["inventory.json"], &response)).To(Succeed())
+			expectDatastoreIdentity(response)
+		})
+	})
+
 	Context("scope main (default)", func() {
 		It("wraps the response in the v2 Inventory envelope when no scope is set", func() {
 			ctx := context.Background()
@@ -227,7 +285,9 @@ var _ = Describe("Inventory handler", func() {
 					Filter: "name = 'vm1'",
 					Inventory: &inventory.Inventory{
 						VCenterID: "vc-a",
-						VCenter:   &inventory.InventoryData{VMs: inventory.VMsData{Total: 4}},
+						VCenter: &inventory.InventoryData{VMs: inventory.VMsData{Total: 4}, Infra: inventory.InfraData{Datastores: []inventory.Datastore{{
+							DiskId: "vvol", StorageArrays: []inventory.StorageArray{{UUID: "subset-array"}},
+						}}}},
 						Clusters: map[string]inventory.InventoryData{
 							"cluster-a": {VMs: inventory.VMsData{Total: 3}},
 						},
@@ -269,6 +329,13 @@ var _ = Describe("Inventory handler", func() {
 			Expect(*subsetA.VcenterId).To(Equal("vc-a"))
 			Expect(subsetA.VmsCount).NotTo(BeNil())
 			Expect(*subsetA.VmsCount).To(Equal(4))
+			Expect(subsetA.Inventory.Vcenter.Infra.Datastores).To(HaveLen(1))
+			arrays := subsetA.Inventory.Vcenter.Infra.Datastores[0].StorageArrays
+			Expect(arrays).NotTo(BeNil())
+			encoded, err := json.Marshal(arrays)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(encoded)).To(MatchJSON(`[{"uuid":"subset-array"}]`))
+
 		})
 
 		It("returns an error when a subset has no vcenter totals", func() {

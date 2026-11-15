@@ -86,7 +86,11 @@ var _ = Describe("GetGroup handler", func() {
 		Expect(err).NotTo(HaveOccurred())
 		groupID = created.ID.String()
 
-		inv := &inventory.Inventory{VCenterID: "test-vcenter", VCenterVersion: "7.0.0"}
+		inv := &inventory.Inventory{VCenterID: "test-vcenter", VCenterVersion: "7.0.0",
+			VCenter: &inventory.InventoryData{Infra: inventory.InfraData{Datastores: []inventory.Datastore{{
+				DiskId: "vvol", StorageArrays: []inventory.StorageArray{{UUID: "group-array"}, {Name: "partial"}}, StorageContainerID: "group-container",
+			}}}},
+		}
 		Expect(st.Group().UpdateInventory(ctx, created.ID, inv)).To(Succeed())
 
 		handler = handlers.NewHandler(config.Configuration{}, &stubServiceProvider{groupSvc: groupSvc})
@@ -115,6 +119,15 @@ var _ = Describe("GetGroup handler", func() {
 			var resp v2api.GroupResponse
 			Expect(json.Unmarshal(w.Body.Bytes(), &resp)).To(Succeed())
 			Expect(resp.Inventory).NotTo(BeNil())
+			Expect(resp.Inventory.Vcenter).NotTo(BeNil())
+			Expect(resp.Inventory.Vcenter.Infra.Datastores).To(HaveLen(1))
+			datastore := resp.Inventory.Vcenter.Infra.Datastores[0]
+			encoded, err := json.Marshal(datastore.StorageArrays)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(encoded)).To(MatchJSON(`[{"uuid":"group-array"},{"name":"partial"}]`))
+			Expect(datastore.StorageContainerId).NotTo(BeNil())
+			Expect(*datastore.StorageContainerId).To(Equal("group-container"))
+
 		})
 
 		It("omits inventory when the group has none", func() {
@@ -165,6 +178,15 @@ var _ = Describe("GetGroup handler", func() {
 			var resp v2api.GroupResponse
 			Expect(json.Unmarshal(w.Body.Bytes(), &resp)).To(Succeed())
 			Expect(resp.Inventory).NotTo(BeNil())
+			Expect(resp.Inventory.Vcenter).NotTo(BeNil())
+			Expect(resp.Inventory.Vcenter.Infra.Datastores).To(HaveLen(1))
+			datastore := resp.Inventory.Vcenter.Infra.Datastores[0]
+			encoded, err := json.Marshal(datastore.StorageArrays)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(encoded)).To(MatchJSON(`[{"uuid":"group-array"},{"name":"partial"}]`))
+			Expect(datastore.StorageContainerId).NotTo(BeNil())
+			Expect(*datastore.StorageContainerId).To(Equal("group-container"))
+
 		})
 
 		It("omits inventory when the group has none", func() {

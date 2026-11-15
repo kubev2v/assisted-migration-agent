@@ -26,7 +26,6 @@ var _ = Describe("Storage export", func() {
 	var (
 		ctx context.Context
 		st  *store.Store
-		db  *store.Database
 		svc *services.ExportService
 	)
 
@@ -40,8 +39,7 @@ var _ = Describe("Storage export", func() {
 			Expect(os.Symlink(extension, filepath.Join(dir, "sqlite_scanner.duckdb_extension"))).To(Succeed())
 		}
 
-		var err error
-		db, err = pool.NewDatabase("export", filepath.Join(dir, "collection.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
+		db, err := pool.NewDatabase("export", filepath.Join(dir, "collection.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 		Expect(err).NotTo(HaveOccurred())
 		pool.Add(db)
 		DeferCleanup(pool.Close)
@@ -120,10 +118,10 @@ var _ = Describe("Storage export", func() {
 			}
 		}
 
-		Expect(datastoreRows[0]).To(Equal([]string{"name", "id", "address", "type", "capacity_mib", "capacity_gib", "free_mib", "free_gib", "used_percent", "mha_enabled", "hosts", "vm_count", "used_gib", "storage_protocol", "filesystem_type", "filesystem_major_version", "backing_devices", "sioc_enabled", "protocol_type", "storage_access_category", "vendor", "model"}))
+		Expect(datastoreRows[0]).To(Equal([]string{"name", "id", "address", "type", "capacity_mib", "capacity_gib", "free_mib", "free_gib", "used_percent", "mha_enabled", "hosts", "vm_count", "used_gib", "storage_protocol", "filesystem_type", "filesystem_major_version", "backing_devices", "sioc_enabled", "protocol_type", "storage_access_category", "vendor", "model", "storage_arrays", "storage_container_id"}))
 		Expect(datastoreRows[0]).NotTo(ContainElement("host_names"))
 		Expect(datastoreRows[1][10]).To(Equal(`["host-1","esxi-2","duplicate","missing"]`))
-		Expect(datastoreRows[1][12:]).To(Equal([]string{"1.5", "FC", "VMFS", "6", `["naa.1"]`, "true", "FibreChannel", "", "", ""}))
+		Expect(datastoreRows[1][12:]).To(Equal([]string{"1.5", "FC", "VMFS", "6", `["naa.1"]`, "true", "FibreChannel", "", "", "", "", ""}))
 		Expect(datastoreRows[2][8]).To(Equal("0.0"))
 		Expect(datastoreRows[3][12]).To(Equal("0.0009765625"))
 		Expect(datastoreRows[4][12]).To(BeEmpty())
@@ -137,6 +135,89 @@ var _ = Describe("Storage export", func() {
 		Entry("CSV ZIP", "zip"),
 		Entry("Excel", "xlsx"),
 	)
+
+	Context("datastore array identity exports", func() {
+		const arrays = `[{"uuid":"array-1","name":"Main, \"Production\"","vendorId":"vendor","modelId":"model"},{"uuid":null,"name":"Partial","vendorId":null,"modelId":null}]`
+
+		BeforeEach(func() {
+			_, err := st.Querier().ExecContext(ctx, `
+				INSERT INTO vdatastore
+					("Object ID", "Name", "Type", "Capacity MiB", "Storage Arrays", "Storage Container ID")
+				VALUES
+					('ds-1', 'shared-name', 'VVOL', 2048, ?, 'container-1'),
+					('ds-2', 'shared-name', 'VVOL', 4096, '[{"uuid":"array-1"}]', 'container-2'),
+					('ds-3', 'unavailable', 'NFS', 1024, NULL, NULL),
+					('ds-4', 'empty', 'VMFS', 1024, '[]', ''),
+					('ds-5', 'container-only', 'VVOL', 1024, NULL, '=container');
+			`, arrays)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		assertDatastoreRows := func(rows [][]string) {
+			Expect(rows).To(HaveLen(6))
+			arrayColumn := slices.Index(rows[0], "storage_arrays")
+			containerColumn := slices.Index(rows[0], "storage_container_id")
+			idColumn := slices.Index(rows[0], "id")
+			capacityColumn := slices.Index(rows[0], "capacity_mib")
+			Expect(arrayColumn).NotTo(Equal(-1))
+			Expect(containerColumn).NotTo(Equal(-1))
+			Expect(idColumn).NotTo(Equal(-1))
+			Expect(capacityColumn).NotTo(Equal(-1))
+
+			expectedArrays := map[string]string{"ds-1": arrays, "ds-2": `[{"uuid":"array-1"}]`, "ds-3": "", "ds-4": "", "ds-5": ""}
+			expectedContainers := map[string]string{"ds-1": "container-1", "ds-2": "container-2", "ds-3": "", "ds-4": "", "ds-5": "'=container"}
+			seen := make(map[string]bool)
+			for _, row := range rows[1:] {
+				id := row[idColumn]
+				Expect(expectedArrays).To(HaveKey(id))
+				Expect(seen[id]).To(BeFalse(), "duplicate datastore "+id)
+				seen[id] = true
+				if expectedArrays[id] == "" {
+					Expect(row[arrayColumn]).To(BeEmpty(), id)
+				} else {
+					Expect(row[arrayColumn]).To(MatchJSON(expectedArrays[id]), id)
+				}
+				Expect(row[containerColumn]).To(Equal(expectedContainers[id]), id)
+				if id == "ds-1" {
+					Expect(row[capacityColumn]).To(Equal("2048.0"))
+				}
+				if id == "ds-2" {
+					Expect(row[capacityColumn]).To(Equal("4096.0"))
+				}
+			}
+		}
+
+		It("preserves array identity and datastore relationships in CSV ZIP", func() {
+			var buf bytes.Buffer
+			Expect(svc.WriteZip(ctx, []string{"datastores"}, &buf)).To(Succeed())
+			archive, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(archive.File).To(HaveLen(1))
+			file, err := archive.Open("datastores.csv")
+			Expect(err).NotTo(HaveOccurred())
+			rows, err := csv.NewReader(file).ReadAll()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(file.Close()).To(Succeed())
+			assertDatastoreRows(rows)
+		})
+
+		It("preserves array identity and datastore relationships in Excel", func() {
+			var buf bytes.Buffer
+			Expect(svc.WriteExcel(ctx, []string{"datastores"}, &buf)).To(Succeed())
+			workbook, err := excelize.OpenReader(bytes.NewReader(buf.Bytes()))
+			Expect(err).NotTo(HaveOccurred())
+			DeferCleanup(workbook.Close)
+			Expect(workbook.GetSheetList()).To(Equal([]string{"Datastores"}))
+			rows, err := workbook.GetRows("Datastores")
+			Expect(err).NotTo(HaveOccurred())
+			for i := range rows {
+				for len(rows[i]) < len(rows[0]) {
+					rows[i] = append(rows[i], "")
+				}
+			}
+			assertDatastoreRows(rows)
+		})
+	})
 
 	DescribeTable("exports complete VM datastore, RDM, and adapter metadata", func(format string) {
 		const seed = `
