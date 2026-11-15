@@ -120,10 +120,10 @@ var _ = Describe("Storage export", func() {
 			}
 		}
 
-		Expect(datastoreRows[0]).To(Equal([]string{"name", "id", "address", "type", "capacity_mib", "capacity_gib", "free_mib", "free_gib", "used_percent", "mha_enabled", "hosts", "vm_count", "used_gib", "storage_protocol", "filesystem_type", "filesystem_major_version", "backing_devices", "sioc_enabled", "protocol_type", "storage_access_category", "vendor", "model"}))
+		Expect(datastoreRows[0]).To(Equal([]string{"name", "id", "address", "type", "capacity_mib", "capacity_gib", "free_mib", "free_gib", "used_percent", "mha_enabled", "hosts", "vm_count", "used_gib", "storage_protocol", "filesystem_type", "filesystem_major_version", "backing_devices", "sioc_enabled", "protocol_type", "storage_access_category", "vendor", "model", "storage_arrays", "storage_container_id"}))
 		Expect(datastoreRows[0]).NotTo(ContainElement("host_names"))
 		Expect(datastoreRows[1][10]).To(Equal(`["host-1","esxi-2","duplicate","missing"]`))
-		Expect(datastoreRows[1][12:]).To(Equal([]string{"1.5", "FC", "VMFS", "6", `["naa.1"]`, "true", "FibreChannel", "", "", ""}))
+		Expect(datastoreRows[1][12:]).To(Equal([]string{"1.5", "FC", "VMFS", "6", `["naa.1"]`, "true", "FibreChannel", "", "", "", "", ""}))
 		Expect(datastoreRows[2][8]).To(Equal("0.0"))
 		Expect(datastoreRows[3][12]).To(Equal("0.0009765625"))
 		Expect(datastoreRows[4][12]).To(BeEmpty())
@@ -137,6 +137,136 @@ var _ = Describe("Storage export", func() {
 		Entry("CSV ZIP", "zip"),
 		Entry("Excel", "xlsx"),
 	)
+
+	DescribeTable("preserves array identity and datastore relationships in exports", func(format string) {
+		arrays := `[{"uuid":"array-1","name":"Main, \"Production\"","vendorId":"vendor","modelId":"model"},{"uuid":null,"name":"Partial","vendorId":null,"modelId":null}]`
+		_, err := st.Querier().ExecContext(ctx, `INSERT INTO vdatastore
+            ("Object ID", "Name", "Type", "Capacity MiB", "Storage Arrays", "Storage Container ID") VALUES
+            ('ds-1','shared-name','VVOL',2048,?,'container-1'),
+            ('ds-2','shared-name','VVOL',4096,'[{"uuid":"array-1"}]','container-2'),
+            ('ds-3','unavailable','NFS',1024,NULL,NULL),
+            ('ds-4','empty','VMFS',1024,'[]',''),
+            ('ds-5','container-only','VVOL',1024,NULL,'=container')`, arrays)
+		Expect(err).NotTo(HaveOccurred())
+
+		var buf bytes.Buffer
+		var rows [][]string
+		if format == "zip" {
+			Expect(svc.WriteZip(ctx, []string{"datastores"}, &buf)).To(Succeed())
+			archive, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(archive.File).To(HaveLen(1))
+			file, err := archive.Open("datastores.csv")
+			Expect(err).NotTo(HaveOccurred())
+			rows, err = csv.NewReader(file).ReadAll()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(file.Close()).To(Succeed())
+		} else {
+			Expect(svc.WriteExcel(ctx, []string{"datastores"}, &buf)).To(Succeed())
+			workbook, err := excelize.OpenReader(bytes.NewReader(buf.Bytes()))
+			Expect(err).NotTo(HaveOccurred())
+			DeferCleanup(workbook.Close)
+			Expect(workbook.GetSheetList()).To(Equal([]string{"Datastores"}))
+			rows, err = workbook.GetRows("Datastores")
+			Expect(err).NotTo(HaveOccurred())
+			for i := range rows {
+				for len(rows[i]) < len(rows[0]) {
+					rows[i] = append(rows[i], "")
+				}
+			}
+		}
+
+		Expect(rows).To(HaveLen(6))
+		arrayColumn := slices.Index(rows[0], "storage_arrays")
+		containerColumn := slices.Index(rows[0], "storage_container_id")
+		idColumn := slices.Index(rows[0], "id")
+		capacityColumn := slices.Index(rows[0], "capacity_mib")
+		Expect(arrayColumn).NotTo(Equal(-1))
+		Expect(containerColumn).NotTo(Equal(-1))
+		Expect(idColumn).NotTo(Equal(-1))
+		Expect(capacityColumn).NotTo(Equal(-1))
+
+		expectedArrays := map[string]string{"ds-1": arrays, "ds-2": `[{"uuid":"array-1"}]`, "ds-3": "", "ds-4": "", "ds-5": ""}
+		expectedContainers := map[string]string{"ds-1": "container-1", "ds-2": "container-2", "ds-3": "", "ds-4": "", "ds-5": "'=container"}
+		seen := make(map[string]bool)
+		for _, row := range rows[1:] {
+			id := row[idColumn]
+			Expect(expectedArrays).To(HaveKey(id))
+			Expect(seen[id]).To(BeFalse(), "duplicate datastore "+id)
+			seen[id] = true
+			if expectedArrays[id] == "" {
+				Expect(row[arrayColumn]).To(BeEmpty(), id)
+			} else {
+				Expect(row[arrayColumn]).To(MatchJSON(expectedArrays[id]), id)
+			}
+			Expect(row[containerColumn]).To(Equal(expectedContainers[id]), id)
+			if id == "ds-1" {
+				Expect(row[capacityColumn]).To(Equal("2048.0"))
+			}
+			if id == "ds-2" {
+				Expect(row[capacityColumn]).To(Equal("4096.0"))
+			}
+		}
+	}, Entry("CSV ZIP", "zip"), Entry("Excel", "xlsx"))
+
+	DescribeTable("upgrades legacy collections before exporting datastore array identity", func(format string) {
+		_, err := st.Querier().ExecContext(ctx, `
+			ALTER TABLE vdatastore DROP COLUMN "Storage Arrays";
+			ALTER TABLE vdatastore DROP COLUMN "Storage Container ID";
+			DELETE FROM collection_schema_migrations WHERE version = 6;
+			INSERT INTO vdatastore ("Object ID", "Name", "Type", "Capacity MiB")
+				VALUES ('ds-legacy', 'legacy-data', 'VVOL', 2048);
+		`)
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(db.Migrate(ctx, func(ctx context.Context, sqlDB *sql.DB) error {
+			return migrations.RunCollection(ctx, sqlDB, "collection")
+		})).To(Succeed())
+
+		var output bytes.Buffer
+		if format == "zip" {
+			Expect(svc.WriteZip(ctx, []string{"datastores"}, &output)).To(Succeed())
+		} else {
+			Expect(svc.WriteExcel(ctx, []string{"datastores"}, &output)).To(Succeed())
+		}
+
+		var rows [][]string
+		if format == "zip" {
+			archive, err := zip.NewReader(bytes.NewReader(output.Bytes()), int64(output.Len()))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(archive.File).To(HaveLen(1))
+			file, err := archive.File[0].Open()
+			Expect(err).NotTo(HaveOccurred())
+			rows, err = csv.NewReader(file).ReadAll()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(file.Close()).To(Succeed())
+		} else {
+			workbook, err := excelize.OpenReader(bytes.NewReader(output.Bytes()))
+			Expect(err).NotTo(HaveOccurred())
+			DeferCleanup(workbook.Close)
+			rows, err = workbook.GetRows("Datastores")
+			Expect(err).NotTo(HaveOccurred())
+			for i := range rows {
+				for len(rows[i]) < len(rows[0]) {
+					rows[i] = append(rows[i], "")
+				}
+			}
+		}
+
+		Expect(rows).To(HaveLen(2))
+		arrayColumn := slices.Index(rows[0], "storage_arrays")
+		containerColumn := slices.Index(rows[0], "storage_container_id")
+		idColumn := slices.Index(rows[0], "id")
+		capacityColumn := slices.Index(rows[0], "capacity_mib")
+		Expect(arrayColumn).NotTo(Equal(-1))
+		Expect(containerColumn).NotTo(Equal(-1))
+		Expect(idColumn).NotTo(Equal(-1))
+		Expect(capacityColumn).NotTo(Equal(-1))
+		Expect(rows[1][idColumn]).To(Equal("ds-legacy"))
+		Expect(rows[1][capacityColumn]).To(Equal("2048.0"))
+		Expect(rows[1][arrayColumn]).To(BeEmpty())
+		Expect(rows[1][containerColumn]).To(BeEmpty())
+	}, Entry("CSV ZIP", "zip"), Entry("Excel", "xlsx"))
 
 	DescribeTable("exports complete VM datastore, RDM, and adapter metadata", func(format string) {
 		const seed = `

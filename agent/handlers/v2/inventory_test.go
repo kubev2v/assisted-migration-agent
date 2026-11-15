@@ -108,7 +108,7 @@ var _ = Describe("Inventory handler", func() {
 	}
 
 	saveMainInventory := func(collSt *store.Store) {
-		inventoryJSON := `{"vcenter_id":"vc-test","vcenter":{"infra":{"hosts":[{"id":"host-1","vendor":"Dell","model":"PowerEdge","datacenter":"dc1","cluster":"cluster1","cpuModel":"Xeon Gold 6338","serialNumber":"SN-1"}]}},"clusters":{"cluster-1":{"vms":{"total":5},"infra":{}}}}`
+		inventoryJSON := `{"vcenter_id":"vc-test","vcenter":{"infra":{"datastores":[{"diskId":"vvol","storageArrays":[{"uuid":"array-1","name":"Main","vendorId":"vendor","modelId":"model"},{"name":"partial"}],"storageContainerId":"container"}],"hosts":[{"id":"host-1","vendor":"Dell","model":"PowerEdge","datacenter":"dc1","cluster":"cluster1","cpuModel":"Xeon Gold 6338","serialNumber":"SN-1"}]}},"clusters":{"cluster-1":{"vms":{"total":5},"infra":{}}}}`
 		Expect(collSt.Inventory().Save(context.Background(), []byte(inventoryJSON))).To(Succeed())
 	}
 
@@ -186,6 +186,13 @@ var _ = Describe("Inventory handler", func() {
 			Expect(*host.CpuModel).To(Equal("Xeon Gold 6338"))
 			Expect(host.SerialNumber).NotTo(BeNil())
 			Expect(*host.SerialNumber).To(Equal("SN-1"))
+			datastores := resp.Inventory.Inventory.Vcenter.Infra.Datastores
+			Expect(datastores).To(HaveLen(1))
+			Expect(datastores[0].StorageArrays).NotTo(BeNil())
+			Expect(*datastores[0].StorageArrays).To(HaveLen(2))
+			Expect(*(*datastores[0].StorageArrays)[0].Uuid).To(Equal("array-1"))
+			Expect(*datastores[0].StorageContainerId).To(Equal("container"))
+
 		})
 
 		It("returns JSON when scope is explicitly main", func() {
@@ -210,6 +217,10 @@ var _ = Describe("Inventory handler", func() {
 			files := readZip(w.Body.Bytes())
 			Expect(files).To(HaveKey("inventory.json"))
 			Expect(files).To(HaveLen(1))
+			var bundled v1.Inventory
+			Expect(json.Unmarshal(files["inventory.json"], &bundled)).To(Succeed())
+			Expect(bundled.Vcenter.Infra.Datastores[0].StorageArrays).NotTo(BeNil())
+			Expect(*bundled.Vcenter.Infra.Datastores[0].StorageArrays).To(HaveLen(2))
 
 			var mainInv v1.Inventory
 			Expect(json.Unmarshal(files["inventory.json"], &mainInv)).To(Succeed())
@@ -227,7 +238,9 @@ var _ = Describe("Inventory handler", func() {
 					Filter: "name = 'vm1'",
 					Inventory: &inventory.Inventory{
 						VCenterID: "vc-a",
-						VCenter:   &inventory.InventoryData{VMs: inventory.VMsData{Total: 4}},
+						VCenter: &inventory.InventoryData{VMs: inventory.VMsData{Total: 4}, Infra: inventory.InfraData{Datastores: []inventory.Datastore{{
+							DiskId: "vvol", StorageArrays: []inventory.StorageArray{{UUID: "subset-array"}},
+						}}}},
 						Clusters: map[string]inventory.InventoryData{
 							"cluster-a": {VMs: inventory.VMsData{Total: 3}},
 						},
@@ -269,6 +282,13 @@ var _ = Describe("Inventory handler", func() {
 			Expect(*subsetA.VcenterId).To(Equal("vc-a"))
 			Expect(subsetA.VmsCount).NotTo(BeNil())
 			Expect(*subsetA.VmsCount).To(Equal(4))
+			Expect(subsetA.Inventory.Vcenter.Infra.Datastores).To(HaveLen(1))
+			arrays := subsetA.Inventory.Vcenter.Infra.Datastores[0].StorageArrays
+			Expect(arrays).NotTo(BeNil())
+			encoded, err := json.Marshal(arrays)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(string(encoded)).To(MatchJSON(`[{"uuid":"subset-array"}]`))
+
 		})
 
 		It("returns an error when a subset has no vcenter totals", func() {
