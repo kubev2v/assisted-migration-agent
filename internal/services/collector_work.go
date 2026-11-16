@@ -216,7 +216,7 @@ func (f *vCenterCollectorWorkFactory) Build() work.WorkBuilder[models.CollectorS
 				return r, nil
 			},
 		},
-		// 3b. Tag categories: save category names before importing vCenter tags.
+		// 3b. Tag categories: resolve categories used by collected VM tags before ingestion, which requires category names.
 		{
 			Status: func() models.CollectorStatus {
 				return models.CollectorStatus{State: models.CollectorStateCollecting}
@@ -228,10 +228,17 @@ func (f *vCenterCollectorWorkFactory) Build() work.WorkBuilder[models.CollectorS
 					return r, r.Err
 				}
 
-				lookupCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-				defer cancel()
+				ids, err := st.Metadata().ListUsedTagCategoryIDs(ctx, r.SQLitePath)
+				if err != nil {
+					r.Err = err
+					return r, r.Err
+				}
+				if len(ids) == 0 {
+					return r, nil
+				}
+
 				rc := rest.NewClient(r.Client.Client)
-				if err := rc.Login(lookupCtx, url.UserPassword(credentials.Username, credentials.Password)); err != nil {
+				if err := rc.Login(ctx, url.UserPassword(credentials.Username, credentials.Password)); err != nil {
 					log.Warnw("tag category login failed; tags without category names will be skipped", "error", err)
 					return r, nil
 				}
@@ -244,18 +251,13 @@ func (f *vCenterCollectorWorkFactory) Build() work.WorkBuilder[models.CollectorS
 				}()
 
 				manager := tags.NewManager(rc)
-				ids, err := manager.ListCategories(lookupCtx)
-				if err != nil {
-					log.Warnw("listing tag categories failed; tags without category names will be skipped", "error", err)
-					return r, nil
-				}
-
-				names := make(map[string]string)
+				names := make(map[string]string, len(ids))
 				for _, id := range ids {
-					if lookupCtx.Err() != nil {
+					if ctx.Err() != nil {
 						break
 					}
-					category, err := manager.GetCategory(lookupCtx, id)
+
+					category, err := manager.GetCategory(ctx, id)
 					if err != nil || strings.TrimSpace(category.Name) == "" {
 						log.Warnw("tag category lookup failed or returned an empty name; tags in this category will be skipped", "category_id", id, "error", err)
 						continue

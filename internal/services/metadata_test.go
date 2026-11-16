@@ -3,10 +3,12 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -30,7 +32,6 @@ var _ = Describe("Metadata category names", func() {
 	}{
 		{name: "retains resolved names and skips failed or empty categories"},
 		{name: "login failure is nonfatal", failPath: "/rest/com/vmware/cis/session"},
-		{name: "listing failure is nonfatal", failPath: categoryPath},
 	} {
 		It(tc.name, func() {
 			ctx := context.Background()
@@ -93,6 +94,23 @@ var _ = Describe("Metadata category names", func() {
 				result.Client = nil // The test client has no SOAP session to log out.
 				Expect(builder.Finalize(ctx, result)).NotTo(HaveOccurred())
 			}()
+			result.SQLitePath = filepath.Join(dir, "collector's inventory.db")
+			escapedPath := strings.ReplaceAll(result.SQLitePath, "'", "''")
+			_, err = mainStore.Querier().ExecContext(ctx, fmt.Sprintf("ATTACH '%s' AS inventory_fixture (TYPE sqlite)", escapedPath))
+			Expect(err).NotTo(HaveOccurred())
+			_, err = mainStore.Querier().ExecContext(ctx, "CREATE TABLE inventory_fixture.VM (IsTemplate INTEGER, Tags VARCHAR)")
+			Expect(err).NotTo(HaveOccurred())
+			_, err = mainStore.Querier().ExecContext(ctx, "INSERT INTO inventory_fixture.VM VALUES (0, ?)",
+				`[
+					{"categoryID":"urn:cat1","name":"production"},
+					{"categoryID":"urn:cat2","name":"production"},
+					{"categoryID":"urn:cat3","name":"production"},
+					{"categoryID":"urn:cat4","name":"production"}
+				]`)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = mainStore.Querier().ExecContext(ctx, "DETACH inventory_fixture")
+			Expect(err).NotTo(HaveOccurred())
+
 			// Supply the existing collector client without running a full vSphere collection.
 			endpoint, err := url.Parse(server.URL)
 			Expect(err).NotTo(HaveOccurred())
