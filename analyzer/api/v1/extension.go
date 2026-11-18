@@ -576,6 +576,112 @@ func NewMigrationEstimationByComplexityResponseFromModel(result models.Migration
 	}
 }
 
+func (r ClusterRequirementsRequest) ToModel() models.ClusterRequirementsRequestForm {
+	form := models.ClusterRequirementsRequestForm{
+		WorkerNodeCPU:           r.WorkerNodeCPU,
+		WorkerNodeMemory:        r.WorkerNodeMemory,
+		WorkerNodeThreads:       r.WorkerNodeThreads,
+		ControlPlaneSchedulable: r.ControlPlaneSchedulable,
+		ControlPlaneCPU:         r.ControlPlaneCPU,
+		ControlPlaneMemory:      r.ControlPlaneMemory,
+		HostedControlPlane:      r.HostedControlPlane,
+		CompactMode:             r.CompactMode,
+	}
+
+	switch r.CpuOverCommitRatio {
+	case CpuOneToOne:
+		form.CPUOverCommitMultiplier = 1
+	case CpuOneToTwo:
+		form.CPUOverCommitMultiplier = 2
+	case CpuOneToFour:
+		form.CPUOverCommitMultiplier = 4
+	case CpuOneToSix:
+		form.CPUOverCommitMultiplier = 6
+	case CpuOneToEight:
+		form.CPUOverCommitMultiplier = 8
+	}
+
+	switch r.MemoryOverCommitRatio {
+	case MemoryOneToOne:
+		form.MemoryOverCommitMultiplier = 1
+	case MemoryOneToTwo:
+		form.MemoryOverCommitMultiplier = 2
+	case MemoryOneToFour:
+		form.MemoryOverCommitMultiplier = 4
+	}
+
+	if r.FilterExpression != nil {
+		form.Expression = *r.FilterExpression
+	}
+	if r.ControlPlaneNodeCount != nil {
+		count := int(*r.ControlPlaneNodeCount)
+		form.ControlPlaneNodeCount = &count
+	}
+
+	return form
+}
+
+func NewClusterRequirementsResponseFromModel(result models.ClusterRequirementsResponse) ClusterRequirementsResponse {
+	response := ClusterRequirementsResponse{
+		ClusterSizing: newClusterSizingFromModel(result.ClusterSizing),
+		ResourceConsumption: SizingResourceConsumption{
+			Cpu:    result.ResourceConsumption.CPU,
+			Memory: result.ResourceConsumption.Memory,
+		},
+		InventoryTotals: InventoryTotals{
+			TotalVMs:    result.InventoryTotals.TotalVMs,
+			TotalCPU:    result.InventoryTotals.TotalCPU,
+			TotalMemory: result.InventoryTotals.TotalMemory,
+		},
+	}
+
+	if result.OptimizedSizing != nil {
+		sizing := newClusterSizingFromModel(*result.OptimizedSizing)
+		response.OptimizedSizing = &sizing
+	}
+	if result.Savings != nil {
+		response.Savings = &Savings{
+			NodesSaved:          result.Savings.NodesSaved,
+			PercentageReduction: result.Savings.PercentageReduction,
+			Description:         result.Savings.Description,
+		}
+	}
+	if result.OptimizationStatus != nil {
+		response.OptimizationStatus = &OptimizationStatus{
+			Attempted: result.OptimizationStatus.Attempted,
+			Reason:    OptimizationStatusReason(result.OptimizationStatus.Reason),
+		}
+	}
+	if result.ResourceConsumption.Limits != nil {
+		response.ResourceConsumption.Limits = &SizingResourceLimits{
+			Cpu:    result.ResourceConsumption.Limits.CPU,
+			Memory: result.ResourceConsumption.Limits.Memory,
+		}
+	}
+	if result.ResourceConsumption.OverCommitRatio != nil {
+		response.ResourceConsumption.OverCommitRatio = &SizingOverCommitRatio{
+			Cpu:    result.ResourceConsumption.OverCommitRatio.CPU,
+			Memory: result.ResourceConsumption.OverCommitRatio.Memory,
+		}
+	}
+
+	return response
+}
+
+func newClusterSizingFromModel(sizing models.ClusterSizing) ClusterSizing {
+	return ClusterSizing{
+		TotalNodes:           sizing.TotalNodes,
+		WorkerNodes:          sizing.WorkerNodes,
+		ControlPlaneNodes:    sizing.ControlPlaneNodes,
+		FailoverNodes:        sizing.FailoverNodes,
+		TotalCPU:             sizing.TotalCPU,
+		TotalMemory:          sizing.TotalMemory,
+		CpuUtilizationMax:    sizing.CPUUtilizationMax,
+		MemoryUtilizationMax: sizing.MemoryUtilizationMax,
+		Confidence:           sizing.Confidence,
+	}
+}
+
 func newSchemaEstimations(results map[string]estimation.Result) map[string]SchemaEstimationResult {
 	estimates := make(map[string]SchemaEstimationResult, len(results))
 	for schema, result := range results {

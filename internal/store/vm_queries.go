@@ -343,6 +343,7 @@ var vmOutputQuery = sq.Select(
 	`v."Powerstate" AS power_state`,
 	`COALESCE(v."Cluster", '') AS cluster`,
 	`COALESCE(v."Datacenter", '') AS datacenter`,
+	`COALESCE(v."CPUs", 0) AS cpu_count`,
 	`v."Memory" AS memory`,
 	`COALESCE(d.total_disk, 0) AS disk_size`,
 	`COALESCE(c.issues_count, 0) AS issue_count`,

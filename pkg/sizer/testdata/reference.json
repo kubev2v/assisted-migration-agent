@@ -1,0 +1,3051 @@
+[
+  {
+    "name": "basic",
+    "checks": [
+      "nodeCount",
+      "totals",
+      "consumption",
+      "nodes"
+    ],
+    "request": {
+      "platform": "BareMetal",
+      "detailed": true,
+      "machineSets": [
+        {
+          "name": "worker",
+          "cpu": 16,
+          "memory": 64,
+          "instanceName": "worker",
+          "numberOfDisks": 24,
+          "label": "worker"
+        }
+      ],
+      "workloads": [
+        {
+          "name": "workload",
+          "count": 1,
+          "allowedMachineSets": [
+            "worker"
+          ],
+          "services": [
+            {
+              "name": "app",
+              "requiredCPU": 2,
+              "requiredMemory": 4,
+              "zones": 0,
+              "runsWith": [],
+              "avoid": []
+            }
+          ]
+        }
+      ]
+    },
+    "response": {
+      "success": true,
+      "data": {
+        "nodeCount": 1,
+        "zones": 1,
+        "totalCPU": 16,
+        "totalMemory": 64,
+        "resourceConsumption": {
+          "cpu": 2,
+          "memory": 4
+        },
+        "advanced": [
+          {
+            "zone": "Zone 1",
+            "nodes": [
+              {
+                "name": "Node 1",
+                "machineSetName": "worker",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 2,
+                  "total": 16,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "memory": {
+                  "requested": 4,
+                  "total": 64,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "services": [
+                  {
+                    "name": "app",
+                    "requiredCPU": 2,
+                    "requiredMemory": 4,
+                    "limitCPU": 0,
+                    "limitMemory": 0,
+                    "zones": 0
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "without-details",
+    "checks": [
+      "nodeCount",
+      "totals",
+      "consumption"
+    ],
+    "request": {
+      "platform": "BareMetal",
+      "detailed": false,
+      "machineSets": [
+        {
+          "name": "worker",
+          "cpu": 16,
+          "memory": 64,
+          "instanceName": "worker",
+          "numberOfDisks": 24,
+          "label": "worker"
+        }
+      ],
+      "workloads": [
+        {
+          "name": "workload",
+          "count": 1,
+          "allowedMachineSets": [
+            "worker"
+          ],
+          "services": [
+            {
+              "name": "app",
+              "requiredCPU": 2,
+              "requiredMemory": 4,
+              "zones": 0,
+              "runsWith": [],
+              "avoid": []
+            }
+          ]
+        }
+      ]
+    },
+    "response": {
+      "success": true,
+      "data": {
+        "nodeCount": 1,
+        "zones": 1,
+        "totalCPU": 16,
+        "totalMemory": 64,
+        "resourceConsumption": {
+          "cpu": 2,
+          "memory": 4
+        },
+        "advanced": [
+          {
+            "zone": "Zone 1",
+            "nodes": [
+              {
+                "name": "Node 1",
+                "machineSetName": "worker",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 2,
+                  "total": 16,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "memory": {
+                  "requested": 4,
+                  "total": 64,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "services": [
+                  {
+                    "name": "app",
+                    "requiredCPU": 2,
+                    "requiredMemory": 4,
+                    "limitCPU": 0,
+                    "limitMemory": 0,
+                    "zones": 0
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "static-limits",
+    "checks": [
+      "nodeCount",
+      "totals",
+      "consumption",
+      "nodes"
+    ],
+    "request": {
+      "platform": "BareMetal",
+      "detailed": true,
+      "machineSets": [
+        {
+          "name": "worker",
+          "cpu": 16,
+          "memory": 64,
+          "instanceName": "worker",
+          "numberOfDisks": 24,
+          "label": "worker"
+        }
+      ],
+      "workloads": [
+        {
+          "name": "workload",
+          "count": 1,
+          "allowedMachineSets": [
+            "worker"
+          ],
+          "services": [
+            {
+              "name": "app",
+              "requiredCPU": 2,
+              "requiredMemory": 4,
+              "zones": 0,
+              "runsWith": [],
+              "avoid": [],
+              "limitCPU": 4,
+              "limitMemory": 8
+            }
+          ]
+        }
+      ]
+    },
+    "response": {
+      "success": true,
+      "data": {
+        "nodeCount": 1,
+        "zones": 1,
+        "totalCPU": 16,
+        "totalMemory": 64,
+        "resourceConsumption": {
+          "cpu": 2,
+          "memory": 4,
+          "limits": {
+            "cpu": 4,
+            "memory": 8
+          },
+          "overCommitRatio": {
+            "cpu": 0.2517306482064191,
+            "memory": 0.1367053998632946
+          }
+        },
+        "advanced": [
+          {
+            "zone": "Zone 1",
+            "nodes": [
+              {
+                "name": "Node 1",
+                "machineSetName": "worker",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 2,
+                  "total": 16,
+                  "limits": 4,
+                  "overCommitRatio": 0.2517306482064191
+                },
+                "memory": {
+                  "requested": 4,
+                  "total": 64,
+                  "limits": 8,
+                  "overCommitRatio": 0.1367053998632946
+                },
+                "services": [
+                  {
+                    "name": "app",
+                    "requiredCPU": 2,
+                    "requiredMemory": 4,
+                    "limitCPU": 4,
+                    "limitMemory": 8,
+                    "zones": 0
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "one-sided-limits",
+    "checks": [
+      "nodeCount",
+      "totals",
+      "consumption",
+      "nodes"
+    ],
+    "request": {
+      "platform": "BareMetal",
+      "detailed": true,
+      "machineSets": [
+        {
+          "name": "worker",
+          "cpu": 16,
+          "memory": 64,
+          "instanceName": "worker",
+          "numberOfDisks": 24,
+          "label": "worker"
+        }
+      ],
+      "workloads": [
+        {
+          "name": "workload",
+          "count": 1,
+          "allowedMachineSets": [
+            "worker"
+          ],
+          "services": [
+            {
+              "name": "app",
+              "requiredCPU": 2,
+              "requiredMemory": 4,
+              "zones": 0,
+              "runsWith": [],
+              "avoid": [],
+              "limitCPU": 6
+            }
+          ]
+        }
+      ]
+    },
+    "response": {
+      "success": true,
+      "data": {
+        "nodeCount": 1,
+        "zones": 1,
+        "totalCPU": 16,
+        "totalMemory": 64,
+        "resourceConsumption": {
+          "cpu": 2,
+          "memory": 4,
+          "limits": {
+            "cpu": 6,
+            "memory": 4
+          },
+          "overCommitRatio": {
+            "cpu": 0.37759597230962866,
+            "memory": 0.0683526999316473
+          }
+        },
+        "advanced": [
+          {
+            "zone": "Zone 1",
+            "nodes": [
+              {
+                "name": "Node 1",
+                "machineSetName": "worker",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 2,
+                  "total": 16,
+                  "limits": 6,
+                  "overCommitRatio": 0.37759597230962866
+                },
+                "memory": {
+                  "requested": 4,
+                  "total": 64,
+                  "limits": 4,
+                  "overCommitRatio": 0.0683526999316473
+                },
+                "services": [
+                  {
+                    "name": "app",
+                    "requiredCPU": 2,
+                    "requiredMemory": 4,
+                    "limitCPU": 6,
+                    "limitMemory": 0,
+                    "zones": 0
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "two-services-one-node",
+    "checks": [
+      "nodeCount",
+      "totals",
+      "consumption",
+      "nodes"
+    ],
+    "request": {
+      "platform": "BareMetal",
+      "detailed": true,
+      "machineSets": [
+        {
+          "name": "worker",
+          "cpu": 16,
+          "memory": 64,
+          "instanceName": "worker",
+          "numberOfDisks": 24,
+          "label": "worker"
+        }
+      ],
+      "workloads": [
+        {
+          "name": "apps",
+          "count": 1,
+          "allowedMachineSets": [
+            "worker"
+          ],
+          "services": [
+            {
+              "name": "api",
+              "requiredCPU": 1,
+              "requiredMemory": 2,
+              "zones": 0,
+              "runsWith": [
+                "db"
+              ],
+              "avoid": []
+            },
+            {
+              "name": "db",
+              "requiredCPU": 2,
+              "requiredMemory": 4,
+              "zones": 0,
+              "runsWith": [],
+              "avoid": []
+            }
+          ]
+        }
+      ]
+    },
+    "response": {
+      "success": true,
+      "data": {
+        "nodeCount": 1,
+        "zones": 1,
+        "totalCPU": 16,
+        "totalMemory": 64,
+        "resourceConsumption": {
+          "cpu": 3,
+          "memory": 6
+        },
+        "advanced": [
+          {
+            "zone": "Zone 1",
+            "nodes": [
+              {
+                "name": "Node 1",
+                "machineSetName": "worker",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 3,
+                  "total": 16,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "memory": {
+                  "requested": 6,
+                  "total": 64,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "services": [
+                  {
+                    "name": "api",
+                    "requiredCPU": 1,
+                    "requiredMemory": 2,
+                    "limitCPU": 0,
+                    "limitMemory": 0,
+                    "zones": 0
+                  },
+                  {
+                    "name": "db",
+                    "requiredCPU": 2,
+                    "requiredMemory": 4,
+                    "limitCPU": 0,
+                    "limitMemory": 0,
+                    "zones": 0
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "count-3",
+    "checks": [
+      "nodeCount",
+      "totals",
+      "consumption"
+    ],
+    "request": {
+      "platform": "BareMetal",
+      "detailed": false,
+      "machineSets": [
+        {
+          "name": "large",
+          "cpu": 8,
+          "memory": 32,
+          "instanceName": "large",
+          "numberOfDisks": 24,
+          "label": "large"
+        }
+      ],
+      "workloads": [
+        {
+          "name": "workload",
+          "count": 3,
+          "allowedMachineSets": [
+            "large"
+          ],
+          "services": [
+            {
+              "name": "app",
+              "requiredCPU": 1,
+              "requiredMemory": 2,
+              "zones": 0,
+              "runsWith": [],
+              "avoid": []
+            }
+          ]
+        }
+      ]
+    },
+    "response": {
+      "success": true,
+      "data": {
+        "nodeCount": 3,
+        "zones": 3,
+        "totalCPU": 24,
+        "totalMemory": 96,
+        "resourceConsumption": {
+          "cpu": 3,
+          "memory": 6
+        },
+        "advanced": [
+          {
+            "zone": "Zone 1",
+            "nodes": [
+              {
+                "name": "Node 1",
+                "machineSetName": "large",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 1,
+                  "total": 8,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "memory": {
+                  "requested": 2,
+                  "total": 32,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "services": [
+                  {
+                    "name": "app",
+                    "requiredCPU": 1,
+                    "requiredMemory": 2,
+                    "limitCPU": 0,
+                    "limitMemory": 0,
+                    "zones": 3
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "zone": "Zone 2",
+            "nodes": [
+              {
+                "name": "Node 2",
+                "machineSetName": "large",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 1,
+                  "total": 8,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "memory": {
+                  "requested": 2,
+                  "total": 32,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "services": [
+                  {
+                    "name": "app",
+                    "requiredCPU": 1,
+                    "requiredMemory": 2,
+                    "limitCPU": 0,
+                    "limitMemory": 0,
+                    "zones": 3
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "zone": "Zone 3",
+            "nodes": [
+              {
+                "name": "Node 3",
+                "machineSetName": "large",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 1,
+                  "total": 8,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "memory": {
+                  "requested": 2,
+                  "total": 32,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "services": [
+                  {
+                    "name": "app",
+                    "requiredCPU": 1,
+                    "requiredMemory": 2,
+                    "limitCPU": 0,
+                    "limitMemory": 0,
+                    "zones": 3
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "runs-with-across-workloads",
+    "checks": [
+      "totals",
+      "consumption"
+    ],
+    "request": {
+      "platform": "BareMetal",
+      "detailed": false,
+      "machineSets": [
+        {
+          "name": "large",
+          "cpu": 8,
+          "memory": 32,
+          "instanceName": "large",
+          "numberOfDisks": 24,
+          "label": "large"
+        }
+      ],
+      "workloads": [
+        {
+          "name": "api",
+          "count": 1,
+          "allowedMachineSets": [
+            "large"
+          ],
+          "services": [
+            {
+              "name": "api",
+              "requiredCPU": 1,
+              "requiredMemory": 2,
+              "zones": 0,
+              "runsWith": [],
+              "avoid": []
+            }
+          ]
+        },
+        {
+          "name": "db",
+          "count": 1,
+          "allowedMachineSets": [
+            "large"
+          ],
+          "services": [
+            {
+              "name": "db",
+              "requiredCPU": 1,
+              "requiredMemory": 2,
+              "zones": 0,
+              "runsWith": [
+                "api"
+              ],
+              "avoid": []
+            }
+          ]
+        }
+      ]
+    },
+    "response": {
+      "success": true,
+      "data": {
+        "nodeCount": 1,
+        "zones": 1,
+        "totalCPU": 8,
+        "totalMemory": 32,
+        "resourceConsumption": {
+          "cpu": 2,
+          "memory": 4
+        },
+        "advanced": [
+          {
+            "zone": "Zone 1",
+            "nodes": [
+              {
+                "name": "Node 1",
+                "machineSetName": "large",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 2,
+                  "total": 8,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "memory": {
+                  "requested": 4,
+                  "total": 32,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "services": [
+                  {
+                    "name": "api",
+                    "requiredCPU": 1,
+                    "requiredMemory": 2,
+                    "limitCPU": 0,
+                    "limitMemory": 0,
+                    "zones": 0
+                  },
+                  {
+                    "name": "db",
+                    "requiredCPU": 1,
+                    "requiredMemory": 2,
+                    "limitCPU": 0,
+                    "limitMemory": 0,
+                    "zones": 0
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "avoid-splits-services",
+    "checks": [
+      "nodeCount",
+      "totals",
+      "consumption"
+    ],
+    "request": {
+      "platform": "BareMetal",
+      "detailed": false,
+      "machineSets": [
+        {
+          "name": "large",
+          "cpu": 8,
+          "memory": 32,
+          "instanceName": "large",
+          "numberOfDisks": 24,
+          "label": "large"
+        }
+      ],
+      "workloads": [
+        {
+          "name": "apps",
+          "count": 1,
+          "allowedMachineSets": [
+            "large"
+          ],
+          "services": [
+            {
+              "name": "api",
+              "requiredCPU": 1,
+              "requiredMemory": 2,
+              "zones": 0,
+              "runsWith": [],
+              "avoid": [
+                "db"
+              ]
+            },
+            {
+              "name": "db",
+              "requiredCPU": 1,
+              "requiredMemory": 2,
+              "zones": 0,
+              "runsWith": [],
+              "avoid": []
+            }
+          ]
+        }
+      ]
+    },
+    "response": {
+      "success": true,
+      "data": {
+        "nodeCount": 2,
+        "zones": 1,
+        "totalCPU": 16,
+        "totalMemory": 64,
+        "resourceConsumption": {
+          "cpu": 2,
+          "memory": 4
+        },
+        "advanced": [
+          {
+            "zone": "Zone 1",
+            "nodes": [
+              {
+                "name": "Node 1",
+                "machineSetName": "large",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 1,
+                  "total": 8,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "memory": {
+                  "requested": 2,
+                  "total": 32,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "services": [
+                  {
+                    "name": "api",
+                    "requiredCPU": 1,
+                    "requiredMemory": 2,
+                    "limitCPU": 0,
+                    "limitMemory": 0,
+                    "zones": 0
+                  }
+                ]
+              },
+              {
+                "name": "Node 2",
+                "machineSetName": "large",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 1,
+                  "total": 8,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "memory": {
+                  "requested": 2,
+                  "total": 32,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "services": [
+                  {
+                    "name": "db",
+                    "requiredCPU": 1,
+                    "requiredMemory": 2,
+                    "limitCPU": 0,
+                    "limitMemory": 0,
+                    "zones": 0
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "multi-machine-sets",
+    "checks": [
+      "nodeCount",
+      "totals",
+      "consumption",
+      "nodes"
+    ],
+    "request": {
+      "platform": "BareMetal",
+      "detailed": true,
+      "machineSets": [
+        {
+          "name": "small",
+          "cpu": 2,
+          "memory": 8,
+          "instanceName": "small",
+          "numberOfDisks": 24,
+          "label": "small"
+        },
+        {
+          "name": "large",
+          "cpu": 8,
+          "memory": 32,
+          "instanceName": "large",
+          "numberOfDisks": 24,
+          "label": "large"
+        }
+      ],
+      "workloads": [
+        {
+          "name": "workload",
+          "count": 1,
+          "allowedMachineSets": [
+            "small"
+          ],
+          "services": [
+            {
+              "name": "app",
+              "requiredCPU": 1,
+              "requiredMemory": 2,
+              "zones": 0,
+              "runsWith": [],
+              "avoid": []
+            }
+          ]
+        }
+      ]
+    },
+    "response": {
+      "success": true,
+      "data": {
+        "nodeCount": 1,
+        "zones": 1,
+        "totalCPU": 2,
+        "totalMemory": 8,
+        "resourceConsumption": {
+          "cpu": 1,
+          "memory": 2
+        },
+        "advanced": [
+          {
+            "zone": "Zone 1",
+            "nodes": [
+              {
+                "name": "Node 1",
+                "machineSetName": "small",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 1,
+                  "total": 2,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "memory": {
+                  "requested": 2,
+                  "total": 8,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "services": [
+                  {
+                    "name": "app",
+                    "requiredCPU": 1,
+                    "requiredMemory": 2,
+                    "limitCPU": 0,
+                    "limitMemory": 0,
+                    "zones": 0
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "control-plane-allowed",
+    "checks": [
+      "nodeCount",
+      "totals",
+      "consumption",
+      "nodes"
+    ],
+    "request": {
+      "platform": "BareMetal",
+      "detailed": true,
+      "machineSets": [
+        {
+          "name": "large",
+          "cpu": 8,
+          "memory": 32,
+          "instanceName": "large",
+          "numberOfDisks": 24,
+          "label": "large"
+        },
+        {
+          "name": "controlPlane",
+          "isControlPlane": true,
+          "cpu": 8,
+          "memory": 32,
+          "instanceName": "controlPlane",
+          "numberOfDisks": 24,
+          "label": "controlPlane",
+          "allowWorkloadScheduling": true
+        }
+      ],
+      "workloads": [
+        {
+          "name": "workload",
+          "count": 1,
+          "allowedMachineSets": [
+            "controlPlane"
+          ],
+          "services": [
+            {
+              "name": "app",
+              "requiredCPU": 1,
+              "requiredMemory": 2,
+              "zones": 0,
+              "runsWith": [],
+              "avoid": []
+            }
+          ]
+        }
+      ]
+    },
+    "response": {
+      "success": true,
+      "data": {
+        "nodeCount": 1,
+        "zones": 1,
+        "totalCPU": 8,
+        "totalMemory": 32,
+        "resourceConsumption": {
+          "cpu": 1,
+          "memory": 2
+        },
+        "advanced": [
+          {
+            "zone": "Zone 1",
+            "nodes": [
+              {
+                "name": "Node 1",
+                "machineSetName": "controlPlane",
+                "isControlPlane": true,
+                "cpu": {
+                  "requested": 1,
+                  "total": 8,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "memory": {
+                  "requested": 2,
+                  "total": 32,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "services": [
+                  {
+                    "name": "app",
+                    "requiredCPU": 1,
+                    "requiredMemory": 2,
+                    "limitCPU": 0,
+                    "limitMemory": 0,
+                    "zones": 0
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "control-plane-denied",
+    "checks": [],
+    "request": {
+      "platform": "BareMetal",
+      "detailed": false,
+      "machineSets": [
+        {
+          "name": "large",
+          "cpu": 8,
+          "memory": 32,
+          "instanceName": "large",
+          "numberOfDisks": 24,
+          "label": "large"
+        },
+        {
+          "name": "controlPlane",
+          "isControlPlane": true,
+          "cpu": 8,
+          "memory": 32,
+          "instanceName": "controlPlane",
+          "numberOfDisks": 24,
+          "label": "controlPlane",
+          "allowWorkloadScheduling": false
+        }
+      ],
+      "workloads": [
+        {
+          "name": "workload",
+          "count": 1,
+          "allowedMachineSets": [
+            "controlPlane"
+          ],
+          "services": [
+            {
+              "name": "app",
+              "requiredCPU": 1,
+              "requiredMemory": 2,
+              "zones": 0,
+              "runsWith": [],
+              "avoid": []
+            }
+          ]
+        }
+      ]
+    },
+    "note": "The original places on a controlPlane machine set even when allowWorkloadScheduling is false, as long as the workload names it; the Go port rejects that placement.",
+    "response": {
+      "success": true,
+      "data": {
+        "nodeCount": 1,
+        "zones": 1,
+        "totalCPU": 8,
+        "totalMemory": 32,
+        "resourceConsumption": {
+          "cpu": 1,
+          "memory": 2
+        },
+        "advanced": [
+          {
+            "zone": "Zone 1",
+            "nodes": [
+              {
+                "name": "Node 1",
+                "machineSetName": "controlPlane",
+                "isControlPlane": true,
+                "cpu": {
+                  "requested": 1,
+                  "total": 8,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "memory": {
+                  "requested": 2,
+                  "total": 32,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "services": [
+                  {
+                    "name": "app",
+                    "requiredCPU": 1,
+                    "requiredMemory": 2,
+                    "limitCPU": 0,
+                    "limitMemory": 0,
+                    "zones": 0
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "no-fitting-machine-set",
+    "checks": [
+      "error"
+    ],
+    "request": {
+      "platform": "BareMetal",
+      "detailed": false,
+      "machineSets": [
+        {
+          "name": "large",
+          "cpu": 8,
+          "memory": 32,
+          "instanceName": "large",
+          "numberOfDisks": 24,
+          "label": "large"
+        }
+      ],
+      "workloads": [
+        {
+          "name": "workload",
+          "count": 1,
+          "allowedMachineSets": [
+            "large"
+          ],
+          "services": [
+            {
+              "name": "app",
+              "requiredCPU": 100,
+              "requiredMemory": 500,
+              "zones": 0,
+              "runsWith": [],
+              "avoid": []
+            }
+          ]
+        }
+      ]
+    },
+    "response": {
+      "success": false,
+      "error": "Workload \"workload\" is not schedulable. All available MachineSets are too small to run this workload. Minimum required: at least 102 CPU and 504 GB memory."
+    }
+  },
+  {
+    "name": "pack-unrelated-workloads",
+    "checks": [
+      "nodeCount",
+      "totals",
+      "consumption",
+      "nodes"
+    ],
+    "request": {
+      "platform": "BareMetal",
+      "detailed": true,
+      "machineSets": [
+        {
+          "name": "large",
+          "cpu": 8,
+          "memory": 32,
+          "instanceName": "large",
+          "numberOfDisks": 24,
+          "label": "large"
+        }
+      ],
+      "workloads": [
+        {
+          "name": "api",
+          "count": 1,
+          "allowedMachineSets": [
+            "large"
+          ],
+          "services": [
+            {
+              "name": "api",
+              "requiredCPU": 1,
+              "requiredMemory": 2,
+              "zones": 0,
+              "runsWith": [],
+              "avoid": []
+            }
+          ]
+        },
+        {
+          "name": "db",
+          "count": 1,
+          "allowedMachineSets": [
+            "large"
+          ],
+          "services": [
+            {
+              "name": "db",
+              "requiredCPU": 1,
+              "requiredMemory": 2,
+              "zones": 0,
+              "runsWith": [],
+              "avoid": []
+            }
+          ]
+        }
+      ]
+    },
+    "response": {
+      "success": true,
+      "data": {
+        "nodeCount": 1,
+        "zones": 1,
+        "totalCPU": 8,
+        "totalMemory": 32,
+        "resourceConsumption": {
+          "cpu": 2,
+          "memory": 4
+        },
+        "advanced": [
+          {
+            "zone": "Zone 1",
+            "nodes": [
+              {
+                "name": "Node 1",
+                "machineSetName": "large",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 2,
+                  "total": 8,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "memory": {
+                  "requested": 4,
+                  "total": 32,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "services": [
+                  {
+                    "name": "api",
+                    "requiredCPU": 1,
+                    "requiredMemory": 2,
+                    "limitCPU": 0,
+                    "limitMemory": 0,
+                    "zones": 0
+                  },
+                  {
+                    "name": "db",
+                    "requiredCPU": 1,
+                    "requiredMemory": 2,
+                    "limitCPU": 0,
+                    "limitMemory": 0,
+                    "zones": 0
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "fits-by-memory",
+    "checks": [],
+    "request": {
+      "platform": "BareMetal",
+      "detailed": true,
+      "machineSets": [
+        {
+          "name": "small",
+          "cpu": 2,
+          "memory": 8,
+          "instanceName": "small",
+          "numberOfDisks": 24,
+          "label": "small"
+        },
+        {
+          "name": "large",
+          "cpu": 8,
+          "memory": 32,
+          "instanceName": "large",
+          "numberOfDisks": 24,
+          "label": "large"
+        }
+      ],
+      "workloads": [
+        {
+          "name": "workload",
+          "count": 1,
+          "allowedMachineSets": [
+            "small",
+            "large"
+          ],
+          "services": [
+            {
+              "name": "app",
+              "requiredCPU": 1,
+              "requiredMemory": 20,
+              "zones": 0,
+              "runsWith": [],
+              "avoid": []
+            }
+          ]
+        }
+      ]
+    },
+    "note": "The original creates the first machine set named in usesMachines without rechecking fit, placing a 20 GB service on an 8 GB node; the Go port picks a machine set that fits.",
+    "response": {
+      "success": true,
+      "data": {
+        "nodeCount": 1,
+        "zones": 1,
+        "totalCPU": 2,
+        "totalMemory": 8,
+        "resourceConsumption": {
+          "cpu": 1,
+          "memory": 20
+        },
+        "advanced": [
+          {
+            "zone": "Zone 1",
+            "nodes": [
+              {
+                "name": "Node 1",
+                "machineSetName": "small",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 1,
+                  "total": 2,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "memory": {
+                  "requested": 20,
+                  "total": 8,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "services": [
+                  {
+                    "name": "app",
+                    "requiredCPU": 1,
+                    "requiredMemory": 20,
+                    "limitCPU": 0,
+                    "limitMemory": 0,
+                    "zones": 0
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "two-machine-sets-used",
+    "checks": [
+      "nodeCount",
+      "totals",
+      "consumption",
+      "nodes"
+    ],
+    "request": {
+      "platform": "BareMetal",
+      "detailed": true,
+      "machineSets": [
+        {
+          "name": "worker",
+          "cpu": 16,
+          "memory": 64,
+          "instanceName": "worker",
+          "numberOfDisks": 24,
+          "label": "worker"
+        },
+        {
+          "name": "large",
+          "cpu": 8,
+          "memory": 32,
+          "instanceName": "large",
+          "numberOfDisks": 24,
+          "label": "large"
+        }
+      ],
+      "workloads": [
+        {
+          "name": "api",
+          "count": 1,
+          "allowedMachineSets": [
+            "worker"
+          ],
+          "services": [
+            {
+              "name": "api",
+              "requiredCPU": 1,
+              "requiredMemory": 2,
+              "zones": 0,
+              "runsWith": [],
+              "avoid": []
+            }
+          ]
+        },
+        {
+          "name": "db",
+          "count": 1,
+          "allowedMachineSets": [
+            "large"
+          ],
+          "services": [
+            {
+              "name": "db",
+              "requiredCPU": 1,
+              "requiredMemory": 2,
+              "zones": 0,
+              "runsWith": [],
+              "avoid": []
+            }
+          ]
+        }
+      ]
+    },
+    "response": {
+      "success": true,
+      "data": {
+        "nodeCount": 2,
+        "zones": 1,
+        "totalCPU": 24,
+        "totalMemory": 96,
+        "resourceConsumption": {
+          "cpu": 2,
+          "memory": 4
+        },
+        "advanced": [
+          {
+            "zone": "Zone 1",
+            "nodes": [
+              {
+                "name": "Node 1",
+                "machineSetName": "worker",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 1,
+                  "total": 16,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "memory": {
+                  "requested": 2,
+                  "total": 64,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "services": [
+                  {
+                    "name": "api",
+                    "requiredCPU": 1,
+                    "requiredMemory": 2,
+                    "limitCPU": 0,
+                    "limitMemory": 0,
+                    "zones": 0
+                  }
+                ]
+              },
+              {
+                "name": "Node 2",
+                "machineSetName": "large",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 1,
+                  "total": 8,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "memory": {
+                  "requested": 2,
+                  "total": 32,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "services": [
+                  {
+                    "name": "db",
+                    "requiredCPU": 1,
+                    "requiredMemory": 2,
+                    "limitCPU": 0,
+                    "limitMemory": 0,
+                    "zones": 0
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "limit-below-request",
+    "checks": [
+      "nodeCount",
+      "totals",
+      "consumption",
+      "nodes"
+    ],
+    "request": {
+      "platform": "BareMetal",
+      "detailed": true,
+      "machineSets": [
+        {
+          "name": "worker",
+          "cpu": 16,
+          "memory": 64,
+          "instanceName": "worker",
+          "numberOfDisks": 24,
+          "label": "worker"
+        }
+      ],
+      "workloads": [
+        {
+          "name": "workload",
+          "count": 1,
+          "allowedMachineSets": [
+            "worker"
+          ],
+          "services": [
+            {
+              "name": "app",
+              "requiredCPU": 2,
+              "requiredMemory": 4,
+              "zones": 0,
+              "runsWith": [],
+              "avoid": [],
+              "limitCPU": 0.5,
+              "limitMemory": 1
+            }
+          ]
+        }
+      ]
+    },
+    "response": {
+      "success": true,
+      "data": {
+        "nodeCount": 1,
+        "zones": 1,
+        "totalCPU": 16,
+        "totalMemory": 64,
+        "resourceConsumption": {
+          "cpu": 2,
+          "memory": 4,
+          "limits": {
+            "cpu": 0.5,
+            "memory": 1
+          },
+          "overCommitRatio": {
+            "cpu": 0.03146633102580239,
+            "memory": 0.017088174982911826
+          }
+        },
+        "advanced": [
+          {
+            "zone": "Zone 1",
+            "nodes": [
+              {
+                "name": "Node 1",
+                "machineSetName": "worker",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 2,
+                  "total": 16,
+                  "limits": 0.5,
+                  "overCommitRatio": 0.03146633102580239
+                },
+                "memory": {
+                  "requested": 4,
+                  "total": 64,
+                  "limits": 1,
+                  "overCommitRatio": 0.017088174982911826
+                },
+                "services": [
+                  {
+                    "name": "app",
+                    "requiredCPU": 2,
+                    "requiredMemory": 4,
+                    "limitCPU": 0.5,
+                    "limitMemory": 1,
+                    "zones": 0
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "control-plane-reserved",
+    "checks": [
+      "nodeCount",
+      "totals",
+      "consumption",
+      "nodes"
+    ],
+    "request": {
+      "platform": "BareMetal",
+      "detailed": true,
+      "machineSets": [
+        {
+          "name": "controlPlane",
+          "isControlPlane": true,
+          "cpu": 8,
+          "memory": 32,
+          "instanceName": "controlPlane",
+          "numberOfDisks": 24,
+          "label": "controlPlane",
+          "allowWorkloadScheduling": true,
+          "controlPlaneReservedResources": {
+            "cpu": 0.5,
+            "memory": 2.25
+          }
+        }
+      ],
+      "workloads": [
+        {
+          "name": "workload",
+          "count": 1,
+          "allowedMachineSets": [
+            "controlPlane"
+          ],
+          "services": [
+            {
+              "name": "app",
+              "requiredCPU": 1,
+              "requiredMemory": 2,
+              "zones": 0,
+              "runsWith": [],
+              "avoid": []
+            }
+          ]
+        }
+      ]
+    },
+    "response": {
+      "success": true,
+      "data": {
+        "nodeCount": 1,
+        "zones": 1,
+        "totalCPU": 8,
+        "totalMemory": 32,
+        "resourceConsumption": {
+          "cpu": 1,
+          "memory": 2
+        },
+        "advanced": [
+          {
+            "zone": "Zone 1",
+            "nodes": [
+              {
+                "name": "Node 1",
+                "machineSetName": "controlPlane",
+                "isControlPlane": true,
+                "cpu": {
+                  "requested": 1,
+                  "total": 8,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "memory": {
+                  "requested": 2,
+                  "total": 32,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "services": [
+                  {
+                    "name": "app",
+                    "requiredCPU": 1,
+                    "requiredMemory": 2,
+                    "limitCPU": 0,
+                    "limitMemory": 0,
+                    "zones": 0
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "kubelet-memory-1",
+    "checks": [
+      "nodeCount",
+      "totals",
+      "consumption",
+      "nodes"
+    ],
+    "request": {
+      "platform": "BareMetal",
+      "detailed": true,
+      "machineSets": [
+        {
+          "name": "worker",
+          "cpu": 16,
+          "memory": 1,
+          "instanceName": "worker",
+          "numberOfDisks": 24,
+          "label": "worker"
+        }
+      ],
+      "workloads": [
+        {
+          "name": "workload",
+          "count": 1,
+          "allowedMachineSets": [
+            "worker"
+          ],
+          "services": [
+            {
+              "name": "app",
+              "requiredCPU": 1,
+              "requiredMemory": 1,
+              "zones": 0,
+              "runsWith": [],
+              "avoid": [],
+              "limitCPU": 2,
+              "limitMemory": 2
+            }
+          ]
+        }
+      ]
+    },
+    "response": {
+      "success": true,
+      "data": {
+        "nodeCount": 1,
+        "zones": 1,
+        "totalCPU": 16,
+        "totalMemory": 1,
+        "resourceConsumption": {
+          "cpu": 1,
+          "memory": 1,
+          "limits": {
+            "cpu": 2,
+            "memory": 2
+          },
+          "overCommitRatio": {
+            "cpu": 0.12586532410320955,
+            "memory": 2
+          }
+        },
+        "advanced": [
+          {
+            "zone": "Zone 1",
+            "nodes": [
+              {
+                "name": "Node 1",
+                "machineSetName": "worker",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 1,
+                  "total": 16,
+                  "limits": 2,
+                  "overCommitRatio": 0.12586532410320955
+                },
+                "memory": {
+                  "requested": 1,
+                  "total": 1,
+                  "limits": 2,
+                  "overCommitRatio": 2
+                },
+                "services": [
+                  {
+                    "name": "app",
+                    "requiredCPU": 1,
+                    "requiredMemory": 1,
+                    "limitCPU": 2,
+                    "limitMemory": 2,
+                    "zones": 0
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "kubelet-memory-4",
+    "checks": [
+      "nodeCount",
+      "totals",
+      "consumption",
+      "nodes"
+    ],
+    "request": {
+      "platform": "BareMetal",
+      "detailed": true,
+      "machineSets": [
+        {
+          "name": "worker",
+          "cpu": 16,
+          "memory": 4,
+          "instanceName": "worker",
+          "numberOfDisks": 24,
+          "label": "worker"
+        }
+      ],
+      "workloads": [
+        {
+          "name": "workload",
+          "count": 1,
+          "allowedMachineSets": [
+            "worker"
+          ],
+          "services": [
+            {
+              "name": "app",
+              "requiredCPU": 1,
+              "requiredMemory": 1,
+              "zones": 0,
+              "runsWith": [],
+              "avoid": [],
+              "limitCPU": 2,
+              "limitMemory": 2
+            }
+          ]
+        }
+      ]
+    },
+    "response": {
+      "success": true,
+      "data": {
+        "nodeCount": 1,
+        "zones": 1,
+        "totalCPU": 16,
+        "totalMemory": 4,
+        "resourceConsumption": {
+          "cpu": 1,
+          "memory": 1,
+          "limits": {
+            "cpu": 2,
+            "memory": 2
+          },
+          "overCommitRatio": {
+            "cpu": 0.12586532410320955,
+            "memory": 0.6153846153846154
+          }
+        },
+        "advanced": [
+          {
+            "zone": "Zone 1",
+            "nodes": [
+              {
+                "name": "Node 1",
+                "machineSetName": "worker",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 1,
+                  "total": 16,
+                  "limits": 2,
+                  "overCommitRatio": 0.12586532410320955
+                },
+                "memory": {
+                  "requested": 1,
+                  "total": 4,
+                  "limits": 2,
+                  "overCommitRatio": 0.6153846153846154
+                },
+                "services": [
+                  {
+                    "name": "app",
+                    "requiredCPU": 1,
+                    "requiredMemory": 1,
+                    "limitCPU": 2,
+                    "limitMemory": 2,
+                    "zones": 0
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "kubelet-memory-8",
+    "checks": [
+      "nodeCount",
+      "totals",
+      "consumption",
+      "nodes"
+    ],
+    "request": {
+      "platform": "BareMetal",
+      "detailed": true,
+      "machineSets": [
+        {
+          "name": "worker",
+          "cpu": 16,
+          "memory": 8,
+          "instanceName": "worker",
+          "numberOfDisks": 24,
+          "label": "worker"
+        }
+      ],
+      "workloads": [
+        {
+          "name": "workload",
+          "count": 1,
+          "allowedMachineSets": [
+            "worker"
+          ],
+          "services": [
+            {
+              "name": "app",
+              "requiredCPU": 1,
+              "requiredMemory": 1,
+              "zones": 0,
+              "runsWith": [],
+              "avoid": [],
+              "limitCPU": 2,
+              "limitMemory": 2
+            }
+          ]
+        }
+      ]
+    },
+    "response": {
+      "success": true,
+      "data": {
+        "nodeCount": 1,
+        "zones": 1,
+        "totalCPU": 16,
+        "totalMemory": 8,
+        "resourceConsumption": {
+          "cpu": 1,
+          "memory": 1,
+          "limits": {
+            "cpu": 2,
+            "memory": 2
+          },
+          "overCommitRatio": {
+            "cpu": 0.12586532410320955,
+            "memory": 0.3225806451612903
+          }
+        },
+        "advanced": [
+          {
+            "zone": "Zone 1",
+            "nodes": [
+              {
+                "name": "Node 1",
+                "machineSetName": "worker",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 1,
+                  "total": 16,
+                  "limits": 2,
+                  "overCommitRatio": 0.12586532410320955
+                },
+                "memory": {
+                  "requested": 1,
+                  "total": 8,
+                  "limits": 2,
+                  "overCommitRatio": 0.3225806451612903
+                },
+                "services": [
+                  {
+                    "name": "app",
+                    "requiredCPU": 1,
+                    "requiredMemory": 1,
+                    "limitCPU": 2,
+                    "limitMemory": 2,
+                    "zones": 0
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "kubelet-memory-16",
+    "checks": [
+      "nodeCount",
+      "totals",
+      "consumption",
+      "nodes"
+    ],
+    "request": {
+      "platform": "BareMetal",
+      "detailed": true,
+      "machineSets": [
+        {
+          "name": "worker",
+          "cpu": 16,
+          "memory": 16,
+          "instanceName": "worker",
+          "numberOfDisks": 24,
+          "label": "worker"
+        }
+      ],
+      "workloads": [
+        {
+          "name": "workload",
+          "count": 1,
+          "allowedMachineSets": [
+            "worker"
+          ],
+          "services": [
+            {
+              "name": "app",
+              "requiredCPU": 1,
+              "requiredMemory": 1,
+              "zones": 0,
+              "runsWith": [],
+              "avoid": [],
+              "limitCPU": 2,
+              "limitMemory": 2
+            }
+          ]
+        }
+      ]
+    },
+    "response": {
+      "success": true,
+      "data": {
+        "nodeCount": 1,
+        "zones": 1,
+        "totalCPU": 16,
+        "totalMemory": 16,
+        "resourceConsumption": {
+          "cpu": 1,
+          "memory": 1,
+          "limits": {
+            "cpu": 2,
+            "memory": 2
+          },
+          "overCommitRatio": {
+            "cpu": 0.12586532410320955,
+            "memory": 0.14925373134328357
+          }
+        },
+        "advanced": [
+          {
+            "zone": "Zone 1",
+            "nodes": [
+              {
+                "name": "Node 1",
+                "machineSetName": "worker",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 1,
+                  "total": 16,
+                  "limits": 2,
+                  "overCommitRatio": 0.12586532410320955
+                },
+                "memory": {
+                  "requested": 1,
+                  "total": 16,
+                  "limits": 2,
+                  "overCommitRatio": 0.14925373134328357
+                },
+                "services": [
+                  {
+                    "name": "app",
+                    "requiredCPU": 1,
+                    "requiredMemory": 1,
+                    "limitCPU": 2,
+                    "limitMemory": 2,
+                    "zones": 0
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "kubelet-memory-128",
+    "checks": [
+      "nodeCount",
+      "totals",
+      "consumption",
+      "nodes"
+    ],
+    "request": {
+      "platform": "BareMetal",
+      "detailed": true,
+      "machineSets": [
+        {
+          "name": "worker",
+          "cpu": 16,
+          "memory": 128,
+          "instanceName": "worker",
+          "numberOfDisks": 24,
+          "label": "worker"
+        }
+      ],
+      "workloads": [
+        {
+          "name": "workload",
+          "count": 1,
+          "allowedMachineSets": [
+            "worker"
+          ],
+          "services": [
+            {
+              "name": "app",
+              "requiredCPU": 1,
+              "requiredMemory": 1,
+              "zones": 0,
+              "runsWith": [],
+              "avoid": [],
+              "limitCPU": 2,
+              "limitMemory": 2
+            }
+          ]
+        }
+      ]
+    },
+    "response": {
+      "success": true,
+      "data": {
+        "nodeCount": 1,
+        "zones": 1,
+        "totalCPU": 16,
+        "totalMemory": 128,
+        "resourceConsumption": {
+          "cpu": 1,
+          "memory": 1,
+          "limits": {
+            "cpu": 2,
+            "memory": 2
+          },
+          "overCommitRatio": {
+            "cpu": 0.12586532410320955,
+            "memory": 0.016852039096730703
+          }
+        },
+        "advanced": [
+          {
+            "zone": "Zone 1",
+            "nodes": [
+              {
+                "name": "Node 1",
+                "machineSetName": "worker",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 1,
+                  "total": 16,
+                  "limits": 2,
+                  "overCommitRatio": 0.12586532410320955
+                },
+                "memory": {
+                  "requested": 1,
+                  "total": 128,
+                  "limits": 2,
+                  "overCommitRatio": 0.016852039096730703
+                },
+                "services": [
+                  {
+                    "name": "app",
+                    "requiredCPU": 1,
+                    "requiredMemory": 1,
+                    "limitCPU": 2,
+                    "limitMemory": 2,
+                    "zones": 0
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "kubelet-memory-256",
+    "checks": [
+      "nodeCount",
+      "totals",
+      "consumption",
+      "nodes"
+    ],
+    "request": {
+      "platform": "BareMetal",
+      "detailed": true,
+      "machineSets": [
+        {
+          "name": "worker",
+          "cpu": 16,
+          "memory": 256,
+          "instanceName": "worker",
+          "numberOfDisks": 24,
+          "label": "worker"
+        }
+      ],
+      "workloads": [
+        {
+          "name": "workload",
+          "count": 1,
+          "allowedMachineSets": [
+            "worker"
+          ],
+          "services": [
+            {
+              "name": "app",
+              "requiredCPU": 1,
+              "requiredMemory": 1,
+              "zones": 0,
+              "runsWith": [],
+              "avoid": [],
+              "limitCPU": 2,
+              "limitMemory": 2
+            }
+          ]
+        }
+      ]
+    },
+    "response": {
+      "success": true,
+      "data": {
+        "nodeCount": 1,
+        "zones": 1,
+        "totalCPU": 16,
+        "totalMemory": 256,
+        "resourceConsumption": {
+          "cpu": 1,
+          "memory": 1,
+          "limits": {
+            "cpu": 2,
+            "memory": 2
+          },
+          "overCommitRatio": {
+            "cpu": 0.12586532410320955,
+            "memory": 0.008192692118630182
+          }
+        },
+        "advanced": [
+          {
+            "zone": "Zone 1",
+            "nodes": [
+              {
+                "name": "Node 1",
+                "machineSetName": "worker",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 1,
+                  "total": 16,
+                  "limits": 2,
+                  "overCommitRatio": 0.12586532410320955
+                },
+                "memory": {
+                  "requested": 1,
+                  "total": 256,
+                  "limits": 2,
+                  "overCommitRatio": 0.008192692118630182
+                },
+                "services": [
+                  {
+                    "name": "app",
+                    "requiredCPU": 1,
+                    "requiredMemory": 1,
+                    "limitCPU": 2,
+                    "limitMemory": 2,
+                    "zones": 0
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "service-zones-ignored",
+    "checks": [],
+    "request": {
+      "platform": "BareMetal",
+      "detailed": false,
+      "machineSets": [
+        {
+          "name": "large",
+          "cpu": 8,
+          "memory": 32,
+          "instanceName": "large",
+          "numberOfDisks": 24,
+          "label": "large"
+        }
+      ],
+      "workloads": [
+        {
+          "name": "workload",
+          "count": 1,
+          "allowedMachineSets": [
+            "large"
+          ],
+          "services": [
+            {
+              "name": "app",
+              "requiredCPU": 1,
+              "requiredMemory": 2,
+              "zones": 3,
+              "runsWith": [],
+              "avoid": []
+            }
+          ]
+        }
+      ]
+    },
+    "note": "The original spreads Service.Zones replicas over separate zones; the Go port ignores Service.Zones and reports a single zone.",
+    "response": {
+      "success": true,
+      "data": {
+        "nodeCount": 3,
+        "zones": 3,
+        "totalCPU": 24,
+        "totalMemory": 96,
+        "resourceConsumption": {
+          "cpu": 3,
+          "memory": 6
+        },
+        "advanced": [
+          {
+            "zone": "Zone 1",
+            "nodes": [
+              {
+                "name": "Node 1",
+                "machineSetName": "large",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 1,
+                  "total": 8,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "memory": {
+                  "requested": 2,
+                  "total": 32,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "services": [
+                  {
+                    "name": "app",
+                    "requiredCPU": 1,
+                    "requiredMemory": 2,
+                    "limitCPU": 0,
+                    "limitMemory": 0,
+                    "zones": 3
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "zone": "Zone 2",
+            "nodes": [
+              {
+                "name": "Node 2",
+                "machineSetName": "large",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 1,
+                  "total": 8,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "memory": {
+                  "requested": 2,
+                  "total": 32,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "services": [
+                  {
+                    "name": "app",
+                    "requiredCPU": 1,
+                    "requiredMemory": 2,
+                    "limitCPU": 0,
+                    "limitMemory": 0,
+                    "zones": 3
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "zone": "Zone 3",
+            "nodes": [
+              {
+                "name": "Node 3",
+                "machineSetName": "large",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 1,
+                  "total": 8,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "memory": {
+                  "requested": 2,
+                  "total": 32,
+                  "limits": 0,
+                  "overCommitRatio": 0
+                },
+                "services": [
+                  {
+                    "name": "app",
+                    "requiredCPU": 1,
+                    "requiredMemory": 2,
+                    "limitCPU": 0,
+                    "limitMemory": 0,
+                    "zones": 3
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "kubelet-cpu-1",
+    "checks": [
+      "nodeCount",
+      "totals",
+      "consumption",
+      "nodes"
+    ],
+    "request": {
+      "platform": "BareMetal",
+      "detailed": true,
+      "machineSets": [
+        {
+          "name": "worker",
+          "cpu": 1,
+          "memory": 64,
+          "instanceName": "worker",
+          "numberOfDisks": 24,
+          "label": "worker"
+        }
+      ],
+      "workloads": [
+        {
+          "name": "workload",
+          "count": 1,
+          "allowedMachineSets": [
+            "worker"
+          ],
+          "services": [
+            {
+              "name": "app",
+              "requiredCPU": 0.5,
+              "requiredMemory": 1,
+              "zones": 0,
+              "runsWith": [],
+              "avoid": [],
+              "limitCPU": 1,
+              "limitMemory": 2
+            }
+          ]
+        }
+      ]
+    },
+    "response": {
+      "success": true,
+      "data": {
+        "nodeCount": 1,
+        "zones": 1,
+        "totalCPU": 1,
+        "totalMemory": 64,
+        "resourceConsumption": {
+          "cpu": 0.5,
+          "memory": 1,
+          "limits": {
+            "cpu": 1,
+            "memory": 2
+          },
+          "overCommitRatio": {
+            "cpu": 1.0638297872340425,
+            "memory": 0.03417634996582365
+          }
+        },
+        "advanced": [
+          {
+            "zone": "Zone 1",
+            "nodes": [
+              {
+                "name": "Node 1",
+                "machineSetName": "worker",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 0.5,
+                  "total": 1,
+                  "limits": 1,
+                  "overCommitRatio": 1.0638297872340425
+                },
+                "memory": {
+                  "requested": 1,
+                  "total": 64,
+                  "limits": 2,
+                  "overCommitRatio": 0.03417634996582365
+                },
+                "services": [
+                  {
+                    "name": "app",
+                    "requiredCPU": 0.5,
+                    "requiredMemory": 1,
+                    "limitCPU": 1,
+                    "limitMemory": 2,
+                    "zones": 0
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "kubelet-cpu-2",
+    "checks": [
+      "nodeCount",
+      "totals",
+      "consumption",
+      "nodes"
+    ],
+    "request": {
+      "platform": "BareMetal",
+      "detailed": true,
+      "machineSets": [
+        {
+          "name": "worker",
+          "cpu": 2,
+          "memory": 64,
+          "instanceName": "worker",
+          "numberOfDisks": 24,
+          "label": "worker"
+        }
+      ],
+      "workloads": [
+        {
+          "name": "workload",
+          "count": 1,
+          "allowedMachineSets": [
+            "worker"
+          ],
+          "services": [
+            {
+              "name": "app",
+              "requiredCPU": 0.5,
+              "requiredMemory": 1,
+              "zones": 0,
+              "runsWith": [],
+              "avoid": [],
+              "limitCPU": 1,
+              "limitMemory": 2
+            }
+          ]
+        }
+      ]
+    },
+    "response": {
+      "success": true,
+      "data": {
+        "nodeCount": 1,
+        "zones": 1,
+        "totalCPU": 2,
+        "totalMemory": 64,
+        "resourceConsumption": {
+          "cpu": 0.5,
+          "memory": 1,
+          "limits": {
+            "cpu": 1,
+            "memory": 2
+          },
+          "overCommitRatio": {
+            "cpu": 0.5181347150259068,
+            "memory": 0.03417634996582365
+          }
+        },
+        "advanced": [
+          {
+            "zone": "Zone 1",
+            "nodes": [
+              {
+                "name": "Node 1",
+                "machineSetName": "worker",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 0.5,
+                  "total": 2,
+                  "limits": 1,
+                  "overCommitRatio": 0.5181347150259068
+                },
+                "memory": {
+                  "requested": 1,
+                  "total": 64,
+                  "limits": 2,
+                  "overCommitRatio": 0.03417634996582365
+                },
+                "services": [
+                  {
+                    "name": "app",
+                    "requiredCPU": 0.5,
+                    "requiredMemory": 1,
+                    "limitCPU": 1,
+                    "limitMemory": 2,
+                    "zones": 0
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "kubelet-cpu-4",
+    "checks": [
+      "nodeCount",
+      "totals",
+      "consumption",
+      "nodes"
+    ],
+    "request": {
+      "platform": "BareMetal",
+      "detailed": true,
+      "machineSets": [
+        {
+          "name": "worker",
+          "cpu": 4,
+          "memory": 64,
+          "instanceName": "worker",
+          "numberOfDisks": 24,
+          "label": "worker"
+        }
+      ],
+      "workloads": [
+        {
+          "name": "workload",
+          "count": 1,
+          "allowedMachineSets": [
+            "worker"
+          ],
+          "services": [
+            {
+              "name": "app",
+              "requiredCPU": 0.5,
+              "requiredMemory": 1,
+              "zones": 0,
+              "runsWith": [],
+              "avoid": [],
+              "limitCPU": 1,
+              "limitMemory": 2
+            }
+          ]
+        }
+      ]
+    },
+    "response": {
+      "success": true,
+      "data": {
+        "nodeCount": 1,
+        "zones": 1,
+        "totalCPU": 4,
+        "totalMemory": 64,
+        "resourceConsumption": {
+          "cpu": 0.5,
+          "memory": 1,
+          "limits": {
+            "cpu": 1,
+            "memory": 2
+          },
+          "overCommitRatio": {
+            "cpu": 0.25510204081632654,
+            "memory": 0.03417634996582365
+          }
+        },
+        "advanced": [
+          {
+            "zone": "Zone 1",
+            "nodes": [
+              {
+                "name": "Node 1",
+                "machineSetName": "worker",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 0.5,
+                  "total": 4,
+                  "limits": 1,
+                  "overCommitRatio": 0.25510204081632654
+                },
+                "memory": {
+                  "requested": 1,
+                  "total": 64,
+                  "limits": 2,
+                  "overCommitRatio": 0.03417634996582365
+                },
+                "services": [
+                  {
+                    "name": "app",
+                    "requiredCPU": 0.5,
+                    "requiredMemory": 1,
+                    "limitCPU": 1,
+                    "limitMemory": 2,
+                    "zones": 0
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "kubelet-cpu-8",
+    "checks": [
+      "nodeCount",
+      "totals",
+      "consumption",
+      "nodes"
+    ],
+    "request": {
+      "platform": "BareMetal",
+      "detailed": true,
+      "machineSets": [
+        {
+          "name": "worker",
+          "cpu": 8,
+          "memory": 64,
+          "instanceName": "worker",
+          "numberOfDisks": 24,
+          "label": "worker"
+        }
+      ],
+      "workloads": [
+        {
+          "name": "workload",
+          "count": 1,
+          "allowedMachineSets": [
+            "worker"
+          ],
+          "services": [
+            {
+              "name": "app",
+              "requiredCPU": 0.5,
+              "requiredMemory": 1,
+              "zones": 0,
+              "runsWith": [],
+              "avoid": [],
+              "limitCPU": 1,
+              "limitMemory": 2
+            }
+          ]
+        }
+      ]
+    },
+    "response": {
+      "success": true,
+      "data": {
+        "nodeCount": 1,
+        "zones": 1,
+        "totalCPU": 8,
+        "totalMemory": 64,
+        "resourceConsumption": {
+          "cpu": 0.5,
+          "memory": 1,
+          "limits": {
+            "cpu": 1,
+            "memory": 2
+          },
+          "overCommitRatio": {
+            "cpu": 0.1264222503160556,
+            "memory": 0.03417634996582365
+          }
+        },
+        "advanced": [
+          {
+            "zone": "Zone 1",
+            "nodes": [
+              {
+                "name": "Node 1",
+                "machineSetName": "worker",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 0.5,
+                  "total": 8,
+                  "limits": 1,
+                  "overCommitRatio": 0.1264222503160556
+                },
+                "memory": {
+                  "requested": 1,
+                  "total": 64,
+                  "limits": 2,
+                  "overCommitRatio": 0.03417634996582365
+                },
+                "services": [
+                  {
+                    "name": "app",
+                    "requiredCPU": 0.5,
+                    "requiredMemory": 1,
+                    "limitCPU": 1,
+                    "limitMemory": 2,
+                    "zones": 0
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "count-3-with-limits",
+    "checks": [
+      "totals",
+      "consumption"
+    ],
+    "request": {
+      "platform": "BareMetal",
+      "detailed": false,
+      "machineSets": [
+        {
+          "name": "large",
+          "cpu": 8,
+          "memory": 32,
+          "instanceName": "large",
+          "numberOfDisks": 24,
+          "label": "large"
+        }
+      ],
+      "workloads": [
+        {
+          "name": "workload",
+          "count": 3,
+          "allowedMachineSets": [
+            "large"
+          ],
+          "services": [
+            {
+              "name": "app",
+              "requiredCPU": 2,
+              "requiredMemory": 4,
+              "zones": 0,
+              "runsWith": [],
+              "avoid": [],
+              "limitCPU": 4,
+              "limitMemory": 8
+            }
+          ]
+        }
+      ]
+    },
+    "response": {
+      "success": true,
+      "data": {
+        "nodeCount": 3,
+        "zones": 3,
+        "totalCPU": 24,
+        "totalMemory": 96,
+        "resourceConsumption": {
+          "cpu": 6,
+          "memory": 12,
+          "limits": {
+            "cpu": 12,
+            "memory": 24
+          },
+          "overCommitRatio": {
+            "cpu": 0.5056890012642224,
+            "memory": 0.2812939521800281
+          }
+        },
+        "advanced": [
+          {
+            "zone": "Zone 1",
+            "nodes": [
+              {
+                "name": "Node 1",
+                "machineSetName": "large",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 2,
+                  "total": 8,
+                  "limits": 4,
+                  "overCommitRatio": 0.5056890012642224
+                },
+                "memory": {
+                  "requested": 4,
+                  "total": 32,
+                  "limits": 8,
+                  "overCommitRatio": 0.2812939521800281
+                },
+                "services": [
+                  {
+                    "name": "app",
+                    "requiredCPU": 2,
+                    "requiredMemory": 4,
+                    "limitCPU": 4,
+                    "limitMemory": 8,
+                    "zones": 3
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "zone": "Zone 2",
+            "nodes": [
+              {
+                "name": "Node 2",
+                "machineSetName": "large",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 2,
+                  "total": 8,
+                  "limits": 4,
+                  "overCommitRatio": 0.5056890012642224
+                },
+                "memory": {
+                  "requested": 4,
+                  "total": 32,
+                  "limits": 8,
+                  "overCommitRatio": 0.2812939521800281
+                },
+                "services": [
+                  {
+                    "name": "app",
+                    "requiredCPU": 2,
+                    "requiredMemory": 4,
+                    "limitCPU": 4,
+                    "limitMemory": 8,
+                    "zones": 3
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "zone": "Zone 3",
+            "nodes": [
+              {
+                "name": "Node 3",
+                "machineSetName": "large",
+                "isControlPlane": false,
+                "cpu": {
+                  "requested": 2,
+                  "total": 8,
+                  "limits": 4,
+                  "overCommitRatio": 0.5056890012642224
+                },
+                "memory": {
+                  "requested": 4,
+                  "total": 32,
+                  "limits": 8,
+                  "overCommitRatio": 0.2812939521800281
+                },
+                "services": [
+                  {
+                    "name": "app",
+                    "requiredCPU": 2,
+                    "requiredMemory": 4,
+                    "limitCPU": 4,
+                    "limitMemory": 8,
+                    "zones": 3
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+]
