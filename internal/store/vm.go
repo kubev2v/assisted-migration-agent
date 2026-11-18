@@ -125,6 +125,80 @@ func (s *VMStore) List(ctx context.Context, filter sq.Sqlizer, opts ...ListOptio
 	return vms, rows.Err()
 }
 
+// ListForApplianceDetection returns the VM attributes appliance rules are
+// evaluated against, optionally narrowed by a filter.
+func (s *VMStore) ListForApplianceDetection(ctx context.Context, filter sq.Sqlizer, opts ...ListOption) ([]models.ApplianceVirtualMachine, error) {
+	builder := vmApplianceDetectionQuery
+
+	if filter != nil {
+		subSQL, subArgs, err := vmFilterSubquery.Where(filter).ToSql()
+		if err != nil {
+			return nil, err
+		}
+
+		builder = builder.Where(sq.Expr(fmt.Sprintf(`v."VM ID" IN (%s)`, subSQL), subArgs...))
+	}
+
+	for _, opt := range opts {
+		builder = opt(builder)
+	}
+
+	query, args, err := builder.ToSql()
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	var vms []models.ApplianceVirtualMachine
+	for rows.Next() {
+		var (
+			vm        models.ApplianceVirtualMachine
+			diskSizes IntArray
+		)
+
+		if err := rows.Scan(
+			&vm.ID,
+			&vm.Name,
+			&vm.Annotation,
+			&vm.Folder,
+			&vm.Host,
+			&vm.UUID,
+			&vm.Firmware,
+			&vm.PowerState,
+			&vm.ConnectionState,
+			&vm.CpuCount,
+			&vm.CoresPerSocket,
+			&vm.MemoryMB,
+			&vm.DiskSize,
+			&vm.NICCount,
+			&vm.Datacenter,
+			&vm.Cluster,
+			&vm.HostName,
+			&vm.IPAddress,
+			&vm.IsTemplate,
+			&diskSizes,
+		); err != nil {
+			return nil, err
+		}
+
+		vm.Disks = make([]models.ApplianceDisk, 0, len(diskSizes))
+		for _, size := range diskSizes {
+			vm.Disks = append(vm.Disks, models.ApplianceDisk{Size: int64(size)})
+		}
+
+		vms = append(vms, vm)
+	}
+
+	return vms, rows.Err()
+}
+
 // Count returns the total number of VMs matching the filters.
 func (s *VMStore) Count(ctx context.Context, filter sq.Sqlizer) (int, error) {
 	builder := sq.Select("COUNT(*)").From("vinfo v")

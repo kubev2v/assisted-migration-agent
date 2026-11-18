@@ -75,6 +75,12 @@ func (s *VMService) List(ctx context.Context, params VMListParams) ([]models.Vir
 	return vms, total, nil
 }
 
+// ListForApplianceDetection returns the VMs appliance rules are evaluated
+// against, optionally narrowed by a filter expression.
+func (s *VMService) ListForApplianceDetection(ctx context.Context, byExpression string) ([]models.ApplianceVirtualMachine, error) {
+	return s.store.VM().ListForApplianceDetection(ctx, store.ByFilter(byExpression), store.WithDefaultSort())
+}
+
 func (p VMListParams) listOptions() []store.ListOption {
 	var opts []store.ListOption
 

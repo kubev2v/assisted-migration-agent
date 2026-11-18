@@ -409,13 +409,21 @@ INSERT INTO vdisk ("VM ID", "Disk Key", "Path", "Disk Path", "Capacity MiB", "Ra
 		Context("collections upgraded from before RDM backing details", func() {
 			BeforeEach(func() {
 				Expect(database.Migrate(ctx, func(ctx context.Context, db *sql.DB) error {
-					_, err := db.ExecContext(ctx, `DELETE FROM collection_schema_migrations WHERE version = 5;
-ALTER TABLE vdisk DROP COLUMN "RDM Device Name";
-ALTER TABLE vdisk DROP COLUMN "RDM Backing UUID";
-ALTER TABLE vdisk DROP COLUMN "RDM Compatibility Mode";
-ALTER TABLE vdisk DROP COLUMN "RDM LUN UUID Source";
-ALTER TABLE vdisk DROP COLUMN "Thin Provisioned";
-ALTER TABLE vdisk DROP COLUMN "Eagerly Scrubbed";
+					// Roll the collection back to a pre-RDM snapshot so the upgrade
+					// below is a real upgrade. The migration history has to stay
+					// contiguous, so every version from the RDM migration onwards is
+					// dropped, not just that single version.
+					_, err := db.ExecContext(ctx, `DELETE FROM collection_schema_migrations WHERE version >= 5;
+DROP TABLE IF EXISTS rule_conditions;
+DROP TABLE IF EXISTS rules;
+DROP SEQUENCE IF EXISTS rule_condition_seq;
+DROP SEQUENCE IF EXISTS rule_id_seq;
+ALTER TABLE vdisk DROP COLUMN IF EXISTS "RDM Device Name";
+ALTER TABLE vdisk DROP COLUMN IF EXISTS "RDM Backing UUID";
+ALTER TABLE vdisk DROP COLUMN IF EXISTS "RDM Compatibility Mode";
+ALTER TABLE vdisk DROP COLUMN IF EXISTS "RDM LUN UUID Source";
+ALTER TABLE vdisk DROP COLUMN IF EXISTS "Thin Provisioned";
+ALTER TABLE vdisk DROP COLUMN IF EXISTS "Eagerly Scrubbed";
 INSERT INTO vinfo ("VM ID","VM","Template") VALUES ('vm-1','legacy-vm',false);
 INSERT INTO vdisk ("VM ID","Disk Key","Raw","Capacity MiB","Disk UUID","RDM LUN UUID") VALUES ('vm-1','2000',true,100,'not-a-lun-uuid','lun-uuid-A');`)
 					if err != nil {
