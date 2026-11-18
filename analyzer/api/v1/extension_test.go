@@ -1,6 +1,7 @@
 package v1_test
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -17,6 +18,53 @@ func TestExtension(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Analyzer API V1 Extension Suite")
 }
+
+var _ = Describe("Cluster requirements API contract", func() {
+	It("accepts a filtered sizing request without a planner cluster ID", func() {
+		spec, err := v1.GetSwagger()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(spec.Validate(context.Background())).To(Succeed())
+		var body map[string]any
+		Expect(json.Unmarshal([]byte(`{
+			"filterExpression":"cluster = 'production'",
+			"cpuOverCommitRatio":"1:4",
+			"memoryOverCommitRatio":"1:2",
+			"workerNodeCPU":32,
+			"workerNodeMemory":128
+		}`), &body)).To(Succeed())
+
+		Expect(spec.Components.Schemas["ClusterRequirementsRequest"].Value.VisitJSON(body)).To(Succeed())
+	})
+
+	DescribeTable("requires an explicit overcommit ratio",
+		func(field string) {
+			spec, err := v1.GetSwagger()
+			Expect(err).NotTo(HaveOccurred())
+
+			var body map[string]any
+			Expect(json.Unmarshal([]byte(`{
+				"cpuOverCommitRatio":"1:4",
+				"memoryOverCommitRatio":"1:2",
+				"workerNodeCPU":32,
+				"workerNodeMemory":128
+			}`), &body)).To(Succeed())
+			delete(body, field)
+
+			schema := spec.Components.Schemas["ClusterRequirementsRequest"].Value
+			Expect(schema.VisitJSON(body)).NotTo(Succeed())
+			Expect(schema.Properties[field].Value.Default).To(BeNil())
+		},
+		Entry("CPU", "cpuOverCommitRatio"),
+		Entry("memory", "memoryOverCommitRatio"),
+	)
+
+	It("describes a sizing response for successful calculations", func() {
+		spec, err := v1.GetSwagger()
+		Expect(err).NotTo(HaveOccurred())
+		response := spec.Paths.Find("/cluster-requirements").Post.Responses.Status(200)
+		Expect(response.Value.Content["application/json"].Schema.Ref).To(Equal("#/components/schemas/ClusterRequirementsResponse"))
+	})
+})
 
 var _ = Describe("NewVirtualMachineDetailFromModel", func() {
 	It("includes a zero NIC count in JSON", func() {

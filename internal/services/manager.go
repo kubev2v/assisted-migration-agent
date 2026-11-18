@@ -322,6 +322,20 @@ func (m *ServiceManager) LatestEstimationService() (*EstimationService, error) {
 	return m.estimationService(db)
 }
 
+func (m *ServiceManager) LatestSizerService() (*SizerService, error) {
+	db, err := m.pool.Latest()
+	if err != nil {
+		return nil, err
+	}
+
+	st, err := db.Store()
+	if err != nil {
+		return nil, err
+	}
+
+	return NewSizerService(st), nil
+}
+
 func (m *ServiceManager) LatestRightsizingService() (*RightsizingService, error) {
 	db, err := m.pool.Latest()
 	if err != nil {
