@@ -64,6 +64,7 @@ help:
 	@echo "    tidy:            tidy go mod"
 	@echo "    tidy-check:      check that go.mod and go.sum are tidy"
 	@echo "    test:            run all tests with coverage (profile + HTML in coverage/)"
+	@echo "    test.unit:       run unit tests with coverage, without timed fuzzing"
 	@echo "    test.fuzz:       run fuzz tests (default 30s, override with FUZZ_TIME=1m)"
 	@echo "    setup-opa-policies: download OPA policies from Forklift project"
 	@echo "    clean-opa-policies: clean OPA policies directory"
@@ -322,9 +323,11 @@ COVERAGE_DIR := $(CURDIR)/coverage
 COVERAGE_PROFILE := $(COVERAGE_DIR)/coverage.out
 COVERAGE_HTML := $(COVERAGE_DIR)/coverage.html
 
-.PHONY: test test.fuzz vcsim
+.PHONY: test test.unit test.fuzz vcsim
+test: test.fuzz test.unit
+
 # Run unit tests using ginkgo with coverage
-test: $(GINKGO) vcsim test.fuzz
+test.unit: $(GINKGO) vcsim
 	@echo "🧪 Running Unit tests..."
 	@mkdir -p $(COVERAGE_DIR)
 	@$(GINKGO) -v --show-node-events --coverprofile=coverage.out --output-dir=$(COVERAGE_DIR) $(UNIT_TEST_GINKGO_OPTIONS) $(UNIT_TEST_PACKAGES)

@@ -4,6 +4,8 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, edited]
     branches: [main, stable]
+  merge_group:
+    types: [checks_requested]
 
 permissions:
   pull-requests: read
@@ -12,6 +14,7 @@ permissions:
 jobs:
   # Configuration job - define all shared values once
   config:
+    name: Validation configuration
     runs-on: ubuntu-latest
     outputs:
       allowed-types: ${{ steps.set-config.outputs.allowed-types }}
@@ -34,6 +37,10 @@ jobs:
         id: filter
         uses: dorny/paths-filter@v3
         with:
+          # Compare the entire queue candidate with its recorded base, not just
+          # the last PR or the current (potentially newer) target branch.
+          base: ${{ github.event.merge_group.base_sha || '' }}
+          ref: ${{ github.event.merge_group.head_sha || '' }}
           filters: .github/path-filters.yml
           predicate-quantifier: 'every'
 
@@ -59,8 +66,8 @@ jobs:
 
   lint:
     name: Lint
-    needs: [config, validate-commits, validate-pr-title]
-    if: needs.config.outputs.run-code-validations == 'true'
+    needs: config
+    if: github.event_name != 'merge_group' && needs.config.outputs.run-code-validations == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -76,8 +83,8 @@ jobs:
 
   format-check:
     name: Format Check
-    needs: [config, validate-commits, validate-pr-title]
-    if: needs.config.outputs.run-code-validations == 'true'
+    needs: config
+    if: github.event_name != 'merge_group' && needs.config.outputs.run-code-validations == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -93,7 +100,7 @@ jobs:
 
   tidy-check:
     name: Go Mod Tidy Check
-    needs: [config, validate-commits, validate-pr-title]
+    needs: config
     if: needs.config.outputs.run-code-validations == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -109,7 +116,7 @@ jobs:
         run: make tidy-check
 
   check-generate:
-    needs: [config, validate-commits, validate-pr-title]
+    needs: config
     if: needs.config.outputs.run-code-validations == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -130,7 +137,7 @@ jobs:
 
   verify-build:
     name: Verify Build
-    needs: [config, validate-commits, validate-pr-title]
+    needs: config
     if: needs.config.outputs.run-code-validations == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -146,7 +153,7 @@ jobs:
         run: make build build.analyzer
 
   unit-test:
-    needs: [config, validate-commits, validate-pr-title]
+    needs: config
     if: needs.config.outputs.run-code-validations == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -158,57 +165,21 @@ jobs:
       with:
         go-version: '1.27.4'
 
-    - name: Run the tests
-      run: make test
+    - name: Run unit tests
+      run: make test.unit
 
-  # Always runs so branch protection can require this single check.
-  # Skipped jobs count as success, but a failed commit check would also skip
-  # them — this job fails unless commit/title checks passed and, when code
-  # changed, the code validations passed.
-  required:
-    name: Required validations
-    needs:
-      - config
-      - validate-commits
-      - validate-pr-title
-      - lint
-      - format-check
-      - tidy-check
-      - check-generate
-      - verify-build
-      - unit-test
-    if: always()
+  fuzz-test:
+    needs: config
+    if: github.event_name != 'merge_group' && needs.config.outputs.run-code-validations == 'true'
     runs-on: ubuntu-latest
     steps:
-      - name: Verify required jobs
-        env:
-          RUN_CODE: ${{ needs.config.outputs.run-code-validations }}
-          CONFIG: ${{ needs.config.result }}
-          COMMITS: ${{ needs.validate-commits.result }}
-          TITLE: ${{ needs.validate-pr-title.result }}
-          LINT: ${{ needs.lint.result }}
-          FORMAT: ${{ needs.format-check.result }}
-          TIDY: ${{ needs.tidy-check.result }}
-          GENERATE: ${{ needs.check-generate.result }}
-          BUILD: ${{ needs.verify-build.result }}
-          TEST: ${{ needs.unit-test.result }}
-        run: |
-          echo "config=$CONFIG commits=$COMMITS title=$TITLE run_code=$RUN_CODE"
-          echo "lint=$LINT format=$FORMAT tidy=$TIDY generate=$GENERATE build=$BUILD test=$TEST"
+    - name: Check out code
+      uses: actions/checkout@v4
 
-          fail() { echo "::error::$1"; exit 1; }
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.27.4'
 
-          [[ "$CONFIG" == success ]] || fail "config did not succeed ($CONFIG)"
-          [[ "$COMMITS" == success ]] || fail "validate-commits did not succeed ($COMMITS)"
-          [[ "$TITLE" == success ]] || fail "validate-pr-title did not succeed ($TITLE)"
-
-          if [[ "$RUN_CODE" == true ]]; then
-            [[ "$LINT" == success ]] || fail "lint did not succeed ($LINT)"
-            [[ "$FORMAT" == success ]] || fail "format-check did not succeed ($FORMAT)"
-            [[ "$TIDY" == success ]] || fail "tidy-check did not succeed ($TIDY)"
-            [[ "$GENERATE" == success ]] || fail "check-generate did not succeed ($GENERATE)"
-            [[ "$BUILD" == success ]] || fail "verify-build did not succeed ($BUILD)"
-            [[ "$TEST" == success ]] || fail "unit-test did not succeed ($TEST)"
-          else
-            echo "Only skippable files changed; code validations were skipped"
-          fi
+    - name: Run fuzz tests
+      run: make test.fuzz
