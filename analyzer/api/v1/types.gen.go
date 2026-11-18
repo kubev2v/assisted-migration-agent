@@ -15,6 +15,12 @@ const (
 	Ready AnalyzerStatusStatus = "ready"
 )
 
+// Defines values for ClusterRequirementsRequestControlPlaneNodeCount.
+const (
+	N1 ClusterRequirementsRequestControlPlaneNodeCount = 1
+	N3 ClusterRequirementsRequestControlPlaneNodeCount = 3
+)
+
 // Defines values for CollectorStatusStatus.
 const (
 	CollectorStatusMetricsCollecting CollectorStatusStatus = "collecting metrics"
@@ -26,6 +32,15 @@ const (
 	CollectorStatusStatusReady       CollectorStatusStatus = "ready"
 )
 
+// Defines values for CpuOverCommitRatio.
+const (
+	CpuOneToEight CpuOverCommitRatio = "1:8"
+	CpuOneToFour  CpuOverCommitRatio = "1:4"
+	CpuOneToOne   CpuOverCommitRatio = "1:1"
+	CpuOneToSix   CpuOverCommitRatio = "1:6"
+	CpuOneToTwo   CpuOverCommitRatio = "1:2"
+)
+
 // Defines values for InspectionStatusState.
 const (
 	InspectionStatusStateCanceled  InspectionStatusState = "canceled"
@@ -33,6 +48,21 @@ const (
 	InspectionStatusStateError     InspectionStatusState = "error"
 	InspectionStatusStatePending   InspectionStatusState = "pending"
 	InspectionStatusStateRunning   InspectionStatusState = "running"
+)
+
+// Defines values for MemoryOverCommitRatio.
+const (
+	MemoryOneToFour MemoryOverCommitRatio = "1:4"
+	MemoryOneToOne  MemoryOverCommitRatio = "1:1"
+	MemoryOneToTwo  MemoryOverCommitRatio = "1:2"
+)
+
+// Defines values for OptimizationStatusReason.
+const (
+	CalculationError  OptimizationStatusReason = "calculation_error"
+	LowConfidence     OptimizationStatusReason = "low_confidence"
+	NoUtilizationData OptimizationStatusReason = "no_utilization_data"
+	Success           OptimizationStatusReason = "success"
 )
 
 // Defines values for RDMBackingCompatibilityMode.
@@ -79,6 +109,99 @@ type BatchUpdateExclusionRequest struct {
 
 	// VmIds VM IDs to update
 	VmIds []string `binding:"required,min=1,dive,required" json:"vmIds"`
+}
+
+// ClusterRequirementsRequest Request payload for calculating cluster requirements
+type ClusterRequirementsRequest struct {
+	// CompactMode If true, creates a 3-node compact cluster with no dedicated workers. Requires controlPlaneNodeCount=3 and controlPlaneSchedulable=true. Incompatible with hostedControlPlane=true
+	CompactMode *bool `json:"compactMode,omitempty"`
+
+	// ControlPlaneCPU CPU cores per control plane node (default: 6)
+	ControlPlaneCPU *int `json:"controlPlaneCPU,omitempty" validate:"omitempty,min=2,max=384"`
+
+	// ControlPlaneMemory Memory in GB per control plane node (default: 16)
+	ControlPlaneMemory *int `json:"controlPlaneMemory,omitempty" validate:"omitempty,min=4,max=4096"`
+
+	// ControlPlaneNodeCount Number of control plane nodes: 1 or 3 (default: 3)
+	ControlPlaneNodeCount *ClusterRequirementsRequestControlPlaneNodeCount `json:"controlPlaneNodeCount,omitempty" validate:"omitempty,oneof=1 3"`
+
+	// ControlPlaneSchedulable Allow workload scheduling on control plane nodes (default: false)
+	ControlPlaneSchedulable *bool `json:"controlPlaneSchedulable,omitempty"`
+
+	// CpuOverCommitRatio CPU over-commit ratio (e.g., "1:4")
+	CpuOverCommitRatio CpuOverCommitRatio `json:"cpuOverCommitRatio" validate:"required"`
+
+	// FilterExpression Filter expression selecting VMs to estimate. When omitted, all VMs are selected.
+	FilterExpression *string `json:"filterExpression,omitempty"`
+
+	// HostedControlPlane If true, control plane is hosted externally. Incompatible with control plane fields (default: false)
+	HostedControlPlane *bool `json:"hostedControlPlane,omitempty"`
+
+	// MemoryOverCommitRatio Memory over-commit ratio (e.g., "1:2")
+	MemoryOverCommitRatio MemoryOverCommitRatio `json:"memoryOverCommitRatio" validate:"required"`
+
+	// WorkerNodeCPU CPU cores per worker node
+	WorkerNodeCPU int `json:"workerNodeCPU" validate:"required,min=2,max=384"`
+
+	// WorkerNodeMemory Memory (GB) per worker node
+	WorkerNodeMemory int `json:"workerNodeMemory" validate:"required,min=4,max=4096"`
+
+	// WorkerNodeThreads Number of CPU threads per worker node (for SMT calculation). If not provided, assumes no SMT (threads = cores). Must be >= workerNodeCPU
+	WorkerNodeThreads *int `json:"workerNodeThreads,omitempty" validate:"omitempty,min=2,max=2000"`
+}
+
+// ClusterRequirementsRequestControlPlaneNodeCount Number of control plane nodes: 1 or 3 (default: 3)
+type ClusterRequirementsRequestControlPlaneNodeCount int
+
+// ClusterRequirementsResponse Cluster requirements calculation results
+type ClusterRequirementsResponse struct {
+	// ClusterSizing Overall cluster sizing summary
+	ClusterSizing ClusterSizing `json:"clusterSizing"`
+
+	// InventoryTotals Inventory totals for the cluster
+	InventoryTotals InventoryTotals `json:"inventoryTotals"`
+
+	// OptimizationStatus Status of utilization-based optimization attempt
+	OptimizationStatus *OptimizationStatus `json:"optimizationStatus,omitempty"`
+
+	// OptimizedSizing Overall cluster sizing summary
+	OptimizedSizing *ClusterSizing `json:"optimizedSizing,omitempty"`
+
+	// ResourceConsumption Resource consumption across the cluster
+	ResourceConsumption SizingResourceConsumption `json:"resourceConsumption"`
+
+	// Savings Infrastructure savings comparison
+	Savings *Savings `json:"savings,omitempty"`
+}
+
+// ClusterSizing Overall cluster sizing summary
+type ClusterSizing struct {
+	// Confidence Data coverage confidence 0-100 (only in optimized_sizing)
+	Confidence *float64 `json:"confidence,omitempty"`
+
+	// ControlPlaneNodes Number of control plane nodes
+	ControlPlaneNodes int `json:"controlPlaneNodes"`
+
+	// CpuUtilizationMax CPU utilization maximum percentage (only in optimized_sizing)
+	CpuUtilizationMax *float64 `json:"cpuUtilizationMax,omitempty"`
+
+	// FailoverNodes Number of failover nodes added for availability
+	FailoverNodes int `json:"failoverNodes"`
+
+	// MemoryUtilizationMax Memory utilization maximum percentage (only in optimized_sizing)
+	MemoryUtilizationMax *float64 `json:"memoryUtilizationMax,omitempty"`
+
+	// TotalCPU Total CPU cores across all nodes
+	TotalCPU int `json:"totalCPU"`
+
+	// TotalMemory Total memory (GB) across all nodes
+	TotalMemory int `json:"totalMemory"`
+
+	// TotalNodes Total number of nodes (worker + control plane)
+	TotalNodes int `json:"totalNodes"`
+
+	// WorkerNodes Number of worker nodes
+	WorkerNodes int `json:"workerNodes"`
 }
 
 // Inventory defines model for CollectedInventory.
@@ -145,6 +268,9 @@ type ComplexityOSScoreEntry struct {
 	// VmCount Number of VMs at this complexity score
 	VmCount int `json:"vmCount"`
 }
+
+// CpuOverCommitRatio CPU over-commit ratio
+type CpuOverCommitRatio string
 
 // CreateGroupRequest defines model for CreateGroupRequest.
 type CreateGroupRequest struct {
@@ -270,6 +396,21 @@ type InventoryResponse struct {
 	Vcenters []SubResource          `json:"vcenters"`
 }
 
+// InventoryTotals Inventory totals for the cluster
+type InventoryTotals struct {
+	// TotalCPU Total CPU cores across all VMs in the cluster
+	TotalCPU int `json:"totalCPU"`
+
+	// TotalMemory Total memory (GB) across all VMs in the cluster
+	TotalMemory int `json:"totalMemory"`
+
+	// TotalVMs Total number of VMs in the cluster
+	TotalVMs int `json:"totalVMs"`
+}
+
+// MemoryOverCommitRatio Memory over-commit ratio
+type MemoryOverCommitRatio string
+
 // MigrationComplexityRequest Request payload for calculating migration complexity estimation
 type MigrationComplexityRequest struct {
 	// FilterExpression Filter by expression
@@ -322,6 +463,18 @@ type MigrationEstimationResponse struct {
 	Estimation        map[string]SchemaEstimationResult `json:"estimation"`
 	EstimationContext EstimationContext                 `json:"estimationContext"`
 }
+
+// OptimizationStatus Status of utilization-based optimization attempt
+type OptimizationStatus struct {
+	// Attempted Whether optimization was attempted based on available utilization data
+	Attempted bool `json:"attempted"`
+
+	// Reason Reason for optimization result
+	Reason OptimizationStatusReason `json:"reason"`
+}
+
+// OptimizationStatusReason Reason for optimization result
+type OptimizationStatusReason string
 
 // OsDiskEstimationEntry defines model for OsDiskEstimationEntry.
 type OsDiskEstimationEntry struct {
@@ -383,6 +536,18 @@ type RDMHostLun struct {
 	LunUuid *string `json:"lunUuid,omitempty"`
 }
 
+// Savings Infrastructure savings comparison
+type Savings struct {
+	// Description Human-readable description of savings source
+	Description string `json:"description"`
+
+	// NodesSaved Number of nodes saved compared to baseline
+	NodesSaved int `json:"nodesSaved"`
+
+	// PercentageReduction Percentage reduction in nodes
+	PercentageReduction float64 `json:"percentageReduction"`
+}
+
 // SchemaEstimationResult Estimation results for a single schema
 type SchemaEstimationResult struct {
 	// Breakdown Per-calculator results
@@ -393,6 +558,39 @@ type SchemaEstimationResult struct {
 
 	// MinTotalDuration Minimum total estimated duration across all calculators
 	MinTotalDuration string `json:"minTotalDuration"`
+}
+
+// SizingOverCommitRatio Over-commit ratios
+type SizingOverCommitRatio struct {
+	// Cpu CPU over-commit ratio
+	Cpu float64 `json:"cpu"`
+
+	// Memory Memory over-commit ratio
+	Memory float64 `json:"memory"`
+}
+
+// SizingResourceConsumption Resource consumption across the cluster
+type SizingResourceConsumption struct {
+	// Cpu Total CPU requested
+	Cpu float64 `json:"cpu"`
+
+	// Limits Resource limits
+	Limits *SizingResourceLimits `json:"limits,omitempty"`
+
+	// Memory Total memory (GB) requested
+	Memory float64 `json:"memory"`
+
+	// OverCommitRatio Over-commit ratios
+	OverCommitRatio *SizingOverCommitRatio `json:"overCommitRatio,omitempty"`
+}
+
+// SizingResourceLimits Resource limits
+type SizingResourceLimits struct {
+	// Cpu Total CPU limits
+	Cpu float64 `json:"cpu"`
+
+	// Memory Total memory (GB) limits
+	Memory float64 `json:"memory"`
 }
 
 // SubResource defines model for SubResource.
@@ -910,6 +1108,9 @@ type ListLatestVirtualMachinesParams struct {
 	// PageSize Number of items per page
 	PageSize *int `form:"pageSize,omitempty" json:"pageSize,omitempty"`
 }
+
+// CalculateClusterRequirementsJSONRequestBody defines body for CalculateClusterRequirements for application/json ContentType.
+type CalculateClusterRequirementsJSONRequestBody = ClusterRequirementsRequest
 
 // StartRvtoolsCollectorMultipartRequestBody defines body for StartRvtoolsCollector for multipart/form-data ContentType.
 type StartRvtoolsCollectorMultipartRequestBody StartRvtoolsCollectorMultipartBody

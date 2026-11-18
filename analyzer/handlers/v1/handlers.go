@@ -19,6 +19,7 @@ type ServiceProvider interface {
 	LatestGroupService() (*services.GroupService, error)
 	LatestInventoryService() (*services.InventoryService, error)
 	LatestEstimationService() (*services.EstimationService, error)
+	LatestSizerService() (*services.SizerService, error)
 	LatestRightsizingService() (*services.RightsizingService, error)
 	GetCollectorStatus() models.CollectorStatus
 	StopCollecting() error
