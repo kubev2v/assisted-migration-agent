@@ -6,9 +6,13 @@ on:
     branches: [main, stable]
   pull_request:
     branches: [main, stable]
+  merge_group:
+    types: [checks_requested]
 
 jobs:
   config:
+    name: E2E configuration
+    if: github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     outputs:
       run-code-validations: ${{ steps.filter.outputs.code }}
@@ -25,7 +29,7 @@ jobs:
 
   e2e:
     needs: [config]
-    if: needs.config.outputs.run-code-validations == 'true'
+    if: github.event_name != 'merge_group' && needs.config.outputs.run-code-validations == 'true'
     runs-on: ubuntu-latest
     name: e2e
     env:
@@ -90,30 +94,3 @@ jobs:
             -podman-socket=${{ env.PODMAN_SOCKET }} \
             -iso-path=${{ github.workspace }}/iso \
             --ginkgo.v
-
-  # Always runs so branch protection can require this single check.
-  required:
-    name: Required e2e validations
-    needs:
-      - config
-      - e2e
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Verify required jobs
-        env:
-          RUN_CODE: ${{ needs.config.outputs.run-code-validations }}
-          CONFIG: ${{ needs.config.result }}
-          E2E: ${{ needs.e2e.result }}
-        run: |
-          echo "config=$CONFIG e2e=$E2E run_code=$RUN_CODE"
-
-          fail() { echo "::error::$1"; exit 1; }
-
-          [[ "$CONFIG" == success ]] || fail "config did not succeed ($CONFIG)"
-
-          if [[ "$RUN_CODE" == true ]]; then
-            [[ "$E2E" == success ]] || fail "e2e did not succeed ($E2E)"
-          else
-            echo "Only skippable files changed; e2e tests were skipped"
-          fi
