@@ -13,3 +13,116 @@ type Appliance struct {
 	ApplicationUrl  string
 	VirtualMachines VirtualMachinesIdentites
 }
+
+// ApplianceVirtualMachine carries the VM attributes appliance rules are
+// evaluated against. It holds only the fields rules can match on, so detection
+// does not depend on the full VM model.
+type ApplianceVirtualMachine struct {
+	ID              string
+	Name            string
+	Annotation      string
+	Folder          string
+	Host            string
+	UUID            string
+	Firmware        string
+	PowerState      string
+	ConnectionState string
+	GuestID         string
+	NestedHVEnabled bool
+	IsTemplate      bool
+	CpuCount        int32
+	CoresPerSocket  int32
+	MemoryMB        int32
+	DiskSize        int64
+	NICCount        int32
+	Datacenter      string
+	Cluster         string
+	HostName        string
+	IPAddress       string
+	Disks           []ApplianceDisk
+}
+
+type ApplianceDisk struct {
+	File string
+	Size int64
+}
+
+type ConfidenceLevel int
+
+const (
+	NoConfidence ConfidenceLevel = iota
+	ConfidenceLowerLevel
+	ConfidenceMediumLevel
+	ConfidenceHighLevel
+)
+
+type OsvVerdict int
+
+const (
+	OsvBlocked OsvVerdict = iota
+	OsvConditional
+	OsvSupported
+	OsvUnknown
+)
+
+type Evidence struct {
+	RuleName          string
+	VirtualMachineID  string
+	MatchedConditions map[string]int // conditions name is the key, weight the value
+}
+
+type DetectionResult struct {
+	VirtualMachineID  string
+	RuleName          string
+	MatchedConditions []string
+	Confidence        ConfidenceLevel
+}
+
+type DetectionError struct {
+	VirtualMachineID string
+	RuleName         string
+	Err              error
+}
+
+type Rule struct {
+	Name       string
+	Vendor     string
+	Category   string
+	OsvVerdict OsvVerdict
+	Confidence ConfidenceLevel
+	MinMatches int
+
+	Conditions []any
+}
+
+type ConditionConstraint interface {
+	int | bool | string
+}
+
+// ConditionFuncs maps a persisted function name to its implementation. An
+// implementation is either func(T, ApplianceVirtualMachine) (bool, error) or
+// func([]T, ApplianceVirtualMachine) (bool, error), depending on how many
+// values the condition carries.
+type ConditionFuncs map[string]any
+
+// ExpressionCondition is a filter expression evaluated against
+// ApplianceVirtualMachine. It is the only non-func condition shape.
+type ExpressionCondition struct {
+	Name       string
+	Tier       int
+	Expression string
+}
+
+type ListValueFuncCondition[T []E, E ConditionConstraint] struct {
+	Values T
+	Name   string
+	Tier   int
+	Func   func(value T, vm ApplianceVirtualMachine) (bool, error)
+}
+
+type SingleValueFuncCondition[T ConditionConstraint] struct {
+	Value T
+	Name  string
+	Tier  int
+	Func  func(value T, vm ApplianceVirtualMachine) (bool, error)
+}

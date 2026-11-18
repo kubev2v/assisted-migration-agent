@@ -421,3 +421,41 @@ func IsCollectionCatalogError(err error) bool {
 	msg := err.Error()
 	return strings.Contains(msg, "Catalog Error") && strings.Contains(msg, "does not exist")
 }
+
+// DetectionError describes a failed rule condition evaluation for a VM.
+type DetectionError struct {
+	RuleName         string
+	VirtualMachineID string
+	ConditionType    string
+	ConditionName    string
+	FieldName        string
+	Reason           string
+}
+
+func NewDetectionError(ruleName, virtualMachineID, conditionType, conditionName, fieldName, reason string) *DetectionError {
+	return &DetectionError{
+		RuleName:         ruleName,
+		VirtualMachineID: virtualMachineID,
+		ConditionType:    conditionType,
+		ConditionName:    conditionName,
+		FieldName:        fieldName,
+		Reason:           reason,
+	}
+}
+
+func (e *DetectionError) Error() string {
+	return fmt.Sprintf(
+		"rule %q on VM %q: %s condition %q (field %q): %s",
+		e.RuleName,
+		e.VirtualMachineID,
+		e.ConditionType,
+		e.ConditionName,
+		e.FieldName,
+		e.Reason,
+	)
+}
+
+func IsDetectionError(err error) bool {
+	var e *DetectionError
+	return errors.As(err, &e)
+}

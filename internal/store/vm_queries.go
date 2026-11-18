@@ -410,3 +410,35 @@ WHERE report_id = (
 		GROUP BY u.vm_id
 	) g ON v."VM ID" = g.vm_id`).
 	LeftJoin(`vm_vapp_products ON vm_vapp_products."VM_ID" = v."VM ID"`)
+
+// vmApplianceDetectionQuery builds the flat VM rows appliance rules are
+// evaluated against. It reads vinfo plus the per-VM disk capacity total and
+// skips the nested collections built by vmGetQuery.
+var vmApplianceDetectionQuery = sq.Select(
+	`v."VM ID" AS id`,
+	`COALESCE(v."VM", '') AS name`,
+	`COALESCE(v."Annotation", '') AS annotation`,
+	`COALESCE(v."Folder", '') AS folder`,
+	`COALESCE(v."Host", '') AS host`,
+	`COALESCE(v."SMBIOS UUID", v."VM UUID", '') AS uuid`,
+	`COALESCE(v."Firmware", '') AS firmware`,
+	`COALESCE(v."Powerstate", '') AS power_state`,
+	`COALESCE(v."Connection state", '') AS connection_state`,
+	`COALESCE(v."CPUs", 0) AS cpu_count`,
+	`COALESCE(c."Cores p/s", 0) AS cores_per_socket`,
+	`COALESCE(v."Memory", 0) AS memory_mb`,
+	`COALESCE(d.total, 0)::BIGINT AS disk_size`,
+	`COALESCE(v."NICs", 0) AS nic_count`,
+	`COALESCE(v."Datacenter", '') AS datacenter`,
+	`COALESCE(v."Cluster", '') AS cluster`,
+	`COALESCE(v."DNS Name", '') AS host_name`,
+	`COALESCE(v."Primary IP Address", '') AS ip_address`,
+	`COALESCE(v."Template", false) AS is_template`,
+	`COALESCE((SELECT list("Capacity MiB" ORDER BY "Disk Key") FROM vdisk vd WHERE vd."VM ID" = v."VM ID"), []) AS disk_sizes`,
+).From("vinfo v").
+	LeftJoin(`vcpu c ON c."VM ID" = v."VM ID"`).
+	LeftJoin(`(
+		SELECT "VM ID", SUM("Capacity MiB") AS total
+		FROM vdisk
+		GROUP BY 1
+	) d ON d."VM ID" = v."VM ID"`)

@@ -48,6 +48,87 @@ func (s *StringArray) Scan(src any) error {
 	}
 }
 
+// IntArray is a scanner for DuckDB INTEGER[] arrays.
+type IntArray []int
+
+func (a *IntArray) Scan(src any) error {
+	if src == nil {
+		*a = []int{}
+		return nil
+	}
+
+	switch v := src.(type) {
+	case []interface{}:
+		result := make([]int, 0, len(v))
+
+		for _, elem := range v {
+			switch n := elem.(type) {
+			case nil:
+				continue
+			case int:
+				result = append(result, n)
+			case int32:
+				result = append(result, int(n))
+			case int64:
+				result = append(result, int(n))
+			default:
+				return fmt.Errorf("unsupported element for IntArray: %T", elem)
+			}
+		}
+
+		*a = result
+		return nil
+	case []int32:
+		result := make([]int, len(v))
+
+		for i, elem := range v {
+			result[i] = int(elem)
+		}
+
+		*a = result
+		return nil
+	case []int:
+		*a = v
+		return nil
+	default:
+		return fmt.Errorf("unsupported type for IntArray: %T", src)
+	}
+}
+
+// BoolArray is a scanner for DuckDB BOOLEAN[] arrays.
+type BoolArray []bool
+
+func (a *BoolArray) Scan(src any) error {
+	if src == nil {
+		*a = []bool{}
+		return nil
+	}
+
+	switch v := src.(type) {
+	case []interface{}:
+		result := make([]bool, 0, len(v))
+
+		for _, elem := range v {
+			switch b := elem.(type) {
+			case nil:
+				continue
+			case bool:
+				result = append(result, b)
+			default:
+				return fmt.Errorf("unsupported element for BoolArray: %T", elem)
+			}
+		}
+
+		*a = result
+		return nil
+	case []bool:
+		*a = v
+		return nil
+	default:
+		return fmt.Errorf("unsupported type for BoolArray: %T", src)
+	}
+}
+
 type AppProducts []models.AppProduct
 
 func (n *AppProducts) Scan(value interface{}) error {
