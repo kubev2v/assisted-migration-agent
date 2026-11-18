@@ -426,7 +426,9 @@ var datastoresQuery = `
                 ` + datastoreProtocolExpr + ` AS protocol_type,
                 ` + datastoreAccessCategoryExpr + ` AS storage_access_category,
                 backing_info.vendor AS vendor,
-                backing_info.model AS model
+                backing_info.model AS model,
+                NULLIF(ds."Storage Arrays", '[]') AS storage_arrays,
+                ds."Storage Container ID" AS storage_container_id
 
 			FROM storage_datastores ds
             LEFT JOIN backing_info ON backing_info.datastore_row_id = ds.datastore_row_id

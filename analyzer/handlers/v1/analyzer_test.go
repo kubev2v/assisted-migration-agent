@@ -1,16 +1,21 @@
 package analyzer_test
 
 import (
+	"archive/zip"
 	"bytes"
+	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
@@ -24,6 +29,8 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/services"
+	"github.com/kubev2v/assisted-migration-agent/internal/store"
+	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
@@ -61,6 +68,23 @@ type inventoryDeleteServices struct {
 
 func (s *inventoryDeleteServices) LatestInventoryService() (*services.InventoryService, error) {
 	return nil, s.err
+}
+
+type storageInventoryServices struct {
+	analyzer.ServiceProvider
+	st *store.Store
+}
+
+func (s *storageInventoryServices) LatestInventoryService() (*services.InventoryService, error) {
+	return services.NewInventoryService(s.st), nil
+}
+
+func (s *storageInventoryServices) InventoryService(string) (*services.InventoryService, error) {
+	return services.NewInventoryService(s.st), nil
+}
+
+func (s *storageInventoryServices) LatestGroupService() (*services.GroupService, error) {
+	return services.NewGroupService(s.st, duckdb_parser.New(s.st.Querier(), nil)), nil
 }
 
 var _ = Describe("Analyzer API", func() {
@@ -191,6 +215,65 @@ var _ = DescribeTable("Deleting a vCenter inventory",
 		http.StatusInternalServerError,
 	),
 )
+
+var _ = Describe("Analyzer storage array inventory", func() {
+	DescribeTable("preserves stored array identity in existing inventory responses", func(path string) {
+		ctx := context.Background()
+		pool := store.NewPool(time.Minute)
+		DeferCleanup(pool.Close)
+		db, err := pool.NewDatabase("collection", filepath.Join(GinkgoT().TempDir(), "collection.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		Expect(err).NotTo(HaveOccurred())
+		st, err := db.Store()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(duckdb_parser.New(st.Querier(), nil).Init()).To(Succeed())
+		Expect(db.Migrate(ctx, func(ctx context.Context, db *sql.DB) error {
+			return migrations.RunCollection(ctx, db, "collection")
+		})).To(Succeed())
+		pool.Add(db)
+		raw := `{"vcenter_id":"46f19dd0-a83a-4b13-a310-30ce5d4c1a92","vcenter":{"infra":{"datastores":[{"diskId":"vvol","storageArrays":[{"uuid":"array-1","vendorId":"vendor"},{"name":"partial"}],"storageContainerId":"container"}]}},"clusters":{}}`
+		Expect(st.Inventory().Save(ctx, []byte(raw))).To(Succeed())
+		gin.SetMode(gin.TestMode)
+		router := gin.New()
+		v1.RegisterHandlers(router.Group("/api/v1"), analyzer.NewHandler(config.Configuration{}, &storageInventoryServices{st: st}))
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
+		Expect(response.Code).To(Equal(http.StatusOK), response.Body.String())
+		body := response.Body.Bytes()
+		if path == "/api/v1/inventory?scope=all" {
+			archive, err := zip.NewReader(bytes.NewReader(body), int64(len(body)))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(archive.File).To(HaveLen(1))
+			reader, err := archive.File[0].Open()
+			Expect(err).NotTo(HaveOccurred())
+			body, err = io.ReadAll(reader)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(reader.Close()).To(Succeed())
+		}
+		var root map[string]json.RawMessage
+		Expect(json.Unmarshal(body, &root)).To(Succeed())
+		inventoryJSON := body
+		if data, ok := root["data"]; ok {
+			inventoryJSON = data
+		}
+		if data, ok := root["inventory"]; ok {
+			inventoryJSON = data
+		}
+		var inv struct {
+			VCenter struct {
+				Infra struct {
+					Datastores []map[string]json.RawMessage `json:"datastores"`
+				} `json:"infra"`
+			} `json:"vcenter"`
+		}
+		Expect(json.Unmarshal(inventoryJSON, &inv)).To(Succeed())
+		Expect(inv.VCenter.Infra.Datastores).To(HaveLen(1))
+		datastore := inv.VCenter.Infra.Datastores[0]
+		Expect(string(datastore["storageContainerId"])).To(Equal(`"container"`))
+		Expect(string(datastore["storageArrays"])).To(MatchJSON(`[{"uuid":"array-1","vendorId":"vendor"},{"name":"partial"}]`))
+	}, Entry("latest", "/api/v1/inventory"), Entry("collection", "/api/v1/collections/collection/inventory"),
+		Entry("vCenter", "/api/v1/inventory/vcenters/46f19dd0-a83a-4b13-a310-30ce5d4c1a92"),
+		Entry("JSON bundle", "/api/v1/inventory?scope=all"))
+})
 
 type rvtoolsUpload struct {
 	name    string

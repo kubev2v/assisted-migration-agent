@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/pkg/opa"
 	. "github.com/onsi/gomega"
 
@@ -56,6 +57,10 @@ func TestCollectorWork_CollectionTimeAndStorage(t *testing.T) {
 		`UPDATE fixture.Host SET HbaDiskInfo = '[{"key":"hba-1","hbaDevice":"vmhba1","protocol":"FibreChannel","nodeWorldWideName":"000123","portWorldWideName":"000456"}]',
             HostScsiDisks = '[{"key":"lun-1","canonicalName":"naa.001","vendor":"NETAPP","model":"LUN"}]',
             HostScsiTopology = '[{"key":"hba-1","scsiDiskKeys":["lun-1"]}]'`,
+
+		`CREATE TABLE fixture.Datastore (ID VARCHAR, Name VARCHAR, Free BIGINT, Capacity BIGINT, MaintenanceMode VARCHAR, Type VARCHAR, BackingDevicesNames VARCHAR, IORMEnabled BOOLEAN, IORMCongestionThreshold INTEGER, IORMCongestionThresholdMode VARCHAR, IORMPercentOfPeakThroughput INTEGER, StorageArrays VARCHAR, StorageContainerID VARCHAR)`,
+		`INSERT INTO fixture.Datastore VALUES ('ds-1', 'vvol', 1073741824, 2147483648, '', 'VVOL', '["naa.001"]', false, 30, 'automatic', 90, '[{"uuid":" array-1 ","vendorId":" vendor ","modelId":"model"},{"name":"partial"}]', ' container ')`,
+		`UPDATE fixture.Host SET Datastores='[{"id":"ds-1"}]'`,
 		`CREATE TABLE fixture.VM (
                     ID VARCHAR, Name VARCHAR, Folder VARCHAR, Host VARCHAR, UUID VARCHAR, Firmware VARCHAR,
                     PowerState VARCHAR, ConnectionState VARCHAR, FaultToleranceEnabled INTEGER,
@@ -123,6 +128,24 @@ func TestCollectorWork_CollectionTimeAndStorage(t *testing.T) {
 	var stored []byte
 	g.Expect(db.QueryRowContext(ctx, "SELECT data FROM inventory LIMIT 1").Scan(&stored)).To(Succeed())
 	g.Expect(stored).To(Equal(result.Inventory))
+	var collected api.Inventory
+	g.Expect(json.Unmarshal(stored, &collected)).To(Succeed())
+	g.Expect(collected.Vcenter).NotTo(BeNil())
+	scopes := []api.InventoryData{*collected.Vcenter}
+	for _, cluster := range collected.Clusters {
+		scopes = append(scopes, cluster)
+	}
+	g.Expect(scopes).To(HaveLen(2))
+	for _, scope := range scopes {
+		datastores := scope.Infra.Datastores
+		g.Expect(datastores).To(HaveLen(1))
+		encoded, err := json.Marshal(datastores[0].StorageArrays)
+		g.Expect(err).NotTo(HaveOccurred())
+		g.Expect(string(encoded)).To(MatchJSON(`[{"uuid":"array-1","vendorId":"vendor","modelId":"model"},{"name":"partial"}]`))
+		g.Expect(datastores[0].StorageContainerId).NotTo(BeNil())
+		g.Expect(*datastores[0].StorageContainerId).To(Equal("container"))
+	}
+
 	assertCollectedStorage(g, stored,
 		`[{"device":"vmhba1","key":"hba-1","protocol":"FibreChannel","nodeWwn":"000123","portWwn":"000456"}]`,
 		`[{"canonicalName":"naa.001","key":"lun-1","vendor":"NETAPP","model":"LUN","adapterDevices":["vmhba1"]}]`)

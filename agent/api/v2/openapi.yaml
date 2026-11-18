@@ -1746,7 +1746,7 @@ components:
         - inventory
       properties:
         inventory:
-          $ref: 'https://raw.githubusercontent.com/kubev2v/migration-planner/4c26df296ca678427f46d2c7d61e7eb92a053263/api/v1alpha1/openapi.yaml#/components/schemas/UpdateInventory'
+          $ref: '../../../../migration-planner/api/v1alpha1/openapi.yaml#/components/schemas/UpdateInventory'
 
     # ── VCenter Credentials ──────────────────────────────────────────────
     VcenterCredentials:
@@ -2472,7 +2472,7 @@ components:
         group:
           $ref: '#/components/schemas/Group'
         inventory:
-          $ref: 'https://raw.githubusercontent.com/kubev2v/migration-planner/4c26df296ca678427f46d2c7d61e7eb92a053263/api/v1alpha1/openapi.yaml#/components/schemas/Inventory'
+          $ref: '../../../../migration-planner/api/v1alpha1/openapi.yaml#/components/schemas/Inventory'
         vms:
           type: array
           items:
