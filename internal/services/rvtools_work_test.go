@@ -389,12 +389,43 @@ var _ = Describe("RVTools work", func() {
 
 		const adapters = `[{"device":"vmhba1","type":"Fibre Channel","protocol":"FibreChannel","model":"adapter","driver":"driver","nodeWwn":"0000000000000123","portWwn":"0000000000000456"}]`
 		const luns = `[{"canonicalName":"naa.001","lunUuid":"000lun-uuid","vendor":"NETAPP","model":"LUN","adapterDevices":["vmhba1"]}]`
-		g := NewGomega(Fail)
-		assertCollectedStorage(g, stored.Data, adapters, luns)
+		var inventory struct {
+			VCenter struct {
+				Infra struct {
+					Hosts []map[string]json.RawMessage `json:"hosts"`
+				} `json:"infra"`
+			} `json:"vcenter"`
+		}
+		Expect(json.Unmarshal(stored.Data, &inventory)).To(Succeed())
+		Expect(inventory.VCenter.Infra.Hosts).To(HaveLen(1))
+
+		host := inventory.VCenter.Infra.Hosts[0]
+		Expect(host).To(HaveKey("storageAdapters"))
+		Expect(host).To(HaveKey("storageLuns"))
+		Expect(string(host["storageAdapters"])).To(MatchJSON(adapters))
+		Expect(string(host["storageLuns"])).To(MatchJSON(luns))
+		Expect(string(host["cpuModel"])).To(Equal(`"Xeon Gold 6338"`))
+		Expect(string(host["serialNumber"])).To(Equal(`"SN-1"`))
 
 		// Per-source inventory survives the temporary-DB append as well as aggregation.
 		subset, err := inventoryStore.GetByID(ctx, "vc-1")
 		Expect(err).NotTo(HaveOccurred())
-		assertCollectedStorage(g, subset.Data, adapters, luns)
+		var sourceInventory struct {
+			VCenter struct {
+				Infra struct {
+					Hosts []map[string]json.RawMessage `json:"hosts"`
+				} `json:"infra"`
+			} `json:"vcenter"`
+		}
+		Expect(json.Unmarshal(subset.Data, &sourceInventory)).To(Succeed())
+		Expect(sourceInventory.VCenter.Infra.Hosts).To(HaveLen(1))
+
+		sourceHost := sourceInventory.VCenter.Infra.Hosts[0]
+		Expect(sourceHost).To(HaveKey("storageAdapters"))
+		Expect(sourceHost).To(HaveKey("storageLuns"))
+		Expect(string(sourceHost["storageAdapters"])).To(MatchJSON(adapters))
+		Expect(string(sourceHost["storageLuns"])).To(MatchJSON(luns))
+		Expect(string(sourceHost["cpuModel"])).To(Equal(`"Xeon Gold 6338"`))
+		Expect(string(sourceHost["serialNumber"])).To(Equal(`"SN-1"`))
 	})
 })
