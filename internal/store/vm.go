@@ -171,7 +171,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 	var nicCount int32
 	var pvm duckdb_models.VM
 	var groups StringArray
-	var metadata duckdb.Composite[map[string][]string]
+	var metadata metadataMap
 	var hostNICs duckdb.Composite[[]models.HostPhysicalNIC]
 	var annotation string
 	var (
@@ -219,7 +219,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 	result := fromDB(pvm)
 	result.HostPhysicalNICs = hostNICs.Get()
 	result.Annotation = annotation
-	result.Metadata = metadata.Get()
+	result.Metadata = metadata
 	if result.Metadata == nil {
 		result.Metadata = make(map[string][]string)
 	}
@@ -262,12 +262,12 @@ func (s *VMStore) GetFilterOptions(ctx context.Context) (models.VMFilterOptions,
 	row := s.db.QueryRowContext(ctx, vmFilterOptionsQuery)
 
 	var clusters, datacenters, concernLabels, concernCategories, applications StringArray
-	var metadata duckdb.Composite[map[string][]string]
+	var metadata metadataMap
 	if err := row.Scan(&clusters, &datacenters, &concernLabels, &concernCategories, &applications, &metadata); err != nil {
 		return models.VMFilterOptions{}, err
 	}
 
-	values := metadata.Get()
+	values := metadata
 	if values == nil {
 		values = make(map[string][]string)
 	}
@@ -990,7 +990,7 @@ func (s *VMStore) CopyLabelsToAttached(ctx context.Context, attachAlias string, 
 	srcVinfo := cat + ".main.vinfo"
 	exclusionArr := buildExclusionArray(excludeLabels)
 	filterExpr := fmt.Sprintf(
-		`list_filter(CAST(%s."labels" AS VARCHAR[]), x -> NOT list_contains(CAST(%s AS VARCHAR[]), x))`,
+		`list_filter(CAST(%s."labels" AS VARCHAR[]), lambda x: NOT list_contains(CAST(%s AS VARCHAR[]), x))`,
 		srcVinfo, exclusionArr,
 	)
 	query, args, err := sq.Update(attachAlias+".vinfo").
@@ -1079,7 +1079,7 @@ func (s *VMStore) RemoveLabel(ctx context.Context, vmID string, label string) er
 	// Use DuckDB's list_filter with lambda to remove the specific label
 	// If label doesn't exist, this is a no-op (idempotent)
 	query, args, err := sq.Update("vinfo").
-		Set(`"labels"`, sq.Expr("list_filter(CAST(\"labels\" AS VARCHAR[]), x -> x != ?)", label)).
+		Set(`"labels"`, sq.Expr("list_filter(CAST(\"labels\" AS VARCHAR[]), lambda x: x != ?)", label)).
 		Where(sq.Eq{`"VM ID"`: vmID}).
 		ToSql()
 	if err != nil {
@@ -1107,7 +1107,7 @@ func (s *VMStore) RemoveLabelGlobally(ctx context.Context, label string) (int, e
 	// Update all VMs that have the label
 	// WHERE clause with list_contains optimizes to only update relevant VMs
 	query, args, err := sq.Update("vinfo").
-		Set(`"labels"`, sq.Expr("list_filter(CAST(\"labels\" AS VARCHAR[]), x -> x != ?)", label)).
+		Set(`"labels"`, sq.Expr("list_filter(CAST(\"labels\" AS VARCHAR[]), lambda x: x != ?)", label)).
 		Where(sq.Expr("list_contains(CAST(\"labels\" AS VARCHAR[]), ?)", label)).
 		ToSql()
 	if err != nil {
@@ -1214,7 +1214,7 @@ func (s *VMStore) RemoveLabelBatch(ctx context.Context, vmIDs []string, label st
 	}
 
 	query, args, err := sq.Update("vinfo").
-		Set(`"labels"`, sq.Expr("list_filter(CAST(\"labels\" AS VARCHAR[]), x -> x != ?)", label)).
+		Set(`"labels"`, sq.Expr("list_filter(CAST(\"labels\" AS VARCHAR[]), lambda x: x != ?)", label)).
 		Where(sq.Expr(`"VM ID" IN (SELECT unnest(?))`, vmIDs)).
 		ToSql()
 	if err != nil {

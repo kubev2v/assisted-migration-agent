@@ -257,7 +257,7 @@ SELECT
     LIST_FILTER(
         LIST_VALUE(i."Network #1", i."Network #2", i."Network #3", i."Network #4",
                    i."Network #5", i."Network #6", i."Network #7", i."Network #8"),
-        x -> x IS NOT NULL AND x != '' AND x != 'VM'
+        lambda x: x IS NOT NULL AND x != '' AND x != 'VM'
     ) AS "Networks",
     COALESCE(con.concerns, []) AS "Concerns",
     u.moid,

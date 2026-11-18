@@ -1020,6 +1020,16 @@ var _ = Describe("VMStore", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
+		It("reads VM details with deprecated lambda syntax disabled", func() {
+			db.SetMaxOpenConns(1)
+			_, err := db.ExecContext(ctx, `SET lambda_syntax = 'DISABLE_SINGLE_ARROW'`)
+			Expect(err).NotTo(HaveOccurred())
+
+			vm, err := s.VM().Get(ctx, "vm-003")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vm.ID).To(Equal("vm-003"))
+		})
+
 		DescribeTable("preserves annotation and VM identity fields in the API response", func(annotation sql.NullString, expected string) {
 			insertVMWithFolder("vm-annotation", "annotation-vm-name", "folder-annotation", "annotation-folder-name")
 			_, err := s.Querier().ExecContext(ctx, `
