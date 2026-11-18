@@ -4,6 +4,8 @@ import (
 	"database/sql/driver"
 	"fmt"
 
+	duckdb "github.com/duckdb/duckdb-go/v2"
+
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 )
 
@@ -83,6 +85,35 @@ func (n *AppProducts) Scan(value interface{}) error {
 
 func (n AppProducts) Value() (driver.Value, error) {
 	return n, nil
+}
+
+type metadataMap map[string][]string
+
+func (m *metadataMap) Scan(src any) error {
+	var entries duckdb.OrderedMap
+	err := entries.Scan(src)
+	if err != nil {
+		return err
+	}
+
+	keys, values := entries.Keys(), entries.Values()
+	result := make(metadataMap, len(keys))
+	for i, key := range keys {
+		name, ok := key.(string)
+		if !ok {
+			return fmt.Errorf("expected metadata key to be string, got %T", key)
+		}
+
+		var tags StringArray
+		err = tags.Scan(values[i])
+		if err != nil {
+			return fmt.Errorf("scanning metadata values for %q: %w", name, err)
+		}
+		result[name] = tags
+	}
+
+	*m = result
+	return nil
 }
 
 func toString(v interface{}) string {

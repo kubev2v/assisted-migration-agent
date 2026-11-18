@@ -65,10 +65,10 @@ RUN microdnf install -y wget gzip ca-certificates && \
 
 WORKDIR /extensions
 
-# Download sqlite_scanner extension for DuckDB v1.4.3, verified against pinned SHA-256 checksums
-ARG DUCKDB_VERSION=v1.4.3
-ARG DUCKDB_SQLITE_SCANNER_SHA256_AMD64=75ead0bb623cd67c8c7e40d30f96e5fc2823fd3df90eb2ecd289aae177b15820
-ARG DUCKDB_SQLITE_SCANNER_SHA256_ARM64=03aa6ee4f8c4044d179b08632f3836cfd1cc426a50b8d687444847adb801888b
+# Download sqlite_scanner for the DuckDB version linked by the Go driver.
+ARG DUCKDB_VERSION=v2.0.0
+ARG DUCKDB_SQLITE_SCANNER_SHA256_AMD64=59b8a0ba6d7599d4aa584bd24e8b4cc3247076bb174157f43e110e56e6c72e86
+ARG DUCKDB_SQLITE_SCANNER_SHA256_ARM64=49b2ff354ea10f797fde7609d2be58e3b141130371e500bb4a94aeee9ef4f3a1
 RUN case "$(uname -m)" in \
         x86_64) platform=linux_amd64; checksum=${DUCKDB_SQLITE_SCANNER_SHA256_AMD64} ;; \
         aarch64) platform=linux_arm64; checksum=${DUCKDB_SQLITE_SCANNER_SHA256_ARM64} ;; \
