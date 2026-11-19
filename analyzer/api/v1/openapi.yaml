@@ -442,31 +442,6 @@ paths:
         '500':
           description: Internal server error
 
-  /groups/{groupId}/applications:
-    get:
-      tags:
-      - Groups
-      summary: List detected applications for a group
-      operationId: listGroupApplications
-      parameters:
-      - name: groupId
-        in: path
-        required: true
-        description: Group ID
-        schema:
-          type: string
-      responses:
-        '200':
-          description: List of detected applications
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApplicationListResponse'
-        '404':
-          description: No collections or group not found
-        '500':
-          description: Internal server error
-
   /inventory:
     get:
       tags:
@@ -1598,6 +1573,9 @@ components:
         name:
           type: string
           description: Display name of the VirtualMachine
+        annotation:
+          type: string
+          description: Free-text notes/description for the VirtualMachine in vSphere
         vCenterID:
           type: string
           description: Identifier of the vCenter this VirtualMachine belongs to
@@ -1685,6 +1663,14 @@ components:
         faultToleranceEnabled:
           type: boolean
           description: Whether Fault Tolerance is enabled
+        metadata:
+          type: object
+          readOnly: true
+          description: Tags and custom attributes collected from vCenter or RVTools, grouped by tag category name, custom attribute name, or RVTools column header. Empty object when absent. vCenter tags with unresolved category names are omitted.
+          additionalProperties:
+            type: array
+            items:
+              type: string
         nestedHVEnabled:
           type: boolean
           description: Whether nested virtualization is enabled
@@ -2112,51 +2098,6 @@ components:
           x-oapi-codegen-extra-tags:
             binding: omitempty,min=1
 
-    ApplicationListResponse:
-      type: object
-      required:
-      - applications
-      properties:
-        applications:
-          type: array
-          items:
-            $ref: '#/components/schemas/ApplicationOverview'
-
-    ApplicationOverview:
-      type: object
-      required:
-      - name
-      - description
-      - vmCount
-      - vms
-      properties:
-        name:
-          type: string
-          description: Application name
-        description:
-          type: string
-          description: Application description
-        vmCount:
-          type: integer
-          description: Number of VMs running this application
-        vms:
-          type: array
-          items:
-            $ref: '#/components/schemas/ApplicationVM'
-
-    ApplicationVM:
-      type: object
-      required:
-      - id
-      - name
-      properties:
-        id:
-          type: string
-          description: VM ID
-        name:
-          type: string
-          description: VM name
-
     VirtualMachineUpdateRequest:
       type: object
       properties:
@@ -2198,7 +2139,15 @@ components:
       - concernLabels
       - concernCategories
       - applications
+      - metadata
       properties:
+        metadata:
+          type: object
+          description: Distinct metadata values grouped by key, available for VM filtering.
+          additionalProperties:
+            type: array
+            items:
+              type: string
         clusters:
           type: array
           items:

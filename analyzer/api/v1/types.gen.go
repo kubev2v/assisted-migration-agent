@@ -65,33 +65,6 @@ type AnalyzerStatus struct {
 // AnalyzerStatusStatus defines model for AnalyzerStatus.Status.
 type AnalyzerStatusStatus string
 
-// ApplicationListResponse defines model for ApplicationListResponse.
-type ApplicationListResponse struct {
-	Applications []ApplicationOverview `json:"applications"`
-}
-
-// ApplicationOverview defines model for ApplicationOverview.
-type ApplicationOverview struct {
-	// Description Application description
-	Description string `json:"description"`
-
-	// Name Application name
-	Name string `json:"name"`
-
-	// VmCount Number of VMs running this application
-	VmCount int             `json:"vmCount"`
-	Vms     []ApplicationVM `json:"vms"`
-}
-
-// ApplicationVM defines model for ApplicationVM.
-type ApplicationVM struct {
-	// Id VM ID
-	Id string `json:"id"`
-
-	// Name VM name
-	Name string `json:"name"`
-}
-
 // BatchUpdateExclusionRequest defines model for BatchUpdateExclusionRequest.
 type BatchUpdateExclusionRequest struct {
 	// MigrationExcluded Exclusion state to set for all VMs
@@ -422,6 +395,9 @@ type VMFilterOptionsResponse struct {
 
 	// Datacenters Distinct datacenter names
 	Datacenters []string `json:"datacenters"`
+
+	// Metadata Distinct metadata values grouped by key, available for VM filtering.
+	Metadata map[string][]string `json:"metadata"`
 }
 
 // VMLabelsResponse defines model for VMLabelsResponse.
@@ -544,6 +520,9 @@ type VirtualMachineDatastore struct {
 
 // VirtualMachineDetail defines model for VirtualMachineDetail.
 type VirtualMachineDetail struct {
+	// Annotation Free-text notes/description for the VirtualMachine in vSphere
+	Annotation *string `json:"annotation,omitempty"`
+
 	// Cluster Cluster name
 	Cluster *string `json:"cluster,omitempty"`
 
@@ -605,6 +584,9 @@ type VirtualMachineDetail struct {
 
 	// MemoryMB Memory in megabytes
 	MemoryMB int32 `json:"memoryMB"`
+
+	// Metadata Tags and custom attributes collected from vCenter or RVTools, grouped by tag category name, custom attribute name, or RVTools column header. Empty object when absent. vCenter tags with unresolved category names are omitted.
+	Metadata *map[string][]string `json:"metadata,omitempty"`
 
 	// Migratable Whether the VirtualMachine can be migrated
 	Migratable *bool `json:"migratable,omitempty"`
