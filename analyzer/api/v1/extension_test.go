@@ -19,6 +19,17 @@ func TestExtension(t *testing.T) {
 }
 
 var _ = Describe("NewVirtualMachineDetailFromModel", func() {
+	It("returns an empty metadata object and omits unavailable notes", func() {
+		detail := v1.NewVirtualMachineDetailFromModel(models.VM{})
+
+		raw, err := json.Marshal(detail)
+		Expect(err).NotTo(HaveOccurred())
+		var fields map[string]json.RawMessage
+		Expect(json.Unmarshal(raw, &fields)).To(Succeed())
+		Expect(string(fields["metadata"])).To(MatchJSON(`{}`))
+		Expect(fields).NotTo(HaveKey("annotation"))
+	})
+
 	It("includes a zero NIC count in JSON", func() {
 		detail := v1.NewVirtualMachineDetailFromModel(models.VM{})
 		raw, err := json.Marshal(detail)

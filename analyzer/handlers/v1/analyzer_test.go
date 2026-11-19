@@ -2,6 +2,8 @@ package analyzer_test
 
 import (
 	"bytes"
+	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
@@ -24,6 +27,8 @@ import (
 	"github.com/kubev2v/assisted-migration-agent/internal/config"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/services"
+	"github.com/kubev2v/assisted-migration-agent/internal/store"
+	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
 
@@ -53,6 +58,74 @@ func (s *testServices) GetCollectorStatus() models.CollectorStatus {
 func (s *testServices) StopCollecting() error {
 	return s.startErr
 }
+
+type vmServices struct {
+	analyzer.ServiceProvider
+	vm *services.VMService
+}
+
+func (s vmServices) LatestVirtualMachineService() (*services.VMService, error) {
+	return s.vm, nil
+}
+
+func (s vmServices) VirtualMachineService(_ string) (*services.VMService, error) {
+	return s.vm, nil
+}
+
+var _ = Describe("Analyzer VM metadata", func() {
+	DescribeTable("returns VM details and tag filter options", func(collectionPath string) {
+		ctx := context.Background()
+		dbPath := filepath.Join(GinkgoT().TempDir(), "collection.duckdb")
+		pool := store.NewPool(time.Minute)
+		DeferCleanup(pool.Close)
+
+		db, err := pool.NewDatabase("collection", dbPath, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		Expect(err).NotTo(HaveOccurred())
+		pool.Add(db)
+
+		st, err := db.Store()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(duckdb_parser.New(st.Querier(), nil).Init()).To(Succeed())
+		Expect(db.Migrate(ctx, func(ctx context.Context, db *sql.DB) error {
+			return migrations.RunCollection(ctx, db, "collection")
+		})).To(Succeed())
+
+		_, err = st.Querier().ExecContext(ctx, `
+			INSERT INTO vinfo ("VM ID", "VM", "Annotation")
+			VALUES ('vm-001', 'db-server', 'Database maintenance notes');
+			INSERT INTO vm_metadata (vm_id, key, value) VALUES
+				('vm-001', 'Environment', 'Production'),
+				('vm-001', 'Environment', 'QA'),
+				('vm-001', 'Owner', 'Finance');
+		`)
+		Expect(err).NotTo(HaveOccurred())
+
+		gin.SetMode(gin.TestMode)
+		router := gin.New()
+		svc := vmServices{vm: services.NewVMService(st)}
+		v1.RegisterHandlers(router.Group("/api/v1"), analyzer.NewHandler(config.Configuration{}, svc))
+		vmPath := "/api/v1" + collectionPath + "/virtualmachines"
+		wantMetadata := `{"Environment": ["Production", "QA"], "Owner": ["Finance"]}`
+
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, vmPath+"/vm-001", nil))
+		Expect(response.Code).To(Equal(http.StatusOK), response.Body.String())
+		var detail map[string]json.RawMessage
+		Expect(json.Unmarshal(response.Body.Bytes(), &detail)).To(Succeed())
+		Expect(string(detail["metadata"])).To(MatchJSON(wantMetadata))
+		Expect(string(detail["annotation"])).To(MatchJSON(`"Database maintenance notes"`))
+
+		response = httptest.NewRecorder()
+		router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, vmPath+"/filter-options", nil))
+		Expect(response.Code).To(Equal(http.StatusOK), response.Body.String())
+		var options map[string]json.RawMessage
+		Expect(json.Unmarshal(response.Body.Bytes(), &options)).To(Succeed())
+		Expect(string(options["metadata"])).To(MatchJSON(wantMetadata))
+	},
+		Entry("from the latest collection", ""),
+		Entry("from a named collection", "/collections/collection"),
+	)
+})
 
 type inventoryDeleteServices struct {
 	analyzer.ServiceProvider
@@ -147,6 +220,12 @@ var _ = Describe("Analyzer API", func() {
 			"vm inspection",
 			http.MethodDelete,
 			"/api/v1/virtualmachines/vm-1/inspection",
+		),
+
+		Entry(
+			"group applications",
+			http.MethodGet,
+			"/api/v1/groups/11111111-1111-1111-1111-111111111111/applications",
 		),
 
 		Entry(
