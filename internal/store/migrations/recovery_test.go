@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -132,6 +133,7 @@ func TestRecoveryPreservesBaselineData(t *testing.T) {
 			folder := t.TempDir()
 			r, err := NewRecovery(folder)
 			require.NoError(t, err)
+			baselineVersion := len(r.registries[CollectionSchema])
 			seedMain(t, folder)
 			seedCollection(t, folder, "collection_100.duckdb", preexisting, true)
 			seedCollection(t, folder, "collection_200.duckdb", true, true)
@@ -145,8 +147,8 @@ func TestRecoveryPreservesBaselineData(t *testing.T) {
 			require.NoError(t, err)
 			var manifest Manifest
 			require.NoError(t, json.Unmarshal(original, &manifest))
-			require.Equal(t, []int{1, 2, 3, 4}, manifest.Databases[0].Versions)
-			require.Equal(t, []int{1, 2, 3, 4}, manifest.Databases[1].Versions)
+			require.Equal(t, versionsThrough(baselineVersion), manifest.Databases[0].Versions)
+			require.Equal(t, versionsThrough(baselineVersion), manifest.Databases[1].Versions)
 			require.Equal(t, []int{1}, manifest.Databases[2].Versions)
 			_, err = r.Run(context.Background(), request)
 			require.ErrorContains(t, err, "creating new attempt")
@@ -157,8 +159,8 @@ func TestRecoveryPreservesBaselineData(t *testing.T) {
 			request.Operation = "apply"
 			result, err := r.Run(context.Background(), request)
 			require.NoError(t, err)
-			require.Equal(t, []int{5}, result.Databases[0].Steps)
-			require.Equal(t, []int{5}, result.Databases[1].Steps)
+			require.Equal(t, []int{baselineVersion + 1}, result.Databases[0].Steps)
+			require.Equal(t, []int{baselineVersion + 1}, result.Databases[1].Steps)
 			request.Operation = "verify"
 			_, err = r.Run(context.Background(), request)
 			require.Error(t, err)
@@ -167,7 +169,7 @@ func TestRecoveryPreservesBaselineData(t *testing.T) {
 			request.Operation, request.DryRun = "rollback", true
 			result, err = r.Run(context.Background(), request)
 			require.NoError(t, err)
-			require.Equal(t, []int{5}, result.Databases[0].Steps)
+			require.Equal(t, []int{baselineVersion + 1}, result.Databases[0].Steps)
 			after, err = os.ReadFile(filepath.Join(folder, "collection_100.duckdb"))
 			require.NoError(t, err)
 			require.Equal(t, before, after, "dry-run must not change database bytes")
@@ -291,7 +293,7 @@ func TestRecoveryPreflightsEveryDatabase(t *testing.T) {
 	db = testDatabase(t, filepath.Join(folder, "collection_100.duckdb"))
 	var version int
 	require.NoError(t, db.QueryRow(`SELECT max(version) FROM collection_schema_migrations`).Scan(&version))
-	require.Equal(t, 5, version, "earlier databases must stay unchanged when a later preflight fails")
+	require.Equal(t, len(r.registries[CollectionSchema]), version, "earlier databases must stay unchanged when a later preflight fails")
 	require.NoError(t, db.Close())
 }
 
@@ -391,6 +393,10 @@ func seedCollection(t *testing.T, folder, name string, preexisting, latest bool)
 	_, err := db.Exec(`CREATE TABLE vinfo ("VM ID" VARCHAR PRIMARY KEY);
 		CREATE TABLE vdisk ("VM ID" VARCHAR);
 		CREATE TABLE vdatastore ("Name" VARCHAR);
+		CREATE TABLE vnetwork ("VM ID" VARCHAR);
+		CREATE TABLE dvport ("Port" VARCHAR);
+		CREATE TABLE vport ("Host" VARCHAR);
+		CREATE TABLE dvswitch ("Name" VARCHAR);
 		CREATE TABLE collection_schema_migrations (version INTEGER PRIMARY KEY, applied_at TIMESTAMP DEFAULT now());`)
 	require.NoError(t, err)
 	content, err := collectionMigrationFiles.ReadFile("collection/up/001_initial.sql")
@@ -415,6 +421,7 @@ func TestRecoveryResumesBetweenDatabases(t *testing.T) {
 	folder := t.TempDir()
 	r, err := NewRecovery(folder)
 	require.NoError(t, err)
+	baselineVersion := len(r.registries[CollectionSchema])
 	seedMain(t, folder)
 	seedCollection(t, folder, "collection_100.duckdb", false, true)
 	seedCollection(t, folder, "collection_200.duckdb", false, true)
@@ -434,13 +441,13 @@ func TestRecoveryResumesBetweenDatabases(t *testing.T) {
 	// Model a process stopping after the first database's committed down step.
 	baseline := manifest.Databases[0]
 	db := testDatabase(t, filepath.Join(folder, baseline.Path))
-	require.NoError(t, executeMigration(context.Background(), db, historyTable(CollectionSchema), 5, r.registries[CollectionSchema][4].Down, true))
+	require.NoError(t, executeMigration(context.Background(), db, historyTable(CollectionSchema), baselineVersion+1, r.registries[CollectionSchema][baselineVersion].Down, true))
 	require.NoError(t, db.Close())
 	request.Operation = "rollback"
 	result, err := r.Run(context.Background(), request)
 	require.NoError(t, err)
 	require.Empty(t, result.Databases[0].Steps)
-	require.Equal(t, []int{5}, result.Databases[1].Steps)
+	require.Equal(t, []int{baselineVersion + 1}, result.Databases[1].Steps)
 	request.Operation = "verify"
 	_, err = r.Run(context.Background(), request)
 	require.NoError(t, err)
@@ -455,6 +462,7 @@ func TestRecoveryIgnoresUnrelatedSchemaChanges(t *testing.T) {
 	folder := t.TempDir()
 	r, err := NewRecovery(folder)
 	require.NoError(t, err)
+	baselineVersion := len(r.registries[CollectionSchema])
 	seedMain(t, folder)
 	seedCollection(t, folder, "collection_100.duckdb", false, true)
 	seedCollection(t, folder, "collection_200.duckdb", false, true)
@@ -480,7 +488,7 @@ func TestRecoveryIgnoresUnrelatedSchemaChanges(t *testing.T) {
 		db := testDatabase(t, filepath.Join(folder, name))
 		var version int
 		require.NoError(t, db.QueryRow(`SELECT max(version) FROM collection_schema_migrations`).Scan(&version))
-		require.Equal(t, 4, version)
+		require.Equal(t, baselineVersion, version)
 		require.NoError(t, db.Close())
 	}
 
@@ -517,6 +525,7 @@ func TestRecoveryRejectsManifestBelowPermanentBaseline(t *testing.T) {
 	folder := t.TempDir()
 	r, err := NewRecovery(folder)
 	require.NoError(t, err)
+	baselineVersion := len(r.registries[CollectionSchema])
 	seedMain(t, folder)
 	seedCollection(t, folder, "collection_100.duckdb", true, true)
 	addCollectionUpgrade(r)
@@ -545,7 +554,7 @@ func TestRecoveryRejectsManifestBelowPermanentBaseline(t *testing.T) {
 	db := testDatabase(t, filepath.Join(folder, "collection_100.duckdb"))
 	var version int
 	require.NoError(t, db.QueryRow(`SELECT max(version) FROM collection_schema_migrations`).Scan(&version))
-	require.Equal(t, 5, version)
+	require.Equal(t, baselineVersion+1, version)
 	require.NoError(t, db.Close())
 }
 
@@ -553,11 +562,12 @@ func TestRecoveryResumesAfterLaterDownSQLFails(t *testing.T) {
 	folder := t.TempDir()
 	r, err := NewRecovery(folder)
 	require.NoError(t, err)
+	baselineVersion := len(r.registries[CollectionSchema])
 	seedMain(t, folder)
 	seedCollection(t, folder, "collection_100.duckdb", false, true)
 	seedCollection(t, folder, "collection_200.duckdb", false, true)
 	r.registries[CollectionSchema] = append(r.registries[CollectionSchema], migration{
-		Version: 5,
+		Version: baselineVersion + 1,
 		Name:    "rollback_gate",
 		Up:      `CREATE TABLE rollback_gate (allow_down BOOLEAN); INSERT INTO rollback_gate VALUES (false);`,
 		Down:    `SELECT CASE WHEN (SELECT allow_down FROM rollback_gate) THEN 1 ELSE error('blocked') END; DROP TABLE rollback_gate;`,
@@ -576,15 +586,15 @@ func TestRecoveryResumesAfterLaterDownSQLFails(t *testing.T) {
 	request.Operation = "rollback"
 	_, err = r.Run(context.Background(), request)
 	require.ErrorContains(t, err, "collection_200.duckdb")
-	require.ErrorContains(t, err, "migration 5")
+	require.ErrorContains(t, err, fmt.Sprintf("migration %d", baselineVersion+1))
 	for _, name := range []string{"collection_100.duckdb", "collection_200.duckdb"} {
 		db := testDatabase(t, filepath.Join(folder, name))
 		var version int
 		require.NoError(t, db.QueryRow(`SELECT max(version) FROM collection_schema_migrations`).Scan(&version))
 		if name == "collection_100.duckdb" {
-			require.Equal(t, 4, version, "earlier down steps commit without previewing later SQL")
+			require.Equal(t, baselineVersion, version, "earlier down steps commit without previewing later SQL")
 		} else {
-			require.Equal(t, 5, version, "the failed step retains its migration history")
+			require.Equal(t, baselineVersion+1, version, "the failed step retains its migration history")
 		}
 		require.NoError(t, db.Close())
 	}
@@ -623,14 +633,15 @@ func TestRecoveryStopsAtRecordedStartingVersion(t *testing.T) {
 	folder := t.TempDir()
 	r, err := NewRecovery(folder)
 	require.NoError(t, err)
+	baselineVersion := len(r.registries[CollectionSchema])
 	seedMain(t, folder)
 	seedCollection(t, folder, "collection_100.duckdb", true, true)
 	addCollectionUpgrade(r)
 	db := testDatabase(t, filepath.Join(folder, "collection_100.duckdb"))
-	require.NoError(t, executeMigration(context.Background(), db, historyTable(CollectionSchema), 5, r.registries[CollectionSchema][4].Up, false))
+	require.NoError(t, executeMigration(context.Background(), db, historyTable(CollectionSchema), baselineVersion+1, r.registries[CollectionSchema][baselineVersion].Up, false))
 	require.NoError(t, db.Close())
 	r.registries[CollectionSchema] = append(r.registries[CollectionSchema], migration{
-		Version: 6,
+		Version: baselineVersion + 2,
 		Name:    "next_upgrade",
 		Up:      `ALTER TABLE upgrade_notes ADD COLUMN extra VARCHAR;`,
 		Down:    `ALTER TABLE upgrade_notes DROP COLUMN extra;`,
@@ -644,8 +655,8 @@ func TestRecoveryStopsAtRecordedStartingVersion(t *testing.T) {
 	request.Operation = "rollback"
 	result, err := r.Run(context.Background(), request)
 	require.NoError(t, err)
-	require.Equal(t, []int{6}, result.Databases[0].Steps)
-	require.Equal(t, []int{1, 2, 3, 4, 5}, result.Databases[0].Versions)
+	require.Equal(t, []int{baselineVersion + 2}, result.Databases[0].Steps)
+	require.Equal(t, versionsThrough(baselineVersion+1), result.Databases[0].Versions)
 	request.Operation = "verify"
 	_, err = r.Run(context.Background(), request)
 	require.NoError(t, err)
@@ -658,9 +669,19 @@ func TestRecoveryStopsAtRecordedStartingVersion(t *testing.T) {
 
 func addCollectionUpgrade(r *Recovery) {
 	r.registries[CollectionSchema] = append(r.registries[CollectionSchema], migration{
-		Version: 5,
+		Version: len(r.registries[CollectionSchema]) + 1,
 		Name:    "upgrade_notes",
 		Up:      `CREATE TABLE upgrade_notes (value VARCHAR); INSERT INTO upgrade_notes VALUES ('candidate');`,
 		Down:    `DROP TABLE upgrade_notes;`,
 	})
+}
+
+func versionsThrough(n int) []int {
+	versions := make([]int, n)
+
+	for i := range versions {
+		versions[i] = i + 1
+	}
+
+	return versions
 }

@@ -3,8 +3,10 @@ package migrations_test
 import (
 	"context"
 	"database/sql"
+	"encoding/csv"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -38,6 +40,11 @@ func TestApplicationCatalogMigrationUpgradesExistingCollection(t *testing.T) {
 			PRIMARY KEY (app_name, vm_id)
 		);
 		INSERT INTO vm_applications VALUES ('Existing App', 'Existing', 'vm-1', 'old-vm');
+		CREATE TABLE vinfo ("VM ID" VARCHAR PRIMARY KEY);
+		CREATE TABLE vnetwork ("VM ID" VARCHAR);
+		CREATE TABLE dvport ("Port" VARCHAR);
+		CREATE TABLE vport ("Host" VARCHAR);
+		CREATE TABLE dvswitch ("Name" VARCHAR);
 	`)
 	require.NoError(t, err)
 	require.NoError(t, migrations.RunCollection(ctx, db, "memory"))
@@ -208,6 +215,208 @@ var _ = Describe("Migrations", func() {
 		})
 	})
 })
+
+var _ = DescribeTableSubtree("Network topology collection migration",
+	func(legacy bool) {
+		var ctx context.Context
+		var db *sql.DB
+		var downSQL []byte
+		var folder string
+
+		BeforeEach(func() {
+			ctx = context.Background()
+			var err error
+			folder = GinkgoT().TempDir()
+			db, err = sql.Open("duckdb", filepath.Join(folder, "collection_100.duckdb"))
+			Expect(err).NotTo(HaveOccurred())
+			DeferCleanup(db.Close)
+			Expect(duckdb_parser.New(db, nil).Init()).To(Succeed())
+			Expect(migrations.RunCollection(ctx, db, "collection_100")).To(Succeed())
+			_, err = db.Exec(`DELETE FROM collection_schema_migrations WHERE version = 5`)
+			Expect(err).NotTo(HaveOccurred())
+
+			if legacy {
+				_, err = db.Exec(`
+					DROP TABLE vsc_vmk;
+					DROP TABLE vswitch;
+					DROP TABLE vnetwork;
+					DROP TABLE dvport;
+					DROP TABLE vport;
+					DROP TABLE dvswitch;
+
+					CREATE TABLE vnetwork (
+					    "VM ID" VARCHAR,
+					    "Network" VARCHAR,
+					    "Mac Address" VARCHAR,
+					    "NIC label" VARCHAR,
+					    "Adapter" VARCHAR,
+					    "Switch" VARCHAR,
+					    "Connected" BOOLEAN DEFAULT false,
+					    "Starts Connected" BOOLEAN DEFAULT false,
+					    "Type" VARCHAR,
+					    "IPv4 Addresses" VARCHAR[] DEFAULT [],
+					    "IPv6 Addresses" VARCHAR[] DEFAULT [],
+					    "VLAN" VARCHAR,
+					    "Cluster" VARCHAR,
+					    FOREIGN KEY ("VM ID") REFERENCES vinfo("VM ID")
+					);
+
+					CREATE TABLE dvport (
+					    "Port" VARCHAR,
+					    "VLAN" VARCHAR,
+					    "Switch" VARCHAR
+					);
+
+					CREATE TABLE vport (
+					    "Host" VARCHAR,
+					    "Port Group" VARCHAR,
+					    "Switch" VARCHAR,
+					    "VLAN" VARCHAR
+					);
+
+					CREATE TABLE dvswitch ("Name" VARCHAR);
+				`)
+				Expect(err).NotTo(HaveOccurred())
+			}
+
+			_, err = db.Exec(`
+				INSERT INTO vinfo ("VM ID", "VM", "Host")
+				VALUES ('vm-1', 'saved-vm', 'host-1');
+
+				INSERT INTO vnetwork ("VM ID", "Network", "Mac Address", "Type")
+				VALUES ('vm-1', 'management', '01', 'assigned');
+
+				INSERT INTO vport ("Host", "Port Group", "Switch", "VLAN")
+				VALUES ('host-1', 'management', 'vSwitch0', '0');
+
+				INSERT INTO dvport ("Port", "VLAN", "Switch")
+				VALUES ('storage', '10', 'distributed');
+
+				INSERT INTO dvswitch ("Name")
+				VALUES ('distributed');
+			`)
+			Expect(err).NotTo(HaveOccurred())
+
+			downSQL, err = os.ReadFile("collection/down/005_network_topology.sql")
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("keeps existing VM details readable after upgrading", func() {
+			Expect(migrations.RunCollection(ctx, db, "collection_100")).To(Succeed())
+			vm, err := store.NewVMStore(db).Get(ctx, "vm-1")
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vm.Name).To(Equal("saved-vm"))
+			Expect(vm.HostVMkernelInterfaces).To(BeEmpty())
+			Expect(vm.NICs).To(HaveLen(1))
+			Expect(vm.NICs[0].MAC).To(Equal("01"))
+			Expect(vm.NICs[0].Network).To(Equal("management"))
+		})
+
+		DescribeTable("keeps exports readable after upgrading", func(scope string) {
+			Expect(migrations.RunCollection(ctx, db, "collection_100")).To(Succeed())
+			path := filepath.Join(GinkgoT().TempDir(), scope+".csv")
+			Expect(store.NewExportStore(db).CopyScope(ctx, scope, path)).To(Succeed())
+
+			file, err := os.Open(path)
+			Expect(err).NotTo(HaveOccurred())
+			DeferCleanup(file.Close)
+			rows, err := csv.NewReader(file).ReadAll()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(rows).To(HaveLen(2))
+		},
+			Entry("VM CSV", "vms"),
+			Entry("network CSV", "network"),
+		)
+
+		DescribeTable("restores the old table shape and records on downgrade", func(table, expected string) {
+			Expect(migrations.RunCollection(ctx, db, "collection_100")).To(Succeed())
+			_, err := db.Exec(string(downSQL))
+			Expect(err).NotTo(HaveOccurred())
+
+			var record string
+			Expect(db.QueryRow(`SELECT CAST(to_json(t) AS VARCHAR) FROM ` + table + ` t`).Scan(&record)).To(Succeed())
+			Expect(record).To(MatchJSON(expected))
+		},
+			Entry("standard port group", "vport", `{"Host":"host-1","Port Group":"management","Switch":"vSwitch0","VLAN":"0"}`),
+			Entry("distributed port group", "dvport", `{"Port":"storage","VLAN":"10","Switch":"distributed"}`),
+			Entry("distributed switch", "dvswitch", `{"Name":"distributed"}`),
+			Entry("VM adapter", "vnetwork", `{
+    "VM ID":"vm-1", "Network":"management", "Mac Address":"01",
+    "NIC label":null, "Adapter":null, "Switch":null,
+    "Connected":false, "Starts Connected":false, "Type":"assigned",
+    "IPv4 Addresses":[], "IPv6 Addresses":[], "VLAN":null, "Cluster":null
+}`),
+		)
+
+		It("removes only the new tables on downgrade", func() {
+			Expect(migrations.RunCollection(ctx, db, "collection_100")).To(Succeed())
+			_, err := db.Exec(string(downSQL))
+			Expect(err).NotTo(HaveOccurred())
+
+			var count int
+			Expect(db.QueryRow(`
+				SELECT count(*)
+				FROM information_schema.tables
+				WHERE table_name IN ('vswitch', 'vsc_vmk')
+			`).Scan(&count)).To(Succeed())
+			Expect(count).To(BeZero())
+			var name string
+			Expect(db.QueryRow(`SELECT "VM" FROM vinfo WHERE "VM ID" = 'vm-1'`).Scan(&name)).To(Succeed())
+			Expect(name).To(Equal("saved-vm"))
+		})
+
+		It("can upgrade again after a downgrade", func() {
+			Expect(migrations.RunCollection(ctx, db, "collection_100")).To(Succeed())
+			_, err := db.Exec(string(downSQL))
+			Expect(err).NotTo(HaveOccurred())
+			_, err = db.Exec(`DELETE FROM collection_schema_migrations WHERE version = 5`)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(migrations.RunCollection(ctx, db, "collection_100")).To(Succeed())
+			vm, err := store.NewVMStore(db).Get(ctx, "vm-1")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vm.NICs).To(HaveLen(1))
+		})
+
+		It("rolls back through offline recovery and restores migration history", func() {
+			mainDB, err := sql.Open("duckdb", filepath.Join(folder, "agent.duckdb"))
+			Expect(err).NotTo(HaveOccurred())
+			DeferCleanup(mainDB.Close)
+			Expect(migrations.RunMain(ctx, mainDB)).To(Succeed())
+			Expect(mainDB.Close()).To(Succeed())
+			Expect(db.Close()).To(Succeed())
+
+			recovery, err := migrations.NewRecovery(folder)
+			Expect(err).NotTo(HaveOccurred())
+			request := migrations.Request{
+				Operation: "prepare", AttemptID: "network-upgrade",
+				PreviousImage:  "sha256:" + strings.Repeat("a", 64),
+				CandidateImage: "sha256:" + strings.Repeat("b", 64),
+			}
+			_, err = recovery.Run(ctx, request)
+			Expect(err).NotTo(HaveOccurred())
+			request.Operation = "apply"
+			_, err = recovery.Run(ctx, request)
+			Expect(err).NotTo(HaveOccurred())
+			request.Operation = "rollback"
+			_, err = recovery.Run(ctx, request)
+			Expect(err).NotTo(HaveOccurred())
+			request.Operation = "verify"
+			_, err = recovery.Run(ctx, request)
+			Expect(err).NotTo(HaveOccurred())
+
+			db, err = sql.Open("duckdb", filepath.Join(folder, "collection_100.duckdb"))
+			Expect(err).NotTo(HaveOccurred())
+			DeferCleanup(db.Close)
+			var version int
+			Expect(db.QueryRow(`SELECT max(version) FROM collection_schema_migrations`).Scan(&version)).To(Succeed())
+			Expect(version).To(Equal(4))
+		})
+	},
+	Entry("existing collection", true),
+	Entry("fresh collection", false),
+)
 
 var _ = Describe("RDM LUN UUID collection migration", func() {
 	It("preserves disk data when the migration is applied again", func() {

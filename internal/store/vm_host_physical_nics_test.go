@@ -75,8 +75,8 @@ var _ = Describe("VM host physical NICs", func() {
      ('esxi-2','host-2','vmnic0',25000), ('',NULL,'unowned',1000), (NULL,NULL,'unowned-null',1000)`)
 		Expect(err).NotTo(HaveOccurred())
 		want := map[string]string{
-			"vm-1": `[{"id":"vmnic0","linkSpeedMbps":10000},{"id":"vmnic1"}]`,
-			"vm-2": `[{"id":"vmnic0","linkSpeedMbps":10000},{"id":"vmnic1"}]`,
+			"vm-1": `[{"id":"vmnic0","linkSpeedMbps":10000},{"id":"vmnic1","linkSpeedMbps":null}]`,
+			"vm-2": `[{"id":"vmnic0","linkSpeedMbps":10000},{"id":"vmnic1","linkSpeedMbps":null}]`,
 			"vm-3": `[{"id":"vmnic0","linkSpeedMbps":25000}]`,
 			"vm-4": `[]`, "vm-5": `[]`, "vm-6": `[]`,
 		}
@@ -107,7 +107,8 @@ var _ = Describe("VM host physical NICs", func() {
 			idCol := slices.Index(rows[0], "id")
 			nicCol := slices.Index(rows[0], "host_physical_nics")
 			Expect(idCol).To(BeNumerically(">=", 0))
-			Expect(nicCol).To(Equal(len(rows[0]) - 1))
+			Expect(nicCol).To(Equal(len(rows[0]) - 2))
+			Expect(rows[0][nicCol+1]).To(Equal("host_vmkernel_interfaces"))
 			Expect(rows[0]).To(ContainElement("network_1"))
 			seen := map[string]bool{}
 			for _, row := range rows[1:] {
@@ -279,8 +280,8 @@ var _ = Describe("VM host physical NICs", func() {
 			Expect(count).To(Equal(3))
 		}
 		want := map[string]string{
-			"vm-1": `[{"id":"vmnic0","linkSpeedMbps":10000},{"id":"vmnic1"}]`,
-			"vm-2": `[{"id":"vmnic0","linkSpeedMbps":10000},{"id":"vmnic1"}]`,
+			"vm-1": `[{"id":"vmnic0","linkSpeedMbps":10000},{"id":"vmnic1","linkSpeedMbps":null}]`,
+			"vm-2": `[{"id":"vmnic0","linkSpeedMbps":10000},{"id":"vmnic1","linkSpeedMbps":null}]`,
 			"vm-3": `[{"id":"vmnic0","linkSpeedMbps":25000}]`,
 			"vm-4": `[]`,
 		}

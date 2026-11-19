@@ -55,6 +55,10 @@ INSERT INTO vdisk ("VM ID", "Disk Key", "Path", "Disk Path", "Capacity MiB") VAL
 		Expect(err).NotTo(HaveOccurred())
 		topology, err = duckdb_parser.VMStorageTopologyQuery(ctx, db)
 		Expect(err).NotTo(HaveOccurred())
+		network, err := duckdb_parser.NetworkTopologyQuery()
+		Expect(err).NotTo(HaveOccurred())
+
+		topology += ", " + network
 		// Inspect the production CTE results before the final VM join can hide
 		// unnecessary topology aggregation for unrelated datastores.
 		var ok bool
