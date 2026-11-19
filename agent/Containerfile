@@ -104,9 +104,9 @@ RUN microdnf install -y wget gzip && \
 
 WORKDIR /extensions
 
-# Download sqlite_scanner extension for DuckDB v1.4.3 linux_amd64, verified against a pinned SHA-256
-ARG DUCKDB_VERSION=v1.4.3
-ARG DUCKDB_SQLITE_SCANNER_SHA256=75ead0bb623cd67c8c7e40d30f96e5fc2823fd3df90eb2ecd289aae177b15820
+# Download sqlite_scanner for the DuckDB version linked by the Go driver.
+ARG DUCKDB_VERSION=v2.0.0
+ARG DUCKDB_SQLITE_SCANNER_SHA256=59b8a0ba6d7599d4aa584bd24e8b4cc3247076bb174157f43e110e56e6c72e86
 RUN wget -q "https://extensions.duckdb.org/${DUCKDB_VERSION}/linux_amd64/sqlite_scanner.duckdb_extension.gz" && \
     echo "${DUCKDB_SQLITE_SCANNER_SHA256}  sqlite_scanner.duckdb_extension.gz" | sha256sum -c - && \
     gunzip sqlite_scanner.duckdb_extension.gz
@@ -162,10 +162,7 @@ ENV LIBGUESTFS_BACKEND=direct
 
 # Create entrypoint script
 RUN printf '#!/bin/sh\n\
-# Copy DuckDB extensions to persistent data folder\n\
-if [ -d /app/extensions ] && [ -d /var/lib/agent ]; then\n\
-    cp -n /app/extensions/*.duckdb_extension /var/lib/agent/ 2>/dev/null || true\n\
-fi\n\
+cp --remove-destination /app/extensions/*.duckdb_extension /var/lib/agent/ || exit 1\n\
 exec /app/agent "$@"\n' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 ARG RELEASE_TAGS=""
