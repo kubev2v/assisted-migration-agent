@@ -90,6 +90,7 @@ func (s *VMStore) List(ctx context.Context, filter sq.Sqlizer, opts ...ListOptio
 			&vm.PowerState,
 			&vm.Cluster,
 			&vm.Datacenter,
+			&vm.CpuCount,
 			&vm.Memory,
 			&vm.DiskSize,
 			&vm.IssueCount,

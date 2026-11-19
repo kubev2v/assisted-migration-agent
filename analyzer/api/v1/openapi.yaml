@@ -5,73 +5,73 @@ info:
   version: 1.0.0
 
 servers:
-- url: /api/v1
+  - url: /api/v1
 
 tags:
-- name: Collections
-  description: Collection database management
+  - name: Collections
+    description: Collection database management
 
-- name: Collector
-  description: Inventory collection operations
+  - name: Collector
+    description: Inventory collection operations
 
-- name: Inventories
-  description: Collected inventory resources
+  - name: Inventories
+    description: Collected inventory resources
 
-- name: VirtualMachines
-  description: Virtual machine queries across all vCenters
+  - name: VirtualMachines
+    description: Virtual machine queries across all vCenters
 
-- name: Groups
-  description: VirtualMachine group management
+  - name: Groups
+    description: VirtualMachine group management
 
-- name: Rightsizing
-  description: Rightsizing reports and cluster/VM utilization
+  - name: Rightsizing
+    description: Rightsizing reports and cluster/VM utilization
 
-- name: Version
-  description: Analyzer version information
+  - name: Version
+    description: Analyzer version information
 
-- name: Analyzer
-  description: Analyzer status
+  - name: Analyzer
+    description: Analyzer status
 
 paths:
 
   /virtualmachines:
     get:
       tags:
-      - VirtualMachines
+        - VirtualMachines
       summary: List VirtualMachines from the latest collection
       operationId: listLatestVirtualMachines
       parameters:
-      - name: byExpression
-        in: query
-        description: Filter by expression
-        schema:
-          type: string
-      - name: sort
-        in: query
-        description: Sort fields with direction (e.g., "name:asc", "cluster:desc"). Valid fields are name, vCenterState,
-          cluster, diskSize, memory, issues, cpuUsage, diskUsage, ramUsage, cpuAvg, memAvg.
-        schema:
-          type: array
-          items:
+        - name: byExpression
+          in: query
+          description: Filter by expression
+          schema:
             type: string
-        style: form
-        explode: true
-        example:
-        - cluster:asc
-        - name:desc
-      - name: page
-        in: query
-        description: Page number for pagination
-        schema:
-          type: integer
-          default: 1
-          minimum: 1
-      - name: pageSize
-        in: query
-        description: Number of items per page
-        schema:
-          type: integer
-          minimum: 1
+        - name: sort
+          in: query
+          description: Sort fields with direction (e.g., "name:asc", "cluster:desc"). Valid fields are name, vCenterState,
+            cluster, diskSize, memory, issues, cpuUsage, diskUsage, ramUsage, cpuAvg, memAvg.
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+          example:
+            - cluster:asc
+            - name:desc
+        - name: page
+          in: query
+          description: Page number for pagination
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: pageSize
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            minimum: 1
       responses:
         '200':
           description: List of VirtualMachines
@@ -89,7 +89,7 @@ paths:
   /virtualmachines/batch-update-exclusion:
     post:
       tags:
-      - VirtualMachines
+        - VirtualMachines
       summary: Batch update migration exclusion for multiple VMs in the latest collection
       operationId: batchUpdateLatestVMExclusion
       requestBody:
@@ -111,7 +111,7 @@ paths:
   /virtualmachines/filter-options:
     get:
       tags:
-      - VirtualMachines
+        - VirtualMachines
       summary: Get available filter option values from the latest collection
       operationId: getLatestVMFilterOptions
       responses:
@@ -129,7 +129,7 @@ paths:
   /virtualmachines/labels:
     get:
       tags:
-      - VirtualMachines
+        - VirtualMachines
       summary: Get all distinct labels with counts from the latest collection
       operationId: getLatestVMLabels
       responses:
@@ -147,16 +147,16 @@ paths:
   /virtualmachines/labels/{label}:
     patch:
       tags:
-      - VirtualMachines
+        - VirtualMachines
       summary: Add or remove a label from multiple VMs in the latest collection
       operationId: updateLatestLabelVMs
       parameters:
-      - name: label
-        in: path
-        required: true
-        description: Label name
-        schema:
-          type: string
+        - name: label
+          in: path
+          required: true
+          description: Label name
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -174,16 +174,16 @@ paths:
           description: Internal server error
     delete:
       tags:
-      - VirtualMachines
+        - VirtualMachines
       summary: Remove a label from all VMs in the latest collection
       operationId: deleteLatestLabelGlobally
       parameters:
-      - name: label
-        in: path
-        required: true
-        description: Label name
-        schema:
-          type: string
+        - name: label
+          in: path
+          required: true
+          description: Label name
+          schema:
+            type: string
       responses:
         '200':
           description: Label removed
@@ -199,16 +199,16 @@ paths:
   /virtualmachines/{vmId}:
     get:
       tags:
-      - VirtualMachines
+        - VirtualMachines
       summary: Get VirtualMachine details from the latest collection
       operationId: getLatestVirtualMachine
       parameters:
-      - name: vmId
-        in: path
-        required: true
-        description: VirtualMachine ID
-        schema:
-          type: string
+        - name: vmId
+          in: path
+          required: true
+          description: VirtualMachine ID
+          schema:
+            type: string
       responses:
         '200':
           description: VirtualMachine details
@@ -222,16 +222,16 @@ paths:
           description: Internal server error
     patch:
       tags:
-      - VirtualMachines
+        - VirtualMachines
       summary: Update VirtualMachine properties in the latest collection
       operationId: updateLatestVirtualMachine
       parameters:
-      - name: vmId
-        in: path
-        required: true
-        description: VirtualMachine ID
-        schema:
-          type: string
+        - name: vmId
+          in: path
+          required: true
+          description: VirtualMachine ID
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -251,16 +251,16 @@ paths:
   /virtualmachines/{vmId}/utilization:
     get:
       tags:
-      - Rightsizing
+        - Rightsizing
       summary: Get utilization breakdown for a specific VM from the latest collection
       operationId: getLatestVMUtilization
       parameters:
-      - name: vmId
-        in: path
-        required: true
-        description: VirtualMachine MoRef ID
-        schema:
-          type: string
+        - name: vmId
+          in: path
+          required: true
+          description: VirtualMachine MoRef ID
+          schema:
+            type: string
       responses:
         '200':
           description: VM utilization details
@@ -276,33 +276,33 @@ paths:
   /groups:
     get:
       tags:
-      - Groups
+        - Groups
       summary: List groups from the latest collection
       operationId: listLatestGroups
       parameters:
-      - name: byName
-        in: query
-        required: false
-        description: Filter groups by name (case-insensitive substring match)
-        schema:
-          type: string
-      - name: page
-        in: query
-        required: false
-        description: Page number (1-indexed)
-        schema:
-          type: integer
-          minimum: 1
-          default: 1
-      - name: pageSize
-        in: query
-        required: false
-        description: Number of groups per page
-        schema:
-          type: integer
-          minimum: 1
-          maximum: 100
-          default: 20
+        - name: byName
+          in: query
+          required: false
+          description: Filter groups by name (case-insensitive substring match)
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          description: Page number (1-indexed)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          required: false
+          description: Number of groups per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
       responses:
         '200':
           description: List of groups
@@ -318,7 +318,7 @@ paths:
           description: Internal server error
     post:
       tags:
-      - Groups
+        - Groups
       summary: Create a new group in the latest collection
       operationId: createLatestGroup
       requestBody:
@@ -344,42 +344,42 @@ paths:
   /groups/{groupId}:
     get:
       tags:
-      - Groups
+        - Groups
       summary: Get group by ID from the latest collection
       operationId: getLatestGroup
       parameters:
-      - name: groupId
-        in: path
-        required: true
-        description: Group ID
-        schema:
-          type: string
-      - name: sort
-        in: query
-        description: Sort fields with direction (e.g., "name:asc", "cluster:desc"). Valid fields are name, vCenterState,
-          cluster, diskSize, memory, issues, cpuUsage, diskUsage, ramUsage, cpuAvg, memAvg.
-        schema:
-          type: array
-          items:
+        - name: groupId
+          in: path
+          required: true
+          description: Group ID
+          schema:
             type: string
-        style: form
-        explode: true
-        example:
-        - cluster:asc
-        - name:desc
-      - name: page
-        in: query
-        description: Page number for pagination
-        schema:
-          type: integer
-          default: 1
-          minimum: 1
-      - name: pageSize
-        in: query
-        description: Number of items per page
-        schema:
-          type: integer
-          minimum: 1
+        - name: sort
+          in: query
+          description: Sort fields with direction (e.g., "name:asc", "cluster:desc"). Valid fields are name, vCenterState,
+            cluster, diskSize, memory, issues, cpuUsage, diskUsage, ramUsage, cpuAvg, memAvg.
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+          example:
+            - cluster:asc
+            - name:desc
+        - name: page
+          in: query
+          description: Page number for pagination
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: pageSize
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            minimum: 1
       responses:
         '200':
           description: Group details with VirtualMachines
@@ -393,16 +393,16 @@ paths:
           description: Internal server error
     patch:
       tags:
-      - Groups
+        - Groups
       summary: Update group in the latest collection
       operationId: updateLatestGroup
       parameters:
-      - name: groupId
-        in: path
-        required: true
-        description: Group ID
-        schema:
-          type: string
+        - name: groupId
+          in: path
+          required: true
+          description: Group ID
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -424,16 +424,16 @@ paths:
           description: Internal server error
     delete:
       tags:
-      - Groups
+        - Groups
       summary: Delete group from the latest collection
       operationId: deleteLatestGroup
       parameters:
-      - name: groupId
-        in: path
-        required: true
-        description: Group ID
-        schema:
-          type: string
+        - name: groupId
+          in: path
+          required: true
+          description: Group ID
+          schema:
+            type: string
       responses:
         '204':
           description: Group deleted
@@ -445,16 +445,16 @@ paths:
   /groups/{groupId}/applications:
     get:
       tags:
-      - Groups
+        - Groups
       summary: List detected applications for a group
       operationId: listGroupApplications
       parameters:
-      - name: groupId
-        in: path
-        required: true
-        description: Group ID
-        schema:
-          type: string
+        - name: groupId
+          in: path
+          required: true
+          description: Group ID
+          schema:
+            type: string
       responses:
         '200':
           description: List of detected applications
@@ -470,22 +470,22 @@ paths:
   /inventory:
     get:
       tags:
-      - Inventories
+        - Inventories
       summary: Get inventory from the latest collection
       operationId: getLatestInventory
       parameters:
-      - name: scope
-        in: query
-        required: false
-        description: Selects which inventories to return. "main" (default) returns only the main inventory as JSON.
-          "all" returns a ZIP bundle containing the main inventory (inventory.json) and every group subset inventory
-          (subsets/<groupId>.json), for manual upload in disconnected environments.
-        schema:
-          type: string
-          enum:
-          - main
-          - all
-          default: main
+        - name: scope
+          in: query
+          required: false
+          description: Selects which inventories to return. "main" (default) returns only the main inventory as JSON.
+            "all" returns a ZIP bundle containing the main inventory (inventory.json) and every group subset inventory
+            (subsets/<groupId>.json), for manual upload in disconnected environments.
+          schema:
+            type: string
+            enum:
+              - main
+              - all
+            default: main
       responses:
         '200':
           description: Collected inventory. JSON when scope is "main"; a ZIP archive when scope is "all".
@@ -552,7 +552,7 @@ paths:
   /collections:
     get:
       tags:
-      - Collections
+        - Collections
       summary: List all collections
       operationId: listCollections
       responses:
@@ -566,7 +566,7 @@ paths:
           description: Internal server error
     delete:
       tags:
-      - Collections
+        - Collections
       summary: Delete all collections
       operationId: deleteCollections
       responses:
@@ -578,7 +578,7 @@ paths:
   /collector:
     get:
       tags:
-      - Collector
+        - Collector
       summary: Get collector status
       operationId: getCollectorStatus
       responses:
@@ -592,7 +592,7 @@ paths:
           description: Internal server error
     delete:
       tags:
-      - Collector
+        - Collector
       summary: Stop collector
       operationId: stopCollector
       responses:
@@ -604,7 +604,7 @@ paths:
   /collector/rvtools:
     post:
       tags:
-      - Collector
+        - Collector
       summary: Start a collection from RVTools files
       operationId: startRvtoolsCollector
       requestBody:
@@ -614,7 +614,7 @@ paths:
             schema:
               type: object
               required:
-              - files
+                - files
               properties:
                 files:
                   type: array
@@ -636,7 +636,7 @@ paths:
           description: Internal server error
     put:
       tags:
-      - Collector
+        - Collector
       summary: Update the lastest collection from RVTools files
       operationId: updateRvtoolsCollector
       requestBody:
@@ -646,7 +646,7 @@ paths:
             schema:
               type: object
               required:
-              - files
+                - files
               properties:
                 files:
                   type: array
@@ -670,16 +670,16 @@ paths:
   /collections/{id}/inventory:
     get:
       tags:
-      - Inventories
+        - Inventories
       summary: Get collected inventory for a collection
       operationId: getInventory
       parameters:
-      - name: id
-        in: path
-        required: true
-        description: Collection ID
-        schema:
-          type: string
+        - name: id
+          in: path
+          required: true
+          description: Collection ID
+          schema:
+            type: string
       responses:
         '200':
           description: Collected inventory
@@ -695,47 +695,47 @@ paths:
   /collections/{id}/virtualmachines:
     get:
       tags:
-      - VirtualMachines
+        - VirtualMachines
       summary: List VirtualMachines in a collection
       operationId: listVirtualMachines
       parameters:
-      - name: id
-        in: path
-        required: true
-        description: Collection ID
-        schema:
-          type: string
-      - name: byExpression
-        in: query
-        description: Filter by expression
-        schema:
-          type: string
-      - name: sort
-        in: query
-        description: Sort fields with direction (e.g., "name:asc", "cluster:desc"). Valid fields are name, vCenterState,
-          cluster, diskSize, memory, issues, cpuUsage, diskUsage, ramUsage, cpuAvg, memAvg.
-        schema:
-          type: array
-          items:
+        - name: id
+          in: path
+          required: true
+          description: Collection ID
+          schema:
             type: string
-        style: form
-        explode: true
-        example:
-        - cluster:asc
-        - name:desc
-      - name: page
-        in: query
-        description: Page number for pagination
-        schema:
-          type: integer
-          default: 1
-          minimum: 1
-      - name: pageSize
-        in: query
-        description: Number of items per page
-        schema:
-          type: integer
-          minimum: 1
+        - name: byExpression
+          in: query
+          description: Filter by expression
+          schema:
+            type: string
+        - name: sort
+          in: query
+          description: Sort fields with direction (e.g., "name:asc", "cluster:desc"). Valid fields are name, vCenterState,
+            cluster, diskSize, memory, issues, cpuUsage, diskUsage, ramUsage, cpuAvg, memAvg.
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+          example:
+            - cluster:asc
+            - name:desc
+        - name: page
+          in: query
+          description: Page number for pagination
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: pageSize
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            minimum: 1
       responses:
         '200':
           description: List of VirtualMachines
@@ -753,16 +753,16 @@ paths:
   /collections/{id}/virtualmachines/filter-options:
     get:
       tags:
-      - VirtualMachines
+        - VirtualMachines
       summary: Get available filter option values
       operationId: getVMFilterOptions
       parameters:
-      - name: id
-        in: path
-        required: true
-        description: Collection ID
-        schema:
-          type: string
+        - name: id
+          in: path
+          required: true
+          description: Collection ID
+          schema:
+            type: string
       responses:
         '200':
           description: Filter options
@@ -778,16 +778,16 @@ paths:
   /collections/{id}/virtualmachines/labels:
     get:
       tags:
-      - VirtualMachines
+        - VirtualMachines
       summary: Get all distinct labels with counts
       operationId: getVMLabels
       parameters:
-      - name: id
-        in: path
-        required: true
-        description: Collection ID
-        schema:
-          type: string
+        - name: id
+          in: path
+          required: true
+          description: Collection ID
+          schema:
+            type: string
       responses:
         '200':
           description: Labels with counts
@@ -803,22 +803,22 @@ paths:
   /collections/{id}/virtualmachines/{vmId}:
     get:
       tags:
-      - VirtualMachines
+        - VirtualMachines
       summary: Get VirtualMachine details
       operationId: getVirtualMachine
       parameters:
-      - name: id
-        in: path
-        required: true
-        description: Collection ID
-        schema:
-          type: string
-      - name: vmId
-        in: path
-        required: true
-        description: VirtualMachine ID
-        schema:
-          type: string
+        - name: id
+          in: path
+          required: true
+          description: Collection ID
+          schema:
+            type: string
+        - name: vmId
+          in: path
+          required: true
+          description: VirtualMachine ID
+          schema:
+            type: string
       responses:
         '200':
           description: VirtualMachine details
@@ -834,22 +834,22 @@ paths:
   /collections/{id}/virtualmachines/{vmId}/utilization:
     get:
       tags:
-      - VirtualMachines
+        - VirtualMachines
       summary: Get utilization breakdown for a specific VM
       operationId: getVMUtilization
       parameters:
-      - name: id
-        in: path
-        required: true
-        description: Collection ID
-        schema:
-          type: string
-      - name: vmId
-        in: path
-        required: true
-        description: VirtualMachine MoRef ID
-        schema:
-          type: string
+        - name: id
+          in: path
+          required: true
+          description: Collection ID
+          schema:
+            type: string
+        - name: vmId
+          in: path
+          required: true
+          description: VirtualMachine MoRef ID
+          schema:
+            type: string
       responses:
         '200':
           description: VM utilization details
@@ -865,33 +865,33 @@ paths:
   /collections/{id}/export:
     get:
       tags:
-      - Collections
+        - Collections
       summary: Export collection data as CSV ZIP archive or Excel workbook
       operationId: exportCollection
       parameters:
-      - name: id
-        in: path
-        required: true
-        description: Collection ID
-        schema:
-          type: string
-      - name: scope
-        in: query
-        required: false
-        description: Comma-separated export scopes (e.g., "overview,vms,groups"). Defaults to "overview".
-        schema:
-          type: string
-      - name: format
-        in: query
-        required: false
-        description: 'Output format: zip (CSV files in a ZIP archive) or xlsx (Excel workbook with one sheet per
+        - name: id
+          in: path
+          required: true
+          description: Collection ID
+          schema:
+            type: string
+        - name: scope
+          in: query
+          required: false
+          description: Comma-separated export scopes (e.g., "overview,vms,groups"). Defaults to "overview".
+          schema:
+            type: string
+        - name: format
+          in: query
+          required: false
+          description: 'Output format: zip (CSV files in a ZIP archive) or xlsx (Excel workbook with one sheet per
           scope)'
-        schema:
-          type: string
-          enum:
-          - zip
-          - xlsx
-          default: zip
+          schema:
+            type: string
+            enum:
+              - zip
+              - xlsx
+            default: zip
       responses:
         '200':
           description: ZIP archive containing CSV files or Excel workbook
@@ -914,39 +914,39 @@ paths:
   /collections/{id}/groups:
     get:
       tags:
-      - Groups
+        - Groups
       summary: List all groups in a collection
       operationId: listGroups
       parameters:
-      - name: id
-        in: path
-        required: true
-        description: Collection ID
-        schema:
-          type: string
-      - name: byName
-        in: query
-        required: false
-        description: Filter groups by name (case-insensitive substring match)
-        schema:
-          type: string
-      - name: page
-        in: query
-        required: false
-        description: Page number (1-indexed)
-        schema:
-          type: integer
-          minimum: 1
-          default: 1
-      - name: pageSize
-        in: query
-        required: false
-        description: Number of groups per page
-        schema:
-          type: integer
-          minimum: 1
-          maximum: 100
-          default: 20
+        - name: id
+          in: path
+          required: true
+          description: Collection ID
+          schema:
+            type: string
+        - name: byName
+          in: query
+          required: false
+          description: Filter groups by name (case-insensitive substring match)
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          description: Page number (1-indexed)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          required: false
+          description: Number of groups per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
       responses:
         '200':
           description: List of groups
@@ -964,48 +964,48 @@ paths:
   /collections/{id}/groups/{groupId}:
     get:
       tags:
-      - Groups
+        - Groups
       summary: Get group by ID with its VirtualMachines
       operationId: getGroup
       parameters:
-      - name: id
-        in: path
-        required: true
-        description: Collection ID
-        schema:
-          type: string
-      - name: groupId
-        in: path
-        required: true
-        description: Group ID
-        schema:
-          type: string
-      - name: sort
-        in: query
-        description: Sort fields with direction (e.g., "name:asc", "cluster:desc"). Valid fields are name, vCenterState,
-          cluster, diskSize, memory, issues, cpuUsage, diskUsage, ramUsage, cpuAvg, memAvg.
-        schema:
-          type: array
-          items:
+        - name: id
+          in: path
+          required: true
+          description: Collection ID
+          schema:
             type: string
-        style: form
-        explode: true
-        example:
-        - cluster:asc
-        - name:desc
-      - name: page
-        in: query
-        description: Page number for pagination
-        schema:
-          type: integer
-          default: 1
-          minimum: 1
-      - name: pageSize
-        in: query
-        description: Number of items per page
-        schema:
-          type: integer
-          minimum: 1
+        - name: groupId
+          in: path
+          required: true
+          description: Group ID
+          schema:
+            type: string
+        - name: sort
+          in: query
+          description: Sort fields with direction (e.g., "name:asc", "cluster:desc"). Valid fields are name, vCenterState,
+            cluster, diskSize, memory, issues, cpuUsage, diskUsage, ramUsage, cpuAvg, memAvg.
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+          example:
+            - cluster:asc
+            - name:desc
+        - name: page
+          in: query
+          description: Page number for pagination
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: pageSize
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            minimum: 1
       responses:
         '200':
           description: Group details with VirtualMachines
@@ -1021,7 +1021,7 @@ paths:
   /version:
     get:
       tags:
-      - Version
+        - Version
       summary: Get analyzer version information
       operationId: getVersion
       responses:
@@ -1035,7 +1035,7 @@ paths:
   /status:
     get:
       tags:
-      - Analyzer
+        - Analyzer
       summary: Get analyzer status
       operationId: getAnalyzerStatus
       responses:
@@ -1124,6 +1124,31 @@ paths:
         "500":
           description: Internal error
 
+  /cluster-requirements:
+    post:
+      tags:
+        - recommendations
+      description: Calculate cluster sizing for the latest collection
+      operationId: CalculateClusterRequirements
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClusterRequirementsRequest"
+        required: true
+      responses:
+        "200":
+          description: Cluster sizing calculation successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClusterRequirementsResponse"
+        "400":
+          description: Bad Request
+        "404":
+          description: Not found
+        "500":
+          description: Internal error
 components:
   schemas:
 
@@ -1151,9 +1176,9 @@ components:
     Collection:
       type: object
       required:
-      - id
-      - name
-      - createdAt
+        - id
+        - name
+        - createdAt
       properties:
         id:
           type: string
@@ -1169,7 +1194,7 @@ components:
     CollectionListResponse:
       type: object
       required:
-      - collections
+        - collections
       properties:
         collections:
           type: array
@@ -1179,26 +1204,26 @@ components:
     CollectorStatus:
       type: object
       required:
-      - status
+        - status
       properties:
         status:
           type: string
           enum:
-          - ready
-          - connecting
-          - collecting
-          - collecting metrics
-          - parsing
-          - collected
-          - error
+            - ready
+            - connecting
+            - collecting
+            - collecting metrics
+            - parsing
+            - collected
+            - error
           x-enum-varnames:
-          - CollectorStatusStatusReady
-          - CollectorStatusStatusConnecting
-          - CollectorStatusStatusCollecting
-          - CollectorStatusMetricsCollecting
-          - CollectorStatusStatusParsing
-          - CollectorStatusStatusCollected
-          - CollectorStatusStatusError
+            - CollectorStatusStatusReady
+            - CollectorStatusStatusConnecting
+            - CollectorStatusStatusCollecting
+            - CollectorStatusMetricsCollecting
+            - CollectorStatusStatusParsing
+            - CollectorStatusStatusCollected
+            - CollectorStatusStatusError
         error:
           type: string
           description: Error message when status is error
@@ -1208,10 +1233,99 @@ components:
       x-go-name: Inventory
       type: object
       required:
-      - inventory
+        - inventory
       properties:
         inventory:
           $ref: https://raw.githubusercontent.com/kubev2v/migration-planner/4c26df296ca678427f46d2c7d61e7eb92a053263/api/v1alpha1/openapi.yaml#/components/schemas/Inventory
+
+    ClusterRequirementsRequest:
+      type: object
+      description: Request payload for calculating cluster requirements
+      properties:
+        filterExpression:
+          type: string
+          description: >
+            Filter expression selecting VMs to estimate.
+            When omitted, all VMs are selected.
+        cpuOverCommitRatio:
+          allOf:
+            - $ref: "#/components/schemas/CpuOverCommitRatio"
+          description: CPU over-commit ratio (e.g., "1:4")
+          x-oapi-codegen-extra-tags:
+            validate: "required"
+        memoryOverCommitRatio:
+          allOf:
+            - $ref: "#/components/schemas/MemoryOverCommitRatio"
+          description: Memory over-commit ratio (e.g., "1:2")
+          x-oapi-codegen-extra-tags:
+            validate: "required"
+        workerNodeCPU:
+          type: integer
+          minimum: 2
+          maximum: 384
+          description: CPU cores per worker node
+          x-oapi-codegen-extra-tags:
+            validate: "required,min=2,max=384"
+        workerNodeMemory:
+          type: integer
+          minimum: 4
+          maximum: 4096
+          description: Memory (GB) per worker node
+          x-oapi-codegen-extra-tags:
+            validate: "required,min=4,max=4096"
+        workerNodeThreads:
+          type: integer
+          minimum: 2
+          maximum: 2000
+          description: Number of CPU threads per worker node (for SMT calculation). If not provided, assumes no SMT (threads = cores). Must be >= workerNodeCPU
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,min=2,max=2000"
+        controlPlaneSchedulable:
+          type: boolean
+          description: "Allow workload scheduling on control plane nodes (default: false)"
+        controlPlaneCPU:
+          type: integer
+          minimum: 2
+          maximum: 384
+          description: "CPU cores per control plane node (default: 6)"
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,min=2,max=384"
+        controlPlaneMemory:
+          type: integer
+          minimum: 4
+          maximum: 4096
+          description: "Memory in GB per control plane node (default: 16)"
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,min=4,max=4096"
+        controlPlaneNodeCount:
+          type: integer
+          enum: [ 1, 3 ]
+          description: "Number of control plane nodes: 1 or 3 (default: 3)"
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,oneof=1 3"
+        hostedControlPlane:
+          type: boolean
+          description: "If true, control plane is hosted externally. Incompatible with control plane fields (default: false)"
+        compactMode:
+          type: boolean
+          description: "If true, creates a 3-node compact cluster with no dedicated workers. Requires controlPlaneNodeCount=3 and controlPlaneSchedulable=true. Incompatible with hostedControlPlane=true"
+      required:
+        - cpuOverCommitRatio
+        - memoryOverCommitRatio
+        - workerNodeCPU
+        - workerNodeMemory
+
+    CpuOverCommitRatio:
+      type: string
+      enum: [ "1:1", "1:2", "1:4", "1:6", "1:8" ]
+      x-enum-varnames: [ "CpuOneToOne", "CpuOneToTwo", "CpuOneToFour", "CpuOneToSix", "CpuOneToEight" ]
+      description: CPU over-commit ratio
+
+    MemoryOverCommitRatio:
+      type: string
+      enum: [ "1:1", "1:2", "1:4" ]
+      x-enum-varnames: [ "MemoryOneToOne", "MemoryOneToTwo", "MemoryOneToFour" ]
+      description: Memory over-commit ratio
 
     MigrationComplexityRequest:
       type: object
@@ -1220,7 +1334,7 @@ components:
         filterExpression:
           type: string
           description: Filter by expression
-          example:  "cluster = 'cluster-34'"
+          example: "cluster = 'cluster-34'"
 
     MigrationEstimationRequest:
       type: object
@@ -1247,6 +1361,145 @@ components:
             User-supplied settings override defaults. VM counts and disk sizes always
             come from inventory and cannot be overridden. Unknown keys are rejected with HTTP 400.
           additionalProperties: true
+
+    ClusterRequirementsResponse:
+      type: object
+      description: Cluster requirements calculation results
+      properties:
+        clusterSizing:
+          $ref: "#/components/schemas/ClusterSizing"
+        optimizedSizing:
+          $ref: "#/components/schemas/ClusterSizing"
+        savings:
+          $ref: "#/components/schemas/Savings"
+        optimizationStatus:
+          $ref: "#/components/schemas/OptimizationStatus"
+        resourceConsumption:
+          $ref: "#/components/schemas/SizingResourceConsumption"
+        inventoryTotals:
+          $ref: "#/components/schemas/InventoryTotals"
+      required:
+        - clusterSizing
+        - resourceConsumption
+        - inventoryTotals
+
+    ClusterSizing:
+      type: object
+      description: Overall cluster sizing summary
+      properties:
+        totalNodes:
+          type: integer
+          description: Total number of nodes (worker + control plane)
+        workerNodes:
+          type: integer
+          description: Number of worker nodes
+        controlPlaneNodes:
+          type: integer
+          description: Number of control plane nodes
+        failoverNodes:
+          type: integer
+          description: Number of failover nodes added for availability
+        totalCPU:
+          type: integer
+          description: Total CPU cores across all nodes
+        totalMemory:
+          type: integer
+          description: Total memory (GB) across all nodes
+        cpuUtilizationMax:
+          type: number
+          format: double
+          description: CPU utilization maximum percentage (only in optimized_sizing)
+        memoryUtilizationMax:
+          type: number
+          format: double
+          description: Memory utilization maximum percentage (only in optimized_sizing)
+        confidence:
+          type: number
+          format: double
+          description: Data coverage confidence 0-100 (only in optimized_sizing)
+      required:
+        - totalNodes
+        - workerNodes
+        - controlPlaneNodes
+        - failoverNodes
+        - totalCPU
+        - totalMemory
+
+    Savings:
+      type: object
+      description: Infrastructure savings comparison
+      properties:
+        nodesSaved:
+          type: integer
+          description: Number of nodes saved compared to baseline
+        percentageReduction:
+          type: number
+          format: double
+          description: Percentage reduction in nodes
+        description:
+          type: string
+          description: Human-readable description of savings source
+      required:
+        - nodesSaved
+        - percentageReduction
+        - description
+
+    OptimizationStatus:
+      type: object
+      description: Status of utilization-based optimization attempt
+      properties:
+        attempted:
+          type: boolean
+          description: Whether optimization was attempted based on available utilization data
+        reason:
+          type: string
+          description: Reason for optimization result
+          enum:
+            - "no_utilization_data"
+            - "low_confidence"
+            - "calculation_error"
+            - "success"
+      required:
+        - attempted
+        - reason
+
+    SizingResourceConsumption:
+      type: object
+      description: Resource consumption across the cluster
+      properties:
+        cpu:
+          type: number
+          format: double
+          description: Total CPU requested
+        memory:
+          type: number
+          format: double
+          description: Total memory (GB) requested
+        limits:
+          $ref: "#/components/schemas/SizingResourceLimits"
+        overCommitRatio:
+          $ref: "#/components/schemas/SizingOverCommitRatio"
+      required:
+        - cpu
+        - memory
+
+    InventoryTotals:
+      type: object
+      description: Inventory totals for the cluster
+      properties:
+        totalVMs:
+          type: integer
+          description: Total number of VMs in the cluster
+        totalCPU:
+          type: integer
+          description: Total CPU cores across all VMs in the cluster
+        totalMemory:
+          type: integer
+          description: Total memory (GB) across all VMs in the cluster
+      required:
+        - totalVMs
+        - totalCPU
+        - totalMemory
 
     MigrationEstimationResponse:
       type: object
@@ -1342,6 +1595,38 @@ components:
         - minTotalDuration
         - maxTotalDuration
         - breakdown
+
+    SizingResourceLimits:
+      type: object
+      description: Resource limits
+      properties:
+        cpu:
+          type: number
+          format: double
+          description: Total CPU limits
+        memory:
+          type: number
+          format: double
+          description: Total memory (GB) limits
+      required:
+        - cpu
+        - memory
+
+    SizingOverCommitRatio:
+      type: object
+      description: Over-commit ratios
+      properties:
+        cpu:
+          type: number
+          format: double
+          description: CPU over-commit ratio
+        memory:
+          type: number
+          format: double
+          description: Memory over-commit ratio
+      required:
+        - cpu
+        - memory
 
     EstimationDetail:
       type: object
@@ -1482,15 +1767,15 @@ components:
     VirtualMachine:
       type: object
       required:
-      - name
-      - id
-      - vCenterID
-      - vCenterState
-      - cluster
-      - datacenter
-      - diskSize
-      - memory
-      - issueCount
+        - name
+        - id
+        - vCenterID
+        - vCenterState
+        - cluster
+        - datacenter
+        - diskSize
+        - memory
+        - issueCount
       properties:
         name:
           type: string
@@ -1580,17 +1865,17 @@ components:
     VirtualMachineDetail:
       type: object
       required:
-      - id
-      - name
-      - vCenterID
-      - powerState
-      - connectionState
-      - cpuCount
-      - coresPerSocket
-      - memoryMB
-      - disks
-      - nicCount
-      - nics
+        - id
+        - name
+        - vCenterID
+        - powerState
+        - connectionState
+        - cpuCount
+        - coresPerSocket
+        - memoryMB
+        - disks
+        - nicCount
+        - nics
       properties:
         id:
           type: string
@@ -1737,7 +2022,7 @@ components:
     Process:
       type: object
       required:
-      - name
+        - name
       properties:
         name:
           type: string
@@ -1749,10 +2034,10 @@ components:
     VirtualMachineListResponse:
       type: object
       required:
-      - virtualMachines
-      - total
-      - page
-      - pageCount
+        - virtualMachines
+        - total
+        - page
+        - pageCount
       properties:
         virtualMachines:
           type: array
@@ -1917,9 +2202,9 @@ components:
     VirtualMachineIssue:
       type: object
       required:
-      - label
-      - category
-      - description
+        - label
+        - category
+        - description
       properties:
         label:
           type: string
@@ -1930,39 +2215,39 @@ components:
         category:
           type: string
           enum:
-          - Critical
-          - Warning
-          - Information
-          - Advisory
-          - Error
-          - Other
+            - Critical
+            - Warning
+            - Information
+            - Advisory
+            - Error
+            - Other
           x-enum-varnames:
-          - VirtualMachineIssueCategoryCritical
-          - VirtualMachineIssueCategoryWarning
-          - VirtualMachineIssueCategoryInformation
-          - VirtualMachineIssueCategoryAdvisory
-          - VirtualMachineIssueCategoryError
-          - VirtualMachineIssueCategoryOther
+            - VirtualMachineIssueCategoryCritical
+            - VirtualMachineIssueCategoryWarning
+            - VirtualMachineIssueCategoryInformation
+            - VirtualMachineIssueCategoryAdvisory
+            - VirtualMachineIssueCategoryError
+            - VirtualMachineIssueCategoryOther
 
     InspectionStatus:
       type: object
       required:
-      - state
+        - state
       properties:
         state:
           type: string
           enum:
-          - pending
-          - running
-          - completed
-          - canceled
-          - error
+            - pending
+            - running
+            - completed
+            - canceled
+            - error
           x-enum-varnames:
-          - InspectionStatusStatePending
-          - InspectionStatusStateRunning
-          - InspectionStatusStateCompleted
-          - InspectionStatusStateCanceled
-          - InspectionStatusStateError
+            - InspectionStatusStatePending
+            - InspectionStatusStateRunning
+            - InspectionStatusStateCompleted
+            - InspectionStatusStateCanceled
+            - InspectionStatusStateError
           description: Current inspection state
         details:
           type: string
@@ -1983,9 +2268,9 @@ components:
     VirtualMachineInspectionConcern:
       type: object
       required:
-      - message
-      - category
-      - label
+        - message
+        - category
+        - label
       properties:
         label:
           type: string
@@ -1998,9 +2283,9 @@ components:
     Group:
       type: object
       required:
-      - id
-      - name
-      - filter
+        - id
+        - name
+        - filter
       properties:
         id:
           type: string
@@ -2028,10 +2313,10 @@ components:
     GroupListResponse:
       type: object
       required:
-      - groups
-      - total
-      - page
-      - pageCount
+        - groups
+        - total
+        - page
+        - pageCount
       properties:
         groups:
           type: array
@@ -2047,11 +2332,11 @@ components:
     GroupResponse:
       type: object
       required:
-      - group
-      - vms
-      - total
-      - page
-      - pageCount
+        - group
+        - vms
+        - total
+        - page
+        - pageCount
       properties:
         group:
           $ref: '#/components/schemas/Group'
@@ -2071,8 +2356,8 @@ components:
     CreateGroupRequest:
       type: object
       required:
-      - name
-      - filter
+        - name
+        - filter
       properties:
         name:
           type: string
@@ -2115,7 +2400,7 @@ components:
     ApplicationListResponse:
       type: object
       required:
-      - applications
+        - applications
       properties:
         applications:
           type: array
@@ -2125,10 +2410,10 @@ components:
     ApplicationOverview:
       type: object
       required:
-      - name
-      - description
-      - vmCount
-      - vms
+        - name
+        - description
+        - vmCount
+        - vms
       properties:
         name:
           type: string
@@ -2147,8 +2432,8 @@ components:
     ApplicationVM:
       type: object
       required:
-      - id
-      - name
+        - id
+        - name
       properties:
         id:
           type: string
@@ -2176,8 +2461,8 @@ components:
     BatchUpdateExclusionRequest:
       type: object
       required:
-      - vmIds
-      - migrationExcluded
+        - vmIds
+        - migrationExcluded
       properties:
         vmIds:
           type: array
@@ -2193,11 +2478,11 @@ components:
     VMFilterOptionsResponse:
       type: object
       required:
-      - clusters
-      - datacenters
-      - concernLabels
-      - concernCategories
-      - applications
+        - clusters
+        - datacenters
+        - concernLabels
+        - concernCategories
+        - applications
       properties:
         clusters:
           type: array
@@ -2228,8 +2513,8 @@ components:
     VMLabelsResponse:
       type: object
       required:
-      - labels
-      - counts
+        - labels
+        - counts
       properties:
         labels:
           type: array
@@ -2263,8 +2548,8 @@ components:
     DeleteLabelGloballyResponse:
       type: object
       required:
-      - label
-      - affected
+        - label
+        - affected
       properties:
         label:
           type: string
@@ -2276,21 +2561,21 @@ components:
     VmUtilizationDetails:
       type: object
       required:
-      - moid
-      - vm_name
-      - provisioned_cpus
-      - provisioned_memory_mb
-      - provisioned_disk_kb
-      - cpu_avg
-      - cpu_p95
-      - cpu_max
-      - cpu_latest
-      - mem_avg
-      - mem_p95
-      - mem_max
-      - mem_latest
-      - disk
-      - confidence
+        - moid
+        - vm_name
+        - provisioned_cpus
+        - provisioned_memory_mb
+        - provisioned_disk_kb
+        - cpu_avg
+        - cpu_p95
+        - cpu_max
+        - cpu_latest
+        - mem_avg
+        - mem_p95
+        - mem_max
+        - mem_latest
+        - disk
+        - confidence
       properties:
         moid:
           type: string
@@ -2337,8 +2622,8 @@ components:
     VersionInfo:
       type: object
       required:
-      - version
-      - gitCommit
+        - version
+        - gitCommit
       properties:
         version:
           type: string
@@ -2350,11 +2635,11 @@ components:
     AnalyzerStatus:
       type: object
       required:
-      - status
+        - status
       properties:
         status:
           type: string
           enum:
-          - ready
+            - ready
 
 
