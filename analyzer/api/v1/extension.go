@@ -79,6 +79,9 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 	}
 	details.HostPhysicalNics = &hostNICs
 
+	if vm.Annotation != "" {
+		details.Annotation = &vm.Annotation
+	}
 	if vm.UUID != "" {
 		details.Uuid = &vm.UUID
 	}
@@ -134,6 +137,11 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 	if len(vm.Labels) > 0 {
 		details.Labels = &vm.Labels
 	}
+	metadata := vm.Metadata
+	if metadata == nil {
+		metadata = make(map[string][]string)
+	}
+	details.Metadata = &metadata
 
 	for _, d := range vm.Disks {
 		capacityBytes := d.Capacity * 1024 * 1024
@@ -419,24 +427,6 @@ func NewGroupFromModel(g models.Group) Group {
 		group.VmCount = &g.VmCount
 	}
 	return group
-}
-
-func NewApplicationList(apps []models.ApplicationOverview) []ApplicationOverview {
-	apiApps := make([]ApplicationOverview, 0, len(apps))
-	for _, app := range apps {
-		vms := make([]ApplicationVM, 0, len(app.VMs))
-		for _, vm := range app.VMs {
-			vms = append(vms, ApplicationVM{Id: vm.ID, Name: vm.Name})
-		}
-		apiApps = append(apiApps, ApplicationOverview{
-			Name:        app.Name,
-			Description: app.Description,
-			VmCount:     app.VMCount,
-			Vms:         vms,
-		})
-	}
-
-	return apiApps
 }
 
 func NewVCenterInventory(m models.VCenterInventory) (InventoryResponse, error) {

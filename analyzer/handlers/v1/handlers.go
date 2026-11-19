@@ -20,7 +20,6 @@ type ServiceProvider interface {
 	LatestInventoryService() (*services.InventoryService, error)
 	LatestEstimationService() (*services.EstimationService, error)
 	LatestRightsizingService() (*services.RightsizingService, error)
-	LatestApplicationService() (*services.ApplicationService, error)
 	GetCollectorStatus() models.CollectorStatus
 	StopCollecting() error
 	StartRVToolsCollecting([]string, bool) (models.CollectorStatus, error)
