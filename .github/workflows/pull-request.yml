@@ -35,7 +35,7 @@ jobs:
 
       - name: Detect whether code validations are needed
         id: filter
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
         with:
           # Compare the entire queue candidate with its recorded base, not just
           # the last PR or the current (potentially newer) target branch.
