@@ -1,5 +1,5 @@
 # UI image commit used by the Appliance container build.
-AGENT_UI_IMAGE_TAG=464b4cbb4b1a85d30a4d7ae9b180c7d8c5e18926
+AGENT_UI_IMAGE_TAG=f7d8723e43d408bc00a56c6a455b03d8ac07bb1e
 
 # UI image commit used by the Rvtool Offline Analyzer container build.
 OFFLINE_ANALYZER_UI_IMAGE_TAG=ee72be344d93d6e863615156302b820cba20cf18
