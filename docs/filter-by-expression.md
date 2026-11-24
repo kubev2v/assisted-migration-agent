@@ -261,6 +261,7 @@ Identifiers are **case-insensitive**. Dotted names refer to joined tables (e.g. 
 | `provisioned`    | integer | Provisioned (MiB)                   |
 | `resource_pool`  | string  | Resource pool                       |
 | `issues_count`   | integer | Number of concerns/issues for the VM |
+| `annotation`   | string | Annotation |
 
 ### Metadata — tags and custom attributes
 
