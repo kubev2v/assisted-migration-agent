@@ -150,6 +150,8 @@ var DefaultMapper filter.MapFunc = func(name string) (string, filter.FieldType, 
 		return `(COALESCE(crit.critical_count, 0) = 0)`, filter.BooleanField, nil
 	case "migration_excluded":
 		return `v."migration_excluded"`, filter.BooleanField, nil
+	case "annotation":
+		return `v."annotation"`, filter.StringField, nil
 
 	// vinfo (v) — array fields
 	case "labels":
