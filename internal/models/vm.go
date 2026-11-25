@@ -1,5 +1,7 @@
 package models
 
+import "github.com/kubev2v/migration-planner/pkg/inventory"
+
 // VirtualMachineSummary represents a lightweight VM record for list views.
 type VirtualMachineSummary struct {
 	ID                     string
@@ -150,6 +152,8 @@ type DiskDatastore struct {
 	BackingDeviceIDs       []string
 	Vendor                 string
 	Model                  string
+	StorageArrays          []inventory.StorageArray
+	StorageContainerID     string
 }
 
 type HostPhysicalNIC struct {

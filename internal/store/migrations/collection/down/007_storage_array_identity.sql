@@ -1,0 +1,2 @@
+ALTER TABLE IF EXISTS vdatastore DROP COLUMN IF EXISTS "Storage Container ID";
+ALTER TABLE IF EXISTS vdatastore DROP COLUMN IF EXISTS "Storage Arrays";

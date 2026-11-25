@@ -166,6 +166,12 @@ These optional fields also apply to v2 latest/collection inventory and group inv
 
 LUN records describe storage visible to the host. They do not provide per-path health, array UUIDs, or ordinary VMDK-to-LUN placement. Host LUN UUIDs are exposed only when retained by the source; datastore backing IDs and VM disk RDM LUN UUIDs remain separate fields.
 
+Datastore records under `vcenter.infra.datastores` and `clusters[*].infra.datastores` can also include `storageArrays`, a list of source VASA records with optional `uuid`, `name`, `vendorId`, and `modelId`, and a separate optional `storageContainerId`. These fields propagate through Agent v2 and Analyzer v1 inventory responses and existing JSON bundles. Array UUIDs and vendor/model IDs remain separate from device inquiry vendor/model, backing-device NAA values, host/RDM LUN UUIDs, containers, and protocol endpoints.
+
+Current source coverage is Forklift vVol datastores when vCenter supplies VASA records. Equivalent RVTools identity and generic VMFS/NFS array discovery are not established. Missing facts remain omitted; no identity is inferred from NFS hostnames/exports or LUN inquiry data. Partial source records retain their supplied fields without inventing a UUID, and multiple records remain attached to their owning datastore. An absent list does not establish that the datastore has no backing array. Runtime VASA availability has not been verified in this local implementation and must be checked before closing OMA-2512.
+
+The `datastores` CSV export (`datastores.csv`) and Excel `Datastores` sheet append `storage_arrays` and `storage_container_id` columns. `storage_arrays` contains the stored JSON array of source records, preserving each array's UUID/name/vendor ID/model ID association and partial records in one cell. The export keeps one row per datastore, including when arrays are shared between datastores. Missing arrays, empty array lists, and missing container IDs produce blank cells. Existing columns retain their order and meaning; the new fields use the existing CSV escaping and spreadsheet formula sanitization. Agent and Analyzer use the same export pipeline.
+
 ```bash
 curl http://localhost:8000/api/v1/inventory
 ```
@@ -499,6 +505,8 @@ Each identifier comes from its own source field; none is a fallback for another.
 | `backingDeviceIds` | array of strings | Canonical identifiers for devices backing the datastore, such as an NAA identifier for a SCSI LUN; may be unavailable for some datastore types |
 | `vendor` | string | Vendor reported by matching backing devices, when available |
 | `model` | string | Model reported by matching backing devices, when available |
+| `storageArrays` | array of objects | Source-reported VASA arrays for the matched datastore. Each entry can include `uuid`, `name`, `vendorId`, and `modelId` |
+| `storageContainerId` | string | Source-reported storage container identifier for the matched datastore, when available |
 
 #### NIC Object
 

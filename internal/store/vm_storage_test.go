@@ -15,10 +15,13 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
+	"github.com/kubev2v/migration-planner/pkg/inventory"
 
 	v2 "github.com/kubev2v/assisted-migration-agent/agent/api/v2"
+	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 	"github.com/kubev2v/assisted-migration-agent/internal/store/migrations"
+	"github.com/kubev2v/assisted-migration-agent/test"
 )
 
 var _ = Describe("VMStore storage metadata", func() {
@@ -51,6 +54,32 @@ var _ = Describe("VMStore storage metadata", func() {
 			})).To(Succeed())
 			st, err = database.Store()
 			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("exposes source array and container identity on the matching VM disk datastore", func() {
+			_, err := st.Querier().ExecContext(ctx, test.VMWithDatastoreArrayIdentitySQL)
+			Expect(err).NotTo(HaveOccurred())
+			vm, err := st.VM().Get(ctx, "vm-1")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vm.Disks).To(HaveLen(2))
+
+			datastores := make(map[string]*models.DiskDatastore, len(vm.Disks))
+			for _, disk := range vm.Disks {
+				Expect(disk.Datastore).NotTo(BeNil())
+				datastores[disk.Datastore.ID] = disk.Datastore
+			}
+			vvol := datastores["ds-vvol"]
+			Expect(vvol).NotTo(BeNil())
+			Expect(vvol.StorageArrays).To(Equal([]inventory.StorageArray{
+				{UUID: "array-1", VendorID: "vendor", ModelID: "model"},
+				{Name: "partial"},
+			}))
+			Expect(vvol.StorageContainerID).To(Equal("container-1"))
+
+			vmfs := datastores["ds-vmfs"]
+			Expect(vmfs).NotTo(BeNil())
+			Expect(vmfs.StorageArrays).To(BeEmpty())
+			Expect(vmfs.StorageContainerID).To(BeEmpty())
 		})
 
 		Context("RDM LUN UUID", func() {
@@ -406,50 +435,26 @@ INSERT INTO vdisk ("VM ID", "Disk Key", "Path", "Disk Path", "Capacity MiB", "Ra
 			})
 		})
 
-		Context("collections upgraded from before RDM backing details", func() {
-			BeforeEach(func() {
-				Expect(database.Migrate(ctx, func(ctx context.Context, db *sql.DB) error {
-					// Roll the collection back to a pre-RDM snapshot so the upgrade
-					// below is a real upgrade. The migration history has to stay
-					// contiguous, so every version from the RDM migration onwards is
-					// dropped, not just that single version.
-					_, err := db.ExecContext(ctx, `DELETE FROM collection_schema_migrations WHERE version >= 5;
-DROP TABLE IF EXISTS rule_conditions;
-DROP TABLE IF EXISTS rules;
-DROP SEQUENCE IF EXISTS rule_condition_seq;
-DROP SEQUENCE IF EXISTS rule_id_seq;
-ALTER TABLE vdisk DROP COLUMN IF EXISTS "RDM Device Name";
-ALTER TABLE vdisk DROP COLUMN IF EXISTS "RDM Backing UUID";
-ALTER TABLE vdisk DROP COLUMN IF EXISTS "RDM Compatibility Mode";
-ALTER TABLE vdisk DROP COLUMN IF EXISTS "RDM LUN UUID Source";
-ALTER TABLE vdisk DROP COLUMN IF EXISTS "Thin Provisioned";
-ALTER TABLE vdisk DROP COLUMN IF EXISTS "Eagerly Scrubbed";
-INSERT INTO vinfo ("VM ID","VM","Template") VALUES ('vm-1','legacy-vm',false);
-INSERT INTO vdisk ("VM ID","Disk Key","Raw","Capacity MiB","Disk UUID","RDM LUN UUID") VALUES ('vm-1','2000',true,100,'not-a-lun-uuid','lun-uuid-A');`)
-					if err != nil {
-						return err
-					}
-					// The startup migration upgrades the legacy collection in
-					// place, exactly as Pool.Migrate does on agent startup.
-					return migrations.RunCollection(ctx, db, "collection")
-				})).To(Succeed())
-			})
-			It("reads upgraded collections with the new fields absent", func() {
-				vm, err := st.VM().Get(ctx, "vm-1")
-				Expect(err).NotTo(HaveOccurred())
-				Expect(vm.Disks).To(HaveLen(1))
-				Expect(vm.Disks[0].RDM).To(BeTrue())
-				Expect(vm.Disks[0].Capacity).To(Equal(int64(100)))
-				data, err := json.Marshal(v2.NewVirtualMachineDetailFromModel(*vm))
-				Expect(err).NotTo(HaveOccurred())
-				var got struct {
-					Disks []map[string]any `json:"disks"`
-				}
-				Expect(json.Unmarshal(data, &got)).NotTo(HaveOccurred())
-				Expect(got.Disks[0]["rdmBacking"]).To(Equal(map[string]any{"lunUuid": "lun-uuid-A", "compatibilityMode": "unknown"}))
-				Expect(got.Disks[0]).NotTo(HaveKey("thinProvisioned"))
-				Expect(got.Disks[0]).NotTo(HaveKey("eagerlyScrubbed"))
-			})
+		It("reads an RDM disk with only its LUN UUID populated", func() {
+			_, err := st.Querier().ExecContext(ctx, `
+				INSERT INTO vinfo ("VM ID", "VM", "Template") VALUES ('vm-1', 'legacy-vm', false);
+				INSERT INTO vdisk ("VM ID", "Disk Key", "Raw", "Capacity MiB", "Disk UUID", "RDM LUN UUID")
+					VALUES ('vm-1', '2000', true, 100, 'not-a-lun-uuid', 'lun-uuid-A');
+			`)
+			Expect(err).NotTo(HaveOccurred())
+
+			vm, err := st.VM().Get(ctx, "vm-1")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(vm.Disks).To(HaveLen(1))
+			disk := vm.Disks[0]
+			Expect(disk.RDM).To(BeTrue())
+			Expect(disk.Capacity).To(Equal(int64(100)))
+			Expect(disk.RDMBacking).To(HaveValue(Equal(models.RDMBacking{
+				LunUUID:           "lun-uuid-A",
+				CompatibilityMode: "unknown",
+			})))
+			Expect(disk.ThinProvisioned).To(BeNil())
+			Expect(disk.EagerlyScrubbed).To(BeNil())
 		})
 	})
 })

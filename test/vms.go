@@ -3,7 +3,46 @@ package test
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
+
+const VMWithDatastoreArrayIdentitySQL = `
+	INSERT INTO vinfo ("VM ID", "VM", "Template") VALUES ('vm-1', 'storage-vm', false);
+	INSERT INTO vdatastore ("Object ID", "Name", "Type", "Storage Arrays", "Storage Container ID") VALUES
+		('ds-vvol', 'vvol', 'VVOL', '[{"uuid":"array-1","vendorId":"vendor","modelId":"model"},{"name":"partial"}]', 'container-1'),
+		('ds-vmfs', 'vmfs', 'VMFS', '[]', NULL);
+	INSERT INTO vdisk ("VM ID", "Disk Key", "Path") VALUES
+		('vm-1', '2000', '[vvol] vm/first.vmdk'),
+		('vm-1', '2001', '[vmfs] vm/second.vmdk');
+`
+
+func ExpectVMDetailDatastoreArrayIdentity(body []byte) {
+	ginkgo.GinkgoHelper()
+
+	var detail struct {
+		Disks []struct {
+			Datastore map[string]json.RawMessage
+		}
+	}
+	gomega.Expect(json.Unmarshal(body, &detail)).To(gomega.Succeed())
+	gomega.Expect(detail.Disks).To(gomega.HaveLen(2))
+
+	datastores := make(map[string]map[string]json.RawMessage, len(detail.Disks))
+	for _, disk := range detail.Disks {
+		datastores[string(disk.Datastore["id"])] = disk.Datastore
+	}
+	vvol := datastores[`"ds-vvol"`]
+	gomega.Expect(vvol["storageArrays"]).To(gomega.MatchJSON(`[{"uuid":"array-1","vendorId":"vendor","modelId":"model"},{"name":"partial"}]`))
+	gomega.Expect(vvol["storageContainerId"]).To(gomega.MatchJSON(`"container-1"`))
+
+	vmfs := datastores[`"ds-vmfs"`]
+	gomega.Expect(vmfs).NotTo(gomega.BeNil())
+	gomega.Expect(vmfs).NotTo(gomega.HaveKey("storageArrays"))
+	gomega.Expect(vmfs).NotTo(gomega.HaveKey("storageContainerId"))
+}
 
 type VM struct {
 	ID              string

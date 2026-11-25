@@ -244,6 +244,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 
 	var nicCount int32
 	var pvm duckdb_models.VM
+	var vmDisks vmDetailDisks
 	var groups StringArray
 	var metadata metadataMap
 	var hostNICs duckdb.Composite[[]models.HostPhysicalNIC]
@@ -273,7 +274,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 		&pvm.MigrationExcluded, &pvm.Labels, &groups,
 		&pvm.CpuHotAddEnabled, &pvm.CpuHotRemoveEnabled, &pvm.CpuSockets,
 		&pvm.CoresPerSocket, &pvm.MemoryHotAddEnabled, &pvm.BalloonedMemory,
-		&pvm.Disks, &pvm.NICs, &pvm.Networks, &pvm.Concerns,
+		&vmDisks, &pvm.NICs, &pvm.Networks, &pvm.Concerns,
 		&uMoid, &uVmName, &uProvCpus, &uProvMemMb, &uProvDiskKb,
 		&uCpuAvg, &uCpuP95, &uCpuMax, &uCpuLatest,
 		&uMemAvg, &uMemP95, &uMemMax, &uMemLatest,
@@ -286,11 +287,7 @@ func (s *VMStore) Get(ctx context.Context, id string) (*models.VM, error) {
 		return nil, fmt.Errorf("scanning VM %s: %w", id, err)
 	}
 
-	for i := range pvm.Disks {
-		pvm.Disks[i].ChangeTrackingEnabled = pvm.ChangeTrackingEnabled
-	}
-
-	result := fromDB(pvm)
+	result := fromDB(pvm, vmDisks)
 	result.HostPhysicalNICs = hostNICs.Get()
 	result.Annotation = annotation
 	result.Metadata = metadata
@@ -565,7 +562,7 @@ func normalizeCategory(category, issueID string) string {
 	return "Other"
 }
 
-func fromDB(pvm duckdb_models.VM) models.VM {
+func fromDB(pvm duckdb_models.VM, vmDisks vmDetailDisks) models.VM {
 	issues := make([]models.Issue, 0, len(pvm.Concerns))
 	criticalCount := 0
 	for _, c := range pvm.Concerns {
@@ -581,9 +578,9 @@ func fromDB(pvm duckdb_models.VM) models.VM {
 		}
 	}
 
-	disks := make([]models.Disk, 0, len(pvm.Disks))
+	disks := make([]models.Disk, 0, len(vmDisks))
 	var totalDiskCapacityMiB int64
-	for _, d := range pvm.Disks {
+	for _, d := range vmDisks {
 		var datastore *models.DiskDatastore
 		if d.Datastore.ID != "" ||
 			d.DatastoreName != "" ||
@@ -593,7 +590,9 @@ func fromDB(pvm duckdb_models.VM) models.VM {
 			d.DatastoreStorageProtocol != "" ||
 			d.DatastoreVendor != "" ||
 			d.DatastoreModel != "" ||
-			len(d.DatastoreBackingDeviceIDs) > 0 {
+			len(d.DatastoreBackingDeviceIDs) > 0 ||
+			len(d.storageArrays) > 0 ||
+			d.storageContainerID != "" {
 			datastore = &models.DiskDatastore{
 				ID:                     d.Datastore.ID,
 				Name:                   d.DatastoreName,
@@ -603,10 +602,12 @@ func fromDB(pvm duckdb_models.VM) models.VM {
 				// ProtocolType is the reported transport (e.g. FibreChannel, iSCSI, or NFS).
 				ProtocolType: d.DatastoreStorageProtocol,
 				// StorageProtocol classifies datastore types as Block (VMFS), File (NFS), or Object (vSAN).
-				StorageProtocol:  plannerInventory.StorageProtocolFromDatastoreType(d.DatastoreType),
-				BackingDeviceIDs: append([]string(nil), d.DatastoreBackingDeviceIDs...),
-				Vendor:           d.DatastoreVendor,
-				Model:            d.DatastoreModel,
+				StorageProtocol:    plannerInventory.StorageProtocolFromDatastoreType(d.DatastoreType),
+				BackingDeviceIDs:   append([]string(nil), d.DatastoreBackingDeviceIDs...),
+				Vendor:             d.DatastoreVendor,
+				Model:              d.DatastoreModel,
+				StorageArrays:      d.storageArrays,
+				StorageContainerID: d.storageContainerID,
 			}
 		}
 		var rdmBacking *models.RDMBacking
