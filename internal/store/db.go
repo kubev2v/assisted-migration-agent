@@ -74,11 +74,11 @@ func (l *ExtensionLoader) loadExtension(conn *sql.DB, extDir string, ext Extensi
 
 // NewConnection opens a DuckDB database at the given path.
 func NewConnection(loader *ExtensionLoader, path string) (*sql.DB, error) {
-	return newDatabase(loader, path, 0, ReadWriteDatabase)
+	return newDatabase(loader, path, ReadWriteDatabase)
 }
 
 // NewDB opens a DuckDB database at the given path.
-func newDatabase(loader *ExtensionLoader, path string, memoryLimit int, accessMode DatabaseAccessMode) (*sql.DB, error) {
+func newDatabase(loader *ExtensionLoader, path string, accessMode DatabaseAccessMode) (*sql.DB, error) {
 	dbName := fmt.Sprintf("%s?access_mode=READ_WRITE", path)
 	if accessMode == ReadOnlyDatabase {
 		dbName = fmt.Sprintf("%s?access_mode=READ_ONLY", path)
@@ -114,14 +114,7 @@ func newDatabase(loader *ExtensionLoader, path string, memoryLimit int, accessMo
 		}
 	}
 
-	if memoryLimit > 0 {
-		if _, err := conn.Exec(fmt.Sprintf("SET memory_limit = '%dMB'", memoryLimit)); err != nil {
-			_ = conn.Close()
-			return nil, fmt.Errorf("setting memory limit: %w", err)
-		}
-	}
-
-	zap.S().Infow("connection created to database", "path", path, "memory_limit_MB", memoryLimit, "access_mode", accessMode)
+	zap.S().Infow("connection created to database", "path", path, "access_mode", accessMode)
 
 	return conn, nil
 }

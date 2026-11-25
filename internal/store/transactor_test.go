@@ -33,7 +33,7 @@ var _ = Describe("WithTx", func() {
 		tmpDir, err = os.MkdirTemp("", "transactor-store-test-*")
 		Expect(err).NotTo(HaveOccurred())
 		pool = store.NewPool(5 * time.Minute)
-		collDB, dbErr := pool.NewDatabase("coll", filepath.Join(tmpDir, "collection.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		collDB, dbErr := pool.NewDatabase("coll", filepath.Join(tmpDir, "collection.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 		Expect(dbErr).NotTo(HaveOccurred())
 		Expect(collDB.Migrate(ctx, func(mCtx context.Context, sqlDB *sql.DB) error {
 			st, stErr := collDB.Store()

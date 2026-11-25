@@ -35,7 +35,6 @@ func buildTestStore(vms []struct {
 		filepath.Join(tmpDir, "test.duckdb"),
 		time.Now(),
 		store.EagerConnectionInitilization,
-		0,
 		store.ReadWriteDatabase,
 	)
 	Expect(err).NotTo(HaveOccurred())

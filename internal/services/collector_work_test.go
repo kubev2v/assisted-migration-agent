@@ -37,7 +37,7 @@ var _ = Describe("Collector work collection time", func() {
 		pool = store.NewPool(time.Minute)
 		DeferCleanup(pool.Close)
 
-		mainDB, err := pool.NewDatabase(store.MainDatabaseID, filepath.Join(dataDir, "agent.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		mainDB, err := pool.NewDatabase(store.MainDatabaseID, filepath.Join(dataDir, "agent.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 		Expect(err).NotTo(HaveOccurred())
 		pool.Add(mainDB)
 		Expect(mainDB.Migrate(ctx, migrations.RunMain)).NotTo(HaveOccurred())

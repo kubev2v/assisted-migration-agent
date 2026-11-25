@@ -116,7 +116,7 @@ func (f *rvtoolsWorkFactory) Build() work.WorkBuilder[models.CollectorStatus, mo
 				}
 
 				var dbError error
-				collectionDb, dbError = f.pool.NewDatabase(cloneDB.ID, dbPath, time.Now(), store.EagerConnectionInitilization, 1024, store.ReadWriteDatabase)
+				collectionDb, dbError = f.pool.NewDatabase(cloneDB.ID, dbPath, time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 				if dbError != nil {
 					r.Err = fmt.Errorf("opening collection database %s: %w", database, dbError)
 					return r, r.Err
@@ -155,7 +155,7 @@ func (f *rvtoolsWorkFactory) Build() work.WorkBuilder[models.CollectorStatus, mo
 
 			if collectionDb == nil {
 				var dbError error
-				collectionDb, dbError = f.pool.NewDatabase(id, dbPath, time.Now(), store.EagerConnectionInitilization, 1024, store.ReadWriteDatabase)
+				collectionDb, dbError = f.pool.NewDatabase(id, dbPath, time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 				if dbError != nil {
 					r.Err = &duckdb_parser.RVToolsProcessingError{
 						Stage: duckdb_parser.RVToolsStageInitialization,
@@ -205,7 +205,7 @@ func (f *rvtoolsWorkFactory) Build() work.WorkBuilder[models.CollectorStatus, mo
 				dbID := fmt.Sprintf("temporary_db_%s", strings.ReplaceAll(uuid.New().String(), "-", "")[:6])
 				tempDBPath := filepath.Join(f.dataDir, fmt.Sprintf("%s.duckdb", dbID))
 
-				collectionTemporaryDB, err := f.pool.NewDatabase(uuid.New().String(), tempDBPath, time.Now(), store.EagerConnectionInitilization, 1024, store.ReadWriteDatabase)
+				collectionTemporaryDB, err := f.pool.NewDatabase(uuid.New().String(), tempDBPath, time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 				if err != nil {
 					r.Err = &duckdb_parser.RVToolsProcessingError{
 						Stage:    duckdb_parser.RVToolsStageInitialization,

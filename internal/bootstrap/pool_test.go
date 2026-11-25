@@ -38,7 +38,7 @@ var _ = Describe("Pool", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			seedPool = store.NewPool(5 * time.Minute)
-			db, err := seedPool.NewDatabase(store.MainDatabaseID, filepath.Join(tmpDir, "agent.duckdb"), time.Now(), store.EagerConnectionInitilization, 256, store.ReadWriteDatabase)
+			db, err := seedPool.NewDatabase(store.MainDatabaseID, filepath.Join(tmpDir, "agent.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			seedPool.Add(db)
 			Expect(db.Migrate(context.Background(), migrations.RunMain)).To(Succeed())
@@ -108,7 +108,7 @@ var _ = Describe("Pool", func() {
 			Expect(err).NotTo(HaveOccurred())
 			defer pool.Close()
 			Expect(pool.Unregister(store.MainDatabaseID)).To(Succeed())
-			mainDB, err := pool.NewDatabase(store.MainDatabaseID, filepath.Join(tmpDir, "agent.duckdb"), time.Now(), store.LazyConnectionInitilization, 256, store.ReadOnlyDatabase)
+			mainDB, err := pool.NewDatabase(store.MainDatabaseID, filepath.Join(tmpDir, "agent.duckdb"), time.Now(), store.LazyConnectionInitilization, store.ReadOnlyDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			pool.Add(mainDB)
 

@@ -40,7 +40,7 @@ var _ = Describe("VMStore", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		pool = store.NewPool(5 * time.Minute)
-		collDB, err := pool.NewDatabase("coll", filepath.Join(tmpDir, "collection.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		collDB, err := pool.NewDatabase("coll", filepath.Join(tmpDir, "collection.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 		Expect(err).NotTo(HaveOccurred())
 		var rawDB *sql.DB
 		Expect(collDB.Migrate(ctx, func(mCtx context.Context, sqlDB *sql.DB) error {
