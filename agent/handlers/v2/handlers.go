@@ -15,6 +15,7 @@ type ServiceProvider interface {
 	VddkService() *svc.VddkService
 	CredentialsService() *svc.CredentialsService
 	ForecasterService() *svc.ForecasterService
+	ApplianceRulesService() (*svc.ApplianceRulesService, error)
 
 	ApplicationService(collectionID string) (*svc.ApplicationService, error)
 	ApplianceService(collectionID string) (*svc.ApplianceService, error)

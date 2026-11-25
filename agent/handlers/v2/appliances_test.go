@@ -69,6 +69,24 @@ var _ = Describe("Appliances handlers", Ordered, func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		pool = store.NewPool(5 * time.Minute)
+
+		mainDB, err := pool.NewDatabase(
+			store.MainDatabaseID,
+			filepath.Join(tmpDir, "agent.duckdb"),
+			time.Now(),
+			store.EagerConnectionInitilization,
+			store.ReadWriteDatabase,
+		)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(mainDB.Migrate(ctx, migrations.RunMain)).To(Succeed())
+		pool.Add(mainDB)
+
+		mainSt, err := mainDB.Store()
+		Expect(err).NotTo(HaveOccurred())
+
+		rulesSvc, err := svc.NewApplianceRulesService(mainSt)
+		Expect(err).NotTo(HaveOccurred())
+
 		database, err := pool.NewDatabase(
 			"test",
 			filepath.Join(tmpDir, "test.duckdb"),
@@ -101,7 +119,7 @@ var _ = Describe("Appliances handlers", Ordered, func() {
 		`)
 		Expect(err).NotTo(HaveOccurred())
 
-		applianceSvc, err := svc.NewApplianceService(st)
+		applianceSvc, err := svc.NewApplianceService(st, rulesSvc)
 		Expect(err).NotTo(HaveOccurred())
 
 		groupSvc = svc.NewGroupService(st, &mockInventoryBuilder{})
@@ -132,6 +150,9 @@ var _ = Describe("Appliances handlers", Ordered, func() {
 	})
 
 	Context("ListAppliances", func() {
+		// Given a collection whose VMs run two detected appliances
+		// When the appliances of the collection are listed
+		// Then both appliances are returned with their VMs and counts
 		It("should return appliances for the collection", func() {
 			// Act
 			req := httptest.NewRequest(http.MethodGet, "/collections/col-1/appliances", nil)
@@ -156,6 +177,9 @@ var _ = Describe("Appliances handlers", Ordered, func() {
 			))
 		})
 
+		// Given a collection id that the service cannot resolve
+		// When the appliances of the collection are listed
+		// Then the response is a not found
 		It("should return 404 when the collection does not exist", func() {
 			// Arrange
 			notFoundHandler := handlers.NewHandler(config.Configuration{}, &applianceProvider{
@@ -175,6 +199,9 @@ var _ = Describe("Appliances handlers", Ordered, func() {
 			Expect(w.Code).To(Equal(http.StatusNotFound))
 		})
 
+		// Given an appliance service that fails for another reason
+		// When the appliances of the collection are listed
+		// Then the response is a server error
 		It("should return 500 when listing appliances fails", func() {
 			// Arrange
 			failingHandler := handlers.NewHandler(config.Configuration{}, &applianceProvider{
@@ -196,6 +223,9 @@ var _ = Describe("Appliances handlers", Ordered, func() {
 	})
 
 	Context("ListGroupAppliances", func() {
+		// Given a group id that is not a UUID
+		// When the appliances of the group are listed
+		// Then the response is a bad request
 		It("should return 400 for invalid group ID", func() {
 			// Act
 			req := httptest.NewRequest(http.MethodGet, "/groups/not-a-uuid/appliances", nil)
@@ -206,6 +236,9 @@ var _ = Describe("Appliances handlers", Ordered, func() {
 			Expect(w.Code).To(Equal(http.StatusBadRequest))
 		})
 
+		// Given a group id that no group has
+		// When the appliances of the group are listed
+		// Then the response is a not found
 		It("should return 404 for non-existent group", func() {
 			// Act
 			req := httptest.NewRequest(http.MethodGet, "/groups/"+uuid.NewString()+"/appliances", nil)
@@ -216,6 +249,9 @@ var _ = Describe("Appliances handlers", Ordered, func() {
 			Expect(w.Code).To(Equal(http.StatusNotFound))
 		})
 
+		// Given no collection to read groups from
+		// When the appliances of a group are listed
+		// Then the response is a not found
 		It("should return 404 when there are no collections", func() {
 			// Arrange
 			noCollectionHandler := handlers.NewHandler(config.Configuration{}, &applianceProvider{
@@ -235,6 +271,9 @@ var _ = Describe("Appliances handlers", Ordered, func() {
 			Expect(w.Code).To(Equal(http.StatusNotFound))
 		})
 
+		// Given a group whose filter matches one VM of a detected appliance
+		// When the appliances of the group are listed
+		// Then only that VM is reported under the appliance
 		It("should return appliances for the group's VMs", func() {
 			// Act
 			req := httptest.NewRequest(http.MethodGet, "/groups/"+groupID+"/appliances", nil)
@@ -254,6 +293,9 @@ var _ = Describe("Appliances handlers", Ordered, func() {
 			}))
 		})
 
+		// Given a group whose filter matches a VM that runs no appliance
+		// When the appliances of the group are listed
+		// Then the appliance list is empty
 		It("should return empty appliances when the group has none", func() {
 			// Arrange
 			emptyGroup, err := groupSvc.Create(ctx, models.Group{

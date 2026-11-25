@@ -4,6 +4,7 @@
 package v2
 
 import (
+	"encoding/json"
 	"time"
 
 	externalRef0 "github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -28,6 +29,42 @@ const (
 	AgentStatusModeDisconnected AgentStatusMode = "disconnected"
 )
 
+// Defines values for ApplianceRuleKind.
+const (
+	Custom  ApplianceRuleKind = "custom"
+	Default ApplianceRuleKind = "default"
+)
+
+// Defines values for ApplianceRuleMaxConfidence.
+const (
+	ApplianceRuleMaxConfidenceHigh   ApplianceRuleMaxConfidence = "high"
+	ApplianceRuleMaxConfidenceLow    ApplianceRuleMaxConfidence = "low"
+	ApplianceRuleMaxConfidenceMedium ApplianceRuleMaxConfidence = "medium"
+)
+
+// Defines values for ApplianceRuleOsvVerdict.
+const (
+	ApplianceRuleOsvVerdictBlocked     ApplianceRuleOsvVerdict = "blocked"
+	ApplianceRuleOsvVerdictConditional ApplianceRuleOsvVerdict = "conditional"
+	ApplianceRuleOsvVerdictSupported   ApplianceRuleOsvVerdict = "supported"
+	ApplianceRuleOsvVerdictUnknown     ApplianceRuleOsvVerdict = "unknown"
+)
+
+// Defines values for ApplianceRuleRequestMaxConfidence.
+const (
+	ApplianceRuleRequestMaxConfidenceHigh   ApplianceRuleRequestMaxConfidence = "high"
+	ApplianceRuleRequestMaxConfidenceLow    ApplianceRuleRequestMaxConfidence = "low"
+	ApplianceRuleRequestMaxConfidenceMedium ApplianceRuleRequestMaxConfidence = "medium"
+)
+
+// Defines values for ApplianceRuleRequestOsvVerdict.
+const (
+	ApplianceRuleRequestOsvVerdictBlocked     ApplianceRuleRequestOsvVerdict = "blocked"
+	ApplianceRuleRequestOsvVerdictConditional ApplianceRuleRequestOsvVerdict = "conditional"
+	ApplianceRuleRequestOsvVerdictSupported   ApplianceRuleRequestOsvVerdict = "supported"
+	ApplianceRuleRequestOsvVerdictUnknown     ApplianceRuleRequestOsvVerdict = "unknown"
+)
+
 // Defines values for CollectionComparisonDiffDimension.
 const (
 	CollectionComparisonDiffDimensionMigratable    CollectionComparisonDiffDimension = "migratable"
@@ -44,6 +81,12 @@ const (
 	CollectorStatusStatusError       CollectorStatusStatus = "error"
 	CollectorStatusStatusParsing     CollectorStatusStatus = "parsing"
 	CollectorStatusStatusReady       CollectorStatusStatus = "ready"
+)
+
+// Defines values for DiskGeometryConditionMode.
+const (
+	Exact    DiskGeometryConditionMode = "exact"
+	Superset DiskGeometryConditionMode = "superset"
 )
 
 // Defines values for ForecastPairStatusState.
@@ -166,6 +209,85 @@ type Appliance struct {
 type ApplianceListResponse struct {
 	Appliances []Appliance `json:"appliances"`
 }
+
+// ApplianceRule defines model for ApplianceRule.
+type ApplianceRule struct {
+	// Category Appliance category
+	Category   string                   `json:"category"`
+	Conditions []ApplianceRuleCondition `json:"conditions"`
+
+	// Id Rule ID
+	Id *string `json:"id,omitempty"`
+
+	// Kind Kind of rules either default or custom
+	Kind ApplianceRuleKind `json:"kind"`
+
+	// MaxConfidence Confidence ceiling for this rule
+	MaxConfidence ApplianceRuleMaxConfidence `json:"max_confidence"`
+
+	// MinMatched Number of conditions that must match before the rule fires
+	MinMatched json.Number `json:"min_matched"`
+
+	// Name Appliance product name
+	Name string `json:"name"`
+
+	// OsvVerdict OSV migration verdict
+	OsvVerdict ApplianceRuleOsvVerdict `json:"osv_verdict"`
+
+	// Vendor Appliance vendor
+	Vendor string `json:"vendor"`
+}
+
+// ApplianceRuleKind Kind of rules either default or custom
+type ApplianceRuleKind string
+
+// ApplianceRuleMaxConfidence Confidence ceiling for this rule
+type ApplianceRuleMaxConfidence string
+
+// ApplianceRuleOsvVerdict OSV migration verdict
+type ApplianceRuleOsvVerdict string
+
+// ApplianceRuleCondition One condition. Either a filter expression over VM attributes or a call to a registered predicate function carrying its own payload. Exactly one of expression or function must be set. Condition names must be unique within a rule, and min_matched may not exceed the number of conditions.
+type ApplianceRuleCondition struct {
+	// Expression Filter DSL expression over the VM attributes appliance rules can match on, e.g. Name ~ /^ORA-/ or NICCount > 3.
+	Expression *string `binding:"required_without=Function,excluded_with=Function" json:"expression,omitempty"`
+
+	// Function A registered predicate selected by name. Exactly one payload field, the one matching name, must be set; the payload is validated server-side against the predicate the name resolves to.
+	Function *ApplianceRuleFunction `json:"function,omitempty"`
+
+	// Name Condition name, unique within the rule. The name decides how much a match contributes: vapp_product and annotation weigh high, guest_id and mount_preffix medium, nic_count, disk_geometry and nested_hv low, and name weighs so little that matching it alone is not a detection. Any other name is rejected.
+	Name string `json:"name"`
+}
+
+// ApplianceRuleFunction A registered predicate selected by name. Exactly one payload field, the one matching name, must be set; the payload is validated server-side against the predicate the name resolves to.
+type ApplianceRuleFunction struct {
+	DiskGeometry *DiskGeometryCondition `json:"disk_geometry,omitempty"`
+
+	// Name Predicate name. disk_geometry is the only one defined; any other name is rejected.
+	Name string `json:"name"`
+}
+
+// ApplianceRuleListResponse defines model for ApplianceRuleListResponse.
+type ApplianceRuleListResponse struct {
+	Rules []ApplianceRule `json:"rules"`
+}
+
+// ApplianceRuleRequest defines model for ApplianceRuleRequest.
+type ApplianceRuleRequest struct {
+	Category      string                            `binding:"required,min=1,max=200" json:"category"`
+	Conditions    []ApplianceRuleCondition          `binding:"required,min=1,dive" json:"conditions"`
+	MaxConfidence ApplianceRuleRequestMaxConfidence `binding:"required,oneof=high medium low" json:"max_confidence"`
+	MinMatched    json.Number                       `binding:"required" json:"min_matched"`
+	Name          string                            `binding:"required,min=1,max=200" json:"name"`
+	OsvVerdict    ApplianceRuleRequestOsvVerdict    `binding:"required,oneof=blocked conditional supported unknown" json:"osv_verdict"`
+	Vendor        string                            `binding:"required,min=1,max=200" json:"vendor"`
+}
+
+// ApplianceRuleRequestMaxConfidence defines model for ApplianceRuleRequest.MaxConfidence.
+type ApplianceRuleRequestMaxConfidence string
+
+// ApplianceRuleRequestOsvVerdict defines model for ApplianceRuleRequest.OsvVerdict.
+type ApplianceRuleRequestOsvVerdict string
 
 // ApplicationListResponse defines model for ApplicationListResponse.
 type ApplicationListResponse struct {
@@ -396,6 +518,18 @@ type DeleteLabelGloballyResponse struct {
 	// Label The label that was removed
 	Label string `json:"label"`
 }
+
+// DiskGeometryCondition defines model for DiskGeometryCondition.
+type DiskGeometryCondition struct {
+	Disks []json.Number             `binding:"required,min=1,dive,min=1" json:"disks"`
+	Mode  DiskGeometryConditionMode `binding:"required,oneof=exact superset" json:"mode"`
+
+	// ToleranceMib Largest difference in MiB allowed between a required disk size and the size of a VM disk. Zero requires the sizes to match exactly.
+	ToleranceMib json.Number `binding:"required" json:"tolerance_mib"`
+}
+
+// DiskGeometryConditionMode defines model for DiskGeometryCondition.Mode.
+type DiskGeometryConditionMode string
 
 // EstimateRange defines model for EstimateRange.
 type EstimateRange struct {
@@ -1256,6 +1390,12 @@ type ListLatestVirtualMachinesParams struct {
 
 // SetAgentModeJSONRequestBody defines body for SetAgentMode for application/json ContentType.
 type SetAgentModeJSONRequestBody = AgentModeRequest
+
+// CreateApplianceRuleJSONRequestBody defines body for CreateApplianceRule for application/json ContentType.
+type CreateApplianceRuleJSONRequestBody = ApplianceRuleRequest
+
+// UpdateApplianceRuleJSONRequestBody defines body for UpdateApplianceRule for application/json ContentType.
+type UpdateApplianceRuleJSONRequestBody = ApplianceRuleRequest
 
 // PutCredentialsJSONRequestBody defines body for PutCredentials for application/json ContentType.
 type PutCredentialsJSONRequestBody = VcenterCredentials

@@ -347,11 +347,18 @@ func (m *ServiceManager) ApplianceService(collectionID string) (*ApplianceServic
 	if err != nil {
 		return nil, err
 	}
+
 	st, err := db.Store()
 	if err != nil {
 		return nil, err
 	}
-	return NewApplianceService(st)
+
+	rulesSrv, err := m.ApplianceRulesService()
+	if err != nil {
+		return nil, err
+	}
+
+	return NewApplianceService(st, rulesSrv)
 }
 
 func (m *ServiceManager) LatestApplianceService() (*ApplianceService, error) {
@@ -363,7 +370,25 @@ func (m *ServiceManager) LatestApplianceService() (*ApplianceService, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewApplianceService(st)
+
+	rulesSrv, err := m.ApplianceRulesService()
+	if err != nil {
+		return nil, err
+	}
+
+	return NewApplianceService(st, rulesSrv)
+}
+
+func (m *ServiceManager) ApplianceRulesService() (*ApplianceRulesService, error) {
+	mainDB, err := m.pool.Get(store.MainDatabaseID)
+	if err != nil {
+		return nil, err
+	}
+	mainStore, err := mainDB.Store()
+	if err != nil {
+		return nil, err
+	}
+	return NewApplianceRulesService(mainStore)
 }
 
 func (m *ServiceManager) Stop(ctx context.Context) {

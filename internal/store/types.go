@@ -48,51 +48,34 @@ func (s *StringArray) Scan(src any) error {
 	}
 }
 
-// IntArray is a scanner for DuckDB INTEGER[] arrays.
-type IntArray []int
+// IntArray is a scanner for DuckDB BIGINT[] arrays.
+// DuckDB returns arrays as []any of int64 values.
+type IntArray []int64
 
+// Scan implements sql.Scanner for DuckDB BIGINT[] arrays.
 func (a *IntArray) Scan(src any) error {
 	if src == nil {
-		*a = []int{}
+		*a = []int64{}
 		return nil
 	}
 
-	switch v := src.(type) {
-	case []interface{}:
-		result := make([]int, 0, len(v))
-
-		for _, elem := range v {
-			switch n := elem.(type) {
-			case nil:
-				continue
-			case int:
-				result = append(result, n)
-			case int32:
-				result = append(result, int(n))
-			case int64:
-				result = append(result, int(n))
-			default:
-				return fmt.Errorf("unsupported element for IntArray: %T", elem)
-			}
-		}
-
-		*a = result
-		return nil
-	case []int32:
-		result := make([]int, len(v))
-
-		for i, elem := range v {
-			result[i] = int(elem)
-		}
-
-		*a = result
-		return nil
-	case []int:
-		*a = v
-		return nil
-	default:
+	values, ok := src.([]any)
+	if !ok {
 		return fmt.Errorf("unsupported type for IntArray: %T", src)
 	}
+
+	result := make([]int64, 0, len(values))
+	for _, elem := range values {
+		number, ok := elem.(int64)
+		if !ok {
+			return fmt.Errorf("unsupported element for IntArray: %T", elem)
+		}
+
+		result = append(result, number)
+	}
+
+	*a = result
+	return nil
 }
 
 // BoolArray is a scanner for DuckDB BOOLEAN[] arrays.

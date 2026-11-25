@@ -609,6 +609,133 @@ func (a *AgentSvc) ListGroupApplications(groupID string) (*v2.ApplicationListRes
 	return &result, nil
 }
 
+// --- Appliance rules ---
+// Rules are agent-wide, not collection scoped, so these paths carry no id.
+
+func (a *AgentSvc) ListApplianceRules() (*v2.ApplianceRuleListResponse, error) {
+	resp, err := a.doGet("/api/v2/appliances/rules")
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var result v2.ApplianceRuleListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+	return &result, nil
+}
+
+func (a *AgentSvc) CreateApplianceRule(req v2.ApplianceRuleRequest) (*v2.ApplianceRule, error) {
+	resp, err := a.doJSON(http.MethodPost, "/api/v2/appliances/rules", req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusCreated {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var result v2.ApplianceRule
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+	return &result, nil
+}
+
+func (a *AgentSvc) CreateApplianceRuleRaw(body []byte) (int, string, error) {
+	return a.sendApplianceRule(http.MethodPost, "/api/v2/appliances/rules", body)
+}
+
+func (a *AgentSvc) GetApplianceRule(ruleID string) (*v2.ApplianceRule, error) {
+	resp, err := a.doGet("/api/v2/appliances/rules/" + url.PathEscape(ruleID))
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var result v2.ApplianceRule
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+	return &result, nil
+}
+
+func (a *AgentSvc) GetApplianceRuleRaw(ruleID string) (int, error) {
+	resp, err := a.doGet("/api/v2/appliances/rules/" + url.PathEscape(ruleID))
+	if err != nil {
+		return 0, err
+	}
+	_ = resp.Body.Close()
+	return resp.StatusCode, nil
+}
+
+// UpdateApplianceRule replaces a rule and returns the stored rule with the status
+// code, which is 200 when the rule existed and 201 when it was created.
+func (a *AgentSvc) UpdateApplianceRule(ruleID string, req v2.ApplianceRuleRequest) (*v2.ApplianceRule, int, error) {
+	raw, err := json.Marshal(req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("marshaling request: %w", err)
+	}
+
+	status, body, err := a.sendApplianceRule(http.MethodPut, "/api/v2/appliances/rules/"+url.PathEscape(ruleID), raw)
+	if err != nil {
+		return nil, status, err
+	}
+
+	if status != http.StatusOK && status != http.StatusCreated {
+		return nil, status, fmt.Errorf("unexpected status code: %d, body: %s", status, body)
+	}
+
+	var result v2.ApplianceRule
+	if err := json.Unmarshal([]byte(body), &result); err != nil {
+		return nil, status, fmt.Errorf("decoding response: %w", err)
+	}
+	return &result, status, nil
+}
+
+func (a *AgentSvc) UpdateApplianceRuleRaw(ruleID string, body []byte) (int, string, error) {
+	return a.sendApplianceRule(http.MethodPut, "/api/v2/appliances/rules/"+url.PathEscape(ruleID), body)
+}
+
+func (a *AgentSvc) DeleteApplianceRule(ruleID string) (int, error) {
+	resp, err := a.doRequest(http.MethodDelete, "/api/v2/appliances/rules/"+url.PathEscape(ruleID), nil)
+	if err != nil {
+		return 0, err
+	}
+	_ = resp.Body.Close()
+	return resp.StatusCode, nil
+}
+
+// sendApplianceRule posts or puts a body and returns the status code together
+// with the response body, so a rejected request can be asserted on its message.
+func (a *AgentSvc) sendApplianceRule(method, path string, body []byte) (int, string, error) {
+	resp, err := a.doRaw(method, path, body)
+	if err != nil {
+		return 0, "", err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return resp.StatusCode, "", fmt.Errorf("reading response: %w", err)
+	}
+
+	return resp.StatusCode, string(bodyBytes), nil
+}
+
 // --- Appliances (collection-scoped) ---
 
 func (a *AgentSvc) ListAppliances(collectionID string) (*v2.ApplianceListResponse, error) {

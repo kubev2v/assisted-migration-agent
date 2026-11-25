@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"reflect"
 	"regexp"
 	"strings"
 
@@ -15,6 +16,16 @@ var tagFormatRegex = regexp.MustCompile(`^[a-zA-Z0-9_.]+$`)
 func RegisterValidators(v *validator.Validate) {
 	_ = v.RegisterValidation("tag_format", validateTagFormat)
 	_ = v.RegisterValidation("notblank", validateNotBlank)
+
+	// Validation messages name fields the way clients send them.
+	v.RegisterTagNameFunc(func(field reflect.StructField) string {
+		name, _, _ := strings.Cut(field.Tag.Get("json"), ",")
+		if name == "-" {
+			return ""
+		}
+
+		return name
+	})
 }
 
 // validateTagFormat checks that a tag contains only alphanumeric characters, underscores, and dots.

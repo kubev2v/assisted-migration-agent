@@ -2,14 +2,21 @@ package v2
 
 import (
 	"crypto/x509"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
 	"github.com/kubev2v/assisted-migration-agent/internal/store"
 )
+
+// diskGeometryFunctionName is the wire name of the only predicate a rule
+// condition can call. The storage layer adds the mode as a suffix.
+const diskGeometryFunctionName = "disk_geometry"
 
 // CredsFromAPI converts a VcenterCredentials API type to models.Credentials.
 func CredsFromAPI(v VcenterCredentials) (models.Credentials, error) {
@@ -801,4 +808,160 @@ func NewApplianceList(appliances []models.Appliance) []Appliance {
 	}
 
 	return apiAppliances
+}
+
+// NewApplianceRuleFromModel converts a stored rule into its API shape. The rule
+// ID is a database integer, so it is rendered as a decimal string.
+//
+// Only expression and disk geometry conditions have an API shape. A condition of
+// any other shape is an error, because dropping it would leave the response
+// describing a rule that does not exist.
+func NewApplianceRuleFromModel(rule models.Rule) (ApplianceRule, error) {
+	id := strconv.FormatInt(rule.ID, 10)
+
+	kind := Default
+	if rule.RuleKind == models.CustomRule {
+		kind = Custom
+	}
+
+	osvVerdict := ApplianceRuleOsvVerdictUnknown
+	switch rule.OsvVerdict {
+	case models.OsvBlocked:
+		osvVerdict = ApplianceRuleOsvVerdictBlocked
+	case models.OsvConditional:
+		osvVerdict = ApplianceRuleOsvVerdictConditional
+	case models.OsvSupported:
+		osvVerdict = ApplianceRuleOsvVerdictSupported
+	}
+
+	maxConfidence := ApplianceRuleMaxConfidenceLow
+	switch rule.Confidence {
+	case models.ConfidenceHighLevel:
+		maxConfidence = ApplianceRuleMaxConfidenceHigh
+	case models.ConfidenceMediumLevel:
+		maxConfidence = ApplianceRuleMaxConfidenceMedium
+	}
+
+	conditions := make([]ApplianceRuleCondition, 0, len(rule.Conditions))
+
+	for i, condition := range rule.Conditions {
+		switch c := condition.(type) {
+		case models.ExpressionCondition:
+			expression := c.Expression
+			conditions = append(conditions, ApplianceRuleCondition{
+				Name:       c.Name,
+				Expression: &expression,
+			})
+
+		case models.FuncCondition[models.DiskGeometry]:
+			disks := make([]json.Number, 0, len(c.Data.Disks))
+			for _, size := range c.Data.Disks {
+				disks = append(disks, json.Number(strconv.FormatInt(size, 10)))
+			}
+
+			conditions = append(conditions, ApplianceRuleCondition{
+				Name: c.Name,
+				Function: &ApplianceRuleFunction{
+					Name: diskGeometryFunctionName,
+					DiskGeometry: &DiskGeometryCondition{
+						Disks:        disks,
+						Mode:         DiskGeometryConditionMode(c.Data.Mode),
+						ToleranceMib: json.Number(strconv.Itoa(c.Data.Tolerance)),
+					},
+				},
+			})
+
+		default:
+			return ApplianceRule{}, fmt.Errorf("rule %q: condition[%d] has type %T, which the API cannot express", rule.Name, i, condition)
+		}
+	}
+
+	return ApplianceRule{
+		Id:            &id,
+		Name:          rule.Name,
+		Vendor:        rule.Vendor,
+		Category:      rule.Category,
+		Kind:          kind,
+		OsvVerdict:    osvVerdict,
+		MaxConfidence: maxConfidence,
+		MinMatched:    json.Number(strconv.Itoa(rule.MinMatches)),
+		Conditions:    conditions,
+	}, nil
+}
+
+// NewRuleFromRequest converts an API request into a domain rule. The conditions
+// are models.ConditionInput: the service resolves them against its condition
+// registry, so an unknown condition or function name is only caught there.
+func NewRuleFromRequest(req ApplianceRuleRequest) (models.Rule, error) {
+	minMatched, err := req.MinMatched.Int64()
+	if err != nil {
+		return models.Rule{}, fmt.Errorf("min_matched must be an integer, got %q", req.MinMatched)
+	}
+
+	osvVerdict := models.OsvBlocked
+	switch req.OsvVerdict {
+	case ApplianceRuleRequestOsvVerdictConditional:
+		osvVerdict = models.OsvConditional
+	case ApplianceRuleRequestOsvVerdictSupported:
+		osvVerdict = models.OsvSupported
+	case ApplianceRuleRequestOsvVerdictUnknown:
+		osvVerdict = models.OsvUnknown
+	}
+
+	maxConfidence := models.ConfidenceLowerLevel
+	switch req.MaxConfidence {
+	case ApplianceRuleRequestMaxConfidenceHigh:
+		maxConfidence = models.ConfidenceHighLevel
+	case ApplianceRuleRequestMaxConfidenceMedium:
+		maxConfidence = models.ConfidenceMediumLevel
+	}
+
+	conditions := make([]any, 0, len(req.Conditions))
+
+	for _, condition := range req.Conditions {
+		input := models.ConditionInput{Name: condition.Name}
+
+		if condition.Expression != nil {
+			input.Expression = *condition.Expression
+		}
+
+		if condition.Function != nil {
+			input.Function = &models.FunctionInput{Name: condition.Function.Name}
+
+			if geometry := condition.Function.DiskGeometry; geometry != nil {
+				disks := make([]int64, 0, len(geometry.Disks))
+				for _, disk := range geometry.Disks {
+					size, err := disk.Int64()
+					if err != nil {
+						return models.Rule{}, fmt.Errorf("disk size must be an integer, got %q", disk)
+					}
+
+					disks = append(disks, size)
+				}
+
+				tolerance, err := geometry.ToleranceMib.Int64()
+				if err != nil {
+					return models.Rule{}, fmt.Errorf("tolerance_mib must be an integer, got %q", geometry.ToleranceMib)
+				}
+
+				input.Function.DiskGeometry = &models.DiskGeometry{
+					Disks:     disks,
+					Tolerance: int(tolerance),
+					Mode:      models.DiskGeometryMode(geometry.Mode),
+				}
+			}
+		}
+
+		conditions = append(conditions, input)
+	}
+
+	return models.Rule{
+		Name:       req.Name,
+		Vendor:     req.Vendor,
+		Category:   req.Category,
+		OsvVerdict: osvVerdict,
+		Confidence: maxConfidence,
+		MinMatches: int(minMatched),
+		Conditions: conditions,
+	}, nil
 }

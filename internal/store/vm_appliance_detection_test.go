@@ -175,7 +175,6 @@ var _ = Describe("VMStore ListForApplianceDetection", Ordered, func() {
 				Expect(vm.Cluster).To(Equal("cluster-a"))
 				Expect(vm.HostName).To(Equal("pa-vm-01.local"))
 				Expect(vm.IPAddress).To(Equal("10.0.0.5"))
-				Expect(vm.IsTemplate).To(BeTrue())
 			})
 
 			It("should default the missing columns of a bare VM", func() {
@@ -195,7 +194,6 @@ var _ = Describe("VMStore ListForApplianceDetection", Ordered, func() {
 				Expect(bare.MemoryMB).To(Equal(int32(0)))
 				Expect(bare.DiskSize).To(Equal(int64(0)))
 				Expect(bare.NICCount).To(Equal(int32(0)))
-				Expect(bare.IsTemplate).To(BeFalse())
 			})
 		})
 

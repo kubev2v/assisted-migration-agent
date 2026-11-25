@@ -294,3 +294,274 @@ var _ = DescribeTable("VM disk storage metadata", func(disk models.Disk, want st
 		"thinProvisioned":true,"eagerlyScrubbed":true
 	}`),
 )
+
+// ptr returns a pointer to value, for the optional API fields.
+func ptr[T any](value T) *T {
+	return &value
+}
+
+var _ = Describe("NewApplianceRuleFromModel", func() {
+	// Given a rule whose only condition is an expression
+	// When it is converted for the API
+	// Then the rule fields and the expression condition are carried over
+	It("should map a rule with an expression condition", func() {
+		// Arrange
+		rule := models.Rule{
+			ID:         7,
+			Name:       "oracle-oda",
+			Vendor:     "Oracle",
+			RuleKind:   models.CustomRule,
+			Category:   "Database",
+			OsvVerdict: models.OsvConditional,
+			Confidence: models.ConfidenceMediumLevel,
+			MinMatches: 2,
+			Conditions: []any{
+				models.ExpressionCondition{Name: "annotation", Tier: 2, Expression: `Name ~ /^ORA-/`},
+			},
+		}
+
+		// Act
+		apiRule, err := v2.NewApplianceRuleFromModel(rule)
+
+		// Assert
+		Expect(err).NotTo(HaveOccurred())
+		Expect(apiRule.Id).To(HaveValue(Equal("7")))
+		Expect(apiRule.Name).To(Equal("oracle-oda"))
+		Expect(apiRule.Vendor).To(Equal("Oracle"))
+		Expect(apiRule.Category).To(Equal("Database"))
+		Expect(apiRule.Kind).To(Equal(v2.Custom))
+		Expect(apiRule.OsvVerdict).To(Equal(v2.ApplianceRuleOsvVerdictConditional))
+		Expect(apiRule.MaxConfidence).To(Equal(v2.ApplianceRuleMaxConfidenceMedium))
+		Expect(apiRule.MinMatched).To(Equal(json.Number("2")))
+		Expect(apiRule.Conditions).To(Equal([]v2.ApplianceRuleCondition{
+			{Name: "annotation", Expression: ptr(`Name ~ /^ORA-/`)},
+		}))
+	})
+
+	// Given a rule whose only condition is a disk geometry predicate
+	// When it is converted for the API
+	// Then the wire shape carries the predicate name, the disks, the mode and the tolerance
+	It("should map a disk geometry condition with its mode and tolerance", func() {
+		// Arrange
+		rule := models.Rule{
+			ID:         8,
+			Name:       "disk-rule",
+			Confidence: models.ConfidenceHighLevel,
+			MinMatches: 1,
+			Conditions: []any{
+				models.FuncCondition[models.DiskGeometry]{
+					Name:     "disk_geometry",
+					Tier:     5,
+					FuncName: "disk_geometry_superset",
+					Data:     models.DiskGeometry{Disks: []int64{2048, 4096}, Tolerance: 512, Mode: models.DiskGeometrySuperset},
+				},
+			},
+		}
+
+		// Act
+		apiRule, err := v2.NewApplianceRuleFromModel(rule)
+
+		// Assert
+		Expect(err).NotTo(HaveOccurred())
+		Expect(apiRule.Conditions).To(HaveLen(1))
+		Expect(apiRule.Conditions[0].Name).To(Equal("disk_geometry"))
+		Expect(apiRule.Conditions[0].Function).To(Equal(&v2.ApplianceRuleFunction{
+			Name: "disk_geometry",
+			DiskGeometry: &v2.DiskGeometryCondition{
+				Disks:        []json.Number{"2048", "4096"},
+				Mode:         v2.Superset,
+				ToleranceMib: json.Number("512"),
+			},
+		}))
+	})
+
+	// Given a rule that holds a condition the API has no shape for
+	// When it is converted for the API
+	// Then the conversion fails instead of dropping the condition
+	It("should fail on a condition the API cannot express", func() {
+		// Arrange
+		rule := models.Rule{
+			Name:       "unexpressible",
+			Conditions: []any{models.ExpressionCondition{Name: "name", Tier: 6, Expression: `Name = "web-01"`}, "not a condition"},
+		}
+
+		// Act
+		_, err := v2.NewApplianceRuleFromModel(rule)
+
+		// Assert
+		Expect(err).To(MatchError(ContainSubstring("condition[1]")))
+		Expect(err).To(MatchError(ContainSubstring("cannot express")))
+	})
+})
+
+var _ = DescribeTable("NewApplianceRuleFromModel OSV verdict",
+	func(verdict models.OsvVerdict, want v2.ApplianceRuleOsvVerdict) {
+		// Arrange
+		rule := models.Rule{
+			Name:       "rule",
+			OsvVerdict: verdict,
+			Conditions: []any{models.ExpressionCondition{Name: "name", Tier: 6, Expression: `Name = "web-01"`}},
+		}
+
+		// Act
+		apiRule, err := v2.NewApplianceRuleFromModel(rule)
+
+		// Assert
+		Expect(err).NotTo(HaveOccurred())
+		Expect(apiRule.OsvVerdict).To(Equal(want))
+	},
+	Entry("blocked", models.OsvBlocked, v2.ApplianceRuleOsvVerdictBlocked),
+	Entry("conditional", models.OsvConditional, v2.ApplianceRuleOsvVerdictConditional),
+	Entry("supported", models.OsvSupported, v2.ApplianceRuleOsvVerdictSupported),
+	Entry("unknown", models.OsvUnknown, v2.ApplianceRuleOsvVerdictUnknown),
+)
+
+var _ = DescribeTable("NewApplianceRuleFromModel confidence",
+	func(confidence models.ConfidenceLevel, want v2.ApplianceRuleMaxConfidence) {
+		// Arrange
+		rule := models.Rule{
+			Name:       "rule",
+			Confidence: confidence,
+			Conditions: []any{models.ExpressionCondition{Name: "name", Tier: 6, Expression: `Name = "web-01"`}},
+		}
+
+		// Act
+		apiRule, err := v2.NewApplianceRuleFromModel(rule)
+
+		// Assert
+		Expect(err).NotTo(HaveOccurred())
+		Expect(apiRule.MaxConfidence).To(Equal(want))
+	},
+	Entry("high", models.ConfidenceHighLevel, v2.ApplianceRuleMaxConfidenceHigh),
+	Entry("medium", models.ConfidenceMediumLevel, v2.ApplianceRuleMaxConfidenceMedium),
+	Entry("low", models.ConfidenceLowerLevel, v2.ApplianceRuleMaxConfidenceLow),
+)
+
+var _ = DescribeTable("NewApplianceRuleFromModel kind",
+	func(kind models.RuleKind, want v2.ApplianceRuleKind) {
+		// Arrange
+		rule := models.Rule{
+			Name:       "rule",
+			RuleKind:   kind,
+			Conditions: []any{models.ExpressionCondition{Name: "name", Tier: 6, Expression: `Name = "web-01"`}},
+		}
+
+		// Act
+		apiRule, err := v2.NewApplianceRuleFromModel(rule)
+
+		// Assert
+		Expect(err).NotTo(HaveOccurred())
+		Expect(apiRule.Kind).To(Equal(want))
+	},
+	Entry("default", models.DefaultRule, v2.Default),
+	Entry("custom", models.CustomRule, v2.Custom),
+)
+
+var _ = Describe("NewRuleFromRequest", func() {
+	// Given a request carrying an expression condition and a disk geometry condition
+	// When it is converted into a domain rule
+	// Then each condition becomes input the service can resolve, tolerance included
+	It("should map both condition shapes", func() {
+		// Arrange
+		req := v2.ApplianceRuleRequest{
+			Name:          "ora",
+			Vendor:        "Oracle",
+			Category:      "Database",
+			OsvVerdict:    v2.ApplianceRuleRequestOsvVerdictSupported,
+			MaxConfidence: v2.ApplianceRuleRequestMaxConfidenceHigh,
+			MinMatched:    json.Number("1"),
+			Conditions: []v2.ApplianceRuleCondition{
+				{Name: "annotation", Expression: ptr(`Name ~ /^ORA-/`)},
+				{
+					Name: "disk_geometry",
+					Function: &v2.ApplianceRuleFunction{
+						Name: "disk_geometry",
+						DiskGeometry: &v2.DiskGeometryCondition{
+							Disks:        []json.Number{"2048", "4096"},
+							Mode:         v2.Superset,
+							ToleranceMib: json.Number("512"),
+						},
+					},
+				},
+			},
+		}
+
+		// Act
+		rule, err := v2.NewRuleFromRequest(req)
+
+		// Assert
+		Expect(err).NotTo(HaveOccurred())
+		Expect(rule.Name).To(Equal("ora"))
+		Expect(rule.Vendor).To(Equal("Oracle"))
+		Expect(rule.Category).To(Equal("Database"))
+		Expect(rule.OsvVerdict).To(Equal(models.OsvSupported))
+		Expect(rule.Confidence).To(Equal(models.ConfidenceHighLevel))
+		Expect(rule.MinMatches).To(Equal(1))
+		Expect(rule.Conditions).To(Equal([]any{
+			models.ConditionInput{Name: "annotation", Expression: `Name ~ /^ORA-/`},
+			models.ConditionInput{
+				Name: "disk_geometry",
+				Function: &models.FunctionInput{
+					Name:         "disk_geometry",
+					DiskGeometry: &models.DiskGeometry{Disks: []int64{2048, 4096}, Tolerance: 512, Mode: models.DiskGeometrySuperset},
+				},
+			},
+		}))
+	})
+
+	// Given a request whose disk geometry carries a size that is not a number
+	// When it is converted into a domain rule
+	// Then the conversion fails
+	It("should fail on a disk size that is not a number", func() {
+		// Arrange
+		req := v2.ApplianceRuleRequest{
+			Name:       "ora",
+			MinMatched: json.Number("1"),
+			Conditions: []v2.ApplianceRuleCondition{{
+				Name: "disk_geometry",
+				Function: &v2.ApplianceRuleFunction{
+					Name: "disk_geometry",
+					DiskGeometry: &v2.DiskGeometryCondition{
+						Disks:        []json.Number{"big"},
+						Mode:         v2.Exact,
+						ToleranceMib: json.Number("0"),
+					},
+				},
+			}},
+		}
+
+		// Act
+		_, err := v2.NewRuleFromRequest(req)
+
+		// Assert
+		Expect(err).To(MatchError(ContainSubstring("disk size must be an integer")))
+	})
+
+	// Given a request whose disk geometry carries a tolerance that is not a number
+	// When it is converted into a domain rule
+	// Then the conversion fails
+	It("should fail on a tolerance that is not a number", func() {
+		// Arrange
+		req := v2.ApplianceRuleRequest{
+			Name:       "ora",
+			MinMatched: json.Number("1"),
+			Conditions: []v2.ApplianceRuleCondition{{
+				Name: "disk_geometry",
+				Function: &v2.ApplianceRuleFunction{
+					Name: "disk_geometry",
+					DiskGeometry: &v2.DiskGeometryCondition{
+						Disks:        []json.Number{"2048"},
+						Mode:         v2.Exact,
+						ToleranceMib: json.Number("lots"),
+					},
+				},
+			}},
+		}
+
+		// Act
+		_, err := v2.NewRuleFromRequest(req)
+
+		// Assert
+		Expect(err).To(MatchError(ContainSubstring("tolerance_mib must be an integer")))
+	})
+})

@@ -433,7 +433,6 @@ var vmApplianceDetectionQuery = sq.Select(
 	`COALESCE(v."Cluster", '') AS cluster`,
 	`COALESCE(v."DNS Name", '') AS host_name`,
 	`COALESCE(v."Primary IP Address", '') AS ip_address`,
-	`COALESCE(v."Template", false) AS is_template`,
 	`COALESCE((SELECT list("Capacity MiB" ORDER BY "Disk Key") FROM vdisk vd WHERE vd."VM ID" = v."VM ID"), []) AS disk_sizes`,
 ).From("vinfo v").
 	LeftJoin(`vcpu c ON c."VM ID" = v."VM ID"`).
