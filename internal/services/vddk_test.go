@@ -42,7 +42,7 @@ var _ = Describe("VddkService", func() {
 
 		pool = store.NewPool(0)
 		mainPath := filepath.Join(dataDir, "agent.duckdb")
-		database, err = pool.NewDatabase(store.MainDatabaseID, mainPath, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		database, err = pool.NewDatabase(store.MainDatabaseID, mainPath, time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(database.Migrate(ctx, func(ctx context.Context, db *sql.DB) error {
 			s, err := database.Store()
@@ -58,7 +58,7 @@ var _ = Describe("VddkService", func() {
 		pool.Add(database)
 
 		collPath := filepath.Join(dataDir, "default_collection.duckdb")
-		collDB, err := pool.NewDatabase("default-coll", collPath, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		collDB, err := pool.NewDatabase("default-coll", collPath, time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(collDB.Migrate(ctx, func(ctx context.Context, db *sql.DB) error {
 			s, err := collDB.Store()
@@ -273,7 +273,7 @@ var _ = Describe("VddkService", func() {
 		addCollectionWithAPIVersion := func(apiVersion string) {
 			ctx := context.Background()
 			collPath := filepath.Join(dataDir, "collection.duckdb")
-			collDB, err := pool.NewDatabase("coll", collPath, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			collDB, err := pool.NewDatabase("coll", collPath, time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(collDB.Migrate(ctx, func(ctx context.Context, db *sql.DB) error {
 				s, err := collDB.Store()

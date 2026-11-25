@@ -41,7 +41,7 @@ var _ = Describe("Storage export", func() {
 		}
 
 		var err error
-		db, err = pool.NewDatabase("export", filepath.Join(dir, "collection.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		db, err = pool.NewDatabase("export", filepath.Join(dir, "collection.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 		Expect(err).NotTo(HaveOccurred())
 		pool.Add(db)
 		DeferCleanup(pool.Close)

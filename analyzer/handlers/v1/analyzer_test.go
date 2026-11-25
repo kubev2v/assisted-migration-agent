@@ -79,7 +79,7 @@ var _ = Describe("Analyzer VM metadata", func() {
 		pool := store.NewPool(time.Minute)
 		DeferCleanup(pool.Close)
 
-		db, err := pool.NewDatabase("collection", dbPath, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		db, err := pool.NewDatabase("collection", dbPath, time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 		Expect(err).NotTo(HaveOccurred())
 		pool.Add(db)
 

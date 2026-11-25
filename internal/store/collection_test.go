@@ -28,7 +28,7 @@ var _ = Describe("CollectionStore", func() {
 		tmpDir, err = os.MkdirTemp("", "collection-store-test-*")
 		Expect(err).NotTo(HaveOccurred())
 		pool = store.NewPool(5 * time.Minute)
-		mainDB, dbErr := pool.NewDatabase(store.MainDatabaseID, filepath.Join(tmpDir, "agent.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		mainDB, dbErr := pool.NewDatabase(store.MainDatabaseID, filepath.Join(tmpDir, "agent.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 		Expect(dbErr).NotTo(HaveOccurred())
 		Expect(mainDB.Migrate(ctx, migrations.RunMain)).To(Succeed())
 		pool.Add(mainDB)

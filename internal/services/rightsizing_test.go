@@ -40,7 +40,7 @@ var _ = Describe("RightsizingService", func() {
 
 		pool = store.NewPool(5 * time.Minute)
 		dbPath := filepath.Join(tmpDir, "test.duckdb")
-		database, err = pool.NewDatabase("test", dbPath, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		database, err = pool.NewDatabase("test", dbPath, time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 		Expect(err).NotTo(HaveOccurred())
 
 		Expect(database.Migrate(ctx, func(ctx context.Context, d *sql.DB) error {

@@ -21,7 +21,7 @@ import (
 
 // newSyncTestDB creates a migrated collection DuckDB database for sync tests.
 func newSyncTestDB(pool *store.Pool, tmpDir, name string) (*store.Database, *store.Store) {
-	db, err := pool.NewDatabase(name, filepath.Join(tmpDir, name+".duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+	db, err := pool.NewDatabase(name, filepath.Join(tmpDir, name+".duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
 	st, err := db.Store()

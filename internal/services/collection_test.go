@@ -36,7 +36,7 @@ var _ = Describe("CollectionService", func() {
 		pool = store.NewPool(5 * time.Minute)
 
 		mainPath := filepath.Join(tmpDir, "agent.duckdb")
-		mainDB, err := pool.NewDatabase(store.MainDatabaseID, mainPath, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		mainDB, err := pool.NewDatabase(store.MainDatabaseID, mainPath, time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(mainDB.Migrate(ctx, migrations.RunMain)).To(Succeed())
 		pool.Add(mainDB)
@@ -55,7 +55,7 @@ var _ = Describe("CollectionService", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(f.Close()).To(Succeed())
 
-		db, err := pool.NewDatabase(name, dbPath, time.Now(), store.LazyConnectionInitilization, 0, store.ReadWriteDatabase)
+		db, err := pool.NewDatabase(name, dbPath, time.Now(), store.LazyConnectionInitilization, store.ReadWriteDatabase)
 		Expect(err).NotTo(HaveOccurred())
 		pool.Add(db)
 	}

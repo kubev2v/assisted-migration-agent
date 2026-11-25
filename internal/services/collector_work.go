@@ -133,7 +133,7 @@ func (f *vCenterCollectorWorkFactory) Build() work.WorkBuilder[models.CollectorS
 				id := hex.EncodeToString(hash[:])[:6]
 
 				var dbError error
-				collectionDb, dbError = f.pool.NewDatabase(id, dbPath, time.Now(), store.EagerConnectionInitilization, 256, store.ReadWriteDatabase)
+				collectionDb, dbError = f.pool.NewDatabase(id, dbPath, time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 				if dbError != nil {
 					r.Err = fmt.Errorf("opening collection database %s: %w", database, dbError)
 					return r, r.Err

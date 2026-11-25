@@ -41,7 +41,7 @@ var _ = Describe("InventoryService", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		pool = store.NewPool(5 * time.Minute)
-		database, err := pool.NewDatabase("test", filepath.Join(tmpDir, "test.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		database, err := pool.NewDatabase("test", filepath.Join(tmpDir, "test.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 		Expect(err).NotTo(HaveOccurred())
 
 		st, err = database.Store()
