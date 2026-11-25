@@ -16,16 +16,17 @@ type ServiceManager struct {
 	dataFolder string
 	pool       *store.Pool
 
-	console     *Console
-	collection  *CollectionService
-	credentials *CredentialsService
-	mu          sync.Mutex
-	inspector   *InspectorService
-	vddk        *VddkService
-	forecaster  *ForecasterService
-	validator   *opa.Validator
-	collector   *CollectorService
-	workBuilder CollectorWorkBuilder
+	console      *Console
+	collection   *CollectionService
+	credentials  *CredentialsService
+	mu           sync.Mutex
+	inspector    *InspectorService
+	vddk         *VddkService
+	imageUpgrade *ImageUpgradeService
+	forecaster   *ForecasterService
+	validator    *opa.Validator
+	collector    *CollectorService
+	workBuilder  CollectorWorkBuilder
 }
 
 type ServiceManagerOption func(*ServiceManager)
@@ -58,6 +59,10 @@ func WithCredentialsService(s *CredentialsService) ServiceManagerOption {
 
 func WithVddkService(s *VddkService) ServiceManagerOption {
 	return func(m *ServiceManager) { m.vddk = s }
+}
+
+func WithImageUpgradeService(s *ImageUpgradeService) ServiceManagerOption {
+	return func(m *ServiceManager) { m.imageUpgrade = s }
 }
 
 func WithForecasterService(s *ForecasterService) ServiceManagerOption {
@@ -201,6 +206,8 @@ func (m *ServiceManager) InspectorService() (*InspectorService, error) {
 func (m *ServiceManager) VddkService() *VddkService {
 	return m.vddk
 }
+
+func (m *ServiceManager) ImageUpgradeService() *ImageUpgradeService { return m.imageUpgrade }
 
 func (m *ServiceManager) ForecasterService() *ForecasterService {
 	return m.forecaster

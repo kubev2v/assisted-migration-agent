@@ -34,5 +34,6 @@ type ConsoleStatus struct {
 }
 
 type AgentStatus struct {
-	Console ConsoleStatus
+	Console            ConsoleStatus
+	ImageUpgradeStatus ImageUpgradeStatus
 }

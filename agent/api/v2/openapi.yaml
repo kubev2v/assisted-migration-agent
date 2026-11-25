@@ -29,6 +29,8 @@ tags:
     description: vCenter credential management
   - name: Version
     description: Agent version information
+  - name: ImageUpgrade
+    description: Appliance image uploads and host image upgrade results
 paths:
   # ── Agent ──────────────────────────────────────────────────────────────
   /agent:
@@ -1544,6 +1546,40 @@ paths:
           description: Internal server error
 
   # ── Version ────────────────────────────────────────────────────────────
+  /image-upgrades:
+    post:
+      tags: [ImageUpgrade]
+      summary: Upload an OCI image for a disconnected appliance image upgrade
+      description: Validate the complete upload and atomically place the archive in the watched directory. The host owns upgrade execution. Read imageUpgradeStatus in GET /agent for upload activity and the last host result.
+      operationId: postImageUpgrade
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: OCI archive; maximum file payload is 3 GiB
+      responses:
+        '202':
+          description: Validated image handed to the host; installation is asynchronous and may restart the agent
+        '400':
+          description: Invalid multipart input, OCI image, platform, or upgrade version
+        '409':
+          description: Connected mode, another image upload in progress, or a published archive still pending host resolution
+        '413':
+          description: File exceeds 3 GiB or multipart framing exceeds 1 MiB
+        '507':
+          description: Insufficient storage; preparation requires three times the archive size
+        '500':
+          description: Internal error
+        '503':
+          description: Image upgrade service unavailable, or upload interrupted by cancellation or timeout
   /version:
     get:
       tags: [Version]
@@ -2810,6 +2846,7 @@ components:
       required:
         - mode
         - consoleConnection
+        - imageUpgradeStatus
       properties:
         mode:
           type: string
@@ -2840,6 +2877,10 @@ components:
         rvtoolsModeEnabled:
           type: boolean
           description: RVTool mode enabled
+        imageUpgradeStatus:
+          description: Always present in both connected and disconnected modes, including while the console is unreachable. Includes upload activity and the last host image upgrade result. Image upgrade status errors do not fail the agent-status response.
+          allOf:
+            - $ref: '#/components/schemas/ImageUpgradeStatus'
 
     AgentModeRequest:
       type: object
@@ -3291,6 +3332,75 @@ components:
             type: string
 
     # ── Version ──────────────────────────────────────────────────────────
+    ImageUpgradeStatus:
+      type: object
+      required: [currentVersion, upload, upgrade, upgradeError]
+      properties:
+        currentVersion:
+          type: string
+        upload:
+          $ref: '#/components/schemas/ImageUploadStatus'
+        upgrade:
+          description: Last host upgrade result, or null if it is missing or cannot be read.
+          allOf:
+            - $ref: '#/components/schemas/ImageUpgradeResult'
+          nullable: true
+        upgradeError:
+          type: string
+          nullable: true
+          description: Error reading the host upgrade result, independent of upload errors. Null when there is no read error.
+    ImageUploadStatus:
+      type: object
+      required: [state, lastError]
+      properties:
+        state:
+          type: string
+          enum: [idle, uploading, validating, unknown]
+          description: Agent upload activity only; idle does not indicate whether the host is running an upgrade. Unknown means the upload state is unavailable. An unreadable host result does not change this state.
+        lastError:
+          type: string
+          nullable: true
+          description: Last upload error, or an upload-state availability error when state is unknown. Host result read errors are reported in upgradeError.
+    ImageUpgradeResult:
+      type: object
+      nullable: true
+      required: [file, outcome, time]
+      properties:
+        file:
+          type: string
+        outcome:
+          type: string
+          enum: [applied, rolled-back, failed, unchanged]
+        time:
+          type: string
+          format: date-time
+        error:
+          type: string
+        errorStage:
+          type: string
+        runningImage:
+          $ref: '#/components/schemas/ImageUpgradeImage'
+        lastSuccessfulUpdate:
+          $ref: '#/components/schemas/SuccessfulImageUpgrade'
+    ImageUpgradeImage:
+      type: object
+      required: [version, digest]
+      properties:
+        version:
+          type: string
+        digest:
+          type: string
+    SuccessfulImageUpgrade:
+      type: object
+      required: [version, digest, time]
+      properties:
+        version:
+          type: string
+        digest:
+          type: string
+        time:
+          type: string
+          format: date-time
     VersionInfo:
       type: object
       required:

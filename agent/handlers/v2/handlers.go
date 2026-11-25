@@ -13,6 +13,7 @@ type ServiceProvider interface {
 	CollectionService() *svc.CollectionService
 	InspectorService() (*svc.InspectorService, error)
 	VddkService() *svc.VddkService
+	ImageUpgradeService() *svc.ImageUpgradeService
 	CredentialsService() *svc.CredentialsService
 	ForecasterService() *svc.ForecasterService
 

@@ -1,9 +1,11 @@
 package v2
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 
 	v2 "github.com/kubev2v/assisted-migration-agent/agent/api/v2"
 	"github.com/kubev2v/assisted-migration-agent/internal/models"
@@ -13,11 +15,8 @@ import (
 // GetAgentStatus returns the current agent status.
 // (GET /agent)
 func (h *Handler) GetAgentStatus(c *gin.Context) {
-	status := h.svc.ConsoleService().Status()
-
 	var resp v2.AgentStatus
-	resp.FromModel(models.AgentStatus{Console: status})
-
+	resp.FromModel(h.agentStatus(c.Request.Context()))
 	c.JSON(http.StatusOK, resp)
 }
 
@@ -50,9 +49,34 @@ func (h *Handler) SetAgentMode(c *gin.Context) {
 		return
 	}
 
-	status := h.svc.ConsoleService().Status()
 	var resp v2.AgentStatus
-	resp.FromModel(models.AgentStatus{Console: status})
+	resp.FromModel(h.agentStatus(c.Request.Context()))
 
 	c.JSON(http.StatusOK, resp)
+}
+
+func (h *Handler) agentStatus(ctx context.Context) models.AgentStatus {
+	status := models.AgentStatus{Console: h.svc.ConsoleService().Status()}
+	// Agent status gates UI startup; an image upgrade error must not block it.
+	message := "image upgrade status is unavailable"
+	status.ImageUpgradeStatus = models.ImageUpgradeStatus{
+		CurrentVersion: h.cfg.Agent.Version,
+		Upload:         models.ImageUploadStatus{State: "unknown", LastError: &message},
+		UpgradeError:   &message,
+	}
+	imageUpgrade := h.svc.ImageUpgradeService()
+	if imageUpgrade != nil {
+		imageUpgradeStatus, err := imageUpgrade.Status(ctx)
+		if err != nil {
+			zap.S().Errorw("reading image upgrade status", "error", err)
+			if imageUpgradeStatus.Upload.State == "" {
+				return status
+			}
+			imageUpgradeStatus.Upgrade = nil
+			message := "host image upgrade result is unavailable"
+			imageUpgradeStatus.UpgradeError = &message
+		}
+		status.ImageUpgradeStatus = imageUpgradeStatus
+	}
+	return status
 }
