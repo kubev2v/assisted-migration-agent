@@ -39,7 +39,7 @@ var _ = Describe("ServiceManager", func() {
 
 		pool = store.NewPool(5 * time.Minute)
 		dbPath := filepath.Join(tmpDir, "agent.duckdb")
-		mainDB, err := pool.NewDatabase(store.MainDatabaseID, dbPath, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		mainDB, err := pool.NewDatabase(store.MainDatabaseID, dbPath, time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(mainDB.Migrate(context.Background(), func(ctx context.Context, db *sql.DB) error {
 			return migrations.RunMain(ctx, db)
@@ -123,7 +123,7 @@ var _ = Describe("ServiceManager", func() {
 
 		It("returns collected when no collector but persisted inventory exists", func() {
 			collPath := filepath.Join(tmpDir, "collection_status.duckdb")
-			collDB, err := pool.NewDatabase("coll-status", collPath, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			collDB, err := pool.NewDatabase("coll-status", collPath, time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(collDB.Migrate(ctx, func(ctx context.Context, db *sql.DB) error {
 				s, err := collDB.Store()
@@ -152,7 +152,7 @@ var _ = Describe("ServiceManager", func() {
 
 		It("returns ready when collection exists but has no inventory", func() {
 			collPath := filepath.Join(tmpDir, "collection_empty.duckdb")
-			collDB, err := pool.NewDatabase("coll-empty", collPath, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			collDB, err := pool.NewDatabase("coll-empty", collPath, time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(collDB.Migrate(ctx, func(ctx context.Context, db *sql.DB) error {
 				s, err := collDB.Store()
@@ -188,7 +188,7 @@ var _ = Describe("ServiceManager", func() {
 
 			// Create a collection DB so pool.Latest() works for InspectorService().
 			collPath := filepath.Join(tmpDir, "collection.duckdb")
-			collDB, err := pool.NewDatabase("collection", collPath, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			collDB, err := pool.NewDatabase("collection", collPath, time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(collDB.Migrate(ctx, func(ctx context.Context, db *sql.DB) error {
 				s, err := collDB.Store()

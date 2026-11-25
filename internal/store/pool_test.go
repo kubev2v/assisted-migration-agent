@@ -41,18 +41,18 @@ var _ = Describe("Pool", func() {
 	Context("NewDatabase", func() {
 		It("should register a database and return a stable ID", func() {
 			dbPath := filepath.Join(tmpDir, "test.duckdb")
-			db1, err := pool.NewDatabase("test", dbPath, time.Now(), store.LazyConnectionInitilization, 0, store.ReadWriteDatabase)
+			db1, err := pool.NewDatabase("test", dbPath, time.Now(), store.LazyConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(db1.ID).NotTo(BeEmpty())
 
-			db2, err := pool.NewDatabase("test", dbPath, time.Now(), store.LazyConnectionInitilization, 0, store.ReadWriteDatabase)
+			db2, err := pool.NewDatabase("test", dbPath, time.Now(), store.LazyConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(db1.ID).To(Equal(db2.ID))
 		})
 
 		It("should eagerly open a usable connection", func() {
 			dbPath := filepath.Join(tmpDir, "eager.duckdb")
-			db, err := pool.NewDatabase("test", dbPath, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			db, err := pool.NewDatabase("test", dbPath, time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 
 			st, err := db.Store()
@@ -64,7 +64,7 @@ var _ = Describe("Pool", func() {
 	Context("Store", func() {
 		It("should lazily connect and execute queries", func() {
 			dbPath := filepath.Join(tmpDir, "lazy.duckdb")
-			db, err := pool.NewDatabase("test", dbPath, time.Now(), store.LazyConnectionInitilization, 0, store.ReadWriteDatabase)
+			db, err := pool.NewDatabase("test", dbPath, time.Now(), store.LazyConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			pool.Add(db)
 
@@ -75,7 +75,7 @@ var _ = Describe("Pool", func() {
 
 		It("should return the same store instance for the same database", func() {
 			dbPath := filepath.Join(tmpDir, "same.duckdb")
-			db, err := pool.NewDatabase("test", dbPath, time.Now(), store.LazyConnectionInitilization, 0, store.ReadWriteDatabase)
+			db, err := pool.NewDatabase("test", dbPath, time.Now(), store.LazyConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			pool.Add(db)
 
@@ -98,7 +98,7 @@ var _ = Describe("Pool", func() {
 			pool = store.NewPool(1 * time.Second)
 
 			dbPath := filepath.Join(tmpDir, "recent.duckdb")
-			db, err := pool.NewDatabase("test", dbPath, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			db, err := pool.NewDatabase("test", dbPath, time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			pool.Add(db)
 
@@ -118,7 +118,7 @@ var _ = Describe("Pool", func() {
 			pool = store.NewPool(1 * time.Millisecond)
 
 			dbPath := filepath.Join(tmpDir, "idle.duckdb")
-			db, err := pool.NewDatabase("test", dbPath, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			db, err := pool.NewDatabase("test", dbPath, time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			pool.Add(db)
 
@@ -141,7 +141,7 @@ var _ = Describe("Pool", func() {
 			pool = store.NewPool(50 * time.Millisecond)
 
 			longIdlePath := filepath.Join(tmpDir, "long.duckdb")
-			longDB, err := pool.NewDatabase("long", longIdlePath, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			longDB, err := pool.NewDatabase("long", longIdlePath, time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			pool.Add(longDB)
 
@@ -152,7 +152,7 @@ var _ = Describe("Pool", func() {
 			time.Sleep(60 * time.Millisecond)
 
 			shortIdlePath := filepath.Join(tmpDir, "short.duckdb")
-			shortDB, err := pool.NewDatabase("short", shortIdlePath, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			shortDB, err := pool.NewDatabase("short", shortIdlePath, time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			pool.Add(shortDB)
 
@@ -178,10 +178,10 @@ var _ = Describe("Pool", func() {
 
 	Context("List", func() {
 		It("should return all registered databases", func() {
-			dbA, err := pool.NewDatabase("a", filepath.Join(tmpDir, "a.duckdb"), time.Now(), store.LazyConnectionInitilization, 0, store.ReadWriteDatabase)
+			dbA, err := pool.NewDatabase("a", filepath.Join(tmpDir, "a.duckdb"), time.Now(), store.LazyConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			pool.Add(dbA)
-			dbB, err := pool.NewDatabase("b", filepath.Join(tmpDir, "b.duckdb"), time.Now(), store.LazyConnectionInitilization, 0, store.ReadOnlyDatabase)
+			dbB, err := pool.NewDatabase("b", filepath.Join(tmpDir, "b.duckdb"), time.Now(), store.LazyConnectionInitilization, store.ReadOnlyDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			pool.Add(dbB)
 
@@ -195,11 +195,11 @@ var _ = Describe("Pool", func() {
 
 	Context("AttachDatabase / DetachDatabase", func() {
 		It("should attach b to a as readonly after closing b", func() {
-			dbA, err := pool.NewDatabase("a", filepath.Join(tmpDir, "a.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			dbA, err := pool.NewDatabase("a", filepath.Join(tmpDir, "a.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			pool.Add(dbA)
 
-			dbB, err := pool.NewDatabase("b", filepath.Join(tmpDir, "b.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			dbB, err := pool.NewDatabase("b", filepath.Join(tmpDir, "b.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			pool.Add(dbB)
 
@@ -230,9 +230,9 @@ var _ = Describe("Pool", func() {
 
 	Context("Append", func() {
 		It("copies rows from shared main tables by column name", func() {
-			destination, err := pool.NewDatabase("destination", filepath.Join(tmpDir, "destination.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			destination, err := pool.NewDatabase("destination", filepath.Join(tmpDir, "destination.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
-			source, err := pool.NewDatabase("source", filepath.Join(tmpDir, "source.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			source, err := pool.NewDatabase("source", filepath.Join(tmpDir, "source.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 
 			destinationStore, err := destination.Store()
@@ -275,9 +275,9 @@ var _ = Describe("Pool", func() {
 		})
 
 		It("skips source tables missing from the destination", func() {
-			destination, err := pool.NewDatabase("destination", filepath.Join(tmpDir, "destination.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			destination, err := pool.NewDatabase("destination", filepath.Join(tmpDir, "destination.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
-			source, err := pool.NewDatabase("source", filepath.Join(tmpDir, "source.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			source, err := pool.NewDatabase("source", filepath.Join(tmpDir, "source.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			sourceStore, err := source.Store()
 			Expect(err).NotTo(HaveOccurred())
@@ -297,9 +297,9 @@ var _ = Describe("Pool", func() {
 		})
 
 		It("skips conflicting rows and copies the remaining rows", func() {
-			destination, err := pool.NewDatabase("destination", filepath.Join(tmpDir, "destination.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			destination, err := pool.NewDatabase("destination", filepath.Join(tmpDir, "destination.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
-			source, err := pool.NewDatabase("source", filepath.Join(tmpDir, "source.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			source, err := pool.NewDatabase("source", filepath.Join(tmpDir, "source.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 
 			destinationStore, err := destination.Store()
@@ -339,7 +339,7 @@ var _ = Describe("Pool", func() {
 
 	Context("LatestCollection", func() {
 		It("returns false when pool has only the main database", func() {
-			mainDB, err := pool.NewDatabase(store.MainDatabaseID, filepath.Join(tmpDir, "main.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			mainDB, err := pool.NewDatabase(store.MainDatabaseID, filepath.Join(tmpDir, "main.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			pool.Add(mainDB)
 
@@ -349,15 +349,15 @@ var _ = Describe("Pool", func() {
 		})
 
 		It("returns the newest collection database, skipping main", func() {
-			mainDB, err := pool.NewDatabase(store.MainDatabaseID, filepath.Join(tmpDir, "main.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			mainDB, err := pool.NewDatabase(store.MainDatabaseID, filepath.Join(tmpDir, "main.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			pool.Add(mainDB)
 
-			older, err := pool.NewDatabase("col-old", filepath.Join(tmpDir, "col-old.duckdb"), time.Now().Add(-1*time.Hour), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			older, err := pool.NewDatabase("col-old", filepath.Join(tmpDir, "col-old.duckdb"), time.Now().Add(-1*time.Hour), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			pool.Add(older)
 
-			newer, err := pool.NewDatabase("col-new", filepath.Join(tmpDir, "col-new.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			newer, err := pool.NewDatabase("col-new", filepath.Join(tmpDir, "col-new.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			pool.Add(newer)
 
@@ -369,10 +369,10 @@ var _ = Describe("Pool", func() {
 
 	Context("Unregister", func() {
 		It("retains the file and falls back to the previous latest collection", func() {
-			older, err := pool.NewDatabase("older", filepath.Join(tmpDir, "older.duckdb"), time.Now().Add(-time.Hour), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			older, err := pool.NewDatabase("older", filepath.Join(tmpDir, "older.duckdb"), time.Now().Add(-time.Hour), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			pool.Add(older)
-			newer, err := pool.NewDatabase("newer", filepath.Join(tmpDir, "newer.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			newer, err := pool.NewDatabase("newer", filepath.Join(tmpDir, "newer.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			pool.Add(newer)
 
@@ -389,7 +389,7 @@ var _ = Describe("Pool", func() {
 	Context("Close", func() {
 		It("should close all connections without removing entries", func() {
 			dbPath := filepath.Join(tmpDir, "close.duckdb")
-			db, err := pool.NewDatabase("test", dbPath, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			db, err := pool.NewDatabase("test", dbPath, time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			pool.Add(db)
 

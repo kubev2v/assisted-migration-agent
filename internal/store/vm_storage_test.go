@@ -40,7 +40,7 @@ var _ = Describe("VMStore storage metadata", func() {
 	Context("current collections", func() {
 		BeforeEach(func() {
 			var err error
-			database, err = pool.NewDatabase("collection", path, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			database, err = pool.NewDatabase("collection", path, time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			pool.Add(database)
 			Expect(database.Migrate(ctx, func(ctx context.Context, db *sql.DB) error {

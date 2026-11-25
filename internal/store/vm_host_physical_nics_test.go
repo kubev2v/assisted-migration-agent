@@ -42,7 +42,7 @@ var _ = Describe("VM host physical NICs", func() {
 		pool = store.NewPool(time.Minute)
 		DeferCleanup(pool.Close)
 		var err error
-		db, err = pool.NewDatabase("coll", filepath.Join(dir, "collection.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		db, err = pool.NewDatabase("coll", filepath.Join(dir, "collection.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 		Expect(err).NotTo(HaveOccurred())
 		pool.Add(db)
 		st, err = db.Store()
@@ -135,7 +135,7 @@ var _ = Describe("VM host physical NICs", func() {
 	DescribeTable("keeps RVTools NICs only for unambiguous host ownership after merging files", func(sources []string, want string) {
 		for i, source := range sources {
 			id := fmt.Sprintf("source_%d", i)
-			sourceDB, err := pool.NewDatabase(id, filepath.Join(dir, id+".duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			sourceDB, err := pool.NewDatabase(id, filepath.Join(dir, id+".duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			DeferCleanup(sourceDB.Close)
 			Expect(sourceDB.Migrate(ctx, func(ctx context.Context, raw *sql.DB) error {

@@ -37,7 +37,7 @@ var _ = Describe("Console Service", func() {
 
 		pool = store.NewPool(5 * time.Minute)
 		dbPath := filepath.Join(tmpDir, "agent.duckdb")
-		mainDB, err := pool.NewDatabase(store.MainDatabaseID, dbPath, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		mainDB, err := pool.NewDatabase(store.MainDatabaseID, dbPath, time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(mainDB.Migrate(context.Background(), func(ctx context.Context, db *sql.DB) error {
 			return migrations.RunMain(ctx, db)

@@ -30,7 +30,7 @@ func InitPool(dataFolder string) (*store.Pool, error) {
 	// Existing migrations reference the DuckDB catalog name "agent". Each product
 	// supplies its own data folder, so their databases remain isolated.
 	mainPath := filepath.Join(dataFolder, "agent.duckdb")
-	mainDB, err := pool.NewDatabase(store.MainDatabaseID, mainPath, time.Now(), store.LazyConnectionInitilization, 256, store.ReadWriteDatabase)
+	mainDB, err := pool.NewDatabase(store.MainDatabaseID, mainPath, time.Now(), store.LazyConnectionInitilization, store.ReadWriteDatabase)
 	if err != nil {
 		return nil, fmt.Errorf("failed to register main database: %w", err)
 	}
@@ -63,7 +63,7 @@ func InitPool(dataFolder string) (*store.Pool, error) {
 		}
 		pathsByID[id] = match
 
-		db, err := pool.NewDatabase(id, match, time.Unix(ts, 0), store.LazyConnectionInitilization, 512, store.ReadWriteDatabase)
+		db, err := pool.NewDatabase(id, match, time.Unix(ts, 0), store.LazyConnectionInitilization, store.ReadWriteDatabase)
 		if err != nil {
 			return nil, fmt.Errorf("failed to register collection database %s: %w", name, err)
 		}

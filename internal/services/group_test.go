@@ -57,7 +57,7 @@ var _ = Describe("GroupService", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		pool = store.NewPool(5 * time.Minute)
-		database, err = pool.NewDatabase("test", filepath.Join(tmpDir, "test.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		database, err = pool.NewDatabase("test", filepath.Join(tmpDir, "test.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 		Expect(err).NotTo(HaveOccurred())
 
 		st, err = database.Store()
@@ -765,7 +765,7 @@ var _ = Describe("GroupService", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			outboxPool = store.NewPool(5 * time.Minute)
-			outboxDB, err := outboxPool.NewDatabase("test", filepath.Join(outboxTmpDir, "test.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			outboxDB, err := outboxPool.NewDatabase("test", filepath.Join(outboxTmpDir, "test.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 
 			st, err = outboxDB.Store()

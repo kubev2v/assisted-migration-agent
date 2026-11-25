@@ -50,14 +50,14 @@ var _ = Describe("GetCollectorStatus handler", func() {
 
 		pool := store.NewPool(5 * time.Minute)
 
-		mainDB, err := pool.NewDatabase(store.MainDatabaseID, filepath.Join(tmpDir, "agent.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		mainDB, err := pool.NewDatabase(store.MainDatabaseID, filepath.Join(tmpDir, "agent.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(mainDB.Migrate(ctx, func(ctx context.Context, db *sql.DB) error {
 			return migrations.RunMain(ctx, db)
 		})).To(Succeed())
 		pool.Add(mainDB)
 
-		collDB, err := pool.NewDatabase("coll-1", filepath.Join(tmpDir, "collection_999.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		collDB, err := pool.NewDatabase("coll-1", filepath.Join(tmpDir, "collection_999.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(collDB.Migrate(ctx, func(ctx context.Context, db *sql.DB) error {
 			s, err := collDB.Store()
