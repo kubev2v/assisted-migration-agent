@@ -110,7 +110,7 @@ func createCollection(dataFolder string, col Collection) (string, error) {
 
 	pool := store.NewPool(5 * time.Minute)
 	db, err := pool.NewDatabase(id, path, time.Unix(col.Timestamp, 0),
-		store.EagerConnectionInitilization, 256, store.ReadWriteDatabase)
+		store.EagerConnectionInitilization, store.ReadWriteDatabase)
 	if err != nil {
 		return "", fmt.Errorf("opening database: %w", err)
 	}

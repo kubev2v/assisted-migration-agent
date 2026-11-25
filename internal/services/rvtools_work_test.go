@@ -45,7 +45,7 @@ var _ = Describe("RVTools validation errors", func() {
 		DeferCleanup(pool.Close)
 
 		var err error
-		mainDB, err = pool.NewDatabase(store.MainDatabaseID, filepath.Join(dir, "agent.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		mainDB, err = pool.NewDatabase(store.MainDatabaseID, filepath.Join(dir, "agent.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(mainDB.Migrate(ctx, migrations.RunMain)).To(Succeed())
 		pool.Add(mainDB)
@@ -242,7 +242,7 @@ var _ = DescribeTable("RVTools safe status errors",
 		dir := GinkgoT().TempDir()
 		pool := store.NewPool(time.Minute)
 		DeferCleanup(pool.Close)
-		mainDB, err := pool.NewDatabase(store.MainDatabaseID, filepath.Join(dir, "agent.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		mainDB, err := pool.NewDatabase(store.MainDatabaseID, filepath.Join(dir, "agent.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(mainDB.Migrate(ctx, migrations.RunMain)).To(Succeed())
 		pool.Add(mainDB)
@@ -349,7 +349,7 @@ var _ = Describe("RVTools work", func() {
 
 		pool := store.NewPool(time.Minute)
 		defer pool.Close()
-		mainDB, err := pool.NewDatabase(store.MainDatabaseID, filepath.Join(dir, "agent.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		mainDB, err := pool.NewDatabase(store.MainDatabaseID, filepath.Join(dir, "agent.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 
 		Expect(err).NotTo(HaveOccurred())
 		Expect(mainDB.Migrate(ctx, migrations.RunMain)).To(Succeed())

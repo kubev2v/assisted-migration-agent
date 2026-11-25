@@ -74,7 +74,6 @@ var _ = Describe("Appliances handlers", Ordered, func() {
 			filepath.Join(tmpDir, "test.duckdb"),
 			time.Now(),
 			store.EagerConnectionInitilization,
-			0,
 			store.ReadWriteDatabase,
 		)
 		Expect(err).NotTo(HaveOccurred())

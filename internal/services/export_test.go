@@ -30,7 +30,7 @@ var _ = Describe("Virtual disk export", func() {
 	BeforeEach(func() {
 		ctx = context.Background()
 		pool = store.NewPool(5 * time.Minute)
-		db, err := pool.NewDatabase("export", filepath.Join(GinkgoT().TempDir(), "collection.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		db, err := pool.NewDatabase("export", filepath.Join(GinkgoT().TempDir(), "collection.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 		Expect(err).NotTo(HaveOccurred())
 		pool.Add(db)
 		DeferCleanup(pool.Close)
@@ -140,7 +140,7 @@ var _ = Describe("Guest process export", func() {
 	BeforeEach(func() {
 		ctx = context.Background()
 		pool = store.NewPool(5 * time.Minute)
-		db, err := pool.NewDatabase("export", filepath.Join(GinkgoT().TempDir(), "collection.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		db, err := pool.NewDatabase("export", filepath.Join(GinkgoT().TempDir(), "collection.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 		Expect(err).NotTo(HaveOccurred())
 		pool.Add(db)
 		DeferCleanup(pool.Close)
@@ -227,7 +227,7 @@ var _ = Describe("Host export", func() {
 		ctx = context.Background()
 		pool = store.NewPool(5 * time.Minute)
 		var err error
-		db, err = pool.NewDatabase("host-export", filepath.Join(GinkgoT().TempDir(), "collection.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		db, err = pool.NewDatabase("host-export", filepath.Join(GinkgoT().TempDir(), "collection.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 		Expect(err).NotTo(HaveOccurred())
 		pool.Add(db)
 		DeferCleanup(pool.Close)

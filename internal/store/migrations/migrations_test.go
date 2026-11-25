@@ -69,14 +69,14 @@ var _ = Describe("Migrations", func() {
 
 		pool = store.NewPool(5 * time.Minute)
 
-		mainDB, err := pool.NewDatabase(store.MainDatabaseID, filepath.Join(tmpDir, "agent.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		mainDB, err := pool.NewDatabase(store.MainDatabaseID, filepath.Join(tmpDir, "agent.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(mainDB.Migrate(ctx, migrations.RunMain)).To(Succeed())
 		pool.Add(mainDB)
 		mainSt, err = mainDB.Store()
 		Expect(err).NotTo(HaveOccurred())
 
-		collDB, err := pool.NewDatabase("coll", filepath.Join(tmpDir, "collection.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		collDB, err := pool.NewDatabase("coll", filepath.Join(tmpDir, "collection.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(collDB.Migrate(ctx, func(ctx context.Context, db *sql.DB) error {
 			st, stErr := collDB.Store()

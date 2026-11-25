@@ -168,7 +168,7 @@ var _ = Describe("CollectorService", func() {
 
 		// Create main database for credentials.
 		mainPath := filepath.Join(tmpDir, "agent.duckdb")
-		mainDB, err := pool.NewDatabase(store.MainDatabaseID, mainPath, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		mainDB, err := pool.NewDatabase(store.MainDatabaseID, mainPath, time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(mainDB.Migrate(ctx, migrations.RunMain)).To(Succeed())
 		pool.Add(mainDB)
@@ -178,7 +178,7 @@ var _ = Describe("CollectorService", func() {
 
 		// Create collection database for inventory/events.
 		collPath := filepath.Join(tmpDir, "collection.duckdb")
-		database, err = pool.NewDatabase("collection", collPath, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		database, err = pool.NewDatabase("collection", collPath, time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(database.Migrate(ctx, func(ctx context.Context, db *sql.DB) error {
 			st, err := database.Store()

@@ -38,7 +38,7 @@ var _ = Describe("ApplianceService", Ordered, func() {
 		pool = store.NewPool(5 * time.Minute)
 
 		dbPath := filepath.Join(tmpDir, "collection.duckdb")
-		db, err := pool.NewDatabase("collection", dbPath, time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		db, err := pool.NewDatabase("collection", dbPath, time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 		Expect(err).NotTo(HaveOccurred())
 
 		Expect(db.Migrate(ctx, func(ctx context.Context, d *sql.DB) error {

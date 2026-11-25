@@ -37,7 +37,7 @@ var _ = Describe("Collection storage export", func() {
 		}
 		pool := store.NewPool(5 * time.Minute)
 		DeferCleanup(pool.Close)
-		db, err := pool.NewDatabase("coll-1", filepath.Join(dir, "collection.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		db, err := pool.NewDatabase("coll-1", filepath.Join(dir, "collection.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 		Expect(err).NotTo(HaveOccurred())
 		pool.Add(db)
 		st, err := db.Store()

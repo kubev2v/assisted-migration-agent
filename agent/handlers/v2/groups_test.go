@@ -64,7 +64,6 @@ var _ = Describe("GetGroup handler", func() {
 			filepath.Join(tmpDir, "test.duckdb"),
 			time.Now(),
 			store.EagerConnectionInitilization,
-			0,
 			store.ReadWriteDatabase,
 		)
 		Expect(err).NotTo(HaveOccurred())
@@ -126,7 +125,7 @@ var _ = Describe("GetGroup handler", func() {
 
 			pool2 := store.NewPool(5 * time.Minute)
 			defer pool2.Close()
-			database2, err := pool2.NewDatabase("test2", filepath.Join(tmpDir2, "test2.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			database2, err := pool2.NewDatabase("test2", filepath.Join(tmpDir2, "test2.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			st2, err := database2.Store()
 			Expect(err).NotTo(HaveOccurred())
@@ -176,7 +175,7 @@ var _ = Describe("GetGroup handler", func() {
 
 			pool3 := store.NewPool(5 * time.Minute)
 			defer pool3.Close()
-			database3, err := pool3.NewDatabase("test3", filepath.Join(tmpDir3, "test3.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+			database3, err := pool3.NewDatabase("test3", filepath.Join(tmpDir3, "test3.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 			Expect(err).NotTo(HaveOccurred())
 			st3, err := database3.Store()
 			Expect(err).NotTo(HaveOccurred())
@@ -231,7 +230,6 @@ var _ = Describe("ListGroupApplications handler", func() {
 			filepath.Join(tmpDir, "test.duckdb"),
 			time.Now(),
 			store.EagerConnectionInitilization,
-			0,
 			store.ReadWriteDatabase,
 		)
 		Expect(err).NotTo(HaveOccurred())
@@ -315,7 +313,7 @@ var _ = Describe("ListGroupApplications handler", func() {
 
 		pool2 := store.NewPool(5 * time.Minute)
 		defer pool2.Close()
-		database2, err := pool2.NewDatabase("test2", filepath.Join(tmpDir2, "test2.duckdb"), time.Now(), store.EagerConnectionInitilization, 0, store.ReadWriteDatabase)
+		database2, err := pool2.NewDatabase("test2", filepath.Join(tmpDir2, "test2.duckdb"), time.Now(), store.EagerConnectionInitilization, store.ReadWriteDatabase)
 		Expect(err).NotTo(HaveOccurred())
 
 		st2, err := database2.Store()

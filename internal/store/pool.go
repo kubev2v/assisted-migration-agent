@@ -25,7 +25,7 @@ import (
 )
 
 // Pool manages multiple isolated DuckDB database connections. Each database
-// gets its own *sql.DB with independent memory limits and access modes.
+// gets its own *sql.DB with an independent access mode.
 //
 // NewDatabase creates and optionally opens a Database but does NOT register
 // it in the pool. The returned Database is private to the caller — it can
@@ -53,10 +53,11 @@ import (
 //
 //	// Register the main agent database (eager, always connected).
 //	mainDB, _ := pool.NewDatabase(
+//	    store.MainDatabaseID,
 //	    "/data/agent.duckdb",
+//	    time.Now(),
 //	    store.EagerConnectionInitilization,
-//		512,
-//		store.ReadWriteDatabase,
+//	    store.ReadWriteDatabase,
 //	)
 //	pool.Add(mainDB)
 //
@@ -68,7 +69,8 @@ import (
 //	    if i == len(files)-1 {
 //	        mode = store.ReadWriteDatabase // latest collection
 //	    }
-//	    db, _ := pool.NewDatabase(f, validator, store.LazyConnectionInitilization, 256, mode)
+//	    id := dbIDFromPath(f) // the agent derives the database ID from the path
+//	    db, _ := pool.NewDatabase(id, f, time.Now(), store.LazyConnectionInitilization, mode)
 //	    pool.Add(db)
 //	}
 //
@@ -134,14 +136,13 @@ func (c constraintsType) HasConstraint(tableName string, constraintName string) 
 }
 
 type Database struct {
-	ID          string
-	Path        string
-	CreatedAt   time.Time
-	mu          sync.Mutex
-	store       *Store
-	accessMode  DatabaseAccessMode
-	connection  *sql.DB
-	memoryLimit int
+	ID         string
+	Path       string
+	CreatedAt  time.Time
+	mu         sync.Mutex
+	store      *Store
+	accessMode DatabaseAccessMode
+	connection *sql.DB
 }
 
 func (d *Database) Store() (*Store, error) {
@@ -153,7 +154,7 @@ func (d *Database) Store() (*Store, error) {
 	}
 
 	if d.connection == nil {
-		conn, err := newDatabase(NewDefaultExtentionLoader(), d.Path, d.memoryLimit, d.accessMode)
+		conn, err := newDatabase(NewDefaultExtentionLoader(), d.Path, d.accessMode)
 		if err != nil {
 			return nil, err
 		}
@@ -361,7 +362,7 @@ func (d *Database) Append(ctx context.Context, source *Database) error {
 func (d *Database) Clone(ctx context.Context) (*Database, error) {
 	d.mu.Lock()
 	if d.connection == nil {
-		conn, err := newDatabase(NewDefaultExtentionLoader(), d.Path, d.memoryLimit, d.accessMode)
+		conn, err := newDatabase(NewDefaultExtentionLoader(), d.Path, d.accessMode)
 		if err != nil {
 			d.mu.Unlock()
 			return nil, err
@@ -387,7 +388,7 @@ func (d *Database) Clone(ctx context.Context) (*Database, error) {
 
 	cloneID := string(uuid.NewString()[:6])
 	clonePath := filepath.Join(filepath.Dir(d.Path), fmt.Sprintf("%s-%s.duckdb", filepath.Base(d.Path), cloneID))
-	dstConn, err := newDatabase(NewDefaultExtentionLoader(), clonePath, d.memoryLimit, ReadWriteDatabase)
+	dstConn, err := newDatabase(NewDefaultExtentionLoader(), clonePath, ReadWriteDatabase)
 	if err != nil {
 		return nil, fmt.Errorf("opening destination database: %w", err)
 	}
@@ -397,12 +398,11 @@ func (d *Database) Clone(ctx context.Context) (*Database, error) {
 	}
 
 	clone := Database{
-		ID:          cloneID,
-		Path:        clonePath,
-		CreatedAt:   time.Now(),
-		connection:  dstConn,
-		accessMode:  ReadWriteDatabase,
-		memoryLimit: d.memoryLimit,
+		ID:         cloneID,
+		Path:       clonePath,
+		CreatedAt:  time.Now(),
+		connection: dstConn,
+		accessMode: ReadWriteDatabase,
 	}
 
 	return &clone, nil
@@ -413,7 +413,7 @@ func (d *Database) Clone(ctx context.Context) (*Database, error) {
 func (d *Database) Migrate(ctx context.Context, fn func(ctx context.Context, db *sql.DB) error) error {
 	d.mu.Lock()
 	if d.connection == nil {
-		conn, err := newDatabase(NewDefaultExtentionLoader(), d.Path, d.memoryLimit, d.accessMode)
+		conn, err := newDatabase(NewDefaultExtentionLoader(), d.Path, d.accessMode)
 		if err != nil {
 			d.mu.Unlock()
 			return err
@@ -442,17 +442,16 @@ func NewPool(cleanupInterval time.Duration) *Pool {
 	}
 }
 
-func (p *Pool) NewDatabase(id string, dbPath string, createdAt time.Time, initType ConnectionInitilizationType, memoryLimit int, accessMode DatabaseAccessMode) (*Database, error) {
+func (p *Pool) NewDatabase(id string, dbPath string, createdAt time.Time, initType ConnectionInitilizationType, accessMode DatabaseAccessMode) (*Database, error) {
 	db := &Database{
-		ID:          id,
-		Path:        dbPath,
-		CreatedAt:   createdAt,
-		memoryLimit: memoryLimit,
-		accessMode:  accessMode,
+		ID:         id,
+		Path:       dbPath,
+		CreatedAt:  createdAt,
+		accessMode: accessMode,
 	}
 
 	if initType == EagerConnectionInitilization {
-		conn, err := newDatabase(NewDefaultExtentionLoader(), dbPath, memoryLimit, accessMode)
+		conn, err := newDatabase(NewDefaultExtentionLoader(), dbPath, accessMode)
 		if err != nil {
 			return nil, err
 		}
