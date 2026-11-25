@@ -50,6 +50,26 @@ func (a *AgentStatus) FromModel(m models.AgentStatus) {
 
 	noRvtoolMode := false
 	a.RvtoolsModeEnabled = &noRvtoolMode
+	s := m.ImageUpgradeStatus
+	a.ImageUpgradeStatus = ImageUpgradeStatus{
+		CurrentVersion: s.CurrentVersion,
+		Upload:         ImageUploadStatus{State: ImageUploadStatusState(s.Upload.State), LastError: s.Upload.LastError},
+		UpgradeError:   s.UpgradeError,
+	}
+	if s.Upgrade != nil {
+		r := s.Upgrade
+		a.ImageUpgradeStatus.Upgrade = &ImageUpgradeResult{
+			File: r.File, Outcome: ImageUpgradeResultOutcome(r.Result), Time: r.Time,
+			Error: &r.Error, ErrorStage: &r.ErrorStage,
+		}
+		if r.RunningImage != nil {
+			a.ImageUpgradeStatus.Upgrade.RunningImage = &ImageUpgradeImage{Version: r.RunningImage.Version, Digest: r.RunningImage.Digest}
+		}
+		if r.LastSuccessfulUpdate != nil {
+			u := r.LastSuccessfulUpdate
+			a.ImageUpgradeStatus.Upgrade.LastSuccessfulUpdate = &SuccessfulImageUpgrade{Version: u.Version, Digest: u.Digest, Time: u.Time}
+		}
+	}
 }
 
 // NewVirtualMachineFromSummary converts a models.VirtualMachineSummary to a v2 VirtualMachine.
@@ -209,7 +229,7 @@ func NewVirtualMachineDetailFromModel(vm models.VM) VirtualMachineDetail {
 
 			mode := RDMBackingCompatibilityMode(d.RDMBacking.CompatibilityMode)
 			if mode == "" {
-				mode = Unknown
+				mode = RDMBackingCompatibilityModeUnknown
 			}
 			backing.CompatibilityMode = &mode
 

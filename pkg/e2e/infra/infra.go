@@ -32,6 +32,7 @@ type AgentConfig struct {
 	UpdateInterval string // e.g. "1s"
 	ISOPath        string // Path to the bootable ISO on disk (VM mode: booted via libvirt)
 	APIVersion     string
+	Version        string // Optional override for the running appliance version.
 }
 
 const (

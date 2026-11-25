@@ -27,6 +27,21 @@ Key flags passed to the binary:
 | `-agent-api-url` | `https://localhost:8000` | Agent local API URL |
 | `-agent-proxy-url` | `http://localhost:8080` | Agent proxy URL |
 
+To run only the image upload test after building the agent image and E2E binary:
+
+```sh
+./bin/e2e -infra-mode=container \
+  -agent-image=assisted-migration-agent:latest \
+  -backend-image=quay.io/kubev2v/migration-planner-api:latest \
+  --ginkgo.focus='Image upgrade v2 e2e tests' --ginkgo.v
+```
+
+This test starts only the agent, uploads a small valid OCI archive to
+`POST /api/v2/image-upgrades`, and checks for `202 Accepted` and exactly one
+published `updates/*.tar` with the uploaded contents. It also verifies that no
+staged files remain. It runs in container mode; VM mode skips it because the
+host updater can consume the archive before the filesystem assertion.
+
 ## Test infrastructure
 
 All infrastructure is managed via the `InfraManager` interface (`pkg/e2e/infra/infra.go`).

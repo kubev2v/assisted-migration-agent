@@ -5,9 +5,12 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"time"
+
+	"go.podman.io/podman/v6/pkg/bindings/containers"
 
 	"github.com/kubev2v/assisted-migration-agent/pkg/e2e/vcsim"
 )
@@ -250,6 +253,9 @@ func (c *ContainerInfraManager) StartAgent(cfg AgentConfig) (string, error) {
 	if cfg.APIVersion != "" {
 		containerCfg.WithEnvVar("AGENT_API", cfg.APIVersion)
 	}
+	if cfg.Version != "" {
+		containerCfg.WithCmd("run", "--version", cfg.Version)
+	}
 
 	return c.runner.StartContainer(containerCfg)
 }
@@ -266,6 +272,14 @@ func (c *ContainerInfraManager) RemoveAgent() error {
 	_ = c.runner.StopContainer(agentContainerName)
 	_ = c.runner.RemoveContainer(agentContainerName)
 	return c.runner.RemoveVolume(agentVolumeName)
+}
+
+func (c *ContainerInfraManager) CopyAgentFiles(path string, destination io.Writer) error {
+	copyFiles, err := containers.CopyToArchive(c.runner.conn, agentContainerName, path, destination)
+	if err != nil {
+		return fmt.Errorf("copying agent files: %w", err)
+	}
+	return copyFiles()
 }
 
 // waitReady polls url until it responds or timeout elapses.

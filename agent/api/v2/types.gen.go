@@ -62,6 +62,22 @@ const (
 	ForecasterStatusStateRunning ForecasterStatusState = "running"
 )
 
+// Defines values for ImageUpgradeResultOutcome.
+const (
+	Applied    ImageUpgradeResultOutcome = "applied"
+	Failed     ImageUpgradeResultOutcome = "failed"
+	RolledBack ImageUpgradeResultOutcome = "rolled-back"
+	Unchanged  ImageUpgradeResultOutcome = "unchanged"
+)
+
+// Defines values for ImageUploadStatusState.
+const (
+	ImageUploadStatusStateIdle       ImageUploadStatusState = "idle"
+	ImageUploadStatusStateUnknown    ImageUploadStatusState = "unknown"
+	ImageUploadStatusStateUploading  ImageUploadStatusState = "uploading"
+	ImageUploadStatusStateValidating ImageUploadStatusState = "validating"
+)
+
 // Defines values for InspectionStatusState.
 const (
 	InspectionStatusStateCanceled  InspectionStatusState = "canceled"
@@ -79,9 +95,9 @@ const (
 
 // Defines values for RDMBackingCompatibilityMode.
 const (
-	Physical RDMBackingCompatibilityMode = "physical"
-	Unknown  RDMBackingCompatibilityMode = "unknown"
-	Virtual  RDMBackingCompatibilityMode = "virtual"
+	RDMBackingCompatibilityModePhysical RDMBackingCompatibilityMode = "physical"
+	RDMBackingCompatibilityModeUnknown  RDMBackingCompatibilityMode = "unknown"
+	RDMBackingCompatibilityModeVirtual  RDMBackingCompatibilityMode = "virtual"
 )
 
 // Defines values for VirtualMachineIssueCategory.
@@ -130,6 +146,9 @@ type AgentStatus struct {
 		// Status Current console connection status
 		Status AgentStatusConsoleConnectionStatus `json:"status"`
 	} `json:"consoleConnection"`
+
+	// ImageUpgradeStatus Always present in both connected and disconnected modes, including while the console is unreachable. Includes upload activity and the last host image upgrade result. Image upgrade status errors do not fail the agent-status response.
+	ImageUpgradeStatus ImageUpgradeStatus `json:"imageUpgradeStatus"`
 
 	// Mode Target mode for the agent
 	Mode AgentStatusMode `json:"mode"`
@@ -515,6 +534,50 @@ type HostPhysicalNIC struct {
 	LinkSpeedMbps *int32 `json:"linkSpeedMbps,omitempty"`
 }
 
+// ImageUpgradeImage defines model for ImageUpgradeImage.
+type ImageUpgradeImage struct {
+	Digest  string `json:"digest"`
+	Version string `json:"version"`
+}
+
+// ImageUpgradeResult defines model for ImageUpgradeResult.
+type ImageUpgradeResult struct {
+	Error                *string                   `json:"error,omitempty"`
+	ErrorStage           *string                   `json:"errorStage,omitempty"`
+	File                 string                    `json:"file"`
+	LastSuccessfulUpdate *SuccessfulImageUpgrade   `json:"lastSuccessfulUpdate,omitempty"`
+	Outcome              ImageUpgradeResultOutcome `json:"outcome"`
+	RunningImage         *ImageUpgradeImage        `json:"runningImage,omitempty"`
+	Time                 time.Time                 `json:"time"`
+}
+
+// ImageUpgradeResultOutcome defines model for ImageUpgradeResult.Outcome.
+type ImageUpgradeResultOutcome string
+
+// ImageUpgradeStatus defines model for ImageUpgradeStatus.
+type ImageUpgradeStatus struct {
+	CurrentVersion string `json:"currentVersion"`
+
+	// Upgrade Last host upgrade result, or null if it is missing or cannot be read.
+	Upgrade *ImageUpgradeResult `json:"upgrade"`
+
+	// UpgradeError Error reading the host upgrade result, independent of upload errors. Null when there is no read error.
+	UpgradeError *string           `json:"upgradeError"`
+	Upload       ImageUploadStatus `json:"upload"`
+}
+
+// ImageUploadStatus defines model for ImageUploadStatus.
+type ImageUploadStatus struct {
+	// LastError Last upload error, or an upload-state availability error when state is unknown. Host result read errors are reported in upgradeError.
+	LastError *string `json:"lastError"`
+
+	// State Agent upload activity only; idle does not indicate whether the host is running an upgrade. Unknown means the upload state is unavailable. An unreadable host result does not change this state.
+	State ImageUploadStatusState `json:"state"`
+}
+
+// ImageUploadStatusState Agent upload activity only; idle does not indicate whether the host is running an upgrade. Unknown means the upload state is unavailable. An unreadable host result does not change this state.
+type ImageUploadStatusState string
+
 // InspectionStatus defines model for InspectionStatus.
 type InspectionStatus struct {
 	// Details Human-readable details about the current inspection state
@@ -676,6 +739,13 @@ type StartForecasterRequest struct {
 type StartInspectionRequest struct {
 	// VmIds VM MoRef IDs to inspect
 	VmIds []string `binding:"required,min=1,dive,required" json:"vmIds"`
+}
+
+// SuccessfulImageUpgrade defines model for SuccessfulImageUpgrade.
+type SuccessfulImageUpgrade struct {
+	Digest  string    `json:"digest"`
+	Time    time.Time `json:"time"`
+	Version string    `json:"version"`
 }
 
 // UpdateGroupRequest defines model for UpdateGroupRequest.
@@ -1219,6 +1289,12 @@ type GetLatestGroupParams struct {
 	PageSize *int `form:"pageSize,omitempty" json:"pageSize,omitempty"`
 }
 
+// PostImageUpgradeMultipartBody defines parameters for PostImageUpgrade.
+type PostImageUpgradeMultipartBody struct {
+	// File OCI archive; maximum file payload is 3 GiB
+	File openapi_types.File `json:"file"`
+}
+
 // GetInspectorStatusParams defines parameters for GetInspectorStatus.
 type GetInspectorStatusParams struct {
 	// IncludeVddk Include VDDK metadata in the response
@@ -1271,6 +1347,9 @@ type CreateLatestGroupJSONRequestBody = CreateGroupRequest
 
 // UpdateLatestGroupJSONRequestBody defines body for UpdateLatestGroup for application/json ContentType.
 type UpdateLatestGroupJSONRequestBody = UpdateGroupRequest
+
+// PostImageUpgradeMultipartRequestBody defines body for PostImageUpgrade for multipart/form-data ContentType.
+type PostImageUpgradeMultipartRequestBody PostImageUpgradeMultipartBody
 
 // StartInspectionJSONRequestBody defines body for StartInspection for application/json ContentType.
 type StartInspectionJSONRequestBody = StartInspectionRequest

@@ -17,6 +17,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/jzelinskie/cobrautil/v2 v2.0.0-20260922163232-4fb24ed00480
+	github.com/klauspost/compress v1.20.4
 	github.com/kubev2v/forklift v0.0.0-20261110114915-def3d784a934
 	github.com/kubev2v/migration-planner v0.28.1-0.20261122150649-30088d66428f
 	github.com/kubev2v/migration-planner-common/estimations v0.0.0-20261117165325-c91bbeaba346
@@ -25,6 +26,8 @@ require (
 	github.com/oapi-codegen/runtime v1.9.1
 	github.com/onsi/ginkgo/v2 v2.34.0
 	github.com/onsi/gomega v1.44.0
+	github.com/opencontainers/go-digest v1.0.0
+	github.com/opencontainers/image-spec v1.1.1
 	github.com/opencontainers/runtime-spec v1.3.0
 	github.com/sirupsen/logrus v1.10.2
 	github.com/spf13/cobra v1.10.2
@@ -37,6 +40,8 @@ require (
 	go.podman.io/podman/v6 v6.2.0
 	go.uber.org/zap v1.28.0
 	golang.org/x/crypto v0.59.0
+	golang.org/x/mod v0.42.0
+	golang.org/x/sys v0.50.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.37.2
 	k8s.io/apimachinery v0.37.2
@@ -158,7 +163,6 @@ require (
 	github.com/jzelinskie/stringz v0.0.3 // indirect
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.7.7 // indirect
 	github.com/kevinburke/ssh_config v1.5.0 // indirect
-	github.com/klauspost/compress v1.20.4 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.2 // indirect
 	github.com/klauspost/pgzip v1.3.0 // indirect
 	github.com/kr/fs v0.1.0 // indirect
@@ -195,8 +199,6 @@ require (
 	github.com/nxadm/tail v1.4.11 // indirect
 	github.com/open-policy-agent/opa v1.6.0 // indirect
 	github.com/opencontainers/cgroups v0.1.0 // indirect
-	github.com/opencontainers/go-digest v1.0.0 // indirect
-	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/opencontainers/runtime-tools v0.9.1-0.20261017090856-bd3b0bd00f44 // indirect
 	github.com/opencontainers/selinux v1.15.1 // indirect
 	github.com/openshift/api v0.0.0-20261120191000-0e5fe796a10f // indirect
@@ -288,11 +290,9 @@ require (
 	go.yaml.in/yaml/v4 v4.0.0 // indirect
 	golang.org/x/arch v0.29.0 // indirect
 	golang.org/x/exp v0.0.0-20261109185158-a52e3aef5920 // indirect
-	golang.org/x/mod v0.42.0 // indirect
 	golang.org/x/net v0.62.0 // indirect
 	golang.org/x/oauth2 v0.37.0 // indirect
 	golang.org/x/sync v0.25.0 // indirect
-	golang.org/x/sys v0.50.0 // indirect
 	golang.org/x/term v0.48.0 // indirect
 	golang.org/x/text v0.44.0 // indirect
 	golang.org/x/time v0.16.0 // indirect
