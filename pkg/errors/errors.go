@@ -459,3 +459,23 @@ func IsDetectionError(err error) bool {
 	var e *DetectionError
 	return errors.As(err, &e)
 }
+
+// InvalidRuleError indicates an appliance rule the service refused because it
+// breaks a rule constraint, such as an unknown condition name or a minimum
+// match count above the number of conditions.
+type InvalidRuleError struct {
+	Reason string
+}
+
+func NewInvalidRuleError(reason string) *InvalidRuleError {
+	return &InvalidRuleError{Reason: reason}
+}
+
+func (e *InvalidRuleError) Error() string {
+	return fmt.Sprintf("invalid appliance rule: %s", e.Reason)
+}
+
+func IsInvalidRuleError(err error) bool {
+	var e *InvalidRuleError
+	return errors.As(err, &e)
+}

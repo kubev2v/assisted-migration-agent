@@ -469,10 +469,13 @@ var _ = Describe("Startup migration policy", func() {
 		})
 
 		DescribeTable("rejects invalid main histories without repairing them",
-			func(query string, expectedVersions int) {
+			func(query string) {
 				db := openStartupDatabase(folder, "agent.duckdb")
 				_, err := db.Exec(query)
 				Expect(err).NotTo(HaveOccurred())
+
+				var seeded int
+				Expect(db.QueryRow(`SELECT count(*) FROM schema_migrations`).Scan(&seeded)).To(Succeed())
 				Expect(db.Close()).To(Succeed())
 				pool, err := startPool(folder, false)
 				Expect(pool).To(BeNil())
@@ -480,14 +483,14 @@ var _ = Describe("Startup migration policy", func() {
 				db = openStartupDatabase(folder, "agent.duckdb")
 				var count int
 				Expect(db.QueryRow(`SELECT count(*) FROM schema_migrations`).Scan(&count)).To(Succeed())
-				Expect(count).To(Equal(expectedVersions))
+				Expect(count).To(Equal(seeded))
 				var mode string
 				Expect(db.QueryRow(`SELECT agent_mode FROM configuration`).Scan(&mode)).To(Succeed())
 				Expect(mode).To(Equal("connected"))
 			},
-			Entry("empty history", `DELETE FROM schema_migrations`, 0),
-			Entry("newer history", `INSERT INTO schema_migrations(version) VALUES (2)`, 2),
-			Entry("gapped history", `UPDATE schema_migrations SET version=2`, 1),
+			Entry("empty history", `DELETE FROM schema_migrations`),
+			Entry("newer history", `INSERT INTO schema_migrations(version) SELECT max(version) + 1 FROM schema_migrations`),
+			Entry("gapped history", `UPDATE schema_migrations SET version = version + 1 WHERE version = (SELECT max(version) FROM schema_migrations)`),
 		)
 
 		It("does not recreate a missing history table", func() {

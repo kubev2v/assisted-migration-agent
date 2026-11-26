@@ -3,6 +3,7 @@ package v2
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
@@ -25,11 +26,17 @@ func validationErrorMessage(err error) string {
 
 func formatFieldError(fe validator.FieldError) string {
 	field := fe.Field()
+
 	switch fe.Tag() {
 	case "required":
 		return fmt.Sprintf("%s is required", field)
 	case "min":
-		return fmt.Sprintf("%s must be at least %s characters", field, fe.Param())
+		switch fe.Kind() {
+		case reflect.Slice, reflect.Array, reflect.Map:
+			return fmt.Sprintf("%s must have at least %s items", field, fe.Param())
+		default:
+			return fmt.Sprintf("%s must be at least %s characters", field, fe.Param())
+		}
 	case "max":
 		return fmt.Sprintf("%s must not exceed %s characters", field, fe.Param())
 	case "oneof":
@@ -38,6 +45,8 @@ func formatFieldError(fe validator.FieldError) string {
 		return fmt.Sprintf("%s must be a valid URL", field)
 	case "notblank":
 		return fmt.Sprintf("%s must not be empty or whitespace-only", field)
+	case "required_without", "excluded_with":
+		return "exactly one of expression or function must be set"
 	default:
 		return fmt.Sprintf("%s failed validation: %s", field, fe.Tag())
 	}

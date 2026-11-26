@@ -183,7 +183,6 @@ func (s *VMStore) ListForApplianceDetection(ctx context.Context, filter sq.Sqliz
 			&vm.Cluster,
 			&vm.HostName,
 			&vm.IPAddress,
-			&vm.IsTemplate,
 			&diskSizes,
 		); err != nil {
 			return nil, err

@@ -29,7 +29,6 @@ type ApplianceVirtualMachine struct {
 	ConnectionState string
 	GuestID         string
 	NestedHVEnabled bool
-	IsTemplate      bool
 	CpuCount        int32
 	CoresPerSocket  int32
 	MemoryMB        int32
@@ -65,6 +64,13 @@ const (
 	OsvUnknown
 )
 
+type RuleKind int
+
+const (
+	DefaultRule RuleKind = iota
+	CustomRule
+)
+
 type Evidence struct {
 	RuleName          string
 	VirtualMachineID  string
@@ -85,8 +91,10 @@ type DetectionError struct {
 }
 
 type Rule struct {
+	ID         int64
 	Name       string
 	Vendor     string
+	RuleKind   RuleKind
 	Category   string
 	OsvVerdict OsvVerdict
 	Confidence ConfidenceLevel
@@ -95,9 +103,36 @@ type Rule struct {
 	Conditions []any
 }
 
-type ConditionConstraint interface {
-	int | bool | string
+// ConditionInput is a condition as the client described it. It is not
+// executable: the payload is keyed by a function name the service has to
+// resolve against its registry, and the tier is assigned by the service.
+// Services resolve every ConditionInput before handing a Rule to the store;
+// rules seeded internally may carry executable conditions directly.
+type ConditionInput struct {
+	Name       string
+	Expression string
+	Function   *FunctionInput
 }
+
+// FunctionInput names a registered predicate and carries the payload the name
+// resolves to. Exactly one payload field is set.
+type FunctionInput struct {
+	Name         string
+	DiskGeometry *DiskGeometry
+}
+
+type DiskGeometry struct {
+	Disks     []int64
+	Tolerance int
+	Mode      DiskGeometryMode
+}
+
+type DiskGeometryMode string
+
+const (
+	DiskGeometryExact    DiskGeometryMode = "exact"
+	DiskGeometrySuperset DiskGeometryMode = "superset"
+)
 
 // ConditionFuncs maps a persisted function name to its implementation. An
 // implementation is either func(T, ApplianceVirtualMachine) (bool, error) or
@@ -113,16 +148,10 @@ type ExpressionCondition struct {
 	Expression string
 }
 
-type ListValueFuncCondition[T []E, E ConditionConstraint] struct {
-	Values T
-	Name   string
-	Tier   int
-	Func   func(value T, vm ApplianceVirtualMachine) (bool, error)
-}
-
-type SingleValueFuncCondition[T ConditionConstraint] struct {
-	Value T
-	Name  string
-	Tier  int
-	Func  func(value T, vm ApplianceVirtualMachine) (bool, error)
+type FuncCondition[T any] struct {
+	Data     T
+	Name     string
+	Tier     int
+	FuncName string
+	Func     func(value T, vm ApplianceVirtualMachine) (bool, error)
 }

@@ -357,28 +357,3 @@ var _ = Describe("ListGroupApplications handler", func() {
 		Expect(resp.Applications).To(BeEmpty())
 	})
 })
-
-func insertVMForHandler(ctx context.Context, db *sql.DB, vmID, vmName string, apps []string) error {
-	appsJSON := "[]"
-	if len(apps) > 0 {
-		entries := make([]map[string]string, len(apps))
-		for i, n := range apps {
-			entries[i] = map[string]string{"name": n}
-		}
-		b, err := json.Marshal(entries)
-		if err != nil {
-			return err
-		}
-		appsJSON = string(b)
-	}
-	_, err := db.ExecContext(ctx, `
-		INSERT INTO vinfo ("VM ID", "VM", "Powerstate", "Connection state", "Cluster", "Datacenter",
-			"Host", "Folder ID", "Firmware", "SMBIOS UUID", "Memory", "CPUs",
-			"OS according to the configuration file", "DNS Name", "Primary IP Address",
-			"In Use MiB", "Template", "FT State", "guest_apps")
-		VALUES (?, ?, 'poweredOn', 'connected', 'cluster-1', 'dc-1',
-			'host-1', 'folder-1', 'bios', 'uuid-1', 4096, 2,
-			'CentOS 7', '', '', 0, false, 'notConfigured', ?)
-	`, vmID, vmName, appsJSON)
-	return err
-}

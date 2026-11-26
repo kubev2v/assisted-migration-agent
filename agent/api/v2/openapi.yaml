@@ -918,6 +918,125 @@ paths:
         '500':
           description: Internal server error
 
+  # ── Appliance rules ───────────────────────────────────────────────────
+  /appliances/rules:
+    get:
+      tags: [Appliances]
+      summary: List appliance rules
+      operationId: listApplianceRules
+      responses:
+        '200':
+          description: Return appliance rules
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplianceRuleListResponse'
+        '500':
+          description: Internal server error
+    post:
+      tags: [Appliances]
+      summary: Create an appliance rule
+      operationId: createApplianceRule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplianceRuleRequest'
+      responses:
+        '201':
+          description: Rule created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplianceRule'
+        '400':
+          description: Invalid rule or rule already exists
+        '500':
+          description: Internal server error
+
+  /appliances/rules/{ruleId}:
+    get:
+      tags: [Appliances]
+      summary: Get an appliance rule
+      operationId: getApplianceRule
+      parameters:
+        - name: ruleId
+          in: path
+          required: true
+          description: Rule ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Rule
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplianceRule'
+        '400':
+          description: Rule ID is not a number
+        '404':
+          description: Rule not found
+        '500':
+          description: Internal server error
+    put:
+      tags: [Appliances]
+      summary: Replace an appliance rule
+      operationId: updateApplianceRule
+      description: >
+        Full replacement of the rule with this id, including its conditions.
+        When no rule has this id a new rule is created and the response carries
+        the server assigned id, which differs from the id in the path.
+      parameters:
+        - name: ruleId
+          in: path
+          required: true
+          description: Rule ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplianceRuleRequest'
+      responses:
+        '200':
+          description: Rule updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplianceRule'
+        '201':
+          description: No rule had this id, so a new rule was created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplianceRule'
+        '400':
+          description: Invalid rule, invalid rule ID or rule already exists
+        '500':
+          description: Internal server error
+    delete:
+      tags: [Appliances]
+      summary: Delete an appliance rule
+      operationId: deleteApplianceRule
+      parameters:
+        - name: ruleId
+          in: path
+          required: true
+          description: Rule ID
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Rule deleted, or no rule had this id
+        '400':
+          description: Rule ID is not a number
+        '500':
+          description: Internal server error
+
   # ── Groups ─────────────────────────────────────────────────────────────
   /collections/{id}/groups:
     get:
@@ -3307,3 +3426,205 @@ components:
         uiGitCommit:
           type: string
           description: UI git commit SHA
+
+    # ── Appliance Rules ─────────────────────────────────────────────────
+    ApplianceRuleListResponse:
+      type: object
+      required:
+        - rules
+      properties:
+        rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/ApplianceRule'
+
+    ApplianceRule:
+      type: object
+      required:
+        - name
+        - vendor
+        - category
+        - osv_verdict
+        - max_confidence
+        - kind
+        - min_matched
+        - conditions
+      properties:
+        id:
+          type: string
+          description: Rule ID
+        name:
+          type: string
+          description: Appliance product name
+        vendor:
+          type: string
+          description: Appliance vendor
+        category:
+          type: string
+          description: Appliance category
+        osv_verdict:
+          type: string
+          enum:
+            - blocked
+            - conditional
+            - supported
+            - unknown
+          description: OSV migration verdict
+        max_confidence:
+          type: string
+          enum:
+            - high
+            - medium
+            - low
+          description: Confidence ceiling for this rule
+        kind:
+          type: string
+          enum:
+            - default
+            - custom
+          description: Kind of rules either default or custom
+        min_matched:
+          type: integer
+          x-go-type: json.Number
+          description: Number of conditions that must match before the rule fires
+        conditions:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/ApplianceRuleCondition'
+
+    ApplianceRuleRequest:
+      type: object
+      required:
+        - name
+        - vendor
+        - category
+        - osv_verdict
+        - max_confidence
+        - min_matched
+        - conditions
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+          x-oapi-codegen-extra-tags:
+            binding: "required,min=1,max=200"
+        vendor:
+          type: string
+          minLength: 1
+          maxLength: 200
+          x-oapi-codegen-extra-tags:
+            binding: "required,min=1,max=200"
+        category:
+          type: string
+          minLength: 1
+          maxLength: 200
+          x-oapi-codegen-extra-tags:
+            binding: "required,min=1,max=200"
+        osv_verdict:
+          type: string
+          enum:
+            - blocked
+            - conditional
+            - supported
+            - unknown
+          x-oapi-codegen-extra-tags:
+            binding: "required,oneof=blocked conditional supported unknown"
+        max_confidence:
+          type: string
+          enum:
+            - high
+            - medium
+            - low
+          x-oapi-codegen-extra-tags:
+            binding: "required,oneof=high medium low"
+        min_matched:
+          type: integer
+          x-go-type: json.Number
+          x-oapi-codegen-extra-tags:
+            binding: "required"
+        conditions:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/ApplianceRuleCondition'
+          x-oapi-codegen-extra-tags:
+            binding: "required,min=1,dive"
+
+    ApplianceRuleCondition:
+      type: object
+      additionalProperties: false
+      description: >
+        One condition. Either a filter expression over VM attributes or a call to
+        a registered predicate function carrying its own payload. Exactly one of
+        expression or function must be set. Condition names must be unique within
+        a rule, and min_matched may not exceed the number of conditions.
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: >
+            Condition name, unique within the rule. The name decides how much a
+            match contributes: vapp_product and annotation weigh high, guest_id
+            and mount_preffix medium, nic_count, disk_geometry and nested_hv
+            low, and name weighs so little that matching it alone is not a
+            detection. Any other name is rejected.
+        expression:
+          type: string
+          description: >
+            Filter DSL expression over the VM attributes appliance rules can
+            match on, e.g. Name ~ /^ORA-/ or NICCount > 3.
+          x-oapi-codegen-extra-tags:
+            binding: "required_without=Function,excluded_with=Function"
+        function:
+          $ref: '#/components/schemas/ApplianceRuleFunction'
+
+    ApplianceRuleFunction:
+      type: object
+      additionalProperties: false
+      description: >
+        A registered predicate selected by name. Exactly one payload field, the
+        one matching name, must be set; the payload is validated server-side
+        against the predicate the name resolves to.
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: >
+            Predicate name. disk_geometry is the only one defined; any other
+            name is rejected.
+        disk_geometry:
+          $ref: '#/components/schemas/DiskGeometryCondition'
+
+    DiskGeometryCondition:
+      type: object
+      required:
+        - disks
+        - mode
+        - tolerance_mib
+      properties:
+        disks:
+          type: array
+          items:
+            type: integer
+            x-go-type: json.Number
+          x-oapi-codegen-extra-tags:
+            binding: "required,min=1,dive,min=1"
+        mode:
+          type: string
+          enum:
+            - exact
+            - superset
+          x-oapi-codegen-extra-tags:
+            binding: "required,oneof=exact superset"
+        tolerance_mib:
+          type: integer
+          x-go-type: json.Number
+          x-oapi-codegen-extra-tags:
+            binding: "required"
+          description: >
+            Largest difference in MiB allowed between a required disk size and
+            the size of a VM disk. Zero requires the sizes to match exactly.

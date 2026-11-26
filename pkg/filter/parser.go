@@ -42,6 +42,11 @@ func Parse(src []byte, mf MapFunc) (sq.Sqlizer, error) {
 	return toSql(expr, mf)
 }
 
+func Validate(src []byte) error {
+	_, err := parse(src)
+	return err
+}
+
 // parse uses panic/recover internally so recursive-descent methods can
 // signal errors without threading (Expression, error) through every call.
 // ParseError panics are caught here and returned as normal errors;

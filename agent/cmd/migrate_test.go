@@ -43,7 +43,7 @@ func TestMigrateCLIWithoutApplicationConfiguration(t *testing.T) {
 			if operation == "apply" || operation == "rollback" {
 				require.Len(t, result.Databases, 1)
 				require.Equal(t, "agent.duckdb", result.Databases[0].Path)
-				require.Equal(t, []int{1}, result.Databases[0].Versions)
+				require.Equal(t, []int{1, 2}, result.Databases[0].Versions)
 			}
 		})
 	}

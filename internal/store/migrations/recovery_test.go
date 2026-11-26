@@ -140,6 +140,10 @@ func TestRecoveryPreservesBaselineData(t *testing.T) {
 			for i, m := range r.registries[CollectionSchema] {
 				baselineVersions[i] = m.Version
 			}
+			mainVersions := make([]int, len(r.registries[MainSchema]))
+			for i, m := range r.registries[MainSchema] {
+				mainVersions[i] = m.Version
+			}
 			upgrade := addCollectionUpgrade(r)
 			baselineColumns := collectionColumns(t, folder, "collection_100.duckdb")
 			request := prepareRequest()
@@ -152,7 +156,7 @@ func TestRecoveryPreservesBaselineData(t *testing.T) {
 			require.NoError(t, json.Unmarshal(original, &manifest))
 			require.Equal(t, baselineVersions, manifest.Databases[0].Versions)
 			require.Equal(t, baselineVersions, manifest.Databases[1].Versions)
-			require.Equal(t, []int{1}, manifest.Databases[2].Versions)
+			require.Equal(t, mainVersions, manifest.Databases[2].Versions)
 			_, err = r.Run(context.Background(), request)
 			require.ErrorContains(t, err, "creating new attempt")
 			after, err := os.ReadFile(manifestPath)
@@ -213,22 +217,29 @@ func TestRecoveryPartialForwardAndDescendingRollback(t *testing.T) {
 	r, err := NewRecovery(folder)
 	require.NoError(t, err)
 	seedMain(t, folder)
+	second := len(r.registries[MainSchema]) + 1
+	third := second + 1
+	failing := third + 1
 	r.registries[MainSchema] = append(r.registries[MainSchema],
-		migration{Version: 2, Name: "second", Up: `CREATE TABLE second (value VARCHAR); INSERT INTO second VALUES ('new');`, Down: `DROP TABLE second;`},
-		migration{Version: 3, Name: "third", Up: `CREATE TABLE third (value VARCHAR); INSERT INTO third SELECT value FROM second;`, Down: `DELETE FROM second WHERE value IN (SELECT value FROM third); DROP TABLE third;`},
-		migration{Version: 4, Name: "fail", Up: `CREATE TABLE incomplete (value VARCHAR); SELECT * FROM missing_table;`, Down: `DROP TABLE incomplete;`},
+		migration{Version: second, Name: "second", Up: `CREATE TABLE second (value VARCHAR); INSERT INTO second VALUES ('new');`, Down: `DROP TABLE second;`},
+		migration{Version: third, Name: "third", Up: `CREATE TABLE third (value VARCHAR); INSERT INTO third SELECT value FROM second;`, Down: `DELETE FROM second WHERE value IN (SELECT value FROM third); DROP TABLE third;`},
+		migration{Version: failing, Name: "fail", Up: `CREATE TABLE incomplete (value VARCHAR); SELECT * FROM missing_table;`, Down: `DROP TABLE incomplete;`},
 	)
 	request := prepareRequest()
 	_, err = r.Run(context.Background(), request)
 	require.NoError(t, err)
 	request.Operation = "apply"
 	result, err := r.Run(context.Background(), request)
-	require.ErrorContains(t, err, "migration 4")
-	require.Equal(t, []int{1, 2, 3}, result.Databases[0].Versions)
+	require.ErrorContains(t, err, fmt.Sprintf("migration %d", failing))
+	applied := make([]int, 0, third)
+	for i := 1; i <= third; i++ {
+		applied = append(applied, i)
+	}
+	require.Equal(t, applied, result.Databases[0].Versions)
 	request.Operation = "rollback"
 	result, err = r.Run(context.Background(), request)
 	require.NoError(t, err)
-	require.Equal(t, []int{3, 2}, result.Databases[0].Steps)
+	require.Equal(t, []int{third, second}, result.Databases[0].Steps)
 	request.Operation = "verify"
 	_, err = r.Run(context.Background(), request)
 	require.NoError(t, err)
@@ -244,8 +255,9 @@ func TestRecoveryDownFailureIsAtomicAndRetryable(t *testing.T) {
 	r, err := NewRecovery(folder)
 	require.NoError(t, err)
 	seedMain(t, folder)
+	reversible := len(r.registries[MainSchema]) + 1
 	r.registries[MainSchema] = append(r.registries[MainSchema], migration{
-		Version: 2, Name: "reversible", Up: `CREATE TABLE second (value INTEGER); INSERT INTO second VALUES (5);`,
+		Version: reversible, Name: "reversible", Up: `CREATE TABLE second (value INTEGER); INSERT INTO second VALUES (5);`,
 		Down: `UPDATE second SET value = value + 1; SELECT CASE WHEN (SELECT value FROM second) = 6 THEN error('blocked') ELSE 1 END; DROP TABLE second;`,
 	})
 	request := prepareRequest()
@@ -256,13 +268,13 @@ func TestRecoveryDownFailureIsAtomicAndRetryable(t *testing.T) {
 	require.NoError(t, err)
 	request.Operation = "rollback"
 	_, err = r.Run(context.Background(), request)
-	require.ErrorContains(t, err, "migration 2")
+	require.ErrorContains(t, err, fmt.Sprintf("migration %d", reversible))
 	db := testDatabase(t, filepath.Join(folder, "agent.duckdb"))
 	var value, version int
 	require.NoError(t, db.QueryRow(`SELECT value FROM second`).Scan(&value))
 	require.Equal(t, 5, value, "failed down SQL must roll back data changes")
 	require.NoError(t, db.QueryRow(`SELECT max(version) FROM schema_migrations`).Scan(&version))
-	require.Equal(t, 2, version)
+	require.Equal(t, reversible, version)
 	_, err = db.Exec(`UPDATE second SET value=10`)
 	require.NoError(t, err)
 	require.NoError(t, db.Close())
@@ -318,7 +330,7 @@ func TestRecoveryRejectsUnsafeState(t *testing.T) {
 				db := testDatabase(t, filepath.Join(folder, "agent.duckdb"))
 				query := `DROP TABLE schema_migrations`
 				if scenario == "history gap" {
-					query = `UPDATE schema_migrations SET version=2`
+					query = `DELETE FROM schema_migrations WHERE version = 1`
 				}
 				if scenario == "unknown version" {
 					query = `INSERT INTO schema_migrations(version) VALUES (99)`

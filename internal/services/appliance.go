@@ -15,17 +15,14 @@ import (
 )
 
 type ApplianceService struct {
-	store          *store.Store
-	conditionFuncs models.ConditionFuncs
+	store        *store.Store
+	rulesService *ApplianceRulesService
 }
 
-func NewApplianceService(st *store.Store) (*ApplianceService, error) {
+func NewApplianceService(st *store.Store, rulesService *ApplianceRulesService) (*ApplianceService, error) {
 	return &ApplianceService{
-		store: st,
-		conditionFuncs: models.ConditionFuncs{
-			"disk_geometry_exact":    matchExactDiskGeometry,
-			"disk_geometry_superset": matchSupersetDiskGeometry,
-		},
+		store:        st,
+		rulesService: rulesService,
 	}, nil
 }
 
@@ -56,7 +53,7 @@ func (s *ApplianceService) Detect(ctx context.Context, filterExpression string) 
 		return []models.DetectionResult{}, []models.DetectionResult{}, nil
 	}
 
-	rules, err := s.store.Appliance().ListRules(ctx, s.conditionFuncs)
+	rules, err := s.rulesService.List(ctx)
 	if err != nil {
 		return []models.DetectionResult{}, []models.DetectionResult{}, err
 	}
@@ -135,60 +132,10 @@ func match(vm models.ApplianceVirtualMachine, rule models.Rule) (models.Evidence
 				matched[c.Name] = c.Tier
 			}
 
-		case models.SingleValueFuncCondition[bool]:
-			ok, err := c.Func(c.Value, vm)
+		case models.FuncCondition[models.DiskGeometry]:
+			ok, err := c.Func(c.Data, vm)
 			if err != nil {
-				return models.Evidence{}, errors.NewDetectionError(rule.Name, vm.ID, "bool", c.Name, "", err.Error())
-			}
-
-			if ok {
-				matched[c.Name] = c.Tier
-			}
-
-		case models.ListValueFuncCondition[[]bool, bool]:
-			ok, err := c.Func(c.Values, vm)
-			if err != nil {
-				return models.Evidence{}, errors.NewDetectionError(rule.Name, vm.ID, "bool", c.Name, "", err.Error())
-			}
-
-			if ok {
-				matched[c.Name] = c.Tier
-			}
-
-		case models.SingleValueFuncCondition[string]:
-			ok, err := c.Func(c.Value, vm)
-			if err != nil {
-				return models.Evidence{}, errors.NewDetectionError(rule.Name, vm.ID, "string", c.Name, "", err.Error())
-			}
-
-			if ok {
-				matched[c.Name] = c.Tier
-			}
-
-		case models.ListValueFuncCondition[[]string, string]:
-			ok, err := c.Func(c.Values, vm)
-			if err != nil {
-				return models.Evidence{}, errors.NewDetectionError(rule.Name, vm.ID, "string", c.Name, "", err.Error())
-			}
-
-			if ok {
-				matched[c.Name] = c.Tier
-			}
-
-		case models.SingleValueFuncCondition[int]:
-			ok, err := c.Func(c.Value, vm)
-			if err != nil {
-				return models.Evidence{}, errors.NewDetectionError(rule.Name, vm.ID, "number", c.Name, "", err.Error())
-			}
-
-			if ok {
-				matched[c.Name] = c.Tier
-			}
-
-		case models.ListValueFuncCondition[[]int, int]:
-			ok, err := c.Func(c.Values, vm)
-			if err != nil {
-				return models.Evidence{}, errors.NewDetectionError(rule.Name, vm.ID, "number", c.Name, "", err.Error())
+				return models.Evidence{}, errors.NewDetectionError(rule.Name, vm.ID, "disk_geometry", c.Name, "", err.Error())
 			}
 
 			if ok {
@@ -228,31 +175,47 @@ func computeConfidence(ev models.Evidence) models.ConfidenceLevel {
 	}
 }
 
-// matchExactDiskGeometry expects the persisted disk sizes to describe the VM
-// disks exactly. Order is ignored.
-func matchExactDiskGeometry(sizes []int, vm models.ApplianceVirtualMachine) (bool, error) {
-	expected := slices.Clone(sizes)
+// matchDiskGeometry expects every persisted disk size to be present among the
+// VM disks, each one within the tolerance of its configured size. Order is
+// ignored. In exact mode the VM must carry the same number of disks; in
+// superset mode it may carry more.
+func matchDiskGeometry(diskGeometry models.DiskGeometry, vm models.ApplianceVirtualMachine) (bool, error) {
+	expected := slices.Clone(diskGeometry.Disks)
 	slices.Sort(expected)
 
-	return slices.Equal(expected, diskSizes(vm.Disks)), nil
-}
+	actual := make([]int64, 0, len(vm.Disks))
+	for _, disk := range vm.Disks {
+		actual = append(actual, disk.Size)
+	}
 
-// matchSupersetDiskGeometry expects every persisted disk size to be present
-// among the VM disks. Extra VM disks are allowed and order is ignored.
-func matchSupersetDiskGeometry(sizes []int, vm models.ApplianceVirtualMachine) (bool, error) {
-	expected := slices.Clone(sizes)
-	slices.Sort(expected)
+	slices.Sort(actual)
 
-	actual := diskSizes(vm.Disks)
+	tolerance := int64(diskGeometry.Tolerance)
+
+	// Exact mode pairs the sizes one to one, so a different number of disks is
+	// a mismatch however large the tolerance is.
+	if diskGeometry.Mode == models.DiskGeometryExact {
+		if len(expected) != len(actual) {
+			return false, nil
+		}
+
+		for i, size := range expected {
+			if max(actual[i]-size, size-actual[i]) > tolerance {
+				return false, nil
+			}
+		}
+
+		return true, nil
+	}
 
 	i := 0
 
 	for _, size := range expected {
-		for i < len(actual) && actual[i] < size {
+		for i < len(actual) && actual[i] < size-tolerance {
 			i++
 		}
 
-		if i == len(actual) || actual[i] != size {
+		if i == len(actual) || actual[i] > size+tolerance {
 			return false, nil
 		}
 
@@ -260,14 +223,4 @@ func matchSupersetDiskGeometry(sizes []int, vm models.ApplianceVirtualMachine) (
 	}
 
 	return true, nil
-}
-
-func diskSizes(disks []models.ApplianceDisk) []int {
-	sizes := make([]int, 0, len(disks))
-	for _, disk := range disks {
-		sizes = append(sizes, int(disk.Size))
-	}
-
-	slices.Sort(sizes)
-	return sizes
 }
