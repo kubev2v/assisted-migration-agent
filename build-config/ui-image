@@ -2,4 +2,4 @@
 AGENT_UI_IMAGE_TAG=df4810bd6b4c6a40a5e9ac4043859d88f52dcdc2
 
 # UI image commit used by the Rvtool Offline Analyzer container build.
-OFFLINE_ANALYZER_UI_IMAGE_TAG=ef925e01e4f8ed11967c4dd94dabcdaf4faf543b
+OFFLINE_ANALYZER_UI_IMAGE_TAG=bbd625792c5b35276805c9b410bcc4c4400e101d
