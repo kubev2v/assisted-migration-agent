@@ -51,3 +51,33 @@ func IsImageUpgradeInsufficientStorageError(err error) bool {
 	var e *ImageUpgradeInsufficientStorageError
 	return errors.As(err, &e)
 }
+
+// NoImageUpgradeError means the console offers no image the appliance can apply in place.
+type NoImageUpgradeError struct{ Reason string }
+
+func NewNoImageUpgradeError(reason string) *NoImageUpgradeError {
+	return &NoImageUpgradeError{Reason: reason}
+}
+
+func (e *NoImageUpgradeError) Error() string { return e.Reason }
+
+func IsNoImageUpgradeError(err error) bool {
+	var e *NoImageUpgradeError
+	return errors.As(err, &e)
+}
+
+// ImageUpgradeConsoleError means the console could not report or serve the upgrade image.
+type ImageUpgradeConsoleError struct{ Err error }
+
+func NewImageUpgradeConsoleError(err error) *ImageUpgradeConsoleError {
+	return &ImageUpgradeConsoleError{Err: err}
+}
+
+func (e *ImageUpgradeConsoleError) Error() string { return "console: " + e.Err.Error() }
+
+func (e *ImageUpgradeConsoleError) Unwrap() error { return e.Err }
+
+func IsImageUpgradeConsoleError(err error) bool {
+	var e *ImageUpgradeConsoleError
+	return errors.As(err, &e)
+}

@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
+	v2 "github.com/kubev2v/assisted-migration-agent/agent/api/v2"
 	"github.com/kubev2v/assisted-migration-agent/internal/services"
 	srvErrors "github.com/kubev2v/assisted-migration-agent/pkg/errors"
 )
@@ -51,6 +52,42 @@ func (h *Handler) PostImageUpgrade(c *gin.Context) {
 	}
 	r := &imageUpgradeMultipartReader{part: part, multipart: mr, body: body}
 	if _, err := imageUpgrade.Upload(c.Request.Context(), r); err != nil {
+		writeImageUpgradeError(c, err)
+		return
+	}
+	c.Status(http.StatusAccepted)
+}
+
+// GetImageUpgradeLatest asks the console whether a newer appliance image is available.
+// (GET /image-upgrades/latest)
+func (h *Handler) GetImageUpgradeLatest(c *gin.Context) {
+	imageUpgrade := h.svc.ImageUpgradeService()
+	if imageUpgrade == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "image upgrade service is unavailable"})
+		return
+	}
+	latest, err := imageUpgrade.Latest(c.Request.Context())
+	if err != nil {
+		writeImageUpgradeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, v2.ImageUpgradeLatest{
+		UpdateAvailable: latest.UpdateAvailable,
+		LatestVersion:   latest.LatestVersion,
+		Supported:       latest.Supported,
+		Reason:          latest.Reason,
+	})
+}
+
+// StartImageUpgradeDownload downloads and stages the latest appliance image from the console.
+// (POST /image-upgrades/latest)
+func (h *Handler) StartImageUpgradeDownload(c *gin.Context) {
+	imageUpgrade := h.svc.ImageUpgradeService()
+	if imageUpgrade == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "image upgrade service is unavailable"})
+		return
+	}
+	if err := imageUpgrade.StartDownload(c.Request.Context()); err != nil {
 		writeImageUpgradeError(c, err)
 		return
 	}
@@ -129,8 +166,10 @@ func writeImageUpgradeError(c *gin.Context, err error) {
 	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
 		code = http.StatusServiceUnavailable
 		message = "image upload was interrupted"
-	case srvErrors.IsModeConflictError(err), srvErrors.IsOperationInProgressError(err):
+	case srvErrors.IsModeConflictError(err), srvErrors.IsOperationInProgressError(err), srvErrors.IsNoImageUpgradeError(err):
 		code = http.StatusConflict
+	case srvErrors.IsImageUpgradeConsoleError(err):
+		code = http.StatusServiceUnavailable
 	case srvErrors.IsInvalidImageUpgradeImageError(err):
 		code = http.StatusBadRequest
 	case srvErrors.IsImageUpgradePayloadTooLargeError(err):

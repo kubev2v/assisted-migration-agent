@@ -2,7 +2,7 @@
 
 OMA-2016 adds image uploads that start a disconnected appliance image upgrade, plus
 image upgrade status in the existing agent-status response. Connected downloads
-and automatic image upgrades are owned by OMA-3031.
+are described at the end of this document.
 
 The image upgrade service is initialized at startup without a feature flag. The upload
 endpoint and image upgrade status are always available; the UI decides whether to
@@ -141,4 +141,34 @@ GET only reads local state and the host result; it does not contact SaaS,
 execute an upgrade, or validate existing application data. Upload errors are
 held in memory; host results persist across restart.
 
-Connected downloads and automatic image upgrade settings belong to OMA-3031.
+## Connected mode download
+
+In connected mode the agent gets the image from the console instead of an
+upload (OMA-3031). Updates start only when the user asks; there is no automatic
+update.
+
+```sh
+curl -k https://localhost:3333/api/v2/image-upgrades/latest
+curl -k -X POST https://localhost:3333/api/v2/image-upgrades/latest
+```
+
+`GET /api/v2/image-upgrades/latest` calls the planner's
+`GET /api/v1/sources/{id}/image-upgrade-status` on every request; nothing is
+cached. It returns `updateAvailable`, `latestVersion`, `supported`, and `reason`.
+`supported: false` with `reason: "new-ova-required"` means the appliance is too
+old for an in-place update and needs a new OVA. Errors are `409` in disconnected
+mode and `503` when the console is unreachable.
+
+`POST /api/v2/image-upgrades/latest` checks the console again to get a fresh
+presigned URL, opens the download, and returns `202`. The download then runs in
+the background through the same staging and validation as an upload, so failed,
+corrupted, or unsupported downloads never reach the watched directory.
+`upload.state` is `downloading` while the image streams in, then `validating`,
+then `idle`; failures go to `upload.lastError`. Downloads and uploads share one
+lock and the pending-archive check. Errors are `409` in disconnected mode, when
+no update is available, when the update is not supported in place, or when a
+download, upload, or published archive is pending. `503` means the console is
+unreachable or has not staged the image yet.
+
+An interrupted download is not resumed: the partial file is removed and the user
+starts again. A download is limited to two hours.

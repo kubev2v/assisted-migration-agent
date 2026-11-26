@@ -1580,6 +1580,39 @@ paths:
           description: Internal error
         '503':
           description: Image upgrade service unavailable, or upload interrupted by cancellation or timeout
+  /image-upgrades/latest:
+    get:
+      tags: [ImageUpgrade]
+      summary: Check the console for a newer appliance image
+      description: Connected mode only. Asks the console on every call; nothing is cached.
+      operationId: getImageUpgradeLatest
+      responses:
+        '200':
+          description: Image upgrade availability reported by the console
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageUpgradeLatest'
+        '409':
+          description: Disconnected mode
+        '500':
+          description: Internal error
+        '503':
+          description: Console unreachable or returned an error
+    post:
+      tags: [ImageUpgrade]
+      summary: Download the latest appliance image from the console and stage it
+      description: Connected mode only. Starts the download in the background and validates it like an uploaded image before handing it to the host. Follow imageUpgradeStatus.upload in GET /agent.
+      operationId: startImageUpgradeDownload
+      responses:
+        '202':
+          description: Download started
+        '409':
+          description: Disconnected mode, no update available, in-place update not supported, another download or upload in progress, or a published archive still pending host resolution
+        '500':
+          description: Internal error
+        '503':
+          description: Image not yet available from the console, or console unreachable
   /version:
     get:
       tags: [Version]
@@ -3367,14 +3400,31 @@ components:
           type: string
           nullable: true
           description: Error reading the host upgrade result, independent of upload errors. Null when there is no read error.
+    ImageUpgradeLatest:
+      type: object
+      required: [updateAvailable, latestVersion, supported, reason]
+      properties:
+        updateAvailable:
+          type: boolean
+        latestVersion:
+          type: string
+          nullable: true
+          description: Appliance version the console serves; null when unknown
+        supported:
+          type: boolean
+          description: Whether the appliance can be updated in place; false means a new OVA must be deployed
+        reason:
+          type: string
+          nullable: true
+          description: Why an in-place update is not supported, e.g. new-ova-required
     ImageUploadStatus:
       type: object
       required: [state, lastError]
       properties:
         state:
           type: string
-          enum: [idle, uploading, validating, unknown]
-          description: Agent upload activity only; idle does not indicate whether the host is running an upgrade. Unknown means the upload state is unavailable. An unreadable host result does not change this state.
+          enum: [idle, downloading, uploading, validating, unknown]
+          description: Agent download and upload activity only; idle does not indicate whether the host is running an upgrade. Unknown means the upload state is unavailable. An unreadable host result does not change this state.
         lastError:
           type: string
           nullable: true
