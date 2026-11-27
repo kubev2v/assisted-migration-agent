@@ -72,10 +72,11 @@ const (
 
 // Defines values for ImageUploadStatusState.
 const (
-	ImageUploadStatusStateIdle       ImageUploadStatusState = "idle"
-	ImageUploadStatusStateUnknown    ImageUploadStatusState = "unknown"
-	ImageUploadStatusStateUploading  ImageUploadStatusState = "uploading"
-	ImageUploadStatusStateValidating ImageUploadStatusState = "validating"
+	ImageUploadStatusStateDownloading ImageUploadStatusState = "downloading"
+	ImageUploadStatusStateIdle        ImageUploadStatusState = "idle"
+	ImageUploadStatusStateUnknown     ImageUploadStatusState = "unknown"
+	ImageUploadStatusStateUploading   ImageUploadStatusState = "uploading"
+	ImageUploadStatusStateValidating  ImageUploadStatusState = "validating"
 )
 
 // Defines values for InspectionStatusState.
@@ -540,6 +541,19 @@ type ImageUpgradeImage struct {
 	Version string `json:"version"`
 }
 
+// ImageUpgradeLatest defines model for ImageUpgradeLatest.
+type ImageUpgradeLatest struct {
+	// LatestVersion Appliance version the console serves; null when unknown
+	LatestVersion *string `json:"latestVersion"`
+
+	// Reason Why an in-place update is not supported, e.g. new-ova-required
+	Reason *string `json:"reason"`
+
+	// Supported Whether the appliance can be updated in place; false means a new OVA must be deployed
+	Supported       bool `json:"supported"`
+	UpdateAvailable bool `json:"updateAvailable"`
+}
+
 // ImageUpgradeResult defines model for ImageUpgradeResult.
 type ImageUpgradeResult struct {
 	Error                *string                   `json:"error,omitempty"`
@@ -571,11 +585,11 @@ type ImageUploadStatus struct {
 	// LastError Last upload error, or an upload-state availability error when state is unknown. Host result read errors are reported in upgradeError.
 	LastError *string `json:"lastError"`
 
-	// State Agent upload activity only; idle does not indicate whether the host is running an upgrade. Unknown means the upload state is unavailable. An unreadable host result does not change this state.
+	// State Agent download and upload activity only; idle does not indicate whether the host is running an upgrade. Unknown means the upload state is unavailable. An unreadable host result does not change this state.
 	State ImageUploadStatusState `json:"state"`
 }
 
-// ImageUploadStatusState Agent upload activity only; idle does not indicate whether the host is running an upgrade. Unknown means the upload state is unavailable. An unreadable host result does not change this state.
+// ImageUploadStatusState Agent download and upload activity only; idle does not indicate whether the host is running an upgrade. Unknown means the upload state is unavailable. An unreadable host result does not change this state.
 type ImageUploadStatusState string
 
 // InspectionStatus defines model for InspectionStatus.

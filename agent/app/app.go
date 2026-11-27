@@ -16,6 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
+	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/pkg/opa"
 	"go.uber.org/zap"
 
@@ -205,6 +206,7 @@ func NewAgentServiceManager(cfg *config.Configuration, pool *store.Pool, console
 	if err != nil {
 		return nil, fmt.Errorf("initializing image upgrade service: %w", err)
 	}
+	imageUpgrade.WithConsole(consoleClient, uuid.MustParse(cfg.Agent.SourceID))
 	managerOpts = append(managerOpts, service.WithImageUpgradeService(imageUpgrade))
 	manager := service.NewServiceManager(cfg.Agent.DataFolder, managerOpts...)
 

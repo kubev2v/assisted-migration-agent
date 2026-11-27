@@ -3,8 +3,11 @@ package console
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 
 	"github.com/google/uuid"
 	v1 "github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -186,6 +189,54 @@ func (c *Client) UpdateSourceSubset(ctx context.Context, sourceID, subsetID uuid
 	default:
 		return fmt.Errorf("failed to update source subset: %s", resp.Status)
 	}
+}
+
+// GetImageUpgradeStatus asks the planner whether a newer appliance image is available
+// GET /api/v1/sources/{id}/image-upgrade-status
+func (c *Client) GetImageUpgradeStatus(ctx context.Context, sourceID uuid.UUID) (*agentAPI.ImageUpgradeStatus, error) {
+	resp, err := c.httpClient.GetImageUpgradeStatus(ctx, sourceID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	switch {
+	case resp.StatusCode >= 200 && resp.StatusCode < 300:
+		var status agentAPI.ImageUpgradeStatus
+		if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
+			return nil, fmt.Errorf("failed to decode image upgrade status: %w", err)
+		}
+		return &status, nil
+	case resp.StatusCode >= 400 && resp.StatusCode < 500:
+		return nil, serviceErrs.NewConsoleClientError(resp.StatusCode, resp.Status)
+	default:
+		return nil, fmt.Errorf("failed to get image upgrade status: %s", resp.Status)
+	}
+}
+
+// DownloadImage opens the presigned appliance image URL returned by GetImageUpgradeStatus.
+// The URL carries its own token, so no agent JWT is sent. The caller closes the body.
+func (c *Client) DownloadImage(ctx context.Context, imageURL string) (io.ReadCloser, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, imageURL, nil)
+	if err != nil {
+		return nil, errors.New("invalid image URL")
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		// Drop the URL from the error: it contains the download token.
+		var urlErr *url.Error
+		if errors.As(err, &urlErr) {
+			err = urlErr.Err
+		}
+		return nil, fmt.Errorf("failed to download image: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		_ = resp.Body.Close()
+		return nil, fmt.Errorf("failed to download image: %s", resp.Status)
+	}
+	return resp.Body, nil
 }
 
 func toSaaSStatus(state models.CollectorStateType) string {

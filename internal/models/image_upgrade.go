@@ -34,3 +34,10 @@ type ImageUpgradeStatus struct {
 	Upgrade        *ImageUpgradeResult `json:"upgrade"`
 	UpgradeError   *string             `json:"upgradeError"`
 }
+
+type ImageUpgradeLatest struct {
+	UpdateAvailable bool
+	LatestVersion   *string
+	Supported       bool
+	Reason          *string
+}
