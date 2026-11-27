@@ -331,6 +331,16 @@ SELECT
      FROM concerns WHERE "Category" IS NOT NULL AND "Category" != '') AS concern_categories,
     (SELECT COALESCE(list(DISTINCT app_name ORDER BY app_name), [])
      FROM vm_applications) AS applications,
+    (SELECT COALESCE(list(DISTINCT "OS according to the configuration file"
+            ORDER BY "OS according to the configuration file"), [])
+     FROM vinfo
+     WHERE "OS according to the configuration file" IS NOT NULL
+       AND "OS according to the configuration file" != '') AS os_configs,
+    (SELECT COALESCE(list(DISTINCT "OS according to the VMware Tools"
+            ORDER BY "OS according to the VMware Tools"), [])
+     FROM vinfo
+     WHERE "OS according to the VMware Tools" IS NOT NULL
+       AND "OS according to the VMware Tools" != '') AS os_tools,
     (SELECT COALESCE(map(list(key ORDER BY key), list(values ORDER BY key)), map())
      FROM metadata_values) AS metadata
 `
@@ -356,6 +366,8 @@ var vmOutputQuery = sq.Select(
 	`COALESCE(g.groups, [])::VARCHAR[] AS groups`,
 	`v."migration_excluded" AS migration_excluded`,
 	`COALESCE(CAST(v."labels" AS VARCHAR[]), [])::VARCHAR[] AS labels`,
+	`COALESCE(v."OS according to the configuration file", '') AS guest_name`,
+	`COALESCE(v."OS according to the VMware Tools", '') AS guest_name_from_vmware_tools`,
 ).From("vinfo v").
 	LeftJoin(`(SELECT "VM_ID", COUNT(*) AS issues_count FROM concerns GROUP BY "VM_ID") c ON v."VM ID" = c."VM_ID"`).
 	LeftJoin(`(SELECT "VM_ID", COUNT(*) AS critical_count FROM concerns WHERE "Category" = 'Critical' GROUP BY "VM_ID") crit ON v."VM ID" = crit."VM_ID"`).

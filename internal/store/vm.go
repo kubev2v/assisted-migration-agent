@@ -103,6 +103,8 @@ func (s *VMStore) List(ctx context.Context, filter sq.Sqlizer, opts ...ListOptio
 			&groups,
 			&migrationExcluded,
 			&labels,
+			&vm.GuestName,
+			&vm.GuestNameFromVmwareTools,
 			&vm.UtilizationCpuP95,
 			&vm.UtilizationMemP95,
 			&vm.UtilizationCpuMax,
@@ -337,8 +339,9 @@ func (s *VMStore) GetFilterOptions(ctx context.Context) (models.VMFilterOptions,
 	row := s.db.QueryRowContext(ctx, vmFilterOptionsQuery)
 
 	var clusters, datacenters, concernLabels, concernCategories, applications StringArray
+	var osConfigs, osTools StringArray
 	var metadata metadataMap
-	if err := row.Scan(&clusters, &datacenters, &concernLabels, &concernCategories, &applications, &metadata); err != nil {
+	if err := row.Scan(&clusters, &datacenters, &concernLabels, &concernCategories, &applications, &osConfigs, &osTools, &metadata); err != nil {
 		return models.VMFilterOptions{}, err
 	}
 
@@ -352,6 +355,8 @@ func (s *VMStore) GetFilterOptions(ctx context.Context) (models.VMFilterOptions,
 		ConcernLabels:     concernLabels,
 		ConcernCategories: concernCategories,
 		Applications:      applications,
+		OsConfigs:         osConfigs,
+		OsTools:           osTools,
 		Metadata:          values,
 	}, nil
 }

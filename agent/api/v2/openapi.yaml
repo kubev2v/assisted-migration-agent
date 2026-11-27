@@ -1887,6 +1887,7 @@ components:
         - diskSize
         - memory
         - issueCount
+        - guestName
       properties:
         name:
           type: string
@@ -1948,6 +1949,12 @@ components:
           description: User-defined labels for this VM
           x-oapi-codegen-extra-tags:
             binding: "omitempty,dive,min=1,max=100"
+        guestName:
+          type: string
+          description: Guest OS according to the VM configuration file (inventory os_config)
+        guestNameFromVmwareTools:
+          type: string
+          description: Guest OS reported by VMware Tools (inventory os_tools)
         utilization_cpu_p95:
           type: number
           format: double
@@ -2757,6 +2764,8 @@ components:
         - concernLabels
         - concernCategories
         - applications
+        - osConfigs
+        - osTools
         - metadata
       properties:
         metadata:
@@ -2791,6 +2800,16 @@ components:
           items:
             type: string
           description: Distinct detected application names
+        osConfigs:
+          type: array
+          items:
+            type: string
+          description: Distinct guest OS values from VM configuration (os_config)
+        osTools:
+          type: array
+          items:
+            type: string
+          description: Distinct guest OS values reported by VMware Tools (os_tools)
 
     VMLabelsResponse:
       type: object

@@ -87,6 +87,7 @@ func NewVirtualMachineFromSummary(vm models.VirtualMachineSummary) VirtualMachin
 		Migratable:        &vm.IsMigratable,
 		Template:          &vm.IsTemplate,
 		MigrationExcluded: &vm.MigrationExcluded,
+		GuestName:         vm.GuestName,
 	}
 
 	if len(vm.Groups) > 0 {
@@ -110,6 +111,10 @@ func NewVirtualMachineFromSummary(vm models.VirtualMachineSummary) VirtualMachin
 	result.UtilizationMemMax = vm.UtilizationMemMax
 	result.UtilizationDisk = vm.UtilizationDisk
 	result.UtilizationConfidence = vm.UtilizationConfidence
+
+	if vm.GuestNameFromVmwareTools != "" {
+		result.GuestNameFromVmwareTools = &vm.GuestNameFromVmwareTools
+	}
 
 	return result
 }

@@ -633,6 +633,12 @@ type VMFilterOptionsResponse struct {
 
 	// Metadata Distinct metadata values grouped by key, available for VM filtering.
 	Metadata map[string][]string `json:"metadata"`
+
+	// OsConfigs Distinct guest OS values from VM configuration (os_config)
+	OsConfigs []string `json:"osConfigs"`
+
+	// OsTools Distinct guest OS values reported by VMware Tools (os_tools)
+	OsTools []string `json:"osTools"`
 }
 
 // VMLabelsResponse defines model for VMLabelsResponse.
@@ -666,6 +672,12 @@ type VirtualMachine struct {
 
 	// Groups Names of groups this VM matches
 	Groups *[]string `json:"groups,omitempty"`
+
+	// GuestName Guest OS according to the VM configuration file (inventory os_config)
+	GuestName string `json:"guestName"`
+
+	// GuestNameFromVmwareTools Guest OS reported by VMware Tools (inventory os_tools)
+	GuestNameFromVmwareTools *string `json:"guestNameFromVmwareTools,omitempty"`
 
 	// Id VirtualMachine ID in vCenter
 	Id string `json:"id"`
