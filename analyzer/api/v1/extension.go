@@ -54,6 +54,13 @@ func NewVirtualMachineFromSummary(vm models.VirtualMachineSummary) VirtualMachin
 	result.UtilizationDisk = vm.UtilizationDisk
 	result.UtilizationConfidence = vm.UtilizationConfidence
 
+	if vm.GuestName != "" {
+		result.GuestName = &vm.GuestName
+	}
+	if vm.GuestNameFromVmwareTools != "" {
+		result.GuestNameFromVmwareTools = &vm.GuestNameFromVmwareTools
+	}
+
 	return result
 }
 

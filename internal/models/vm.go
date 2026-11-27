@@ -2,30 +2,32 @@ package models
 
 // VirtualMachineSummary represents a lightweight VM record for list views.
 type VirtualMachineSummary struct {
-	ID                     string
-	Name                   string
-	VCenterID              string
-	PowerState             string
-	Cluster                string
-	Datacenter             string
-	CpuCount               int32
-	Memory                 int32 // MB
-	DiskSize               int64 // MB (stored as MiB in DB, treated as MB)
-	IssueCount             int
-	IsMigratable           bool
-	IsTemplate             bool
-	InspectionStatus       InspectionStatus
-	InspectionConcernCount int
-	Groups                 []string
-	UtilizationCpuP95      *float64 // CPU utilization at p95 (%); nil when no utilization data
-	UtilizationMemP95      *float64 // Memory utilization at p95 (%); nil when no utilization data
-	UtilizationCpuMax      *float64 // CPU utilization at max (%); nil when no utilization data
-	UtilizationMemMax      *float64 // Memory utilization at max (%); nil when no utilization data
-	UtilizationDisk        *float64 // Disk utilization (%); nil when no utilization data
-	UtilizationConfidence  *float64 // Data confidence (%); nil when no utilization data
-	MigrationExcluded      bool
-	Labels                 []string
-	Tags                   []string
+	ID                       string
+	Name                     string
+	VCenterID                string
+	PowerState               string
+	Cluster                  string
+	Datacenter               string
+	CpuCount                 int32
+	Memory                   int32 // MB
+	DiskSize                 int64 // MB (stored as MiB in DB, treated as MB)
+	IssueCount               int
+	IsMigratable             bool
+	IsTemplate               bool
+	InspectionStatus         InspectionStatus
+	InspectionConcernCount   int
+	Groups                   []string
+	UtilizationCpuP95        *float64 // CPU utilization at p95 (%); nil when no utilization data
+	UtilizationMemP95        *float64 // Memory utilization at p95 (%); nil when no utilization data
+	UtilizationCpuMax        *float64 // CPU utilization at max (%); nil when no utilization data
+	UtilizationMemMax        *float64 // Memory utilization at max (%); nil when no utilization data
+	UtilizationDisk          *float64 // Disk utilization (%); nil when no utilization data
+	UtilizationConfidence    *float64 // Data confidence (%); nil when no utilization data
+	MigrationExcluded        bool
+	Labels                   []string
+	Tags                     []string
+	GuestName                string
+	GuestNameFromVmwareTools string
 }
 
 type VM struct {
@@ -187,6 +189,8 @@ type VMFilterOptions struct {
 	ConcernLabels     []string
 	ConcernCategories []string
 	Applications      []string
+	OsConfigs         []string
+	OsTools           []string
 	Metadata          map[string][]string
 }
 
