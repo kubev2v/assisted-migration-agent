@@ -17,7 +17,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/jzelinskie/cobrautil/v2 v2.0.0-20260922163232-4fb24ed00480
-	github.com/klauspost/compress v1.20.4
+	github.com/klauspost/compress v1.20.5
 	github.com/kubev2v/forklift v0.0.0-20261110114915-def3d784a934
 	github.com/kubev2v/migration-planner v0.28.1-0.20261122150649-30088d66428f
 	github.com/kubev2v/migration-planner-common/estimations v0.0.0-20261117165325-c91bbeaba346
