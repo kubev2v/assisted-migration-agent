@@ -26,6 +26,7 @@ var validSortFields = map[string]bool{
 	"ramUsage":     true,
 	"cpuAvg":       true,
 	"memAvg":       true,
+	"guestOs":      true,
 }
 
 const (

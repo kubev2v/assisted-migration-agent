@@ -84,6 +84,7 @@ func (s *VMStore) List(ctx context.Context, filter sq.Sqlizer, opts ...ListOptio
 		var groups StringArray
 		var migrationExcluded bool
 		var labels StringArray
+		var guestOsEffective string
 		err := rows.Scan(
 			&vm.ID,
 			&vm.Name,
@@ -105,6 +106,7 @@ func (s *VMStore) List(ctx context.Context, filter sq.Sqlizer, opts ...ListOptio
 			&labels,
 			&vm.GuestName,
 			&vm.GuestNameFromVmwareTools,
+			&guestOsEffective,
 			&vm.UtilizationCpuP95,
 			&vm.UtilizationMemP95,
 			&vm.UtilizationCpuMax,
@@ -765,6 +767,7 @@ func WithSort(sorts []SortParam) ListOption {
 		"diskUsage":    "disk_pct",
 		"cpuAvg":       "cpu_avg_pct",
 		"memAvg":       "mem_avg_pct",
+		"guestOs":      "guest_os",
 	}
 
 	// Utilization columns are nullable: always sort NULLs last regardless of direction.
