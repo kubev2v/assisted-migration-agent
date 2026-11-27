@@ -232,6 +232,7 @@ spec:
         value:
         - $(params.build-args[*])
         - "APPLIANCE_VERSION=on-pr-{{revision}}"
+        - PLANNER_AGENT_GIT_COMMIT=$(tasks.clone-repository.results.commit)
       - name: PRIVILEGED_NESTED
         value: $(params.privileged-nested)
       - name: SOURCE_URL

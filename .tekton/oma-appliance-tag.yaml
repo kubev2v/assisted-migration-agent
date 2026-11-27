@@ -231,6 +231,7 @@ spec:
         - "APPLIANCE_VERSION={{git_tag}}"
         - "BRANCH_TAG=prod"
         - "IMAGE_ENV=production"
+        - PLANNER_AGENT_GIT_COMMIT=$(tasks.clone-repository.results.commit)
       - name: PRIVILEGED_NESTED
         value: $(params.privileged-nested)
       - name: SOURCE_URL
