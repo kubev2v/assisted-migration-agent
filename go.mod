@@ -21,7 +21,7 @@ require (
 	github.com/kubev2v/forklift v0.0.0-20261110114915-def3d784a934
 	github.com/kubev2v/migration-planner v0.33.0
 	github.com/kubev2v/migration-planner-common/estimations v0.0.0-20261117165325-c91bbeaba346
-	github.com/kubev2v/vm-migration-detective v0.0.0-20261110092334-17a1481816aa
+	github.com/kubev2v/vm-migration-detective v0.0.0-20261124153838-859bc76ef369
 	github.com/oapi-codegen/gin-middleware v1.2.1
 	github.com/oapi-codegen/runtime v1.9.1
 	github.com/onsi/ginkgo/v2 v2.34.0
@@ -61,6 +61,10 @@ require (
 	github.com/Masterminds/semver/v3 v3.5.0 // indirect
 	github.com/Microsoft/go-winio v0.6.4 // indirect
 	github.com/ProtonMail/go-crypto v1.5.2 // indirect
+	github.com/Velocidex/json v0.0.0-20220224052537-92f3c0326e5a // indirect
+	github.com/Velocidex/ordereddict v0.0.0-20250821063524-02dc06e46238 // indirect
+	github.com/Velocidex/pkcs7 v0.0.0-20210524015001-8d1eee94a157 // indirect
+	github.com/Velocidex/yaml/v2 v2.2.8 // indirect
 	github.com/VividCortex/ewma v1.2.0 // indirect
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
 	github.com/agnivade/levenshtein v1.2.2 // indirect
@@ -150,6 +154,7 @@ require (
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/go-version v1.9.0 // indirect
+	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
@@ -323,6 +328,9 @@ require (
 	sigs.k8s.io/structured-merge-diff/v6 v6.4.2 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 	tags.cncf.io/container-device-interface v1.1.1 // indirect
+	www.velocidex.com/golang/binparsergen v0.1.1-0.20201101234514-bbdb29f9ee31 // indirect
+	www.velocidex.com/golang/evtx v0.2.0 // indirect
+	www.velocidex.com/golang/go-pe v0.1.1-0.20211006062218-8f6d1ad6b2d5 // indirect
 )
 
 replace github.com/go-ini/ini => gopkg.in/ini.v1 v1.68.0
