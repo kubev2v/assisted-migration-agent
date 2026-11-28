@@ -37,7 +37,7 @@ require (
 	github.com/vmware/govmomi v0.52.0
 	github.com/xuri/excelize/v2 v2.11.1
 	go.podman.io/common v0.70.0
-	go.podman.io/podman/v6 v6.2.0
+	go.podman.io/podman/v6 v6.2.1
 	go.uber.org/zap v1.28.0
 	golang.org/x/crypto v0.59.0
 	golang.org/x/mod v0.42.0
